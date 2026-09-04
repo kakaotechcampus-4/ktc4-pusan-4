@@ -1,0 +1,2 @@
+backend/gradlew text eol=lf
+backend/gradlew.bat text eol=crlf
