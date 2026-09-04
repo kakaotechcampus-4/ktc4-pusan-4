@@ -40,7 +40,15 @@ bash ./backend/gradlew -p backend bootRun --args='--spring.profiles.active=local
 
 ## 테스트
 
-단위 테스트는 `src/test/java`, PostgreSQL이 필요한 통합 테스트는 `src/integrationTest/java`에 둡니다.
+모든 테스트는 Gradle 표준 경로인 `src/test/java`에 둡니다. 실행 속도와 외부 인프라 의존성을 기준으로 실행 명령만 분리합니다.
+
+| 종류 | 클래스명 | 실행 명령 | Docker |
+| --- | --- | --- | --- |
+| 단위 테스트 | `*Test` (`*IntegrationTest` 제외) | `test` | 불필요 |
+| 통합 테스트 | `*IntegrationTest` | `integrationTest` | 필요 |
+| 전체 검증 | 위 테스트 전체 | `check` | 필요 |
+
+순수한 도메인 규칙, 계산, 검증과 변환은 단위 테스트로 작성합니다. PostgreSQL, JPA, Flyway, 트랜잭션 또는 전체 Spring 구성이 필요한 검증은 통합 테스트로 작성합니다. 애플리케이션 전체를 검증하는 통합 테스트는 `com.ktc4.pusan4.integration` 패키지에 둡니다.
 
 ```powershell
 .\backend\gradlew.bat -p backend test
@@ -48,7 +56,15 @@ bash ./backend/gradlew -p backend bootRun --args='--spring.profiles.active=local
 .\backend\gradlew.bat -p backend check
 ```
 
-`integrationTest`와 `check`는 Docker가 실행 중이어야 합니다. CI도 단위 테스트와 통합 테스트를 별도 단계로 실행합니다.
+`test`와 `integrationTest`는 같은 테스트 소스셋을 사용하므로 모두 함께 컴파일되지만 클래스명으로 실행 대상을 나눕니다. 새로운 통합 테스트는 클래스명을 `*IntegrationTest`로 작성해야 CI의 통합 테스트 단계에서 실행됩니다.
+
+통합 테스트는 로컬 `compose.yaml`의 DB를 사용하지 않습니다. Testcontainers가 테스트 전용 PostgreSQL을 임의 포트에 생성하고, `@ServiceConnection`이 접속 정보를 Spring Boot에 전달하며, 테스트가 끝나면 컨테이너를 제거합니다. 현재 `BackendApplicationIntegrationTest`는 다음을 검증합니다.
+
+1. Spring 애플리케이션이 실제 PostgreSQL과 함께 기동되는지
+2. `/actuator/health`가 `UP`을 반환하는지
+3. Flyway가 `flyway_schema_history` 테이블을 생성하는지
+
+`integrationTest`와 `check`를 실행하기 전에는 Docker가 실행 중이어야 합니다. CI는 `test` 다음 `integrationTest`를 실행하며, 특정 클래스를 지정하지 않으므로 이후 추가되는 `*IntegrationTest`도 자동으로 포함합니다. 현재는 도메인 단위 테스트가 없어 `test`가 `NO-SOURCE`로 완료됩니다.
 
 ## 코드 구성
 

@@ -27,36 +27,26 @@ dependencies {
     runtimeOnly("org.postgresql:postgresql")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation("org.springframework.boot:spring-boot-testcontainers")
+    testImplementation("org.testcontainers:junit-jupiter")
+    testImplementation("org.testcontainers:postgresql")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-}
-
-val integrationTest by sourceSets.creating {
-    java.srcDir("src/integrationTest/java")
-    resources.srcDir("src/integrationTest/resources")
-    compileClasspath += sourceSets.main.get().output
-    runtimeClasspath += output + compileClasspath
-}
-
-configurations[integrationTest.implementationConfigurationName]
-    .extendsFrom(configurations.testImplementation.get())
-configurations[integrationTest.runtimeOnlyConfigurationName]
-    .extendsFrom(configurations.testRuntimeOnly.get())
-
-dependencies {
-    add("integrationTestImplementation", "org.springframework.boot:spring-boot-testcontainers")
-    add("integrationTestImplementation", "org.testcontainers:junit-jupiter")
-    add("integrationTestImplementation", "org.testcontainers:postgresql")
 }
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
 }
 
+tasks.test {
+    exclude("**/*IntegrationTest.class")
+}
+
 val integrationTestTask = tasks.register<Test>("integrationTest") {
     description = "Runs integration tests."
     group = LifecycleBasePlugin.VERIFICATION_GROUP
-    testClassesDirs = integrationTest.output.classesDirs
-    classpath = integrationTest.runtimeClasspath
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    include("**/*IntegrationTest.class")
     shouldRunAfter(tasks.test)
 }
 

@@ -1,4 +1,4 @@
-package com.ktc4.pusan4;
+package com.ktc4.pusan4.integration;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
