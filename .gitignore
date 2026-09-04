@@ -62,6 +62,7 @@ venv/
 # ── Java / Kotlin / Gradle ──────────────────────────
 target/
 .gradle/
+/backend/bin/
 *.class
 *.jar
 !**/gradle/wrapper/gradle-wrapper.jar
