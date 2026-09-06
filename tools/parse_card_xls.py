@@ -23,6 +23,7 @@ import argparse
 import csv
 import re
 import sys
+from collections import Counter
 from pathlib import Path
 
 try:
@@ -37,7 +38,7 @@ except Exception:  # noqa: BLE001
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_OUT = ROOT / "data" / "sample.csv"
-OUT_FIELDS = ["raw_merchant", "amount", "biz_no", "memo", "source_card"]
+OUT_FIELDS = ["raw_merchant", "amount", "biz_no", "memo", "source_card", "is_aggregated"]
 
 MAGIC_OLE = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
 
@@ -78,9 +79,16 @@ KB_COL = {
 }
 
 # ---------------------------------------------------------------- 공통 규칙
-# 할인 행은 사업자번호가 없다. biz_no 없음 AND 상호가 '할인'으로 끝남 -> 제외.
-# ('○○할인마트'는 biz_no 가 있으므로 걸리지 않는다)
-DISCOUNT_TAIL_RE = re.compile(r"할인$")
+# ── 비거래 항목 ────────────────────────────────────────────
+# 지출이 아니라 카드사가 만든 정산 행이다. 전부 사업자번호가 없다.
+# '할인으로 끝남' 만으로는 '포인트사용' 을 못 잡아서 목록을 명시한다.
+# biz_no 가 있으면 제외하지 않는다 ('○○할인마트' 는 실제 가맹점이다).
+NON_TRANSACTION_RE = re.compile(r"^(정상할인|포인트사용|.*할인)$")
+
+# ── 합산 건 ────────────────────────────────────────────────
+# 카드사가 여러 승인을 하나로 묶어 만든 행. 개별 거래가 아니고
+# 가맹점도 특정되지 않는다. 제외하지 않고 표시만 한다 (여비교통 후보).
+AGGREGATED_RE = re.compile(r"^(교통[-_]|지하철[-_]|버스[-_]|시외버스[-_])")
 CANCEL_RE = re.compile(r"취소")
 
 MEDICAL_RE = re.compile(r"(병원|의원|약국|한의원|치과|의료원|보건소)")
@@ -107,6 +115,8 @@ def norm_bizno(text: str) -> str:
 
 
 def detect_format(path: Path) -> str:
+    if path.suffix.lower() in (".txt", ".list"):
+        return "teammate"
     head = path.open("rb").read(8)
     if head.startswith(MAGIC_OLE):
         return "kb"
@@ -123,10 +133,12 @@ class Stats:
         self.discount = 0
         self.no_amount = 0
         self.foreign_ccy = 0
+        self.aggregated = 0
         self.kept = 0
         self.per_card: dict[str, int] = {}
         self.cancel_samples: list[str] = []
         self.discount_samples: list[str] = []
+        self.aggregated_samples: Counter = Counter()
         # 의료 마스킹: 원본 식별자 -> 의료_마스킹_NN (같은 병원은 같은 번호)
         self.medical_map: dict[str, str] = {}
 
@@ -137,7 +149,11 @@ class Stats:
         return self.medical_map[key]
 
 
-def make_row(st: Stats, merchant: str, amount: int, biz_no: str, memo: str, card: str) -> dict:
+def make_row(st: Stats, merchant: str, amount, biz_no: str, memo: str, card: str) -> dict:
+    aggregated = bool(AGGREGATED_RE.match(merchant))
+    if aggregated:
+        st.aggregated += 1
+        st.aggregated_samples[merchant] += 1
     if MEDICAL_RE.search(merchant):
         merchant = st.mask_medical(merchant, biz_no)
         biz_no = ""   # 사업자번호가 남으면 어느 병원인지 역추적된다
@@ -150,12 +166,13 @@ def make_row(st: Stats, merchant: str, amount: int, biz_no: str, memo: str, card
         "biz_no": biz_no,
         "memo": memo,
         "source_card": card,
+        "is_aggregated": "true" if aggregated else "",
     }
 
 
 def skip_common(st: Stats, merchant: str, biz_no: str, status_fields: list[str], amt_text: str) -> bool:
     """할인·취소 행을 걸러낸다. True 면 버린다."""
-    if not biz_no and DISCOUNT_TAIL_RE.search(merchant):
+    if not biz_no and NON_TRANSACTION_RE.match(merchant):
         st.discount += 1
         if len(st.discount_samples) < 5:
             st.discount_samples.append(merchant)
@@ -246,6 +263,21 @@ def extract_kb(path: Path, st: Stats) -> list[dict]:
     return out
 
 
+# ---------------------------------------------------------------- 텍스트 목록
+def extract_txt(path: Path, st: Stats) -> list[dict]:
+    """가맹점명 한 컬럼짜리 목록. 금액·날짜·사업자번호가 없다."""
+    out = []
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        merchant = line.strip()
+        if not merchant or merchant.startswith("#"):
+            continue
+        st.total += 1
+        if skip_common(st, merchant, "", [], ""):
+            continue
+        out.append(make_row(st, merchant, "", "", "", "teammate"))
+    return out
+
+
 # ---------------------------------------------------------------- main
 def main() -> int:
     ap = argparse.ArgumentParser()
@@ -253,7 +285,8 @@ def main() -> int:
     ap.add_argument("-o", "--out", default=str(DEFAULT_OUT))
     args = ap.parse_args()
 
-    paths = [Path(p) for p in args.inputs] or sorted((ROOT / "data").glob("*.xls"))
+    paths = [Path(p) for p in args.inputs] or (
+        sorted((ROOT / "data").glob("*.xls")) + sorted((ROOT / "data").glob("*.txt")))
     if not paths:
         sys.exit("입력 .xls 가 없습니다. data/ 에 카드 내역 파일을 넣어주세요.")
 
@@ -265,6 +298,8 @@ def main() -> int:
             got = extract_ibk(p, st)
         elif fmt == "kb":
             got = extract_kb(p, st)
+        elif fmt == "teammate":
+            got = extract_txt(p, st)
         else:
             print("%s: 형식 판별 실패 — 건너뜀" % p.name)
             continue
@@ -292,6 +327,7 @@ def report(st: Stats, rows: list[dict], out: Path) -> None:
     print("  취소 제외     %d" % st.cancelled)
     print("  할인 제외     %d" % st.discount)
     print("  외화전용 제외 %d" % st.foreign_ccy)
+    print("  합산 건 표시   %d  (제외하지 않음)" % st.aggregated)
     print("  금액 파싱실패 %d" % st.no_amount)
     print("  의료 마스킹   %d개 상호 (%s)" % (
         len(st.medical_map), ", ".join(sorted(st.medical_map.values())) or "-"))
@@ -305,6 +341,11 @@ def report(st: Stats, rows: list[dict], out: Path) -> None:
 
     if st.discount_samples:
         print("\n  할인 제외 샘플: " + ", ".join(st.discount_samples))
+    if st.aggregated_samples:
+        print("")
+        print("  합산 건 (is_aggregated=true):")
+        for m, c in st.aggregated_samples.most_common(10):
+            print("    %-18s %d건" % (m, c))
     if st.cancel_samples:
         print("  취소 제외 목록:")
         for s in st.cancel_samples:
