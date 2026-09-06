@@ -1,0 +1,107 @@
+version: 1
+encoding_fix: cp949_to_utf8
+
+# ─────────────────────────────────────────────────────────────
+# 키 전략 — 3트랙. 위에서부터 먼저 걸리는 트랙이 norm_key 를 정한다.
+#
+#   1) 사업자번호가 있으면 그것이 키다. 상호명이 절단되든 지점이 바뀌든
+#      같은 사업장은 같은 번호다. 실측: 1상호=여러 사업자번호 0건.
+#   2) 해외 결제는 사업자번호가 없고 문자열 규칙(지점명·법인 표기)도
+#      의미가 없다. 별도 정규화로 보낸다.
+#   3) 그 외는 문자열 정규화.
+# ─────────────────────────────────────────────────────────────
+key_strategy:
+  - { track: 1, id: bizno,    when: has_bizno,   key: biz_no }
+  - { track: 2, id: overseas, when: is_overseas, key: overseas_norm }
+  - { track: 3, id: string,   when: default,     key: string_norm }
+
+detect:
+  # EUC-KR 20바이트에 '정확히' 닿으면 카드사가 잘라낸 것으로 본다.
+  # 카드사가 20에서 자르므로 그보다 긴 문자열은 오지 않는다.
+  # '이상'으로 두면 20을 넘는 정상 입력까지 절단으로 오판한다.
+  # 실측: 12개 상호가 정확히 20바이트.
+  truncation:
+    encoding: euc-kr
+    max_bytes: 20
+    mode: at_limit
+  # 해외 결제 판정: 영문 위주 + 사업자번호 없음.
+  # 사업자번호가 있으면 국내 가맹점이므로 무조건 트랙 1로 간다.
+  overseas:
+    require_no_bizno: true
+    ascii_letter_ratio_min: 0.5
+
+steps:
+  - id: trim_normalize_space
+  - id: fullwidth_to_halfwidth
+
+  # 절단 감지는 원문 길이로 판단해야 하므로 문자를 지우기 전에 둔다.
+  - id: detect_truncation
+
+  # ★ strip_corp 가 strip_special 보다 먼저다.
+  #   순서가 반대면 "(주)" 의 괄호가 먼저 사라져 패턴이 빗나가고
+  #   "주우아한형제들" 같은 키가 만들어진다.
+  - id: strip_corp
+    patterns:
+      - "\\(주\\)"
+      - "\\(유\\)"
+      - "㈜"
+      - "주식회사"
+      - "유한회사"
+      - "코리아(?=\\s|$)"
+      - "KOREA(?=\\s|$)"
+
+  # '*' 는 결제대행사와 서비스명의 경계다. 어느 쪽이 PG인지는
+  # 문자열만으로 결정되지 않으므로(ANTHROPIC*CLA 는 앞이 서비스명,
+  # PYU*Amazon 은 앞이 PG) 양쪽 토큰을 모두 보존한다.
+  - id: split_asterisk
+    join: "|"
+
+  - id: strip_special
+    chars: "[.*#/&,'\"()\\[\\]_~\\\\]"
+  - id: upper_ascii
+
+  # 절단된 문자열에는 적용하지 않는다. 뒤가 이미 잘려나갔으므로
+  # 지점명 제거 규칙이 엉뚱한 글자를 먹는다.
+  - id: strip_branch
+    skip_if_truncated: true
+    min_keep: 2
+    patterns:
+      # 1) 공백으로 분리된 지점 토큰      "GS25 역삼점" -> "GS25"
+      - "\\s+[가-힣A-Z0-9]+점$"
+      # 2) 영문·숫자 뒤에 붙은 지점 토큰   "GS25부산의대학사점" -> "GS25"
+      - "(?<=[A-Z0-9])[가-힣]+점$"
+      # 3) 한글만으로 된 지점 토큰. min_keep 에 걸리면 적용하지 않는다.
+      #    "롯데리아양산부산대점" 은 전부 한글이라 여기서 통째로 사라지므로
+      #    보호되고, 아래 4)만 적용된다.
+      - "[가-힣]{2,}점$"
+      # 4) 마지막 안전판 — 표기어만 제거
+      - "(지점|매장|영업소)$"
+      # 5) 점포번호
+      - "\\d{3,}$"
+
+  - id: protect_exceptions
+  - id: drop_space
+
+# 이 토큰이 입력에 있었으면 결과에도 남아 있어야 한다.
+# 사라지면 축약 직전 값으로 되돌린다.
+exceptions:
+  - 쿠팡이츠        # 쿠팡(온라인쇼핑)과 다른 가맹점이다
+  - 이마트24        # 이마트(대형마트)와 다른 가맹점이다
+  - GS25            # 지에스더프레시·GS칼텍스와 구분
+  - 이마트에브리데이
+  - 세븐일레븐
+  - 배민스토어      # 배달의민족과 정산 주체가 다르다
+
+test_cases:
+  - { in: "스타벅스코리아 강남대로점", out: "스타벅스" }
+  - { in: "GS25 역삼점", out: "GS25" }
+  - { in: "GS25부산의대학사점", out: "GS25" }
+  - { in: "(주)우아한형제들", out: "우아한형제들" }
+  - { in: "이마트24 성수점", out: "이마트24" }
+  - { in: "지에스25 국제외고점", out: "지에스25" }
+  - { in: "코레일유통주식회사(", out: "코레일유통" }
+  # 절단된 문자열은 지점명 제거를 하지 않는다
+  - { in: "하이오커피 해운대 우", out: "하이오커피해운대우" }
+  # 별표 양쪽 토큰 보존
+  - { in: "ANTHROPIC* CLA", out: "ANTHROPIC|CLA" }
+  - { in: "PYU*Amazon Seller Serv", out: "PYU|AMAZONSELLERSERV" }

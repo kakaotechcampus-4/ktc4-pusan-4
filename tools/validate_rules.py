@@ -92,74 +92,10 @@ class Report:
 
 
 # ---------------------------------------------------------------- 정규화 엔진
-class Normalizer:
-    """normalize.yaml 을 그대로 실행한다. 엔진 코드와 동일한 결과를 내야 한다."""
-
-    def __init__(self, spec: dict) -> None:
-        self.spec = spec or {}
-        self.steps = self.spec.get("steps") or []
-        self.exceptions = set(self.spec.get("exceptions") or [])
-        self._exception_keys = {self._bare(e) for e in self.exceptions}
-
-    @staticmethod
-    def _bare(s: str) -> str:
-        return re.sub(r"[\s.\-*#/&,'\"()\[\]]", "", str(s)).upper()
-
-    @staticmethod
-    def step_trim_normalize_space(s: str, _step: dict) -> str:
-        return re.sub(r"\s+", " ", s).strip()
-
-    @staticmethod
-    def step_upper_ascii(s: str, _step: dict) -> str:
-        return "".join(c.upper() if c.isascii() else c for c in s)
-
-    @staticmethod
-    def step_strip_special(s: str, step: dict) -> str:
-        chars = step.get("chars", r"[.\*#/&,'\"()\[\]_~\\|]")
-        return re.sub(chars, "", s)
-
-    @staticmethod
-    def step_fullwidth_to_halfwidth(s: str, _step: dict) -> str:
-        return unicodedata.normalize("NFKC", s)
-
-    @staticmethod
-    def _strip_patterns(s: str, step: dict) -> str:
-        for pat in step.get("patterns") or []:
-            s = re.sub(pat, "", s)
-        return s.strip()
-
-    def step_strip_corp(self, s: str, step: dict) -> str:
-        return self._strip_patterns(s, step)
-
-    def step_strip_branch(self, s: str, step: dict) -> str:
-        prev = None
-        # 지점 표기가 겹쳐 붙는 경우가 있어 더 줄어들지 않을 때까지 반복
-        while prev != s:
-            prev = s
-            s = self._strip_patterns(s, step)
-        return s
-
-    @staticmethod
-    def step_drop_space(s: str, _step: dict) -> str:
-        return s.replace(" ", "")
-
-    SKIP_FOR_EXCEPTIONS = {"strip_corp", "strip_branch"}
-
-    def normalize(self, raw: str) -> str:
-        s = str(raw)
-        is_exception = self._bare(s) in self._exception_keys
-        for step in self.steps:
-            sid = step.get("id")
-            fn = getattr(self, "step_" + str(sid), None)
-            if fn is None:
-                raise ValueError("normalize.yaml: 알 수 없는 step id '%s'" % sid)
-            if is_exception and sid in self.SKIP_FOR_EXCEPTIONS:
-                continue
-            s = fn(s, step)
-            # 축약 전 형태가 예외일 수 있으므로 매 스텝 후 다시 확인
-            if not is_exception and self._bare(s) in self._exception_keys:
-                is_exception = True
-        return s.strip()
+# 구현은 tools/normalize.py 한 곳뿐이다. 여기서 다시 만들면 사전의 norm_key 와
+# 엔진 결과가 조용히 갈라진다.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from normalize import Normalizer  # noqa: E402
 
 
 def load_yaml(path: Path):
@@ -201,7 +137,7 @@ def check_normalize_spec(rep: Report, spec):
     ok = 0
     for c in cases:
         try:
-            got = norm.normalize(c["in"])
+            got = norm.string_key(c["in"])
         except Exception as e:  # noqa: BLE001
             rep.error("test_case 실행 실패 in=%r: %s" % (c.get("in"), e))
             continue
@@ -246,7 +182,7 @@ def check_seed(rep: Report, rows, norm):
         if cat not in CATEGORY_ENUM:
             rep.error("line %d: category '%s' 가 enum 밖 (norm_key=%s)" % (i, cat, key))
         if norm is not None:
-            got = norm.normalize(key)
+            got = norm.string_key(key)
             if got != key:
                 rep.error("line %d: norm_key 가 정규화 결과와 다름 '%s' -> '%s'" % (i, key, got))
     if len(rep.errors) == n0:
@@ -354,6 +290,40 @@ def check_rulecards(rep: Report):
         rep.info("룰카드 %d장 검사 통과" % len(files))
 
 
+
+# 문서에 마스킹 안 된 식별번호가 남는 것을 막는다.
+# 이 repo 는 public 이고, 리포트는 카드 내역에서 자동 생성된다.
+# (정규식에 백슬래시를 쓰지 않는다 — 문자 클래스로 충분하고 이스케이프 사고가 없다)
+DOC_LEAK_PATTERNS = [
+    ("사업자번호", "[0-9]{3}-[0-9]{2}-[0-9]{5}", "107-86-***47 처럼 마스킹할 것"),
+    ("카드번호", "[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{4}", "문서에 카드번호를 쓰지 말 것"),
+    ("계좌번호", "[0-9]{6}-[0-9]{2}-[0-9]{6}", "문서에 계좌번호를 쓰지 말 것"),
+]
+# 마스킹된 형태는 통과시킨다
+DOC_ALLOW = re.compile("[0-9]{3}-[0-9]{2}-[*]{3}[0-9]{2}")
+
+
+def check_docs(rep: Report) -> None:
+    print("[문서] docs/*.md 마스킹 검사")
+    docs = sorted((ROOT / "docs").glob("*.md"))
+    if not docs:
+        rep.info("SKIP - docs/*.md 없음")
+        return
+    n0 = len(rep.errors)
+    for f in docs:
+        text = f.read_text(encoding="utf-8")
+        for lineno, line in enumerate(text.splitlines(), start=1):
+            masked_spans = [m.span() for m in DOC_ALLOW.finditer(line)]
+            for label, pat, hint in DOC_LEAK_PATTERNS:
+                for m in re.finditer(pat, line):
+                    if any(s <= m.start() and m.end() <= e for s, e in masked_spans):
+                        continue
+                    rep.error("%s:%d 마스킹 안 된 %s '%s' - %s"
+                              % (f.name, lineno, label, m.group(0), hint))
+    if len(rep.errors) == n0:
+        rep.info("문서 %d개 통과" % len(docs))
+
+
 # ---------------------------------------------------------------- main
 def main() -> int:
     ap = argparse.ArgumentParser()
@@ -365,7 +335,7 @@ def main() -> int:
     if args.normalize:
         if nspec is None:
             sys.exit("normalize.yaml 이 아직 없다")
-        print(Normalizer(nspec).normalize(args.normalize))
+        print(Normalizer(nspec).string_key(args.normalize))
         return 0
 
     rep = Report()
@@ -375,6 +345,7 @@ def main() -> int:
     check_pg_vs_seed(rep, load_yaml(PG_BLOCKLIST_YAML), rows)
     check_seed(rep, rows, norm)
     check_rulecards(rep)
+    check_docs(rep)
     print()
     return rep.dump()
 
