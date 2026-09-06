@@ -62,9 +62,10 @@ venv/
 # ── Java / Kotlin / Gradle ──────────────────────────
 target/
 .gradle/
+/backend/bin/
 *.class
 *.jar
-!gradle/wrapper/gradle-wrapper.jar
+!**/gradle/wrapper/gradle-wrapper.jar
 
 # ── 기타 ────────────────────────────────────────────
 *.sqlite3
