@@ -38,7 +38,12 @@ KEYWORD_YAML = ROOT / "rules" / "keyword_rules.yaml"
 REPORT_MD = ROOT / "docs" / "keyword_rules_report.md"
 
 # 짧아서 엉뚱한 상호를 잡을 수 있는 패턴. 리포트에서 무엇을 잡았는지 항상 보여준다.
-WATCH_PATTERNS = ["KT\\b", "CU\\b", "커피", "스팀|STEAM", "다이소", "쿠팡", "GCP", "빵"]
+WATCH_PATTERNS = ["KT\\b", "CU\\b", "커피", "스팀|STEAM", "다이소", "쿠팡", "GCP", "빵",
+                  "노래", "헤어", "짐$"]
+
+# PM 회신으로 새로 만든 카테고리. 직전에 uncertain 이던 것들이 여기로 얼마나
+# 넘어왔는지 리포트에 따로 보여준다.
+NEW_CATEGORIES = ["게임", "구독서비스", "여가", "미용", "생활용품"]
 
 
 class KeywordRules:
@@ -262,7 +267,34 @@ def build_report(kw: KeywordRules, pg, norm) -> str:
     a("enum 에 여가·미용 카테고리가 없어서 룰을 만들지 않았다 — "
       "억지로 `기타` 로 넣으면 분류된 척만 하고 되묻기는 그대로 발생한다.")
     a("")
-    a("## 7. PM 판단 필요")
+    a("## 7. 새 카테고리가 회수한 건")
+    a("")
+    a("PM 회신으로 enum 에 5종(게임·구독서비스·여가·미용·생활용품)을 추가했다.")
+    a("업종 세분화가 아니라 **G2(사업관련성)에서 다르게 처리되는지** 를 기준으로 나눈 것이고,")
+    a("노래방·PC방·볼링은 세무 판정이 같아서 `여가` 하나로 묶었다.")
+    a("")
+    new_hit = [(raw, res) for raw, _s, res in hit if res["category"] in NEW_CATEGORIES]
+    new_uniq: dict[str, str] = {}
+    for raw, res in new_hit:
+        new_uniq.setdefault(raw, res["category"])
+    a("| 카테고리 | 건수 | 유니크 상호 |")
+    a("|---|---:|---:|")
+    for c in NEW_CATEGORIES:
+        rows_c = [x for x in new_hit if x[1]["category"] == c]
+        uq = len({x[0] for x in rows_c})
+        a("| %s | %d | %d |" % (c, len(rows_c), uq))
+    a("| **합계** | **%d** | **%d** |" % (len(new_hit), len(new_uniq)))
+    a("")
+    a("추가 전 `uncertain` 이던 상호 중 **%d개**가 여기로 넘어왔다." % len(new_uniq))
+    a("`기타` 로 흡수하지 않은 이유가 여기서 보인다 — `기타` 였다면 분류된 척만 하고")
+    a("되묻기는 그대로 발생했다.")
+    a("")
+    a("| 상호 | 분류 |")
+    a("|---|---|")
+    for raw, c in sorted(new_uniq.items(), key=lambda x: (x[1], x[0])):
+        a("| `%s` | %s |" % (nz.md(anon.label(raw)), c))
+    a("")
+    a("## 8. PM 판단 필요")
     a("")
     for q in kw.spec.get("open_questions") or []:
         a("### %s" % q.get("item"))
