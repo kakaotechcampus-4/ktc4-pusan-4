@@ -270,11 +270,26 @@ class Normalizer:
         return self.run_pipeline(raw)[0]
 
 
+PG_YAML = ROOT / "rules" / "pg_blocklist.yaml"
+
+
 def load() -> Normalizer:
     if not NORMALIZE_YAML.exists():
         sys.exit("rules/normalize.yaml 이 없습니다")
     with NORMALIZE_YAML.open(encoding="utf-8") as f:
-        return Normalizer(yaml.safe_load(f))
+        spec = yaml.safe_load(f)
+    # PG 힌트의 정식 출처는 rules/pg_blocklist.yaml 이다.
+    # 두 파일에 목록을 따로 두면 한쪽만 고쳐지고 갈라진다.
+    if PG_YAML.exists():
+        with PG_YAML.open(encoding="utf-8") as f:
+            pg = yaml.safe_load(f) or {}
+        pats = [p.get("match") for p in (pg.get("patterns") or []) if p.get("match")]
+        PG_SAFE_PATTERNS[:] = pats
+        if pats:
+            for step in spec.get("steps") or []:
+                if step.get("id") == "split_delimiters":
+                    step["pg_hints"] = pats
+    return Normalizer(spec)
 
 
 # ------------------------------------------------------------------ 자체 테스트
@@ -356,6 +371,8 @@ class Anon:
         tok = tok.strip()
         if not tok or is_non_merchant(tok):
             return tok
+        if any(re.search(p, tok, re.I) for p in PG_SAFE_PATTERNS):
+            return tok      # PG 상호. 가릴 것이 없다
         m = re.search(NATIONAL_BRANDS, tok, re.I)
         if m:
             # 브랜드와 정확히 같으면 그대로 둔다. 뒤에 뭐가 붙어 있으면 지운다.
@@ -741,8 +758,13 @@ NATIONAL_BRANDS = (
 # (지점명이 아닌데 지우면 리포트가 "토스***_요기요" 처럼 읽을 수 없게 된다)
 BRAND_SAFE_SUFFIX = (
     "페이|페이먼츠|PAY|닷컴|COM|전자|정보통신|통신|유통|리테일|코리아|공사|복지단|비전|"
-    "도시락|커피|클럽|선물하기|스토어|스쿨|대학|라빈스|스토리|그룹|홀딩스|서비스|본점"
+    "도시락|커피|클럽|선물하기|스토어|스쿨|대학|라빈스|스토리|그룹|홀딩스|서비스|본점|플레이"
 )
+
+# PG 이름은 익명화하지 않는다. 결제대행사 상호에는 지점·생활권 정보가 없고,
+# 가려버리면 리포트에서 어느 PG 인지 알 수 없어 쓸모가 없어진다.
+# rules/pg_blocklist.yaml 이 로드될 때 채워진다.
+PG_SAFE_PATTERNS: list = []
 
 # 가맹점이 아닌 행. 카드사가 만든 정산·합산·마스킹 라벨이라 그대로 써도 된다.
 NON_MERCHANT = "^(교통|버스|지하철|시외버스|정상할인|포인트사용|의료_?마스킹|.*할인$)"
