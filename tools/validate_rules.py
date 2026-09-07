@@ -8,7 +8,8 @@
     python tools/validate_rules.py --normalize "스타벅스코리아 강남대로점"
 
 검사 항목
-  C1. merchant_seed.csv 의 norm_key == normalize.yaml 적용 결과
+  C1. merchant_seed.csv 스키마 — raw_merchant/category 필수,
+      norm_key/merchant_norm 금지 (정규화 엔진 이중화 방지)
   C2. 사전/키워드룰에 verdict / account 컬럼(키)이 없는가
   C3. category 값이 전부 enum 안에 있는가
   C4. PG 블록리스트에 걸리는 문자열이 사전에 들어가 있지 않은가
@@ -17,7 +18,7 @@
         - type: learned 인데 gate: G1
         - type: learned 인데 citations 가 비어있지 않음
         - citations 의 verified: false 인데 id 가 TODO 가 아님 (그 반대도)
-  C6. norm_key 중복 / merchant_seed 스키마
+  C6. 같은 raw_merchant 에 다른 category 가 붙었는지
 
 아직 만들지 않은 파일은 SKIP 으로 표시하고 통과시킨다.
 """
@@ -60,7 +61,13 @@ CATEGORY_ENUM = [
 # 사전·키워드룰에 절대 들어오면 안 되는 키 (판정은 룰카드 소관)
 FORBIDDEN_KEYS = {"verdict", "account", "판정", "계정과목", "계정", "deductible"}
 
-SEED_REQUIRED_COLS = ["norm_key", "merchant_norm", "category", "source", "note"]
+SEED_REQUIRED_COLS = ["raw_merchant", "category"]
+
+# 사전에 정규화 키를 박아두면 안 된다.
+# CSV 에 norm_key 가 있으면 Python 엔진이 만든 키를 Java 엔진도 똑같이 만들어야 한다.
+# 엔진이 둘이 되는 순간, 한쪽만 고쳐졌을 때 사전 히트율이 조용히 0% 가 된다.
+# 키 계산은 적재 시점에 백엔드가 한다.
+SEED_BANNED_COLS = {"norm_key", "merchant_norm", "norm", "key"}
 
 
 # ---------------------------------------------------------------- 결과 수집
@@ -161,32 +168,43 @@ def check_seed(rep: Report, rows, norm):
 
     n0 = len(rep.errors)
     cols = list(rows[0].keys())
+
+    # 판정 금지 (사전은 "이게 무엇인가" 만 저장한다)
     bad = [c for c in cols if str(c).strip().lower() in FORBIDDEN_KEYS]
     if bad:
         rep.error("금지 컬럼 존재: %s - 사전은 category 만 정한다" % bad)
+
+    # 정규화 키 금지 (엔진 이중화 방지)
+    banned = [c for c in cols if str(c).strip().lower() in SEED_BANNED_COLS]
+    if banned:
+        rep.error("정규화 키 컬럼 존재: %s - 키는 적재 시점에 계산한다 "
+                  "(CSV 에 박으면 Python/Java 엔진이 갈라진다)" % banned)
+
     missing = [c for c in SEED_REQUIRED_COLS if c not in cols]
     if missing:
         rep.error("필수 컬럼 누락: %s" % missing)
+        return
 
-    seen = {}
+    seen: dict[str, tuple] = {}
     for i, r in enumerate(rows, start=2):
-        key = (r.get("norm_key") or "").strip()
+        raw = (r.get("raw_merchant") or "").strip()
         cat = (r.get("category") or "").strip()
-        if not key:
-            rep.error("line %d: norm_key 비어 있음" % i)
+        if not raw:
+            rep.error("line %d: raw_merchant 비어 있음" % i)
             continue
-        if key in seen:
-            rep.error("line %d: norm_key 중복 '%s' (line %d)" % (i, key, seen[key]))
-        else:
-            seen[key] = i
         if cat not in CATEGORY_ENUM:
-            rep.error("line %d: category '%s' 가 enum 밖 (norm_key=%s)" % (i, cat, key))
-        if norm is not None:
-            got = norm.string_key(key)
-            if got != key:
-                rep.error("line %d: norm_key 가 정규화 결과와 다름 '%s' -> '%s'" % (i, key, got))
+            rep.error("line %d: category '%s' 가 enum 밖 (raw_merchant=%s)" % (i, cat, raw))
+        # 같은 상호에 다른 카테고리가 붙으면 적재 순서에 따라 결과가 달라진다
+        if raw in seen:
+            prev_cat, prev_line = seen[raw]
+            if prev_cat != cat:
+                rep.error("line %d: '%s' 가 line %d 에서는 '%s', 여기서는 '%s' "
+                          "- 같은 상호는 한 카테고리여야 한다"
+                          % (i, raw, prev_line, prev_cat, cat))
+        else:
+            seen[raw] = (cat, i)
     if len(rep.errors) == n0:
-        rep.info("사전 %d건 검사 통과" % len(rows))
+        rep.info("사전 %d건 / 유니크 상호 %d개 검사 통과" % (len(rows), len(seen)))
 
 
 def check_keyword_rules(rep: Report, spec):
@@ -237,7 +255,7 @@ def check_pg_vs_seed(rep: Report, pg, rows):
             rep.error("patterns[%d]: 정규식 오류 %r: %s" % (i, p.get("match"), e))
     if rows:
         for i, r in enumerate(rows, start=2):
-            key = (r.get("norm_key") or "").strip()
+            key = (r.get("raw_merchant") or "").strip()
             for src, rx in compiled:
                 if key and rx.search(key):
                     rep.error(
