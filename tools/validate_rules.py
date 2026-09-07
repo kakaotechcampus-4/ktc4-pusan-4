@@ -56,6 +56,8 @@ CATEGORY_ENUM = [
     "해외SaaS", "국내SW", "통신", "수도광열", "여비교통", "차량",
     "도서", "교육", "광고", "사무용품", "의료", "금융",
     "지자체_과태료", "경찰청_범칙금", "조세", "PG_미상", "기타",
+    # T3 에서 추가. [PM 확인] T0 고정 enum 22종에는 없던 값이다.
+    "게임", "구독서비스",
 ]
 
 # 사전·키워드룰에 절대 들어오면 안 되는 키 (판정은 룰카드 소관)
@@ -321,6 +323,51 @@ DOC_LEAK_PATTERNS = [
 DOC_ALLOW = re.compile("[0-9]{3}-[0-9]{2}-[*]{3}[0-9]{2}")
 
 
+def literal_of(alt: str) -> str:
+    """정규식 대안 하나에서 문자 그대로인 부분만 뽑는다.
+
+    PG 패턴이 키워드룰에도 들어가 있는지 보려면, 패턴을 실제 문자열처럼
+    만들어 키워드룰에 넣어봐야 한다.
+    """
+    s = alt
+    s = re.sub(r"\\s[*+]", " ", s)         # 문자열 "\s*" -> 공백 한 칸
+    s = re.sub(r"\([^)]*\)\?", "", s)      # "(MENT)?" -> 선택 그룹 제거
+    s = re.sub(r"\\b", "", s)              # 단어 경계 표기 제거
+    s = re.sub(r"[()\[\]?*+^$]", "", s)
+    s = s.replace("\\", "")                # 남은 이스케이프 백슬래시
+    return s.strip()
+
+
+def check_pg_vs_keyword(rep: Report, pg, kw) -> None:
+    """PG 는 차단 대상이다. 같은 문자열이 키워드룰에도 있으면 분류가 갈린다."""
+    print("[T2xT3] PG 블록리스트 x 키워드룰 교차검사")
+    if pg is None or kw is None:
+        rep.info("SKIP - 한쪽 파일이 없음")
+        return
+    n0 = len(rep.errors)
+    rules = []
+    for i, r in enumerate(kw.get("rules") or []):
+        try:
+            rules.append((i, r.get("match", ""), re.compile(r.get("match", ""), re.I),
+                          r.get("category")))
+        except re.error:
+            continue
+    checked = 0
+    for p in pg.get("patterns") or []:
+        for alt in str(p.get("match", "")).split("|"):
+            lit = literal_of(alt)
+            if len(lit) < 3:
+                continue
+            checked += 1
+            for i, src, rx, cat in rules:
+                if rx.search(lit):
+                    rep.error("PG '%s' 가 키워드룰[%d] %r (category=%s) 에도 걸린다 "
+                              "- PG 는 차단 대상이므로 키워드룰에서 빼야 한다"
+                              % (lit, i, src, cat))
+    if len(rep.errors) == n0:
+        rep.info("PG 문자열 %d개, 키워드룰과 겹치지 않음" % checked)
+
+
 def check_docs(rep: Report) -> None:
     print("[문서] docs/*.md 마스킹 검사")
     docs = sorted((ROOT / "docs").glob("*.md"))
@@ -363,6 +410,7 @@ def main() -> int:
     check_pg_vs_seed(rep, load_yaml(PG_BLOCKLIST_YAML), rows)
     check_seed(rep, rows, norm)
     check_rulecards(rep)
+    check_pg_vs_keyword(rep, load_yaml(PG_BLOCKLIST_YAML), load_yaml(KEYWORD_RULES_YAML))
     check_docs(rep)
     print()
     return rep.dump()

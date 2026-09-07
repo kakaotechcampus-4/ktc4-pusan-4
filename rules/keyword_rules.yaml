@@ -1,0 +1,137 @@
+version: 1
+
+# ─────────────────────────────────────────────────────────────
+# 키워드 분류 규칙.
+#
+# 사전은 정확 일치라 `AWS` 는 잡아도 `AMAZON WEB SERVICES KOREA` 는 놓친다.
+# 키워드룰은 부분 문자열로 잡아 패턴 하나가 수십 개를 커버한다.
+#
+# 적용 순서
+#   PG 블록 -> 시드 사전 -> 키워드룰 -> uncertain
+#   사전이 미스일 때만 여기까지 온다. PG 블록이 최우선이다.
+#
+# ★ category 만 정한다. verdict 는 절대 넣지 않는다.
+#   과태료 키워드룰이 verdict: 불가 까지 정하면 G1 관문을 우회한다.
+#   판정은 룰카드 R-004 가 한다.
+# ─────────────────────────────────────────────────────────────
+
+priority_note: |
+  priority 가 큰 것부터 검사하고 처음 걸린 룰이 이긴다.
+  같은 문자열이 여러 룰에 걸릴 때 어느 쪽이 이기는지 명시하기 위한 값이다.
+    900대 : 법정 불산입 후보 (과태료·조세). 다른 무엇보다 먼저 걸려야 한다
+    800대 : 좁은 상호 패턴 (쿠팡이츠 > 쿠팡 처럼 더 구체적인 쪽)
+    700대 : 브랜드·서비스명
+    600대 : 업종 일반 명사 (커피·식당 등). 가장 넓어서 마지막에 온다
+    500대 : 추정 규칙 (도메인 결제 등)
+
+rules:
+  # ── 법정 불산입 후보 (verdict 는 룰카드가 정한다) ──────────
+  - { priority: 950, match: "과태료|범칙금|주정차위반", category: 지자체_과태료 }
+  - { priority: 950, match: "소득세|지방소득세|국세|지방세|주민세|재산세", category: 조세 }
+
+  # ── 해외 SaaS ─────────────────────────────────────────────
+  # AMAZON 계열은 반드시 분리한다. AWS 는 인프라비, AMAZON PAY 는 쇼핑이다.
+  - { priority: 850, match: "AWS|AMAZON\\s*WEB", category: 해외SaaS }
+  - { priority: 850, match: "AMAZON\\s*PAY|AMAZON\\s*SELLER", category: 온라인쇼핑, note: "AWS 와 분리. 실증: PYU*Amazon Seller Serv / AMAZON PAY INDIA" }
+  - { priority: 800, match: "ANTHROPIC|CLAUDE\\.?AI", category: 해외SaaS, note: "실증: ANTHROPIC* CLA / CLAUDE.AI SUBS" }
+  - { priority: 800, match: "OPENAI|CHATGPT", category: 해외SaaS, note: "실증: OPENAI *CHATGPT SUBSCR" }
+  - { priority: 800, match: "GITHUB|FIGMA|NOTION|VERCEL", category: 해외SaaS }
+  - { priority: 800, match: "SLACK|LINEAR|CANVA|ADOBE", category: 해외SaaS }
+  - { priority: 800, match: "CURSOR|SUPABASE|CLOUDFLARE|DIGITALOCEAN|HEROKU", category: 해외SaaS }
+  - { priority: 800, match: "구글클라우드|GOOGLE\\s*CLOUD|GCP", category: 해외SaaS, note: "실증: 구글클라우드코리아 (memo: Google Cloud Platform). PG 아님" }
+  - { priority: 800, match: "MICROSOFT|ONEDRIVE|AZURE|OFFICE\\s*365", category: 해외SaaS }
+  - { priority: 800, match: "GEMINI|GOOGLE\\s*ONE", category: 해외SaaS }
+
+  # ── 구독 서비스 ───────────────────────────────────────────
+  - { priority: 800, match: "NETFLIX|넷플릭스|SPOTIFY|유튜브프리미엄|YOUTUBE\\s*PREMIUM", category: 구독서비스, note: "[PM 확인] enum 에 없던 카테고리다" }
+  - { priority: 750, match: "배민클럽", category: 구독서비스, note: "배달의민족 구독. PG 아님 (T2 판단 유지)" }
+
+  # ── 게임 (사업 무관 후보) ─────────────────────────────────
+  - { priority: 800, match: "STEAM|스팀|NINTENDO|PLAYSTATION|닌텐도|플레이스테이션", category: 게임, note: "[PM 확인] enum 에 없던 카테고리다. 사업 무관 후보" }
+
+  # ── 국내 SW·플랫폼 ────────────────────────────────────────
+  - { priority: 780, match: "한글과컴퓨터|이스트소프트|알집|네이버클라우드|NHN\\s*클라우드|토스랩|잔디", category: 국내SW }
+  - { priority: 780, match: "삼성닷컴", category: 온라인쇼핑, note: "삼성 자체 청구. PG 아님 (T2 판단 유지)" }
+
+  # ── 광고 ──────────────────────────────────────────────────
+  - { priority: 780, match: "구글애즈|GOOGLE\\s*ADS|카카오모먼트|META\\s*PLATFORMS|페이스북광고", category: 광고 }
+
+  # ── 통신 ──────────────────────────────────────────────────
+  - { priority: 760, match: "SKT|SK텔레콤|KT\\b|LGU\\+|엘지유플러스|LG유플러스", category: 통신, note: "[과잉매칭 주의] KT\\b 가 'KT&G' 같은 상호를 잡을 수 있다" }
+  - { priority: 760, match: "아이즈비전|알뜰폰|헬로모바일|세븐모바일", category: 통신, note: "실증: (주)아이즈비전 6건" }
+
+  # ── 수도광열 ──────────────────────────────────────────────
+  - { priority: 760, match: "한국전력|한전|도시가스|수도사업소|상수도", category: 수도광열 }
+
+  # ── 여비교통 ──────────────────────────────────────────────
+  - { priority: 760, match: "KTX|코레일|SRT|한국철도공사", category: 여비교통, note: "실증: 한국철도공사 2건 / 코레일유통" }
+  - { priority: 760, match: "^교통[-_](버스|지하철|시외버스)", category: 여비교통, note: "카드사 합산 행. is_aggregated 로 표시된다" }
+  - { priority: 760, match: "^(지하철|버스|시외버스)[-_]모바일", category: 여비교통, note: "실증: 지하철_모바일 / 버스_모바일" }
+  - { priority: 750, match: "대한항공|아시아나|에어부산|제주항공|티웨이", category: 여비교통 }
+  - { priority: 750, match: "고속버스|시외버스터미널|택시", category: 여비교통 }
+
+  # ── 차량 ──────────────────────────────────────────────────
+  - { priority: 750, match: "GS칼텍스|SK에너지|S-OIL|에쓰오일|현대오일뱅크|주유소", category: 차량 }
+  - { priority: 750, match: "하이패스|한국도로공사|통행료", category: 차량 }
+
+  # ── 편의점 ────────────────────────────────────────────────
+  - { priority: 740, match: "GS25|지에스25|지에스\\(GS\\)25", category: 편의점, note: "실증: 여러 지점" }
+  - { priority: 740, match: "CU\\b|씨유\\(CU\\)|씨유", category: 편의점, note: "[과잉매칭 주의] CU\\b. 실증: 씨유(CU)…점 다수" }
+  - { priority: 740, match: "세븐일레븐|코리아세븐|이마트24", category: 편의점 }
+
+  # ── 음식배달 ──────────────────────────────────────────────
+  - { priority: 830, match: "쿠팡이츠", category: 음식배달, note: "쿠팡(온라인쇼핑)보다 먼저 걸려야 한다" }
+  - { priority: 740, match: "배달의민족|우아한형제들|요기요", category: 음식배달, note: "실증: (주)우아한형제들 / 토스페이_요기요-…" }
+
+  # ── 온라인쇼핑 ────────────────────────────────────────────
+  - { priority: 730, match: "쿠팡", category: 온라인쇼핑, note: "쿠팡이츠보다 우선순위가 낮아야 한다" }
+  - { priority: 730, match: "11번가|G마켓|옥션|위메프|티몬|네이버스마트스토어|무신사", category: 온라인쇼핑 }
+
+  # ── 도서 ──────────────────────────────────────────────────
+  - { priority: 730, match: "교보문고|예스24|YES24|알라딘|리디북스|밀리의서재", category: 도서 }
+
+  # ── 교육 ──────────────────────────────────────────────────
+  - { priority: 720, match: "학원|인프런|INFLEARN|패스트캠퍼스|유데미|UDEMY", category: 교육 }
+  - { priority: 700, match: "대학교|고등학교|중학교|초등학교|국군복지단", category: 교육, note: "[PM 확인] 학교 매점·복지단 매점이 여기 걸린다. 업종은 매점인데 상호는 학교다" }
+
+  # ── 의료 ──────────────────────────────────────────────────
+  - { priority: 900, match: "^의료_?마스킹", category: 의료, note: "파서가 마스킹한 행. 상호는 이미 지워졌다" }
+  - { priority: 720, match: "병원|의원|약국|한의원|치과|의료원|보건소", category: 의료 }
+
+  # ── 금융 ──────────────────────────────────────────────────
+  - { priority: 720, match: "보험|은행|증권|카드사용료|연회비", category: 금융 }
+
+  # ── 사무용품 ──────────────────────────────────────────────
+  - { priority: 710, match: "다이소|아성다이소|오피스디포|모나미|문구", category: 사무용품, note: "[PM 확인] 다이소는 생활용품도 섞인다. 사무용품으로 볼지 기타로 볼지" }
+
+  # ── 카페 (업종 일반 명사. 넓어서 뒤에 온다) ───────────────
+  - { priority: 700, match: "스타벅스|투썸|이디야|메가커피|컴포즈|빽다방|폴바셋|할리스", category: 카페 }
+  - { priority: 620, match: "커피|카페|CAFE|COFFEE", category: 카페, note: "실증: 자스민커피·하삼동커피·노스커피·감성커피·하이오커피·카페16온스" }
+
+  # ── 음식점 (가장 넓다) ────────────────────────────────────
+  - { priority: 700, match: "맘스터치|롯데리아|써브웨이|서브웨이|버거킹|맥도날드|KFC|피자스쿨|도미노", category: 음식점 }
+  - { priority: 640, match: "도시락|김밥|국수|칼국수|짬뽕|돈까스|카츠|치킨|피자|버거", category: 음식점 }
+  - { priority: 640, match: "식당|분식|스시|초밥|보쌈|찌개|낙지|막걸리|포차|맥주|족발|곱창|구이", category: 음식점 }
+  - { priority: 630, match: "베스킨|배스킨라빈스|와플|아이스크림|빵|베이커리|파리바게|뚜레쥬르", category: 음식점 }
+
+  # ── 추정 규칙 ─────────────────────────────────────────────
+  - { priority: 500, match: "\\.COM$|\\.APP$|\\.IO$|\\.DEV$|\\.AI$", category: 해외SaaS, note: "해외 도메인 결제 추정" }
+
+# PM 판단이 필요한 항목
+open_questions:
+  - id: new_categories
+    item: "게임 / 구독서비스"
+    question: "T0 에서 고정한 category enum 22종에 없는 값이다. enum 에 추가할지, 기타로 흡수할지"
+    현재처리: "enum 에 추가하고 validate_rules.py 를 통과시켰다. [PM 확인] 표시함"
+  - id: school_store
+    item: "학교·국군복지단 매점"
+    question: "상호는 학교인데 업종은 매점이다. 교육으로 볼지 편의점으로 볼지"
+    현재처리: "교육으로 분류. 실증 2건"
+  - id: daiso
+    item: "다이소"
+    question: "사무용품인지 기타인지. 생활용품이 섞인다"
+    현재처리: "사무용품으로 분류"
+  - id: karaoke_hair
+    item: "노래연습장 / 헤어살롱 / PC방"
+    question: "enum 에 여가·미용 카테고리가 없다. 기타로 두면 되묻기로 간다"
+    현재처리: "룰을 만들지 않았다. uncertain 으로 남겨 되묻기로 보낸다"
