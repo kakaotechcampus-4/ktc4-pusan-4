@@ -14,9 +14,12 @@
 --card-type 을 주면 그 어댑터를 쓰고, 안 주면 매직바이트로 판별한다.
 지정값과 판별 결과가 다르면 경고를 띄운다 (IBK·KB 가 같은 .xls 확장자다).
 
-출력: raw_merchant, amount, biz_no, memo, source_card, is_aggregated, branch, branch_raw
-  카드번호·승인번호·이용고객명·날짜는 출력하지 않는다.
-  승인번호와 날짜는 취소 페어링에만 쓰고 메모리에서 버린다.
+출력: approved_at, raw_merchant, amount, installment_months, natural_key,
+      biz_no, memo, source_card, is_aggregated, branch, branch_raw,
+      needs_review, review_reason
+
+  승인일은 출력한다 — 귀속연도를 정하는 세무상 필수 값이고 natural_key 의 재료다.
+  계속 버리는 것: 카드번호, 승인번호, 이용고객명, 이용카드명.
 """
 
 from __future__ import annotations
@@ -133,6 +136,11 @@ def report(st, rows, out, warnings) -> None:
     print("  memo 있음         %d건" % with_memo)
     print("  branch 추출       %d건 / branch_raw(추출 실패) %d건" % (with_branch, with_branch_raw))
     print("  needs_review      %d건" % sum(1 for r in rows if r["needs_review"]))
+    print("  approved_at 있음   %d/%d건" % (st.kept - st.no_date, st.kept))
+    print("  natural_key 생성   %d/%d건  (날짜 없으면 못 만든다)"
+          % (st.kept - st.no_natural_key, st.kept))
+    inst = sum(1 for r in rows if str(r["installment_months"]) not in ("0", ""))
+    print("  할부 건            %d건 (나머지는 일시불=0)" % inst)
     print("  폴백 위험 조합     %d개 -> 합산 행 제외 후 %d개"
           % (st.risky_combos_all, st.risky_combos_pairable))
     print("  -> %s" % out)

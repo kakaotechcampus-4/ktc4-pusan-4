@@ -14,7 +14,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from . import Stats, make_record, parse_amount, parse_date
+from . import Stats, make_record, parse_amount, parse_date, parse_installment
 
 SOURCE = "kb"
 
@@ -88,6 +88,7 @@ def read(path: Path, st: Stats) -> list:
             source=SOURCE,
             approval_no=cells[COL["승인번호"]],
             when=parse_date(cells[COL["이용일"]]),
+            installment=parse_installment(cells[COL["결제방법"]]),
             is_cancel=(CANCEL_MARK in str(cells[COL["상태"]])),
         ))
     return out

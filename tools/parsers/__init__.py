@@ -11,11 +11,19 @@ Record 에는 승인번호·날짜 같은 PII 가 들어 있고, **출력 CSV �
 취소 건의 원 결제를 짝지으려면 승인번호가 필요해서 파싱 중에만 메모리에 둔다.
 
 공통 출력 스키마
-    raw_merchant, amount, biz_no, memo, source_card, is_aggregated, branch, branch_raw
+    approved_at, raw_merchant, amount, installment_months, natural_key,
+    biz_no, memo, source_card, is_aggregated, branch, branch_raw,
+    needs_review, review_reason
+
+승인일(approved_at)은 출력한다. 카드번호·고객명과 성격이 다르다 —
+거래 자체의 속성이고 귀속연도를 정하는 세무상 필수 값이며, natural_key 의
+재료다. 날짜가 없으면 기간을 겹쳐 올릴 때 중복 계상을 막을 수 없다.
+계속 버리는 것: 카드번호, 승인번호, 이용고객명, 이용카드명.
 """
 
 from __future__ import annotations
 
+import hashlib
 import re
 import sys
 from collections import Counter
@@ -24,7 +32,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-OUT_FIELDS = ["raw_merchant", "amount", "biz_no", "memo", "source_card",
+OUT_FIELDS = ["approved_at", "raw_merchant", "amount", "installment_months",
+              "natural_key", "biz_no", "memo", "source_card",
               "is_aggregated", "branch", "branch_raw", "needs_review", "review_reason"]
 
 MAGIC_OLE = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
@@ -92,11 +101,34 @@ class Record(dict):
 
 
 def make_record(merchant, amount, biz_no="", memo="", source="", approval_no="",
-                when=None, is_cancel=False) -> Record:
+                when=None, is_cancel=False, installment=0) -> Record:
     return Record(merchant=str(merchant).strip(), amount=amount, biz_no=biz_no,
                   memo=memo, source=source, approval_no=str(approval_no or "").strip(),
-                  when=when, is_cancel=bool(is_cancel),
+                  when=when, is_cancel=bool(is_cancel), installment=installment,
                   needs_review=False, review_reason="")
+
+
+def parse_installment(text) -> int:
+    """결제방법/이용구분에서 할부 개월을 뽑는다. 일시불이면 0."""
+    s = str(text or "")
+    m = re.search(r"(\d+)\s*개?월", s)
+    if m:
+        return int(m.group(1))
+    return 0
+
+
+def natural_key(approved_at: str, raw_merchant: str, amount) -> str:
+    """hash(approved_at + raw_merchant + amount).
+
+    기간을 겹쳐 올렸을 때 같은 거래가 두 번 적재되는 것을 막는 UNIQUE 키다.
+    날짜가 없으면 만들지 않는다 — 팀원 목록(상호명만)이 그런 경우다.
+    상호명은 **저장되는 값**(의료 마스킹 적용 후)을 쓴다. 저장값과 키가
+    다른 재료에서 나오면 재계산이 불가능해진다.
+    """
+    if not approved_at or amount is None or amount == "":
+        return ""
+    raw = "%s|%s|%s" % (approved_at, raw_merchant, amount)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
 
 
 def parse_amount(text):
@@ -135,6 +167,8 @@ class Stats:
         self.paired_originals = 0     # 취소와 짝지어 함께 제외한 원 결제
         self.unpaired_cancels = 0
         self.no_amount = 0
+        self.no_date = 0
+        self.no_natural_key = 0
         self.foreign_ccy = 0
         self.aggregated = 0
         self.kept = 0
@@ -326,9 +360,19 @@ def to_rows(records: list, st: Stats, norm=None) -> list:
             memo = ""
             branch = branch_raw = ""   # 지점명은 생활권 정보다
 
+        approved_at = r.when.isoformat() if isinstance(r.when, date) else ""
+        if not approved_at:
+            st.no_date += 1
+
         st.kept += 1
         st.per_card[r.source] += 1
+        nkey = natural_key(approved_at, merchant, r.amount)
+        if not nkey:
+            st.no_natural_key += 1
         rows.append({
+            "approved_at": approved_at,
+            "installment_months": r.get("installment", 0),
+            "natural_key": nkey,
             "raw_merchant": merchant,
             "amount": r.amount,
             "biz_no": biz_no,
