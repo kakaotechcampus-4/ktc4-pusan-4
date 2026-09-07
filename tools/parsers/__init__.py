@@ -25,7 +25,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 OUT_FIELDS = ["raw_merchant", "amount", "biz_no", "memo", "source_card",
-              "is_aggregated", "branch", "branch_raw"]
+              "is_aggregated", "branch", "branch_raw", "needs_review", "review_reason"]
 
 MAGIC_OLE = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
 
@@ -64,7 +64,8 @@ def make_record(merchant, amount, biz_no="", memo="", source="", approval_no="",
                 when=None, is_cancel=False) -> Record:
     return Record(merchant=str(merchant).strip(), amount=amount, biz_no=biz_no,
                   memo=memo, source=source, approval_no=str(approval_no or "").strip(),
-                  when=when, is_cancel=bool(is_cancel))
+                  when=when, is_cancel=bool(is_cancel),
+                  needs_review=False, review_reason="")
 
 
 def parse_amount(text):
@@ -109,8 +110,11 @@ class Stats:
         self.per_card: Counter = Counter()
         self.non_transaction_samples: Counter = Counter()
         self.aggregated_samples: Counter = Counter()
+        self.ambiguous_cancels = 0    # 취소 대상 불확정
+        self.review_flagged = 0       # needs_review 로 넘긴 행
         self.pair_log: list = []      # (상호, 금액, 매칭방법)
         self.unpaired_log: list = []  # (상호, 금액, 사유)
+        self.ambiguous_log: list = []  # (상호, 금액, 후보수)
         self.medical_map: dict = {}
 
     def mask_medical(self, merchant: str, biz_no: str) -> str:
@@ -161,27 +165,40 @@ def drop_non_transactions(records: list, st: Stats) -> list:
 def pair_cancellations(records: list, st: Stats) -> list:
     """취소 행과 그 원 결제를 함께 제외한다.
 
-    취소 줄만 빼면 원 결제가 남아 경비가 부풀려진다. 과소신고 → 가산세다.
+    취소 줄만 빼면 원 결제가 남아 경비가 부풀려진다 (과소신고 -> 가산세).
+    반대로 **틀린 짝을 지우면 경비가 줄어 세금을 더 낸다.** 그래서 짝이
+    하나로 확정될 때만 자동 제외하고, 애매하면 사용자에게 넘긴다.
 
-    1순위: 승인번호 일치. 카드사가 취소 전표에 원 승인번호를 실어주면 확실하다.
-    2순위: 같은 상호 + 같은 절대금액 + PAIR_WINDOW_DAYS 이내. 승인번호가
-           다르게 찍히는 카드사를 위한 폴백이다.
-    짝을 못 찾은 취소는 제외하되 리포트에 남긴다 — 원 결제가 조회 기간
-    밖일 수 있고, 그때는 아무것도 빼지 않는 것이 맞다.
+    1순위: 승인번호가 정확히 하나 일치.
+      실측: IBK 150행·KB 6행 모두 승인번호가 100% 채워져 있고 전부 유니크였다.
+      즉 이 두 카드사는 취소 전표에 **원 승인번호를 실어주지 않는다** —
+      취소 행도 자기 고유 번호를 받는다. 그래서 이 경로는 사실상 안 걸리고,
+      원 번호를 실어주는 카드사를 위해 남겨둔다.
+
+    2순위 폴백: 같은 상호 + 같은 절대금액 + PAIR_WINDOW_DAYS 이내.
+      후보가 정확히 1건일 때만 제외한다.
+
+    후보가 2건 이상이면 어느 것을 취소한 것인지 문자열만으로 결정할 수 없다.
+    실측: 같은 상호+같은 금액 정상결제가 2건 이상인 조합이 20개 있었다
+    (버스요금 5,000원 8건 등). 이때는 아무것도 지우지 않고 후보 전체에
+    needs_review 를 세워 되묻기로 보낸다.
     """
     originals = [r for r in records if not r.is_cancel]
     cancels = [r for r in records if r.is_cancel]
     used: set = set()
+    flagged: dict = {}
 
     for c in cancels:
         st.cancelled += 1
         mate, how = None, ""
+
         if c.approval_no:
-            mate = next((o for o in originals
-                         if id(o) not in used and o.approval_no
-                         and o.approval_no == c.approval_no), None)
-            if mate is not None:
-                how = "승인번호"
+            hits = [o for o in originals
+                    if id(o) not in used and o.approval_no == c.approval_no]
+            if len(hits) == 1:
+                mate, how = hits[0], "승인번호"
+
+        cands = []
         if mate is None:
             cands = [o for o in originals
                      if id(o) not in used
@@ -192,23 +209,33 @@ def pair_cancellations(records: list, st: Stats) -> list:
                 cands = [o for o in cands
                          if isinstance(o.when, date)
                          and abs((c.when - o.when).days) <= PAIR_WINDOW_DAYS]
-            if cands:
-                if isinstance(c.when, date):
-                    cands.sort(key=lambda o: abs((c.when - o.when).days)
-                               if isinstance(o.when, date) else 10 ** 6)
+            if len(cands) == 1:
                 mate, how = cands[0], "상호+금액+날짜"
 
         if mate is not None:
             used.add(id(mate))
             st.paired_originals += 1
             st.pair_log.append((c.merchant, c.amount, how))
+        elif len(cands) >= 2:
+            # 취소 대상 불확정. 틀린 짝을 지우는 것보다 사용자에게 묻는 게 낫다.
+            st.ambiguous_cancels += 1
+            st.ambiguous_log.append((c.merchant, c.amount, len(cands)))
+            for o in cands:
+                flagged[id(o)] = ("취소 대상 불확정 — 같은 상호·금액 결제가 %d건이라 "
+                                  "어느 건이 취소됐는지 자동 판정 불가" % len(cands))
         else:
             st.unpaired_cancels += 1
-            reason = ("승인번호·상호+금액 모두 불일치 — 원 결제가 조회 기간 밖일 수 있다"
-                      if c.approval_no else "승인번호 없음 + 상호+금액 불일치")
-            st.unpaired_log.append((c.merchant, c.amount, reason))
+            st.unpaired_log.append((
+                c.merchant, c.amount,
+                "짝 후보 없음 — 원 결제가 조회 기간 밖일 수 있다"))
 
-    return [o for o in originals if id(o) not in used]
+    kept = [o for o in originals if id(o) not in used]
+    for o in kept:
+        if id(o) in flagged:
+            o["needs_review"] = True
+            o["review_reason"] = flagged[id(o)]
+            st.review_flagged += 1
+    return kept
 
 
 # ---------------------------------------------------------------- 공통 후처리
@@ -253,6 +280,8 @@ def to_rows(records: list, st: Stats, norm=None) -> list:
             "is_aggregated": "true" if aggregated else "",
             "branch": branch,
             "branch_raw": branch_raw,
+            "needs_review": "true" if r.get("needs_review") else "",
+            "review_reason": r.get("review_reason", ""),
         })
     return rows
 
@@ -271,4 +300,5 @@ def read_file(path: Path, st: Stats, card_type: str | None = None) -> tuple:
     adapter = get_adapter(used)
     if adapter is None:
         return [], used, "형식 판별 실패 — 건너뜁니다"
+
     return adapter.read(path, st), used, warn

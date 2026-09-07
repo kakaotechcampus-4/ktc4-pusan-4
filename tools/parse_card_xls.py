@@ -97,7 +97,6 @@ def report(st, rows, out, warnings) -> None:
         print()
         for name, w in warnings:
             print("  ! %s: %s" % (name, w))
-
     uniq = len({r["raw_merchant"] for r in rows})
     with_bizno = sum(1 for r in rows if r["biz_no"])
     with_memo = sum(1 for r in rows if r["memo"])
@@ -108,7 +107,8 @@ def report(st, rows, out, warnings) -> None:
     print("  원본 행           %d" % st.total)
     print("  취소 행           %d" % st.cancelled)
     print("    ├ 원 결제 짝지어 제외  %d" % st.paired_originals)
-    print("    └ 짝 못 찾음          %d" % st.unpaired_cancels)
+    print("    ├ 취소 대상 불확정     %d  (아무것도 안 지우고 되묻기)" % st.ambiguous_cancels)
+    print("    └ 짝 후보 없음        %d" % st.unpaired_cancels)
     print("  비거래 제외       %d" % st.non_transaction)
     print("  외화전용 제외     %d" % st.foreign_ccy)
     print("  금액 없음         %d" % st.no_amount)
@@ -121,6 +121,7 @@ def report(st, rows, out, warnings) -> None:
     print("  사업자번호        %d/%d  (%.1f%%)" % (with_bizno, st.kept, pct))
     print("  memo 있음         %d건" % with_memo)
     print("  branch 추출       %d건 / branch_raw(추출 실패) %d건" % (with_branch, with_branch_raw))
+    print("  needs_review      %d건" % sum(1 for r in rows if r["needs_review"]))
     print("  -> %s" % out)
 
     if st.pair_log:
@@ -128,6 +129,11 @@ def report(st, rows, out, warnings) -> None:
         print("  취소-원결제 짝지어 제외한 건:")
         for m, amt, how in st.pair_log:
             print("    %-24s %-10s (%s 매칭)" % (m, amt, how))
+    if st.ambiguous_log:
+        print()
+        print("  취소 대상 불확정 (원 결제를 하나도 지우지 않았다):")
+        for m, amt, n in st.ambiguous_log:
+            print("    %-24s %-10s 후보 %d건 -> 전부 needs_review" % (m, amt, n))
     if st.unpaired_log:
         print()
         print("  짝을 못 찾은 취소 (원 결제를 지우지 않았다):")
