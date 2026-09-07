@@ -65,6 +65,7 @@ CATEGORY_ENUM = [
     "게임", "구독서비스", "여가", "미용", "생활용품",
 ]
 
+
 # 사전·키워드룰에 절대 들어오면 안 되는 키 (판정은 룰카드 소관)
 FORBIDDEN_KEYS = {"verdict", "account", "판정", "계정과목", "계정", "deductible"}
 
@@ -75,6 +76,13 @@ SEED_REQUIRED_COLS = ["raw_merchant", "category"]
 # 엔진이 둘이 되는 순간, 한쪽만 고쳐졌을 때 사전 히트율이 조용히 0% 가 된다.
 # 키 계산은 적재 시점에 백엔드가 한다.
 SEED_BANNED_COLS = {"norm_key", "merchant_norm", "norm", "key"}
+
+# 지점명은 생활권 정보다. 저장 위치 경계:
+#   merchant_dict (전 사용자 공용) -> 금지
+#   transaction   (사용자 본인)    -> 가능
+#   user_rules    (사용자 본인)    -> 가능
+SEED_BANNED_BRANCH_COLS = {"branch", "branch_raw", "branch_name",
+                           "지점", "지점명", "매장", "점포"}
 
 
 # ---------------------------------------------------------------- 결과 수집
@@ -187,6 +195,12 @@ def check_seed(rep: Report, rows, norm):
         rep.error("정규화 키 컬럼 존재: %s - 키는 적재 시점에 계산한다 "
                   "(CSV 에 박으면 Python/Java 엔진이 갈라진다)" % banned)
 
+    # 지점명 금지 (전 사용자 공용 사전이다)
+    branch_cols = [c for c in cols if str(c).strip().lower() in SEED_BANNED_BRANCH_COLS]
+    if branch_cols:
+        rep.error("지점명 컬럼 존재: %s - 지점명은 생활권 정보다. 공용 사전에 넣지 않는다 "
+                  "(transaction/user_rules 에만 저장)" % branch_cols)
+
     missing = [c for c in SEED_REQUIRED_COLS if c not in cols]
     if missing:
         rep.error("필수 컬럼 누락: %s" % missing)
@@ -229,7 +243,15 @@ def check_keyword_rules(rep: Report, spec):
         if bad:
             rep.error("rules[%d]: 금지 키 %s - 판정은 룰카드가 한다" % (i, bad))
         cat = r.get("category")
-        if cat not in CATEGORY_ENUM:
+        if cat == "uncertain":
+            # 확정 분류가 아니라 되묻기로 보내는 룰이다.
+            if not r.get("needs_review"):
+                rep.error("rules[%d]: category=uncertain 인데 needs_review 가 없다 "
+                          "(분류도 안 하고 되묻기도 안 하면 그냥 사라진다)" % i)
+            if not r.get("hint"):
+                rep.warn("rules[%d]: category=uncertain 인데 hint 가 없다 "
+                         "(되묻기 화면에서 질문을 좁힐 단서가 없다)" % i)
+        elif cat not in CATEGORY_ENUM:
             rep.error("rules[%d]: category '%s' 가 enum 밖 (match=%r)" % (i, cat, r.get("match")))
         try:
             re.compile(r.get("match", ""))

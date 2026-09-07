@@ -185,13 +185,19 @@ class Normalizer:
 
     def step_strip_branch(self, s, ctx, step):
         if step.get("skip_if_truncated") and ctx.get("is_truncated"):
+            # 절단된 상호는 지점 표기 자체가 잘려나갔다. 억지로 파싱하지 않고
+            # 손대지 못한 문자열을 branch_raw 로만 남긴다.
             ctx["branch_skipped"] = True
+            ctx["branch_raw"] = s
             return s
         min_keep = int(step.get("min_keep", 2))
         for pat in step.get("patterns") or []:
             cand = re.sub(pat, "", s).strip()
             if cand != s and len(cand) >= min_keep:
                 ctx["branch_pattern"] = pat
+                # 떼어낸 부분이 지점명이다. 버리지 않고 보존한다.
+                # (공용 사전에는 절대 넣지 않는다 — 생활권 정보다)
+                ctx["branch"] = s[len(cand):].strip() if s.startswith(cand) else                     re.sub(re.escape(cand), "", s, count=1).strip()
                 return cand
             if cand != s:
                 # min_keep 에 걸렸다 — 통째로 사라질 뻔했다는 뜻이므로 기록만 한다
@@ -259,6 +265,8 @@ class Normalizer:
             branch_skipped=bool(ctx.get("branch_skipped")),
             branch_blocked=ctx.get("branch_blocked") or [],
             protected=ctx.get("protected") or [],
+            branch=ctx.get("branch", ""),
+            branch_raw=ctx.get("branch_raw", ""),
             pg_hint=ctx.get("pg_hint"),
             cond_split=bool(ctx.get("cond_split")),
             cond_kept=bool(ctx.get("cond_kept")),
@@ -833,6 +841,7 @@ def main() -> int:
     if args.text:
         r = norm.normalize(args.text, args.biz_no)
         for k in ("raw", "norm_key", "track", "string_norm", "tokens",
+                  "branch", "branch_raw",
                   "is_truncated", "is_overseas", "enc_bytes", "branch_skipped", "protected"):
             print("  %-14s %s" % (k, r[k]))
         return 0
