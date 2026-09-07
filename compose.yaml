@@ -16,6 +16,16 @@ services:
       timeout: 5s
       retries: 10
       start_period: 5s
+  ai:
+    build: ./ai
+    environment:
+      DATABASE_URL: postgresql://${DB_USERNAME:-ktc4}:${DB_PASSWORD:-ktc4-local}@postgres:5432/${DB_NAME:-ktc4}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    ports:
+      - "${AI_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   postgres-data:
