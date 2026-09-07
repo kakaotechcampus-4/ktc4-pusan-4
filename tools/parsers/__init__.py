@@ -140,6 +140,77 @@ def get_adapter(name: str):
 CARD_TYPES = ("ibk", "kb", "teammate")
 
 
+# ---------------------------------------------------------------- 비거래 제거
+def drop_non_transactions(records: list, st: Stats) -> list:
+    """할인·포인트사용 행을 먼저 걷어낸다.
+
+    IBK 는 승인구분을 '취소또는할인' 한 칸에 묶어 주기 때문에, 이걸 먼저
+    빼지 않으면 할인 17건이 전부 '짝을 못 찾은 취소' 로 리포트에 쌓인다.
+    """
+    kept = []
+    for r in records:
+        if NON_TRANSACTION_RE.match(r.merchant) and not r.biz_no:
+            st.non_transaction += 1
+            st.non_transaction_samples[r.merchant] += 1
+            continue
+        kept.append(r)
+    return kept
+
+
+# ---------------------------------------------------------------- 취소 페어링
+def pair_cancellations(records: list, st: Stats) -> list:
+    """취소 행과 그 원 결제를 함께 제외한다.
+
+    취소 줄만 빼면 원 결제가 남아 경비가 부풀려진다. 과소신고 → 가산세다.
+
+    1순위: 승인번호 일치. 카드사가 취소 전표에 원 승인번호를 실어주면 확실하다.
+    2순위: 같은 상호 + 같은 절대금액 + PAIR_WINDOW_DAYS 이내. 승인번호가
+           다르게 찍히는 카드사를 위한 폴백이다.
+    짝을 못 찾은 취소는 제외하되 리포트에 남긴다 — 원 결제가 조회 기간
+    밖일 수 있고, 그때는 아무것도 빼지 않는 것이 맞다.
+    """
+    originals = [r for r in records if not r.is_cancel]
+    cancels = [r for r in records if r.is_cancel]
+    used: set = set()
+
+    for c in cancels:
+        st.cancelled += 1
+        mate, how = None, ""
+        if c.approval_no:
+            mate = next((o for o in originals
+                         if id(o) not in used and o.approval_no
+                         and o.approval_no == c.approval_no), None)
+            if mate is not None:
+                how = "승인번호"
+        if mate is None:
+            cands = [o for o in originals
+                     if id(o) not in used
+                     and o.merchant == c.merchant
+                     and o.amount is not None and c.amount is not None
+                     and abs(o.amount) == abs(c.amount)]
+            if isinstance(c.when, date):
+                cands = [o for o in cands
+                         if isinstance(o.when, date)
+                         and abs((c.when - o.when).days) <= PAIR_WINDOW_DAYS]
+            if cands:
+                if isinstance(c.when, date):
+                    cands.sort(key=lambda o: abs((c.when - o.when).days)
+                               if isinstance(o.when, date) else 10 ** 6)
+                mate, how = cands[0], "상호+금액+날짜"
+
+        if mate is not None:
+            used.add(id(mate))
+            st.paired_originals += 1
+            st.pair_log.append((c.merchant, c.amount, how))
+        else:
+            st.unpaired_cancels += 1
+            reason = ("승인번호·상호+금액 모두 불일치 — 원 결제가 조회 기간 밖일 수 있다"
+                      if c.approval_no else "승인번호 없음 + 상호+금액 불일치")
+            st.unpaired_log.append((c.merchant, c.amount, reason))
+
+    return [o for o in originals if id(o) not in used]
+
+
 # ---------------------------------------------------------------- 공통 후처리
 def to_rows(records: list, st: Stats, norm=None) -> list:
     """출력 스키마로 변환한다. 여기서 PII(승인번호·날짜)를 버린다."""

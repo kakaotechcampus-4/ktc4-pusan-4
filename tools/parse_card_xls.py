@@ -72,8 +72,12 @@ def main() -> int:
         print("%s: [%s형] %d행" % (p.name, used.upper(), len(recs)))
         records.extend(recs)
 
-    kept = [r for r in records if not r.is_cancel]
-    st.cancelled = sum(1 for r in records if r.is_cancel)
+    # 순서가 중요하다. 할인·포인트사용을 먼저 걷어내야 한다 —
+    # IBK 가 '취소또는할인' 을 한 칸에 묶어 주기 때문에, 안 걷어내면
+    # 할인 17건이 '짝 못 찾은 취소' 로 쌓인다.
+    records = parsers.drop_non_transactions(records, st)
+    # 취소 행과 그 원 결제를 함께 제외한다 (취소만 빼면 경비가 부풀려진다)
+    kept = parsers.pair_cancellations(records, st)
     norm = nz.load() if nz is not None else None
     rows = parsers.to_rows(kept, st, norm)
 
@@ -103,6 +107,8 @@ def report(st, rows, out, warnings) -> None:
     print("  === 이 샘플 기준 ===")
     print("  원본 행           %d" % st.total)
     print("  취소 행           %d" % st.cancelled)
+    print("    ├ 원 결제 짝지어 제외  %d" % st.paired_originals)
+    print("    └ 짝 못 찾음          %d" % st.unpaired_cancels)
     print("  비거래 제외       %d" % st.non_transaction)
     print("  외화전용 제외     %d" % st.foreign_ccy)
     print("  금액 없음         %d" % st.no_amount)
