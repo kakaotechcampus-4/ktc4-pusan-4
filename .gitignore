@@ -71,3 +71,22 @@ target/
 *.sqlite3
 *.db
 .terraform/
+
+# ── 카드 내역 / 개인정보 (경비 정리 앱) ─────
+#   이 repo 는 public 입니다. 카드 이용내역에는 카드번호·이용고객명·
+#   가맹점 사업자번호가 들어 있고, 한 번 커밋되면 히스토리에서 지워지지 않습니다.
+#   각자 로컬 data/ 에 원본을 두고 작업하세요.
+
+# 개인 데이터
+data/
+**/data/
+*.xls
+*.xlsx
+*.csv
+!seeds/*.csv
+
+# 스크린샷 (루트에 떨군 것)
+/*.jpg
+/*.jpeg
+/*.png
+/screenshots/
