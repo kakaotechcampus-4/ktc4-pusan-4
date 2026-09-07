@@ -59,6 +59,9 @@ class KeywordRules:
                 "category": r.get("category"),
                 "priority": int(r.get("priority", 0)),
                 "note": r.get("note", ""),
+                # category: uncertain 인 룰은 분류하지 않고 힌트만 남긴다
+                "needs_review": bool(r.get("needs_review")),
+                "hint": r.get("hint", ""),
             })
         # priority 내림차순. 같으면 파일에 적힌 순서.
         self.ordered = sorted(self.rules, key=lambda r: (-r["priority"], r["index"]))
@@ -66,17 +69,51 @@ class KeywordRules:
     def all_hits(self, text: str) -> list[dict]:
         return [r for r in self.ordered if r["rx"].search(str(text))]
 
-    def classify(self, text: str) -> dict:
-        hits = self.all_hits(text)
+    def classify(self, *texts: str) -> dict:
+        """여러 표현형에 모두 걸어보고 가장 강한 룰을 채택한다.
+
+        raw 로만 매칭하면 '쿠팡 이츠' 가 '쿠팡이츠' 룰(p=830)을 놓치고
+        '쿠팡' 룰(p=730)에 걸려 온라인쇼핑으로 오분류된다.
+        정규화 결과(공백 제거)에도 걸어야 잡힌다.
+
+        승자 기준: priority 내림차순 -> 패턴 길이 내림차순(더 구체적인 쪽).
+        """
+        hits: dict[int, dict] = {}
+        for text in texts:
+            if not text:
+                continue
+            for r in self.all_hits(text):
+                hits.setdefault(r["index"], r)
         if not hits:
-            return {"category": None, "matched": None, "conflicts": []}
-        win = hits[0]
+            return {"category": None, "matched": None, "conflicts": [],
+                    "matched_on": None, "hint": "", "needs_review": False}
+        ranked = sorted(hits.values(), key=lambda r: (-r["priority"], -len(r["match"]), r["index"]))
+        win = ranked[0]
+        matched_on = next((tx for tx in texts if tx and win["rx"].search(tx)), None)
         return {
             "category": win["category"],
             "matched": win["match"],
+            "matched_on": matched_on,
+            "hint": win["hint"],
+            "needs_review": win["needs_review"],
             # 우선순위에서 밀린 룰들. 카테고리가 다르면 진짜 충돌이다.
-            "conflicts": [h for h in hits[1:] if h["category"] != win["category"]],
+            "conflicts": [h for h in ranked[1:] if h["category"] != win["category"]],
         }
+
+    def selftest(self) -> int:
+        cases = self.spec.get("test_cases") or []
+        bad = 0
+        norm = nz.load()
+        for c in cases:
+            got = self.classify(c["in"], norm.normalize(c["in"]).string_norm)
+            ok = got["category"] == c["out"]
+            bad += 0 if ok else 1
+            print("  %s  %-22r -> %-10s %s" % (
+                "ok  " if ok else "FAIL", c["in"], got["category"],
+                "" if ok else "(기대 %s)" % c["out"]))
+        print()
+        print("  %d/%d 통과" % (len(cases) - bad, len(cases)))
+        return 1 if bad else 0
 
 
 def load() -> KeywordRules:
@@ -97,14 +134,16 @@ def pipeline(raw: str, biz_no: str, norm, pg, kw) -> dict:
     blocked = pg.check(raw, r.tokens or [r.string_norm])
     if blocked["blocked"]:
         return {"stage": "pg", "category": blocked["category"], "norm": r, "pg": blocked}
-    # 키워드룰은 원문·정규화 결과 둘 다에 걸어본다.
-    # 정규화가 공백을 없애면서 '커피 16온스' 처럼 띄어쓰기가 붙는 경우가 있다.
-    c = kw.classify(raw)
-    if not c["category"]:
-        c = kw.classify(r.string_norm)
+    # 원문과 정규화 결과 양쪽에 걸어 가장 강한 룰을 채택한다.
+    # 한쪽만 보면 '쿠팡 이츠' 가 '쿠팡'(온라인쇼핑)으로 오분류된다.
+    c = kw.classify(raw, r.string_norm)
+    if c["category"] == "uncertain":
+        # 확정 분류가 아니라 힌트다. 되묻기로 보내되 질문을 좁힐 단서를 남긴다.
+        return {"stage": "uncertain", "category": None, "norm": r, "kw": c,
+                "hint": c["hint"]}
     if c["category"]:
         return {"stage": "keyword", "category": c["category"], "norm": r, "kw": c}
-    return {"stage": "uncertain", "category": None, "norm": r, "kw": c}
+    return {"stage": "uncertain", "category": None, "norm": r, "kw": c, "hint": ""}
 
 
 # ------------------------------------------------------------------ 리포트
@@ -147,6 +186,8 @@ def build_report(kw: KeywordRules, pg, norm) -> str:
                 watch[w].add((raw, res["category"] or "uncertain"))
 
     uniq_unc: dict[str, int] = Counter(o[0] for o in unc)
+    # 도메인 패턴이 힌트로 바뀌면서 확정 분류에서 빠진 건
+    hinted = [(raw, res) for raw, _s, res in unc if res.get("hint")]
 
     L = []
     a = L.append
@@ -267,7 +308,33 @@ def build_report(kw: KeywordRules, pg, norm) -> str:
     a("enum 에 여가·미용 카테고리가 없어서 룰을 만들지 않았다 — "
       "억지로 `기타` 로 넣으면 분류된 척만 하고 되묻기는 그대로 발생한다.")
     a("")
-    a("## 7. 새 카테고리가 회수한 건")
+    a("## 7. 도메인 패턴 — 확정 분류에서 힌트로")
+    a("")
+    a("`.COM$ .APP$ .IO$ .DEV$ .AI$` 를 해외SaaS 로 확정하던 것을 되묻기 힌트로 바꿨다.")
+    a("국내 사이트도 `.com` 으로 끝나고, 도메인만으로 해외 판정은 근거가 약하다.")
+    a("패턴 자체는 `RESEND.COM`, `RAILWAY.APP` 같은 신규 SaaS 롱테일을 놓치지 않기 위해 남겼다.")
+    a("")
+    a("| | 건수 |")
+    a("|---|---:|")
+    a("| 이 패턴에 걸려 uncertain 으로 간 건 | %d |" % len(hinted))
+    a("| 그중 유니크 상호 | %d |" % len({r for r, _ in hinted}))
+    a("")
+    if hinted:
+        a("| 상호 | 힌트 |")
+        a("|---|---|")
+        for raw, res in sorted({r: x for r, x in hinted}.items()):
+            a("| `%s` | %s |" % (nz.md(anon.label(raw)), res["hint"]))
+        a("")
+        a("**커버리지 영향: %.1f%%p 하락** (%d건이 확정 분류에서 되묻기로 이동)."
+          % (len(hinted) / len(non_pg) * 100 if non_pg else 0, len(hinted)))
+    else:
+        a("**커버리지 영향 없음.** 현재 데이터에는 이 패턴에 걸리는 상호가 없다.")
+        a("(해외 결제 문자열이 `ANTHROPIC* CLA` 처럼 도메인 형태가 아니라 잘려서 온다)")
+    a("")
+    a("되묻기 화면에서는 `hint` 를 그대로 띄워 질문을 좁힌다 — ")
+    a("\"해외 서비스 결제로 보입니다. 업무용이 맞나요?\" 처럼 물을 수 있다.")
+    a("")
+    a("## 8. 새 카테고리가 회수한 건")
     a("")
     a("PM 회신으로 enum 에 5종(게임·구독서비스·여가·미용·생활용품)을 추가했다.")
     a("업종 세분화가 아니라 **G2(사업관련성)에서 다르게 처리되는지** 를 기준으로 나눈 것이고,")
@@ -294,7 +361,7 @@ def build_report(kw: KeywordRules, pg, norm) -> str:
     for raw, c in sorted(new_uniq.items(), key=lambda x: (x[1], x[0])):
         a("| `%s` | %s |" % (nz.md(anon.label(raw)), c))
     a("")
-    a("## 8. PM 판단 필요")
+    a("## 9. PM 판단 필요")
     a("")
     for q in kw.spec.get("open_questions") or []:
         a("### %s" % q.get("item"))
@@ -310,6 +377,7 @@ def main() -> int:
     ap.add_argument("--text", help="문자열 하나를 분류한다")
     ap.add_argument("--biz-no", default="")
     ap.add_argument("--report", action="store_true")
+    ap.add_argument("--selftest", action="store_true", help="keyword_rules.yaml 의 test_cases 실행")
     args = ap.parse_args()
 
     kw = load()
@@ -321,6 +389,8 @@ def main() -> int:
         print("  stage      %s" % res["stage"])
         print("  category   %s" % res["category"])
         print("  norm_key   %s" % res["norm"].norm_key)
+        if res.get("hint"):
+            print("  hint       %s" % res["hint"])
         if res.get("kw"):
             print("  matched    %s" % res["kw"]["matched"])
             if res["kw"]["conflicts"]:
@@ -331,6 +401,9 @@ def main() -> int:
             print("  pg_tokens  %s" % res["pg"]["pg_tokens"])
             print("  hint       %s" % res["pg"]["matched_suffix"])
         return 0
+
+    if args.selftest:
+        return kw.selftest()
 
     if args.report:
         REPORT_MD.parent.mkdir(parents=True, exist_ok=True)
