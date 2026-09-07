@@ -146,6 +146,8 @@ class Stats:
         self.pair_log: list = []      # (상호, 금액, 매칭방법)
         self.unpaired_log: list = []  # (상호, 금액, 사유)
         self.ambiguous_log: list = []  # (상호, 금액, 후보수)
+        self.risky_combos_all = 0      # 같은 상호+금액 정상결제 2건 이상 조합
+        self.risky_combos_pairable = 0  # 그중 합산 행을 뺀 뒤 남는 조합
         self.medical_map: dict = {}
         self.statement_kinds: list = []   # (파일명, 판정, 근거)
         self.blocked_files: list = []     # (파일명, 판정, 근거)
@@ -221,19 +223,41 @@ def pair_cancellations(records: list, st: Stats) -> list:
     used: set = set()
     flagged: dict = {}
 
+    # 합산 행은 카드사가 여러 건을 묶어 한 줄로 준 것이라 개별 취소 대상이
+    # 될 수 없다. 폴백 후보에서 빼면 위험 조합이 줄고 불필요한
+    # needs_review 도 생기지 않는다.
+    pairable = [o for o in originals if not AGGREGATED_RE.match(o.merchant)]
+
+    # 금액이 있는 행만 센다. 팀원 목록은 금액이 없어서 (상호, "") 로 뭉쳐
+    # 위험 조합 수를 부풀린다 — 애초에 취소 페어링 대상이 아니다.
+    def has_amt(r):
+        return isinstance(r.amount, int)
+
+    combo_all: Counter = Counter((o.merchant, o.amount) for o in originals if has_amt(o))
+    combo_pairable: Counter = Counter((o.merchant, o.amount) for o in pairable if has_amt(o))
+    st.risky_combos_all = sum(1 for v in combo_all.values() if v >= 2)
+    st.risky_combos_pairable = sum(1 for v in combo_pairable.values() if v >= 2)
+
     for c in cancels:
         st.cancelled += 1
         mate, how = None, ""
 
+        if AGGREGATED_RE.match(c.merchant):
+            # 합산 행의 취소는 짝지을 개별 결제가 존재하지 않는다.
+            st.unpaired_cancels += 1
+            st.unpaired_log.append((c.merchant, c.amount,
+                                    "합산 행 — 개별 취소 대상이 없다"))
+            continue
+
         if c.approval_no:
-            hits = [o for o in originals
+            hits = [o for o in pairable
                     if id(o) not in used and o.approval_no == c.approval_no]
             if len(hits) == 1:
                 mate, how = hits[0], "승인번호"
 
         cands = []
         if mate is None:
-            cands = [o for o in originals
+            cands = [o for o in pairable
                      if id(o) not in used
                      and o.merchant == c.merchant
                      and o.amount is not None and c.amount is not None

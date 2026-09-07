@@ -133,6 +133,8 @@ def report(st, rows, out, warnings) -> None:
     print("  memo 있음         %d건" % with_memo)
     print("  branch 추출       %d건 / branch_raw(추출 실패) %d건" % (with_branch, with_branch_raw))
     print("  needs_review      %d건" % sum(1 for r in rows if r["needs_review"]))
+    print("  폴백 위험 조합     %d개 -> 합산 행 제외 후 %d개"
+          % (st.risky_combos_all, st.risky_combos_pairable))
     print("  -> %s" % out)
 
     if st.pair_log:
