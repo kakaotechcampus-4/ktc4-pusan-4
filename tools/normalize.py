@@ -185,13 +185,19 @@ class Normalizer:
 
     def step_strip_branch(self, s, ctx, step):
         if step.get("skip_if_truncated") and ctx.get("is_truncated"):
+            # 절단된 상호는 지점 표기 자체가 잘려나갔다. 억지로 파싱하지 않고
+            # 손대지 못한 문자열을 branch_raw 로만 남긴다.
             ctx["branch_skipped"] = True
+            ctx["branch_raw"] = s
             return s
         min_keep = int(step.get("min_keep", 2))
         for pat in step.get("patterns") or []:
             cand = re.sub(pat, "", s).strip()
             if cand != s and len(cand) >= min_keep:
                 ctx["branch_pattern"] = pat
+                # 떼어낸 부분이 지점명이다. 버리지 않고 보존한다.
+                # (공용 사전에는 절대 넣지 않는다 — 생활권 정보다)
+                ctx["branch"] = s[len(cand):].strip() if s.startswith(cand) else                     re.sub(re.escape(cand), "", s, count=1).strip()
                 return cand
             if cand != s:
                 # min_keep 에 걸렸다 — 통째로 사라질 뻔했다는 뜻이므로 기록만 한다
@@ -259,6 +265,8 @@ class Normalizer:
             branch_skipped=bool(ctx.get("branch_skipped")),
             branch_blocked=ctx.get("branch_blocked") or [],
             protected=ctx.get("protected") or [],
+            branch=ctx.get("branch", ""),
+            branch_raw=ctx.get("branch_raw", ""),
             pg_hint=ctx.get("pg_hint"),
             cond_split=bool(ctx.get("cond_split")),
             cond_kept=bool(ctx.get("cond_kept")),
@@ -270,11 +278,26 @@ class Normalizer:
         return self.run_pipeline(raw)[0]
 
 
+PG_YAML = ROOT / "rules" / "pg_blocklist.yaml"
+
+
 def load() -> Normalizer:
     if not NORMALIZE_YAML.exists():
         sys.exit("rules/normalize.yaml 이 없습니다")
     with NORMALIZE_YAML.open(encoding="utf-8") as f:
-        return Normalizer(yaml.safe_load(f))
+        spec = yaml.safe_load(f)
+    # PG 힌트의 정식 출처는 rules/pg_blocklist.yaml 이다.
+    # 두 파일에 목록을 따로 두면 한쪽만 고쳐지고 갈라진다.
+    if PG_YAML.exists():
+        with PG_YAML.open(encoding="utf-8") as f:
+            pg = yaml.safe_load(f) or {}
+        pats = [p.get("match") for p in (pg.get("patterns") or []) if p.get("match")]
+        PG_SAFE_PATTERNS[:] = pats
+        if pats:
+            for step in spec.get("steps") or []:
+                if step.get("id") == "split_delimiters":
+                    step["pg_hints"] = pats
+    return Normalizer(spec)
 
 
 # ------------------------------------------------------------------ 자체 테스트
@@ -356,6 +379,8 @@ class Anon:
         tok = tok.strip()
         if not tok or is_non_merchant(tok):
             return tok
+        if any(re.search(p, tok, re.I) for p in PG_SAFE_PATTERNS):
+            return tok      # PG 상호. 가릴 것이 없다
         m = re.search(NATIONAL_BRANDS, tok, re.I)
         if m:
             # 브랜드와 정확히 같으면 그대로 둔다. 뒤에 뭐가 붙어 있으면 지운다.
@@ -719,9 +744,11 @@ REPORT_CATEGORY_HINTS = [
     ("교통", "교통|버스|지하철|코레일|철도공사|철도|택시"),
     ("의료", "의료_마스킹"),
     ("마트·쇼핑", "마트|다이소|백화점|쇼핑|리테일|유통"),
-    ("교육·체육", "학교|대학교|학원|짐|피트니스|헬스|복지단"),
-    ("여가·오락", "노래연습장|노래방|코인노래|PC|피씨|볼링|당구|게임"),
-    ("미용", "헤어|살롱|미용|스튜디오|바버"),
+    ("교육", "학교|대학교|학원|복지단"),
+    # 리포트 라벨도 분류 카테고리와 같은 기준으로 묶는다 (세무 판정 기준).
+    # 헬스장·노래방을 다른 라벨로 두면 리포트에서 같은 건이 다르게 보인다.
+    ("여가", "노래연습장|노래방|코인노래|동전노래|노래|볼링|PC|피씨|당구|게임|짐$|피트니스|헬스"),
+    ("미용", "헤어|살롱|미용|바버|네일"),
     ("통신", "아이즈비전|텔레콤|모바일통신|알뜰폰"),
     ("온라인·구독", "구글|플레이|넷플릭스|NETFLIX|쿠팡|배민|요기요|삼성닷컴"),
 ]
@@ -741,8 +768,13 @@ NATIONAL_BRANDS = (
 # (지점명이 아닌데 지우면 리포트가 "토스***_요기요" 처럼 읽을 수 없게 된다)
 BRAND_SAFE_SUFFIX = (
     "페이|페이먼츠|PAY|닷컴|COM|전자|정보통신|통신|유통|리테일|코리아|공사|복지단|비전|"
-    "도시락|커피|클럽|선물하기|스토어|스쿨|대학|라빈스|스토리|그룹|홀딩스|서비스|본점"
+    "도시락|커피|클럽|선물하기|스토어|스쿨|대학|라빈스|스토리|그룹|홀딩스|서비스|본점|플레이"
 )
+
+# PG 이름은 익명화하지 않는다. 결제대행사 상호에는 지점·생활권 정보가 없고,
+# 가려버리면 리포트에서 어느 PG 인지 알 수 없어 쓸모가 없어진다.
+# rules/pg_blocklist.yaml 이 로드될 때 채워진다.
+PG_SAFE_PATTERNS: list = []
 
 # 가맹점이 아닌 행. 카드사가 만든 정산·합산·마스킹 라벨이라 그대로 써도 된다.
 NON_MERCHANT = "^(교통|버스|지하철|시외버스|정상할인|포인트사용|의료_?마스킹|.*할인$)"
@@ -809,6 +841,7 @@ def main() -> int:
     if args.text:
         r = norm.normalize(args.text, args.biz_no)
         for k in ("raw", "norm_key", "track", "string_norm", "tokens",
+                  "branch", "branch_raw",
                   "is_truncated", "is_overseas", "enc_bytes", "branch_skipped", "protected"):
             print("  %-14s %s" % (k, r[k]))
         return 0
