@@ -35,8 +35,15 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 OUT_FIELDS = ["approved_at", "raw_merchant", "amount", "installment_months",
-              "approval_no", "natural_key", "biz_no", "memo", "source_card",
+              "approval_no", "natural_key", "biz_no", "memo", "source_card", "status",
               "is_aggregated", "branch", "branch_raw", "needs_review", "review_reason"]
+
+# 노션 transaction.status enum 을 그대로 쓴다.
+# 파서는 모든 행을 내보내고 status 만 붙인다. 필터링은 백엔드가 한다 —
+# 세무 자료에서 "왜 이 건이 빠졌나" 를 밝힐 수 없으면 안 된다.
+ST_TARGET = "판정대상"
+ST_OFFSET = "취소상계"
+ST_EXCLUDED = "대상제외"
 
 MAGIC_OLE = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
 
@@ -182,6 +189,7 @@ class Stats:
         self.aggregated = 0
         self.kept = 0
         self.per_card: Counter = Counter()
+        self.by_status: Counter = Counter()
         self.non_transaction_samples: Counter = Counter()
         self.aggregated_samples: Counter = Counter()
         self.ambiguous_cancels = 0    # 취소 대상 불확정
@@ -223,46 +231,44 @@ CARD_TYPES = ("ibk", "kb", "teammate")
 
 
 # ---------------------------------------------------------------- 비거래 제거
-def drop_non_transactions(records: list, st: Stats) -> list:
-    """할인·포인트사용 행을 먼저 걷어낸다.
+def mark_non_transactions(records: list, st: Stats) -> list:
+    """할인·포인트사용 행에 status=대상제외 를 붙인다. 버리지 않는다.
 
     IBK 는 승인구분을 '취소또는할인' 한 칸에 묶어 주기 때문에, 이걸 먼저
-    빼지 않으면 할인 17건이 전부 '짝을 못 찾은 취소' 로 리포트에 쌓인다.
+    갈라놓지 않으면 할인 17건이 전부 '짝을 못 찾은 취소' 로 쌓인다.
     """
-    kept = []
     for r in records:
         if NON_TRANSACTION_RE.match(r.merchant) and not r.biz_no:
             st.non_transaction += 1
             st.non_transaction_samples[r.merchant] += 1
-            continue
-        kept.append(r)
-    return kept
+            r["status"] = ST_EXCLUDED
+            r["review_reason"] = "비거래 항목 (카드사 정산 행)"
+    return records
 
 
 # ---------------------------------------------------------------- 취소 페어링
-def pair_cancellations(records: list, st: Stats) -> list:
-    """취소 행과 그 원 결제를 함께 제외한다.
+def resolve_cancellations(records: list, st: Stats) -> list:
+    """취소 행과 그 원 결제에 status=취소상계 를 붙인다. 행은 지우지 않는다.
 
-    취소 줄만 빼면 원 결제가 남아 경비가 부풀려진다 (과소신고 -> 가산세).
-    반대로 **틀린 짝을 지우면 경비가 줄어 세금을 더 낸다.** 그래서 짝이
-    하나로 확정될 때만 자동 제외하고, 애매하면 사용자에게 넘긴다.
+    취소 줄만 상계하면 원 결제가 남아 경비가 부풀려진다 (과소신고 -> 가산세).
+    반대로 **틀린 짝을 상계하면 경비가 줄어 세금을 더 낸다.** 그래서 짝이
+    하나로 확정될 때만 상계하고, 애매하면 사용자에게 넘긴다.
 
     1순위: 승인번호가 정확히 하나 일치.
       실측: IBK 150행·KB 6행 모두 승인번호가 100% 채워져 있고 전부 유니크였다.
-      즉 이 두 카드사는 취소 전표에 **원 승인번호를 실어주지 않는다** —
-      취소 행도 자기 고유 번호를 받는다. 그래서 이 경로는 사실상 안 걸리고,
-      원 번호를 실어주는 카드사를 위해 남겨둔다.
+      즉 이 두 카드사는 취소 전표에 원 승인번호를 실어주지 않는다. 이 경로는
+      사실상 안 걸리고, 원 번호를 실어주는 카드사를 위해 남겨둔다.
 
     2순위 폴백: 같은 상호 + 같은 절대금액 + PAIR_WINDOW_DAYS 이내.
-      후보가 정확히 1건일 때만 제외한다.
+      후보가 정확히 1건일 때만 상계한다.
 
-    후보가 2건 이상이면 어느 것을 취소한 것인지 문자열만으로 결정할 수 없다.
-    실측: 같은 상호+같은 금액 정상결제가 2건 이상인 조합이 20개 있었다
-    (버스요금 5,000원 8건 등). 이때는 아무것도 지우지 않고 후보 전체에
-    needs_review 를 세워 되묻기로 보낸다.
+    후보가 2건 이상이면 어느 것을 취소한 것인지 결정할 수 없다. 실측: 같은
+    상호+같은 금액 정상결제가 2건 이상인 조합이 20개 있었다(정액 반복 결제).
+    이때는 아무것도 상계하지 않고 후보 전체에 needs_review 를 세운다.
     """
-    originals = [r for r in records if not r.is_cancel]
-    cancels = [r for r in records if r.is_cancel]
+    live = [r for r in records if r.get("status") != ST_EXCLUDED]
+    originals = [r for r in live if not r.is_cancel]
+    cancels = [r for r in live if r.is_cancel]
     used: set = set()
     flagged: dict = {}
 
@@ -271,27 +277,26 @@ def pair_cancellations(records: list, st: Stats) -> list:
     # needs_review 도 생기지 않는다.
     pairable = [o for o in originals if not AGGREGATED_RE.match(o.merchant)]
 
-    # 금액이 있는 행만 센다. 팀원 목록은 금액이 없어서 (상호, "") 로 뭉쳐
-    # 위험 조합 수를 부풀린다 — 애초에 취소 페어링 대상이 아니다.
     def has_amt(r):
         return isinstance(r.amount, int)
 
-    combo_all: Counter = Counter((o.merchant, o.amount) for o in originals if has_amt(o))
-    combo_pairable: Counter = Counter((o.merchant, o.amount) for o in pairable if has_amt(o))
+    combo_all = Counter((o.merchant, o.amount) for o in originals if has_amt(o))
+    combo_pairable = Counter((o.merchant, o.amount) for o in pairable if has_amt(o))
     st.risky_combos_all = sum(1 for v in combo_all.values() if v >= 2)
     st.risky_combos_pairable = sum(1 for v in combo_pairable.values() if v >= 2)
 
     for c in cancels:
         st.cancelled += 1
-        mate, how = None, ""
+        c["status"] = ST_OFFSET
 
         if AGGREGATED_RE.match(c.merchant):
-            # 합산 행의 취소는 짝지을 개별 결제가 존재하지 않는다.
             st.unpaired_cancels += 1
+            c["review_reason"] = "취소 행 (합산 행 — 개별 취소 대상이 없다)"
             st.unpaired_log.append((c.merchant, c.amount,
                                     "합산 행 — 개별 취소 대상이 없다"))
             continue
 
+        mate, how = None, ""
         if c.approval_no:
             hits = [o for o in pairable
                     if id(o) not in used and o.approval_no == c.approval_no]
@@ -310,39 +315,38 @@ def pair_cancellations(records: list, st: Stats) -> list:
                          if isinstance(o.when, date)
                          and abs((c.when - o.when).days) <= PAIR_WINDOW_DAYS]
             if len(cands) == 1:
-                mate, how = cands[0], "상호+금액+날짜"
+                mate, how = cands[0], "폴백"
 
         if mate is not None:
             used.add(id(mate))
             st.paired_originals += 1
+            mate["status"] = ST_OFFSET
+            mate["review_reason"] = "취소 상계 (%s 매칭)" % how
+            c["review_reason"] = "취소 행 (%s 매칭으로 상계됨)" % how
             st.pair_log.append((c.merchant, c.amount, how))
         elif len(cands) >= 2:
-            # 취소 대상 불확정. 틀린 짝을 지우는 것보다 사용자에게 묻는 게 낫다.
             st.ambiguous_cancels += 1
+            c["review_reason"] = "취소 행 (상계 대상 불확정 — 후보 %d건)" % len(cands)
             st.ambiguous_log.append((c.merchant, c.amount, len(cands)))
             for o in cands:
                 flagged[id(o)] = ("취소 대상 불확정 — 같은 상호·금액 결제가 %d건이라 "
                                   "어느 건이 취소됐는지 자동 판정 불가" % len(cands))
         else:
             st.unpaired_cancels += 1
+            c["review_reason"] = "취소 행 (짝 후보 없음 — 원 결제가 조회 기간 밖일 수 있다)"
             st.unpaired_log.append((
                 c.merchant, c.amount,
                 "짝 후보 없음 — 원 결제가 조회 기간 밖일 수 있다"))
 
-    kept = [o for o in originals if id(o) not in used]
-    for o in kept:
+    for o in originals:
+        if o.get("status"):
+            continue
+        o["status"] = ST_TARGET
         if id(o) in flagged:
             o["needs_review"] = True
             o["review_reason"] = flagged[id(o)]
             st.review_flagged += 1
-    return kept
-
-
-def keeps_row(r: Record) -> bool:
-    """to_rows 가 이 레코드를 출력할지. 충돌 검사에서 행을 맞추는 데 쓴다."""
-    if NON_TRANSACTION_RE.match(r.merchant) and not r.biz_no:
-        return False
-    return r.amount is not None
+    return records
 
 
 # ---------------------------------------------------------------- 공통 후처리
@@ -352,13 +356,12 @@ def to_rows(records: list, st: Stats, norm=None) -> list:
     for r in records:
         merchant, biz_no, memo = r.merchant, r.biz_no, r.memo
 
-        if NON_TRANSACTION_RE.match(merchant) and not biz_no:
-            st.non_transaction += 1
-            st.non_transaction_samples[merchant] += 1
-            continue
+        status = r.get("status") or ST_TARGET
+        reason = r.get("review_reason", "")
         if r.amount is None:
+            # 금액을 못 읽은 행도 버리지 않는다. 왜 빠졌는지 남아야 한다.
             st.no_amount += 1
-            continue
+            status, reason = ST_EXCLUDED, reason or "금액 파싱 불가"
 
         aggregated = bool(AGGREGATED_RE.match(merchant))
         if aggregated:
@@ -385,6 +388,7 @@ def to_rows(records: list, st: Stats, norm=None) -> list:
 
         st.kept += 1
         st.per_card[r.source] += 1
+        st.by_status[status] += 1
         if not nkey:
             st.no_natural_key += 1
         rows.append({
@@ -400,8 +404,9 @@ def to_rows(records: list, st: Stats, norm=None) -> list:
             "is_aggregated": "true" if aggregated else "",
             "branch": branch,
             "branch_raw": branch_raw,
+            "status": status,
             "needs_review": "true" if r.get("needs_review") else "",
-            "review_reason": r.get("review_reason", ""),
+            "review_reason": reason,
         })
     return rows
 

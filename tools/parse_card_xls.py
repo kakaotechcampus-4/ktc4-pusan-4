@@ -76,18 +76,16 @@ def main() -> int:
         print("%s: [%s형] %d행" % (p.name, used.upper(), len(recs)))
         records.extend(recs)
 
-    # 순서가 중요하다. 할인·포인트사용을 먼저 걷어내야 한다 —
-    # IBK 가 '취소또는할인' 을 한 칸에 묶어 주기 때문에, 안 걷어내면
+    # 순서가 중요하다. 할인·포인트사용을 먼저 갈라놓아야 한다 —
+    # IBK 가 '취소또는할인' 을 한 칸에 묶어 주기 때문에, 안 갈라놓으면
     # 할인 17건이 '짝 못 찾은 취소' 로 쌓인다.
-    records = parsers.drop_non_transactions(records, st)
-    # 취소 행과 그 원 결제를 함께 제외한다 (취소만 빼면 경비가 부풀려진다)
-    kept = parsers.pair_cancellations(records, st)
+    records = parsers.mark_non_transactions(records, st)
+    # 취소 행과 그 원 결제에 status=취소상계 를 붙인다. 행은 지우지 않는다.
+    records = parsers.resolve_cancellations(records, st)
     norm = nz.load() if nz is not None else None
-    rows = parsers.to_rows(kept, st, norm)
-    # 출력 행과 원본 레코드를 짝지어 natural_key 충돌을 본다.
-    # to_rows 가 일부 행을 버리므로 키가 있는 행만 다시 맞춘다.
-    parsers.check_natural_keys(
-        [r for r in kept if parsers.keeps_row(r)], rows, st)
+    rows = parsers.to_rows(records, st, norm)
+    # 이제 모든 행을 내보내므로 records 와 rows 가 1:1 로 맞는다.
+    parsers.check_natural_keys(records, rows, st)
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -115,35 +113,42 @@ def report(st, rows, out, warnings) -> None:
         print()
         print("  !! 파싱을 거부한 파일 %d개. 위 안내대로 다시 받아주세요." % len(st.blocked_files))
 
-    uniq = len({r["raw_merchant"] for r in rows})
-    with_bizno = sum(1 for r in rows if r["biz_no"])
-    with_memo = sum(1 for r in rows if r["memo"])
-    with_branch = sum(1 for r in rows if r["branch"])
-    with_branch_raw = sum(1 for r in rows if r["branch_raw"])
+    tgt = [r for r in rows if r["status"] == parsers.ST_TARGET]
+    with_bizno = sum(1 for r in tgt if r["biz_no"])
+    with_memo = sum(1 for r in tgt if r["memo"])
+    with_branch = sum(1 for r in tgt if r["branch"])
+    with_branch_raw = sum(1 for r in tgt if r["branch_raw"])
+    n_tgt = len(tgt)
     print()
+    target = [r for r in rows if r["status"] == parsers.ST_TARGET]
     print("  === 이 샘플 기준 ===")
     print("  원본 행           %d" % st.total)
+    print("  전체 출력         %d건  (행을 버리지 않는다. 필터링은 백엔드가 한다)" % st.kept)
+    for stt in (parsers.ST_TARGET, parsers.ST_OFFSET, parsers.ST_EXCLUDED):
+        print("    - %-8s %d건" % (stt, st.by_status.get(stt, 0)))
     print("  취소 행           %d" % st.cancelled)
-    print("    ├ 원 결제 짝지어 제외  %d" % st.paired_originals)
-    print("    ├ 취소 대상 불확정     %d  (아무것도 안 지우고 되묻기)" % st.ambiguous_cancels)
+    print("    ├ 원 결제 상계        %d" % st.paired_originals)
+    print("    ├ 취소 대상 불확정     %d  (아무것도 상계 안 하고 되묻기)" % st.ambiguous_cancels)
     print("    └ 짝 후보 없음        %d" % st.unpaired_cancels)
-    print("  비거래 제외       %d" % st.non_transaction)
-    print("  외화전용 제외     %d" % st.foreign_ccy)
+    print("  비거래 (대상제외)  %d" % st.non_transaction)
+    print("  외화전용 제외     %d  (읽지 않는다)" % st.foreign_ccy)
     print("  금액 없음         %d" % st.no_amount)
-    print("  합산 건 표시      %d  (제외하지 않음)" % st.aggregated)
+    print("  합산 건 표시      %d  (판정대상으로 남는다)" % st.aggregated)
     print("  의료 마스킹       %d개 상호" % len(st.medical_map))
-    print("  기록              %d  (유니크 상호 %d)" % (st.kept, uniq))
+    print()
+    print("  --- 아래는 status=판정대상 %d건 기준 ---" % len(target))
+    print("  유니크 상호       %d" % len({r["raw_merchant"] for r in target}))
     for card, n in sorted(st.per_card.items()):
         print("    - %-9s %d건" % (card, n))
-    pct = (with_bizno / st.kept * 100) if st.kept else 0
-    print("  사업자번호        %d/%d  (%.1f%%)" % (with_bizno, st.kept, pct))
+    pct = (with_bizno / n_tgt * 100) if n_tgt else 0
+    print("  사업자번호        %d/%d  (%.1f%%)" % (with_bizno, n_tgt, pct))
     print("  memo 있음         %d건" % with_memo)
     print("  branch 추출       %d건 / branch_raw(추출 실패) %d건" % (with_branch, with_branch_raw))
-    print("  needs_review      %d건" % sum(1 for r in rows if r["needs_review"]))
-    print("  approved_at 있음   %d/%d건" % (st.kept - st.no_date, st.kept))
+    print("  needs_review      %d건" % sum(1 for r in tgt if r["needs_review"]))
+    print("  approved_at 있음   %d/%d건" % (sum(1 for r in tgt if r["approved_at"]), n_tgt))
     print("  natural_key 생성   %d/%d건  (날짜 없으면 못 만든다)"
-          % (st.kept - st.no_natural_key, st.kept))
-    inst = sum(1 for r in rows if str(r["installment_months"]) not in ("0", ""))
+          % (sum(1 for r in tgt if r["natural_key"]), n_tgt))
+    inst = sum(1 for r in tgt if str(r["installment_months"]) not in ("0", ""))
     print("  할부 건            %d건 (나머지는 일시불=0)" % inst)
     print("  natural_key 충돌   실제 중복 %d건 / 별개 거래 %d건"
           % (len(st.dup_real), len(st.dup_distinct)))
@@ -193,7 +198,7 @@ def report(st, rows, out, warnings) -> None:
             print("    %-20s %d건" % (m, c))
 
     by_merchant: dict = {}
-    for r in rows:
+    for r in tgt:
         by_merchant.setdefault(r["raw_merchant"], set()).add(r["memo"])
     split = {m: v for m, v in by_merchant.items() if len([x for x in v if x]) > 1}
     if split:
