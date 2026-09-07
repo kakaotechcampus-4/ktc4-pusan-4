@@ -11,14 +11,16 @@ Record 에는 승인번호·날짜 같은 PII 가 들어 있고, **출력 CSV �
 취소 건의 원 결제를 짝지으려면 승인번호가 필요해서 파싱 중에만 메모리에 둔다.
 
 공통 출력 스키마
-    approved_at, raw_merchant, amount, installment_months, natural_key,
-    biz_no, memo, source_card, is_aggregated, branch, branch_raw,
+    approved_at, raw_merchant, amount, installment_months, approval_no,
+    natural_key, biz_no, memo, source_card, is_aggregated, branch, branch_raw,
     needs_review, review_reason
 
-승인일(approved_at)은 출력한다. 카드번호·고객명과 성격이 다르다 —
-거래 자체의 속성이고 귀속연도를 정하는 세무상 필수 값이며, natural_key 의
-재료다. 날짜가 없으면 기간을 겹쳐 올릴 때 중복 계상을 막을 수 없다.
-계속 버리는 것: 카드번호, 승인번호, 이용고객명, 이용카드명.
+승인일·승인번호는 출력한다. 카드번호·고객명과 성격이 다르다 — 거래 자체의
+속성이고 개인을 식별하지 않는다. 승인일은 귀속연도를 정하는 세무상 필수
+값이고, 둘 다 natural_key 의 재료다. 승인번호가 없으면 같은 날 같은 가맹점
+같은 금액의 별개 거래가 한 키를 받아 적재가 거부된다(실측 2조합/5행).
+승인번호를 출력하면 취소 페어링이 감사 가능해지는 부수 효과도 있다.
+계속 버리는 것: 카드번호, 이용고객명, 이용카드명.
 """
 
 from __future__ import annotations
@@ -33,7 +35,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 OUT_FIELDS = ["approved_at", "raw_merchant", "amount", "installment_months",
-              "natural_key", "biz_no", "memo", "source_card",
+              "approval_no", "natural_key", "biz_no", "memo", "source_card",
               "is_aggregated", "branch", "branch_raw", "needs_review", "review_reason"]
 
 MAGIC_OLE = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
@@ -117,8 +119,8 @@ def parse_installment(text) -> int:
     return 0
 
 
-def natural_key(approved_at: str, raw_merchant: str, amount) -> str:
-    """hash(approved_at + raw_merchant + amount).
+def natural_key(approved_at: str, raw_merchant: str, amount, approval_no: str = "") -> str:
+    """hash(approved_at + raw_merchant + amount + approval_no).
 
     기간을 겹쳐 올렸을 때 같은 거래가 두 번 적재되는 것을 막는 UNIQUE 키다.
     날짜가 없으면 만들지 않는다 — 팀원 목록(상호명만)이 그런 경우다.
@@ -130,7 +132,9 @@ def natural_key(approved_at: str, raw_merchant: str, amount) -> str:
     """
     if not approved_at or amount is None or amount == "":
         return ""
-    raw = "%s|%s|%s" % (approved_at, raw_merchant, amount)
+    # 승인번호 단독은 유니크가 보장되지 않는다 — 8자리라 재사용될 수 있고
+    # 카드사마다 별개 체계다. 그래서 단독 키로 쓰지 않고 기존 재료에 더한다.
+    raw = "%s|%s|%s|%s" % (approved_at, raw_merchant, amount, approval_no or "")
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
 
 
@@ -377,7 +381,7 @@ def to_rows(records: list, st: Stats, norm=None) -> list:
             st.no_date += 1
 
         # 키는 마스킹 전 원본 상호명으로 만든다 (재파싱 안정성)
-        nkey = natural_key(approved_at, r.merchant, r.amount)
+        nkey = natural_key(approved_at, r.merchant, r.amount, r.approval_no)
 
         st.kept += 1
         st.per_card[r.source] += 1
@@ -386,6 +390,7 @@ def to_rows(records: list, st: Stats, norm=None) -> list:
         rows.append({
             "approved_at": approved_at,
             "installment_months": r.get("installment", 0),
+            "approval_no": r.approval_no,
             "natural_key": nkey,
             "raw_merchant": merchant,
             "amount": r.amount,

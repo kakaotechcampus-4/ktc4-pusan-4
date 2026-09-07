@@ -14,12 +14,12 @@
 --card-type 을 주면 그 어댑터를 쓰고, 안 주면 매직바이트로 판별한다.
 지정값과 판별 결과가 다르면 경고를 띄운다 (IBK·KB 가 같은 .xls 확장자다).
 
-출력: approved_at, raw_merchant, amount, installment_months, natural_key,
-      biz_no, memo, source_card, is_aggregated, branch, branch_raw,
+출력: approved_at, raw_merchant, amount, installment_months, approval_no,
+      natural_key, biz_no, memo, source_card, is_aggregated, branch, branch_raw,
       needs_review, review_reason
 
-  승인일은 출력한다 — 귀속연도를 정하는 세무상 필수 값이고 natural_key 의 재료다.
-  계속 버리는 것: 카드번호, 승인번호, 이용고객명, 이용카드명.
+  승인일·승인번호는 출력한다 — 거래 자체의 속성이고 natural_key 의 재료다.
+  계속 버리는 것: 카드번호, 이용고객명, 이용카드명.
 """
 
 from __future__ import annotations
