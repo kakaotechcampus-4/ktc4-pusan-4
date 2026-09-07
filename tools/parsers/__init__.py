@@ -46,6 +46,37 @@ MEDICAL_PREFIX = "의료_마스킹"
 
 BIZNO_RE = re.compile(r"^\d{3}-?\d{2}-?\d{5}$")
 
+# ── 승인내역 / 청구내역 판별 ───────────────────────────────
+# 청구내역은 상호명이 뭉개져서 분류에 쓸 수 없다. 사용자가 잘못 받아오면
+# 조용히 이상한 데이터가 들어가므로 헤더로 판별해 아예 차단한다.
+MERCHANT_HEADERS = ("이용가맹점명", "이용하신곳", "이용하신 곳", "가맹점명", "가맹점")
+APPROVAL_HEADERS = ("승인번호", "승인일시", "승인구분", "이용일", "이용일자")
+BILLING_HEADERS = ("청구금액", "청구합계", "청구건수", "청구일", "청구원금",
+                   "결제원금", "잔여할부", "할부수수료", "이자")
+
+STATEMENT_GUIDE = (
+    "청구내역이 아니라 승인내역(이용내역)을 받아주세요." + chr(10) +
+    "     카드사 앱 -> 이용내역 조회 -> 엑셀 다운로드"
+)
+
+
+def classify_statement(headers: list) -> tuple:
+    """헤더로 승인내역/청구내역을 가른다. (판정, 근거) 를 돌려준다."""
+    hs = [re.sub(r"\s+", "", str(h or "")) for h in headers]
+    joined = " ".join(hs)
+    has_merchant = [h for h in MERCHANT_HEADERS if re.sub(r"\s+", "", h) in joined]
+    has_approval = [h for h in APPROVAL_HEADERS if h in joined]
+    has_billing = [h for h in BILLING_HEADERS if h in joined]
+
+    if has_merchant and has_approval:
+        return "승인내역", "가맹점명(%s) + 승인정보(%s)" % (has_merchant[0], has_approval[0])
+    if has_billing and not has_merchant:
+        return "청구내역", "청구 컬럼(%s) 있고 가맹점명 없음" % ", ".join(has_billing[:3])
+    if has_merchant and not has_approval:
+        return "판별불가", "가맹점명은 있는데 승인정보 컬럼이 없다"
+    return "판별불가", "가맹점명·승인정보 컬럼을 찾지 못했다 (헤더: %s)" % (joined[:60] or "없음")
+
+
 # 취소-원결제 폴백 매칭에서 허용하는 날짜 차이
 PAIR_WINDOW_DAYS = 62
 
@@ -116,6 +147,8 @@ class Stats:
         self.unpaired_log: list = []  # (상호, 금액, 사유)
         self.ambiguous_log: list = []  # (상호, 금액, 후보수)
         self.medical_map: dict = {}
+        self.statement_kinds: list = []   # (파일명, 판정, 근거)
+        self.blocked_files: list = []     # (파일명, 판정, 근거)
 
     def mask_medical(self, merchant: str, biz_no: str) -> str:
         key = biz_no or merchant
@@ -301,4 +334,12 @@ def read_file(path: Path, st: Stats, card_type: str | None = None) -> tuple:
     if adapter is None:
         return [], used, "형식 판별 실패 — 건너뜁니다"
 
+    # 승인내역인지 확인한다. 청구내역은 상호명을 쓸 수 없어 파싱을 거부한다.
+    if hasattr(adapter, "headers"):
+        kind, why = classify_statement(adapter.headers(path))
+        st.statement_kinds.append((path.name, kind, why))
+        if kind != "승인내역":
+            st.blocked_files.append((path.name, kind, why))
+            msg = "%s 로 판별됨 (%s)" % (kind, why)
+            return [], used, msg + chr(10) + "     " + STATEMENT_GUIDE
     return adapter.read(path, st), used, warn

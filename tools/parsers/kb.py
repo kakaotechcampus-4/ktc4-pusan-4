@@ -40,6 +40,18 @@ COL = {
 CANCEL_MARK = "취소"        # 상태 = '취소전표매입'
 
 
+def headers(path: Path) -> list:
+    """6행이 헤더다. 승인내역/청구내역 판별에 쓴다."""
+    try:
+        import xlrd
+    except ImportError:  # pragma: no cover
+        return []
+    sheet = xlrd.open_workbook(str(path)).sheet_by_index(0)
+    if sheet.nrows <= HEADER_ROW:
+        return []
+    return [str(c.value) for c in sheet.row(HEADER_ROW)]
+
+
 def read(path: Path, st: Stats) -> list:
     try:
         import xlrd

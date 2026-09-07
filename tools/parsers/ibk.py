@@ -43,6 +43,17 @@ MIN_TD = 11
 CANCEL_MARK = "취소"
 
 
+def headers(path: Path) -> list:
+    """헤더 행의 th 텍스트. 승인내역/청구내역 판별에 쓴다."""
+    soup = BeautifulSoup(path.read_text(encoding="utf-8", errors="replace"), "lxml")
+    best: list = []
+    for tr in soup.find_all("tr"):
+        ths = [th.get_text(" ", strip=True) for th in tr.find_all("th")]
+        if len(ths) > len(best):
+            best = ths
+    return best
+
+
 def read(path: Path, st: Stats) -> list:
     html = path.read_text(encoding="utf-8", errors="replace")
     soup = BeautifulSoup(html, "lxml")

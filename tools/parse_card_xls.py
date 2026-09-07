@@ -65,6 +65,7 @@ def main() -> int:
 
     st = parsers.Stats()
     records, warnings = [], []
+    blocked = 0
     for p in paths:
         recs, used, warn = parsers.read_file(p, st, args.card_type)
         if warn:
@@ -93,10 +94,20 @@ def main() -> int:
 
 
 def report(st, rows, out, warnings) -> None:
+    if st.statement_kinds:
+        print()
+        print("  === 승인내역 / 청구내역 판별 ===")
+        for name, kind, why in st.statement_kinds:
+            mark = "OK  " if kind == "승인내역" else "차단"
+            print("  %s %-26s %s  (%s)" % (mark, name, kind, why))
     if warnings:
         print()
         for name, w in warnings:
             print("  ! %s: %s" % (name, w))
+    if st.blocked_files:
+        print()
+        print("  !! 파싱을 거부한 파일 %d개. 위 안내대로 다시 받아주세요." % len(st.blocked_files))
+
     uniq = len({r["raw_merchant"] for r in rows})
     with_bizno = sum(1 for r in rows if r["biz_no"])
     with_memo = sum(1 for r in rows if r["memo"])
