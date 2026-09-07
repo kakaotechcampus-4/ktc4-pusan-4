@@ -84,6 +84,10 @@ def main() -> int:
     kept = parsers.pair_cancellations(records, st)
     norm = nz.load() if nz is not None else None
     rows = parsers.to_rows(kept, st, norm)
+    # 출력 행과 원본 레코드를 짝지어 natural_key 충돌을 본다.
+    # to_rows 가 일부 행을 버리므로 키가 있는 행만 다시 맞춘다.
+    parsers.check_natural_keys(
+        [r for r in kept if parsers.keeps_row(r)], rows, st)
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -141,10 +145,27 @@ def report(st, rows, out, warnings) -> None:
           % (st.kept - st.no_natural_key, st.kept))
     inst = sum(1 for r in rows if str(r["installment_months"]) not in ("0", ""))
     print("  할부 건            %d건 (나머지는 일시불=0)" % inst)
+    print("  natural_key 충돌   실제 중복 %d건 / 별개 거래 %d건"
+          % (len(st.dup_real), len(st.dup_distinct)))
     print("  폴백 위험 조합     %d개 -> 합산 행 제외 후 %d개"
           % (st.risky_combos_all, st.risky_combos_pairable))
     print("  -> %s" % out)
 
+    if st.dup_real:
+        print()
+        print("  natural_key 충돌 — 실제 중복 (승인번호 동일. 같은 거래가 두 번):")
+        for key, m, amt, dt, n, scope, files, *_ in st.dup_real:
+            print("    %s %-22s %-9s %s  %d건 (%s: %s)"
+                  % (key, m, amt, dt, n, scope, ", ".join(files)))
+        print("    -> 자동 병합하지 않는다. 적재 시 UNIQUE 제약이 막는다")
+    if st.dup_distinct:
+        print()
+        print("  natural_key 충돌 — 별개 거래인데 키가 겹침 (설계 한계):")
+        for key, m, amt, dt, n, scope, files, approvals in st.dup_distinct:
+            print("    %s %-22s %-9s %s  %d건 승인번호 %s"
+                  % (key, m, amt, dt, n, ", ".join(approvals)))
+        print("    -> 같은 날 같은 가맹점 같은 금액이 실제로 여러 건인 경우다.")
+        print("       natural_key 만으로는 구분 불가. 자동 병합하면 실제 지출이 사라진다.")
     if st.pair_log:
         print()
         print("  취소-원결제 짝지어 제외한 건:")
@@ -182,6 +203,12 @@ def report(st, rows, out, warnings) -> None:
             print("    %s -> %s" % (m, ", ".join(sorted(x for x in v if x))))
 
     print()
+    print("  ※ natural_key 는 마스킹 전 원본 상호명으로 계산한다. 재파싱 안정성을")
+    print("     위한 것이며, 해시가 원본을 담게 되는 것은 스키마 설계상 모든 행에 공통이다.")
+    print("  ※ teammate 189건은 날짜 컬럼이 없어 natural_key 를 만들지 못한다.")
+    print("     분석용 데이터이고 제품 경로(카드 파일 업로드)에는 들어가지 않으므로 정상이다.")
+    print("  ※ installment 파싱은 실데이터로 검증되지 않았다 — 표본이 전부 일시불이다.")
+    print("     할부 거래가 들어오면 재확인할 것.")
     print("  ※ 위 수치는 현재 입력 파일만 기준이다.")
     print("     시드 사전은 이 샘플만으로 채우지 않는다.")
 

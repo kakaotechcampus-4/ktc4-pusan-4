@@ -86,6 +86,7 @@ def read(path: Path, st: Stats) -> list:
             biz_no="",              # KB 파일에는 가맹점 사업자번호가 없다
             memo=str(cells[COL["메모"]]).strip(),
             source=SOURCE,
+            src_file=path.name,
             approval_no=cells[COL["승인번호"]],
             when=parse_date(cells[COL["이용일"]]),
             installment=parse_installment(cells[COL["결제방법"]]),

@@ -101,11 +101,11 @@ class Record(dict):
 
 
 def make_record(merchant, amount, biz_no="", memo="", source="", approval_no="",
-                when=None, is_cancel=False, installment=0) -> Record:
+                when=None, is_cancel=False, installment=0, src_file="") -> Record:
     return Record(merchant=str(merchant).strip(), amount=amount, biz_no=biz_no,
                   memo=memo, source=source, approval_no=str(approval_no or "").strip(),
                   when=when, is_cancel=bool(is_cancel), installment=installment,
-                  needs_review=False, review_reason="")
+                  src_file=src_file, needs_review=False, review_reason="")
 
 
 def parse_installment(text) -> int:
@@ -122,8 +122,11 @@ def natural_key(approved_at: str, raw_merchant: str, amount) -> str:
 
     기간을 겹쳐 올렸을 때 같은 거래가 두 번 적재되는 것을 막는 UNIQUE 키다.
     날짜가 없으면 만들지 않는다 — 팀원 목록(상호명만)이 그런 경우다.
-    상호명은 **저장되는 값**(의료 마스킹 적용 후)을 쓴다. 저장값과 키가
-    다른 재료에서 나오면 재계산이 불가능해진다.
+    상호명은 **마스킹 전 원본**을 쓴다. 목적이 "같은 원본 파일을 두 번
+    올렸을 때 중복 차단" 이므로, 원본 파일을 다시 파싱하면 같은 키가 나와야
+    한다. 마스킹 인덱스(의료_마스킹_01)는 파싱 순서에 따라 흔들리므로
+    그것으로 해시하면 재파싱 시 키가 바뀌어 중복 차단이 깨진다.
+    CSV 에서 키를 역산할 필요는 없다 — 그건 요건이 아니다.
     """
     if not approved_at or amount is None or amount == "":
         return ""
@@ -169,6 +172,8 @@ class Stats:
         self.no_amount = 0
         self.no_date = 0
         self.no_natural_key = 0
+        self.dup_real: list = []      # 같은 거래가 두 번 (승인번호 동일)
+        self.dup_distinct: list = []  # 별개 거래인데 키 충돌 (승인번호 다름)
         self.foreign_ccy = 0
         self.aggregated = 0
         self.kept = 0
@@ -329,6 +334,13 @@ def pair_cancellations(records: list, st: Stats) -> list:
     return kept
 
 
+def keeps_row(r: Record) -> bool:
+    """to_rows 가 이 레코드를 출력할지. 충돌 검사에서 행을 맞추는 데 쓴다."""
+    if NON_TRANSACTION_RE.match(r.merchant) and not r.biz_no:
+        return False
+    return r.amount is not None
+
+
 # ---------------------------------------------------------------- 공통 후처리
 def to_rows(records: list, st: Stats, norm=None) -> list:
     """출력 스키마로 변환한다. 여기서 PII(승인번호·날짜)를 버린다."""
@@ -364,9 +376,11 @@ def to_rows(records: list, st: Stats, norm=None) -> list:
         if not approved_at:
             st.no_date += 1
 
+        # 키는 마스킹 전 원본 상호명으로 만든다 (재파싱 안정성)
+        nkey = natural_key(approved_at, r.merchant, r.amount)
+
         st.kept += 1
         st.per_card[r.source] += 1
-        nkey = natural_key(approved_at, merchant, r.amount)
         if not nkey:
             st.no_natural_key += 1
         rows.append({
@@ -385,6 +399,35 @@ def to_rows(records: list, st: Stats, norm=None) -> list:
             "review_reason": r.get("review_reason", ""),
         })
     return rows
+
+
+def check_natural_keys(records: list, rows: list, st: Stats) -> None:
+    """natural_key 충돌을 찾아 '실제 중복' 과 '별개 거래' 로 가른다.
+
+    natural_key = hash(날짜 + 상호 + 금액) 이므로, 같은 날 같은 가맹점에서
+    같은 금액을 두 번 결제하면(버스요금 등) 키가 겹친다. 이건 설계 한계다.
+    다만 승인번호는 거래마다 유니크하므로, 그것으로 둘을 가를 수 있다.
+      승인번호가 같다 -> 같은 거래가 두 번 들어온 것 (실제 중복)
+      승인번호가 다르다 -> 별개 거래인데 키가 겹친 것 (설계 한계)
+    **자동 병합하지 않는다.** 보고만 한다.
+    """
+    by_key: dict = {}
+    for r, row in zip(records, rows):
+        if row["natural_key"]:
+            by_key.setdefault(row["natural_key"], []).append((r, row))
+
+    for key, group in by_key.items():
+        if len(group) < 2:
+            continue
+        approvals = {r.approval_no for r, _ in group}
+        files = {r.get("src_file", "") for r, _ in group}
+        scope = "파일 간" if len(files) > 1 else "파일 내"
+        item = (key, group[0][1]["raw_merchant"], group[0][1]["amount"],
+                group[0][1]["approved_at"], len(group), scope, sorted(files))
+        if len(approvals) == 1:
+            st.dup_real.append(item)
+        else:
+            st.dup_distinct.append(item + (sorted(approvals),))
 
 
 def read_file(path: Path, st: Stats, card_type: str | None = None) -> tuple:

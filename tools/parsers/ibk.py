@@ -75,6 +75,7 @@ def read(path: Path, st: Stats) -> list:
             biz_no=norm_bizno(cells[COL["가맹점사업자번호"]]),
             memo="",
             source=SOURCE,
+            src_file=path.name,
             approval_no=cells[COL["승인번호"]],
             when=parse_date(cells[COL["승인일시"]]),   # 날짜만. 시간은 버린다
             # '국내체크일시불' / '국내일시불' -> 0, 'N개월' 표기가 있으면 그 값
