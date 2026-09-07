@@ -66,6 +66,97 @@ CATEGORY_ENUM = [
 ]
 
 
+# 카테고리 메타. enum 과 같은 파일에 두어 단일 원본을 유지한다.
+#   (이름, 포함 예시 2개, 세무 성격)
+# 세무 성격은 G2(사업관련성) 관문에서 어떻게 다뤄지는지를 뜻한다.
+CATEGORY_META = {
+    "카페": (["스타벅스", "컴포즈커피"], "혼재", "거래처 미팅이면 가능, 혼자 작업이면 불산입"),
+    "음식점": (["롯데리아", "한솥도시락"], "혼재", "대표자 본인 식대는 불산입"),
+    "편의점": (["GS25", "세븐일레븐"], "혼재", "소모품 구매와 개인 간식이 섞인다"),
+    "온라인쇼핑": (["쿠팡", "11번가"], "혼재", "품목을 모르면 되묻기 대상"),
+    "음식배달": (["배달의민족", "쿠팡이츠"], "혼재", "대표자 본인 식대는 불산입"),
+    "해외SaaS": (["AWS", "GITHUB"], "업무용 가능", "부가세 불공제. 3만원 초과면 증빙불비 플래그"),
+    "국내SW": (["한글과컴퓨터", "네이버클라우드"], "업무용 가능", ""),
+    "통신": (["SKT", "아이즈비전"], "혼재", "재택이면 안분 대상"),
+    "수도광열": (["한국전력", "도시가스"], "혼재", "재택이면 안분 대상"),
+    "여비교통": (["코레일", "대한항공"], "업무용 가능", "업무 목적 이동에 한한다"),
+    "차량": (["GS칼텍스", "하이패스"], "혼재", "업무용 사용비율 안분 대상"),
+    "도서": (["교보문고", "예스24"], "업무용 가능", ""),
+    "교육": (["인프런", "패스트캠퍼스"], "업무용 가능", "강의료·교재비. 매점은 여기가 아니다"),
+    "광고": (["구글애즈", "카카오모먼트"], "업무용 가능", ""),
+    "사무용품": (["오피스디포", "모나미"], "업무용 가능", "100만원 초과면 비품(자산)"),
+    "의료": (["병원", "약국"], "사업 무관 후보", "파서가 상호를 마스킹한다"),
+    "금융": (["보험", "카드 연회비"], "혼재", ""),
+    "지자체_과태료": (["주정차위반 과태료", "과태료"], "불산입 후보", "판정은 룰카드 R-004"),
+    "경찰청_범칙금": (["범칙금", "교통 범칙금"], "불산입 후보", "판정은 룰카드 R-004"),
+    "조세": (["소득세", "지방소득세"], "불산입 후보", ""),
+    "PG_미상": (["구글플레이", "나이스정보통신"], "되묻기 필요", "실제 가맹점 불명. 사전 등록 금지"),
+    "기타": (["분류 불가", "신규 업종"], "되묻기 필요", ""),
+    "게임": (["Steam", "닌텐도"], "사업 무관 후보", ""),
+    "구독서비스": (["Netflix", "Spotify"], "업무용 가능", "업무 관련성 진술이 필요하다"),
+    "여가": (["노래연습장", "볼링장"], "사업 무관 후보", "노래방·PC방·볼링은 판정이 같아 한 카테고리다"),
+    "미용": (["미용실", "헤어살롱"], "사업 무관 후보", ""),
+    "생활용품": (["다이소", "생활용품점"], "혼재", "사무용품으로 두면 G2 를 자동 통과한다"),
+}
+
+CATEGORIES_DOC = ROOT / "docs" / "categories.md"
+
+
+def build_categories_doc() -> str:
+    L = []
+    a = L.append
+    a("# 카테고리 목록")
+    a("")
+    a("**이 목록이 단일 원본입니다. enum 밖의 값은 검증기에서 FAIL 입니다.**")
+    a("**새 카테고리가 필요하면 PM에게 요청하세요.**")
+    a("**기준은 업종 세분화가 아니라 G2(사업관련성)에서 다르게 처리되는지입니다.**")
+    a("")
+    a("이 파일은 `tools/validate_rules.py` 의 `CATEGORY_ENUM` / `CATEGORY_META` 에서")
+    a("자동 생성됩니다. 직접 고치지 말고 아래를 실행하세요.")
+    a("")
+    a("```")
+    a("python tools/validate_rules.py --emit-categories")
+    a("```")
+    a("")
+    a("총 %d종." % len(CATEGORY_ENUM))
+    a("")
+    a("| 카테고리 | 포함 예시 | 세무 성격 | 비고 |")
+    a("|---|---|---|---|")
+    for c in CATEGORY_ENUM:
+        ex, nature, note = CATEGORY_META.get(c, ([], "미정", "[PM 확인] 메타 없음"))
+        a("| `%s` | %s | %s | %s |" % (
+            c, ", ".join(ex) if ex else "—", nature, note or "—"))
+    a("")
+    a("## 세무 성격이 뜻하는 것")
+    a("")
+    a("| 표기 | 의미 |")
+    a("|---|---|")
+    a("| 업무용 가능 | G2 를 통과할 수 있다. 다만 사용자 진술이 필요할 수 있다 |")
+    a("| 혼재 | 사업/개인이 섞인다. 안분 또는 되묻기 대상 |")
+    a("| 사업 무관 후보 | 개인 소비로 볼 가능성이 높다 |")
+    a("| 불산입 후보 | G1 에서 걸러질 후보. **판정은 룰카드가 한다** |")
+    a("| 되묻기 필요 | 카테고리만으로는 판정 불가 |")
+    a("")
+    a("**카테고리는 `verdict` 가 아닙니다.** 사전·키워드룰은 category 만 정하고,")
+    a("경비 가능 여부는 6관문 룰카드가 판정합니다. 위 '세무 성격' 은 룰카드를")
+    a("설계할 때의 분류 의도를 적어둔 것이고, 그 자체가 판정이 아닙니다.")
+    a("")
+    return chr(10).join(L)
+
+
+def check_categories_doc(rep: Report) -> None:
+    print("[enum] docs/categories.md 동기화 검사")
+    want = build_categories_doc()
+    if not CATEGORIES_DOC.exists():
+        rep.error("docs/categories.md 가 없다 - python tools/validate_rules.py --emit-categories")
+        return
+    if CATEGORIES_DOC.read_text(encoding="utf-8") != want:
+        rep.error("docs/categories.md 가 enum 과 어긋난다 - "
+                  "python tools/validate_rules.py --emit-categories 로 다시 생성할 것")
+    else:
+        rep.info("카테고리 문서 %d종 동기화됨" % len(CATEGORY_ENUM))
+
+
 # 사전·키워드룰에 절대 들어오면 안 되는 키 (판정은 룰카드 소관)
 FORBIDDEN_KEYS = {"verdict", "account", "판정", "계정과목", "계정", "deductible"}
 
@@ -420,7 +511,15 @@ def check_docs(rep: Report) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--normalize", metavar="TEXT", help="문자열 하나를 정규화해 본다")
+    ap.add_argument("--emit-categories", action="store_true",
+                    help="docs/categories.md 를 enum 에서 다시 생성한다")
     args = ap.parse_args()
+
+    if args.emit_categories:
+        CATEGORIES_DOC.parent.mkdir(parents=True, exist_ok=True)
+        CATEGORIES_DOC.write_text(build_categories_doc(), encoding="utf-8")
+        print("-> %s" % CATEGORIES_DOC)
+        return 0
 
     nspec = load_yaml(NORMALIZE_YAML)
 
@@ -438,6 +537,7 @@ def main() -> int:
     check_seed(rep, rows, norm)
     check_rulecards(rep)
     check_pg_vs_keyword(rep, load_yaml(PG_BLOCKLIST_YAML), load_yaml(KEYWORD_RULES_YAML))
+    check_categories_doc(rep)
     check_docs(rep)
     print()
     return rep.dump()
