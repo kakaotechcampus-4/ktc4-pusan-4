@@ -63,41 +63,46 @@ public final class JudgmentEngine {
                 List.of(), List.of(), List.of(), java.util.Map.of(), List.of()
             );
         }
-        Map<String, Object> attributes = new LinkedHashMap<>(winner.attributes());
-        List<QuestionSpec> questions = new ArrayList<>(winner.questions());
-        List<String> appliedRuleIds = new ArrayList<>(List.of(winner.id()));
-        List<Integer> appliedRuleVersions = new ArrayList<>(List.of(winner.version()));
-        LinkedHashSet<Citation> citations = new LinkedHashSet<>(winner.citations());
+        Map<String, Object> attributes = new LinkedHashMap<>();
+        List<QuestionSpec> questions = new ArrayList<>();
+        List<String> appliedRuleIds = new ArrayList<>();
+        List<Integer> appliedRuleVersions = new ArrayList<>();
+        LinkedHashSet<Citation> citations = new LinkedHashSet<>();
         Verdict resolvedVerdict = winner.verdict();
         String resolvedAccount = winner.account();
 
+        // 승자(G2)와 속성 관문(G3~G6) 카드를 한 파이프라인으로 동일하게 처리한다.
+        // 되묻기는 어느 관문에 있든 user_fact로 해소된다.
+        List<RuleCard> pipeline = new ArrayList<>();
+        pipeline.add(winner);
         for (Gate gate : List.of(Gate.G3, Gate.G4, Gate.G5, Gate.G6)) {
-            List<RuleCard> matchedRules = rules.stream()
+            rules.stream()
                 .filter(rule -> rule.gate() == gate)
                 .filter(rule -> rule.isEffectiveOn(transaction.approvedAt()))
                 .filter(rule -> matches(rule.match(), transaction, context))
                 .sorted(WINNER)
-                .toList();
-            for (RuleCard rule : matchedRules) {
-                mergeAttributes(attributes, rule.attributes(), rule.id());
-                for (QuestionSpec question : rule.questions()) {
-                    QuestionEffect effect = resolvedEffect(question, transaction, facts);
-                    if (effect == null) {
-                        questions.add(resolveGroupKey(question, transaction));
-                        continue;
-                    }
-                    mergeAttributes(attributes, effect.attributes(), rule.id() + ":" + question.code());
-                    if (effect.verdict() != null) {
-                        resolvedVerdict = effect.verdict();
-                    }
-                    if (effect.account() != null) {
-                        resolvedAccount = effect.account();
-                    }
+                .forEach(pipeline::add);
+        }
+
+        for (RuleCard rule : pipeline) {
+            mergeAttributes(attributes, rule.attributes(), rule.id());
+            for (QuestionSpec question : rule.questions()) {
+                QuestionEffect effect = resolvedEffect(question, transaction, facts);
+                if (effect == null) {
+                    questions.add(resolveGroupKey(question, transaction));
+                    continue;
                 }
-                appliedRuleIds.add(rule.id());
-                appliedRuleVersions.add(rule.version());
-                citations.addAll(rule.citations());
+                mergeAttributes(attributes, effect.attributes(), rule.id() + ":" + question.code());
+                if (effect.verdict() != null) {
+                    resolvedVerdict = effect.verdict();
+                }
+                if (effect.account() != null) {
+                    resolvedAccount = effect.account();
+                }
             }
+            appliedRuleIds.add(rule.id());
+            appliedRuleVersions.add(rule.version());
+            citations.addAll(rule.citations());
         }
 
         Verdict verdict = questions.isEmpty() ? resolvedVerdict : Verdict.NEEDS_REVIEW;

@@ -295,6 +295,41 @@ class JudgmentEngineTest {
     }
 
     @Test
+    void g2_card_question_is_resolved_by_matching_user_fact() {
+        UUID transactionId = UUID.randomUUID();
+        QuestionSpec purposeQuestion = new QuestionSpec(
+            "PURPOSE", "이 결제는 어떤 용도였나요?", "용도", "transaction",
+            List.of("업무", "개인"),
+            Map.of(
+                "업무", new QuestionEffect(Verdict.AVAILABLE, "소모품비", Map.of()),
+                "개인", new QuestionEffect(Verdict.UNAVAILABLE, null, Map.of())
+            )
+        );
+        RuleCard g2 = new RuleCard(
+            "R-020", 1, Gate.G2, 500, RuleMatch.categories("카페"),
+            Verdict.AVAILABLE, null, List.of(new Citation("소득세법-27-1")),
+            Map.of(), List.of(purposeQuestion)
+        );
+        TransactionInput transaction = new TransactionInput(
+            transactionId, LocalDate.of(2025, 3, 14), "스타벅스", "카페", 20_000
+        );
+        UserFact fact = new UserFact(
+            "transaction:" + transactionId, "용도", Map.of("value", "업무")
+        );
+
+        Judgment result = JudgmentEngine.judge(
+            transaction,
+            new UserContext("940909", false, null),
+            List.of(fact),
+            List.of(g2)
+        );
+
+        assertThat(result)
+            .extracting(Judgment::verdict, Judgment::account, Judgment::questions)
+            .containsExactly(Verdict.AVAILABLE, "소모품비", List.of());
+    }
+
+    @Test
     void g4_forces_asset_question_above_one_million_for_ambiguous_category() {
         Judgment result = JudgmentEngine.judge(
             subscription("구독", 1_200_000),
