@@ -195,6 +195,7 @@ class JudgmentSchemaIntegrationTest {
             result
         ));
 
+        assertThat(judgmentId.version()).isEqualTo(7);
         Map<String, Object> snapshot = jdbcTemplate.queryForMap("""
             select rule_card_id, rule_card_version, attributes ->> 'source' as source,
                    input_facts -> 0 ->> 'factType' as fact_type
@@ -209,6 +210,9 @@ class JudgmentSchemaIntegrationTest {
         assertThat(jdbcTemplate.queryForObject(
             "select count(*) from question_queue where judgment_id = ?", Integer.class, judgmentId
         )).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+            "select id from question_queue where judgment_id = ?", UUID.class, judgmentId
+        ).version()).isEqualTo(7);
         assertThat(jdbcTemplate.queryForObject(
             "select merchant_raw from unmatched_log where judgment_id = ?", String.class, judgmentId
         )).isEqualTo("미분류 가맹점");

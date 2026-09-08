@@ -37,8 +37,8 @@ class QuestionQueueEntity {
     protected QuestionQueueEntity() {
     }
 
-    QuestionQueueEntity(UUID judgmentId, QuestionSpec question) {
-        this.id = UUID.randomUUID();
+    QuestionQueueEntity(UUID id, UUID judgmentId, QuestionSpec question) {
+        this.id = id;
         this.judgmentId = judgmentId;
         this.reasonCode = question.code();
         this.questionText = question.text();

@@ -2,6 +2,7 @@ package com.ktc4.pusan4.judgment.persistence;
 
 import com.ktc4.pusan4.judgment.domain.Citation;
 import com.ktc4.pusan4.judgment.domain.Judgment;
+import com.ktc4.pusan4.shared.UuidGenerator;
 import jakarta.persistence.EntityManager;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,15 +16,17 @@ import java.util.UUID;
 public class JudgmentPersistenceService {
 
     private final EntityManager entityManager;
+    private final UuidGenerator uuidGenerator;
 
-    public JudgmentPersistenceService(EntityManager entityManager) {
+    public JudgmentPersistenceService(EntityManager entityManager, UuidGenerator uuidGenerator) {
         this.entityManager = entityManager;
+        this.uuidGenerator = uuidGenerator;
     }
 
     @Transactional
     public UUID save(SaveJudgmentCommand command) {
         Judgment judgment = command.judgment();
-        UUID judgmentId = UUID.randomUUID();
+        UUID judgmentId = uuidGenerator.generate();
         entityManager.persist(new JudgmentEntity(
             judgmentId,
             command,
@@ -32,7 +35,7 @@ public class JudgmentPersistenceService {
 
         saveCitations(judgmentId, judgment.citations(), command.statuteEffectiveDate());
         judgment.questions().forEach(question ->
-            entityManager.persist(new QuestionQueueEntity(judgmentId, question))
+            entityManager.persist(new QuestionQueueEntity(uuidGenerator.generate(), judgmentId, question))
         );
         if (judgment.unmatchedReason() != null) {
             requireUnmatchedContext(command);
