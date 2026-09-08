@@ -19,7 +19,8 @@ try:
 except ImportError:  # pragma: no cover
     sys.exit("beautifulsoup4 / lxml 이 필요합니다:  pip install beautifulsoup4 lxml")
 
-from . import Stats, make_record, norm_bizno, parse_amount, parse_date
+from . import (Stats, make_record, norm_bizno, parse_amount, parse_date,
+               parse_installment)
 
 SOURCE = "ibk"
 
@@ -74,8 +75,11 @@ def read(path: Path, st: Stats) -> list:
             biz_no=norm_bizno(cells[COL["가맹점사업자번호"]]),
             memo="",
             source=SOURCE,
+            src_file=path.name,
             approval_no=cells[COL["승인번호"]],
-            when=parse_date(cells[COL["승인일시"]]),
+            when=parse_date(cells[COL["승인일시"]]),   # 날짜만. 시간은 버린다
+            # '국내체크일시불' / '국내일시불' -> 0, 'N개월' 표기가 있으면 그 값
+            installment=parse_installment(usage),
             is_cancel=(CANCEL_MARK in approval or CANCEL_MARK in usage),
         ))
     return out

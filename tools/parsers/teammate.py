@@ -23,5 +23,6 @@ def read(path: Path, st: Stats) -> list:
         if not merchant or merchant.startswith("#"):
             continue
         st.total += 1
-        out.append(make_record(merchant=merchant, amount="", source=SOURCE))
+        out.append(make_record(merchant=merchant, amount="", source=SOURCE,
+                               src_file=path.name))
     return out

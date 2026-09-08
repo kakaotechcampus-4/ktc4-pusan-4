@@ -316,7 +316,16 @@ def selftest(norm: Normalizer) -> int:
 
 # ------------------------------------------------------------------ 리포트
 def load_rows() -> tuple[list[dict], list[dict]]:
-    dom = list(csv.DictReader(SAMPLE_CSV.open(encoding="utf-8"))) if SAMPLE_CSV.exists() else []
+    """분류·정규화 리포트용 행. status=판정대상 만 쓴다.
+
+    파서는 상계·제외 행도 내보내므로(감사 추적용), 필터하지 않으면
+    커버리지가 취소·할인 행까지 분모에 넣어 계산된다.
+    """
+    dom = []
+    if SAMPLE_CSV.exists():
+        for r in csv.DictReader(SAMPLE_CSV.open(encoding="utf-8")):
+            if r.get("status", "판정대상") == "판정대상":
+                dom.append(r)
     ovs = list(csv.DictReader(OVERSEAS_CSV.open(encoding="utf-8"))) if OVERSEAS_CSV.exists() else []
     return dom, ovs
 
