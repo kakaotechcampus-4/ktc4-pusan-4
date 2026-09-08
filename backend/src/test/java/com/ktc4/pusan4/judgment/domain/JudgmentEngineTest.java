@@ -110,7 +110,7 @@ class JudgmentEngineTest {
         assertThat(result)
             .extracting(Judgment::verdict, Judgment::attributes,
                 judgment -> judgment.questions().stream().map(QuestionSpec::code).toList(),
-                Judgment::appliedRuleIds)
+                Judgment::appliedRuleIds, Judgment::appliedRuleVersions)
             .containsExactly(
                 Verdict.NEEDS_REVIEW,
                 Map.of(
@@ -120,7 +120,8 @@ class JudgmentEngineTest {
                     "limitBucket", "기업업무추진비"
                 ),
                 List.of("ASSET_TYPE"),
-                List.of("R-020", "R-030", "R-040", "R-050", "R-060")
+                List.of("R-020", "R-030", "R-040", "R-050", "R-060"),
+                List.of(1, 1, 1, 1, 1)
             );
     }
 

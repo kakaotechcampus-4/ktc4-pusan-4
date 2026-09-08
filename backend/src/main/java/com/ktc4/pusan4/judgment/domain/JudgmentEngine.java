@@ -40,6 +40,7 @@ public final class JudgmentEngine {
                 null,
                 rule.account(),
                 List.of(rule.id()),
+                List.of(rule.version()),
                 rule.citations(),
                 rule.attributes(),
                 rule.questions()
@@ -59,12 +60,13 @@ public final class JudgmentEngine {
         if (winner == null) {
             return new Judgment(
                 Verdict.NEEDS_REVIEW, Gate.G2, true, UnmatchedReason.RULE_NOT_FOUND, null,
-                List.of(), List.of(), java.util.Map.of(), List.of()
+                List.of(), List.of(), List.of(), java.util.Map.of(), List.of()
             );
         }
         Map<String, Object> attributes = new LinkedHashMap<>(winner.attributes());
         List<QuestionSpec> questions = new ArrayList<>(winner.questions());
         List<String> appliedRuleIds = new ArrayList<>(List.of(winner.id()));
+        List<Integer> appliedRuleVersions = new ArrayList<>(List.of(winner.version()));
         LinkedHashSet<Citation> citations = new LinkedHashSet<>(winner.citations());
 
         for (Gate gate : List.of(Gate.G3, Gate.G4, Gate.G5, Gate.G6)) {
@@ -77,13 +79,14 @@ public final class JudgmentEngine {
                     mergeAttributes(attributes, rule);
                     questions.addAll(rule.questions());
                     appliedRuleIds.add(rule.id());
+                    appliedRuleVersions.add(rule.version());
                     citations.addAll(rule.citations());
                 });
         }
 
         Verdict verdict = questions.isEmpty() ? winner.verdict() : Verdict.NEEDS_REVIEW;
         return new Judgment(
-            verdict, null, false, null, winner.account(), appliedRuleIds,
+            verdict, null, false, null, winner.account(), appliedRuleIds, appliedRuleVersions,
             List.copyOf(citations), attributes, questions
         );
     }
