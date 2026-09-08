@@ -9,5 +9,6 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql://ktc4:ktc4-local@localhost:15432/ktc4"
     openai_api_key: str | None = None
+    law_api_oc: str = "test"
 
 settings = Settings()
