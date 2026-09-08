@@ -68,8 +68,8 @@ public final class JudgmentEngine {
         List<String> appliedRuleIds = new ArrayList<>();
         List<Integer> appliedRuleVersions = new ArrayList<>();
         LinkedHashSet<Citation> citations = new LinkedHashSet<>();
-        Verdict resolvedVerdict = winner.verdict();
-        String resolvedAccount = winner.account();
+        Verdict resolvedVerdict = null;
+        String resolvedAccount = null;
 
         // 승자(G2)와 속성 관문(G3~G6) 카드를 한 파이프라인으로 동일하게 처리한다.
         // 되묻기는 어느 관문에 있든 user_fact로 해소된다.
@@ -86,6 +86,9 @@ public final class JudgmentEngine {
 
         for (RuleCard rule : pipeline) {
             mergeAttributes(attributes, rule.attributes(), rule.id());
+            // 카드의 기본 판정을, 그 카드의 되묻기 응답(effect)이 있으면 대체한다.
+            Verdict cardVerdict = rule.verdict();
+            String cardAccount = rule.account();
             for (QuestionSpec question : rule.questions()) {
                 QuestionEffect effect = resolvedEffect(question, transaction, facts);
                 if (effect == null) {
@@ -94,20 +97,28 @@ public final class JudgmentEngine {
                 }
                 mergeAttributes(attributes, effect.attributes(), rule.id() + ":" + question.code());
                 if (effect.verdict() != null) {
-                    resolvedVerdict = effect.verdict();
+                    cardVerdict = effect.verdict();
                 }
                 if (effect.account() != null) {
-                    resolvedAccount = effect.account();
+                    cardAccount = effect.account();
                 }
+            }
+            // 관문 간에는 더 제한적인 판정이 이긴다(뒤 관문이 앞 판정을 완화하지 못함).
+            resolvedVerdict = moreRestrictive(resolvedVerdict, cardVerdict);
+            if (cardAccount != null) {
+                resolvedAccount = cardAccount;
             }
             appliedRuleIds.add(rule.id());
             appliedRuleVersions.add(rule.version());
             citations.addAll(rule.citations());
         }
 
-        Verdict verdict = questions.isEmpty() ? resolvedVerdict : Verdict.NEEDS_REVIEW;
+        Verdict verdict = questions.isEmpty()
+            ? resolvedVerdict
+            : moreRestrictive(resolvedVerdict, Verdict.NEEDS_REVIEW);
+        String account = verdict == Verdict.UNAVAILABLE ? null : resolvedAccount;
         return new Judgment(
-            verdict, null, false, null, resolvedAccount, appliedRuleIds, appliedRuleVersions,
+            verdict, null, false, null, account, appliedRuleIds, appliedRuleVersions,
             List.copyOf(citations), attributes, questions
         );
     }
@@ -164,6 +175,24 @@ public final class JudgmentEngine {
                 );
             }
         });
+    }
+
+    private static Verdict moreRestrictive(Verdict left, Verdict right) {
+        if (left == null) {
+            return right;
+        }
+        if (right == null) {
+            return left;
+        }
+        return restrictiveness(left) >= restrictiveness(right) ? left : right;
+    }
+
+    private static int restrictiveness(Verdict verdict) {
+        return switch (verdict) {
+            case AVAILABLE -> 0;
+            case NEEDS_REVIEW -> 1;
+            case UNAVAILABLE -> 2;
+        };
     }
 
     private static QuestionEffect resolvedEffect(

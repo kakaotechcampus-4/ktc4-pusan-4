@@ -330,6 +330,48 @@ class JudgmentEngineTest {
     }
 
     @Test
+    void later_gate_cannot_relax_an_earlier_unavailable_verdict() {
+        UUID transactionId = UUID.randomUUID();
+        QuestionSpec purposeQuestion = new QuestionSpec(
+            "PURPOSE", "용도는?", "용도", "transaction",
+            List.of("업무", "개인"),
+            Map.of(
+                "업무", new QuestionEffect(Verdict.AVAILABLE, "소모품비", Map.of()),
+                "개인", new QuestionEffect(Verdict.UNAVAILABLE, null, Map.of())
+            )
+        );
+        RuleCard g2 = new RuleCard(
+            "R-020", 1, Gate.G2, 500, RuleMatch.categories("카페"),
+            Verdict.NEEDS_REVIEW, null, List.of(new Citation("소득세법-27-1")),
+            Map.of(), List.of(purposeQuestion)
+        );
+        RuleCard g4 = new RuleCard(
+            "R-051", 1, Gate.G4, 500, RuleMatch.categories("카페"),
+            null, null, List.of(new Citation("소득세법시행령-67-4")), Map.of(),
+            List.of(new QuestionSpec(
+                "ASSET_OR_EXPENSE", "자산?", "자산여부", "transaction",
+                List.of("자산", "당기비용"),
+                Map.of("당기비용", new QuestionEffect(Verdict.AVAILABLE, "소모품비", Map.of()))
+            ))
+        );
+        TransactionInput transaction = new TransactionInput(
+            transactionId, LocalDate.of(2025, 3, 14), "스타벅스", "카페", 20_000
+        );
+        List<UserFact> facts = List.of(
+            new UserFact("transaction:" + transactionId, "용도", Map.of("value", "개인")),
+            new UserFact("transaction:" + transactionId, "자산여부", Map.of("value", "당기비용"))
+        );
+
+        Judgment result = JudgmentEngine.judge(
+            transaction, new UserContext("940909", false, null), facts, List.of(g4, g2)
+        );
+
+        assertThat(result)
+            .extracting(Judgment::verdict, Judgment::account, Judgment::questions)
+            .containsExactly(Verdict.UNAVAILABLE, null, List.of());
+    }
+
+    @Test
     void g4_forces_asset_question_above_one_million_for_ambiguous_category() {
         Judgment result = JudgmentEngine.judge(
             subscription("구독", 1_200_000),
