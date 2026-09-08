@@ -10,6 +10,7 @@ import com.ktc4.pusan4.judgment.domain.QuestionEffect;
 import com.ktc4.pusan4.judgment.domain.QuestionSpec;
 import com.ktc4.pusan4.judgment.domain.RuleCard;
 import com.ktc4.pusan4.judgment.domain.RuleMatch;
+import com.ktc4.pusan4.judgment.domain.RuleSet;
 import com.ktc4.pusan4.judgment.domain.Verdict;
 
 import java.io.IOException;
@@ -32,7 +33,7 @@ public final class RuleCardLoader {
 
     private final ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
 
-    public List<RuleCard> load(Path rulesDirectory) throws IOException {
+    public RuleSet load(Path rulesDirectory) throws IOException {
         Path cardsDirectory = rulesDirectory.resolve("cards");
         if (!Files.isDirectory(cardsDirectory)) {
             throw new RuleCardValidationException("Rule cards directory does not exist: " + cardsDirectory);
@@ -49,7 +50,7 @@ public final class RuleCardLoader {
         validateUniqueIds(cards);
         validateBlockingConflicts(cards);
         validateAttributeConflicts(cards);
-        return cards;
+        return new RuleSet(cards);
     }
 
     private RuleCard readUnchecked(Path path) {

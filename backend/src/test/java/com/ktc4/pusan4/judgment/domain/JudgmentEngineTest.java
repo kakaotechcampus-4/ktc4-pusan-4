@@ -36,7 +36,7 @@ class JudgmentEngineTest {
             transaction,
             new UserContext("940909", false, null),
             List.of(),
-            List.of(g2, g1)
+            new RuleSet(List.of(g2, g1))
         );
 
         assertThat(result)
@@ -78,7 +78,7 @@ class JudgmentEngineTest {
             transaction,
             new UserContext("940909", false, null),
             List.of(),
-            List.of(generic, specific)
+            new RuleSet(List.of(generic, specific))
         );
 
         assertThat(result)
@@ -104,7 +104,7 @@ class JudgmentEngineTest {
             transaction,
             new UserContext("940909", false, null),
             List.of(),
-            List.of(g6, g5, g4, g3, g2)
+            new RuleSet(List.of(g6, g5, g4, g3, g2))
         );
 
         assertThat(result)
@@ -135,7 +135,7 @@ class JudgmentEngineTest {
             transaction,
             new UserContext("940909", false, null),
             List.of(),
-            List.of()
+            new RuleSet(List.of())
         );
 
         assertThat(result)
@@ -165,7 +165,7 @@ class JudgmentEngineTest {
             transaction,
             new UserContext("940909", false, null),
             List.of(),
-            List.of(expired)
+            new RuleSet(List.of(expired))
         );
 
         assertThat(result.unmatchedReason()).isEqualTo(UnmatchedReason.RULE_NOT_FOUND);
@@ -201,7 +201,7 @@ class JudgmentEngineTest {
             transaction,
             new UserContext("940909", false, null),
             List.of(fact),
-            List.of(g3, g2)
+            new RuleSet(List.of(g3, g2))
         );
 
         assertThat(result)
@@ -244,7 +244,7 @@ class JudgmentEngineTest {
             transaction,
             new UserContext("940909", false, null),
             List.of(fact),
-            List.of(g3, g2)
+            new RuleSet(List.of(g3, g2))
         );
 
         assertThat(result)
@@ -288,7 +288,7 @@ class JudgmentEngineTest {
             transaction,
             new UserContext("940909", false, null),
             List.of(fact),
-            List.of(g3, g2)
+            new RuleSet(List.of(g3, g2))
         );
 
         assertThat(result.questions()).isEmpty();
@@ -321,7 +321,7 @@ class JudgmentEngineTest {
             transaction,
             new UserContext("940909", false, null),
             List.of(fact),
-            List.of(g2)
+            new RuleSet(List.of(g2))
         );
 
         assertThat(result)
@@ -363,7 +363,7 @@ class JudgmentEngineTest {
         );
 
         Judgment result = JudgmentEngine.judge(
-            transaction, new UserContext("940909", false, null), facts, List.of(g4, g2)
+            transaction, new UserContext("940909", false, null), facts, new RuleSet(List.of(g4, g2))
         );
 
         assertThat(result)
@@ -377,7 +377,7 @@ class JudgmentEngineTest {
             subscription("구독", 1_200_000),
             new UserContext("940909", false, null),
             List.of(),
-            List.of(g2Available(), g4AssetCard())
+            new RuleSet(List.of(g2Available(), g4AssetCard()))
         );
 
         assertThat(result)
@@ -392,7 +392,7 @@ class JudgmentEngineTest {
             subscription("구독", 900_000),
             new UserContext("940909", false, null),
             List.of(),
-            List.of(g2Available(), g4AssetCard())
+            new RuleSet(List.of(g2Available(), g4AssetCard()))
         );
 
         assertThat(result)
@@ -406,7 +406,7 @@ class JudgmentEngineTest {
             subscription("카페", 1_200_000),
             new UserContext("940909", false, null),
             List.of(),
-            List.of(g2Available(), g4AssetCard())
+            new RuleSet(List.of(g2Available(), g4AssetCard()))
         );
 
         assertThat(result)
@@ -425,12 +425,25 @@ class JudgmentEngineTest {
             transaction,
             new UserContext("940909", false, null),
             List.of(fact),
-            List.of(g2Available(), g4AssetCard())
+            new RuleSet(List.of(g2Available(), g4AssetCard()))
         );
 
         assertThat(result)
             .extracting(Judgment::verdict, Judgment::account, Judgment::questions)
             .containsExactly(Verdict.AVAILABLE, "소모품비", List.of());
+    }
+
+    @Test
+    void reuses_rules_without_caching_transaction_matches() {
+        RuleSet rules = new RuleSet(List.of(g4AssetCard(), g2Available()));
+        UserContext context = new UserContext("940909", false, null);
+
+        Judgment large = JudgmentEngine.judge(subscription("구독", 1_200_000), context, List.of(), rules);
+        Judgment small = JudgmentEngine.judge(subscription("구독", 900_000), context, List.of(), rules);
+        Judgment excluded = JudgmentEngine.judge(subscription("카페", 1_200_000), context, List.of(), rules);
+
+        assertThat(List.of(large.verdict(), small.verdict(), excluded.verdict()))
+            .containsExactly(Verdict.NEEDS_REVIEW, Verdict.AVAILABLE, Verdict.AVAILABLE);
     }
 
     private static TransactionInput subscription(String category, long amount) {

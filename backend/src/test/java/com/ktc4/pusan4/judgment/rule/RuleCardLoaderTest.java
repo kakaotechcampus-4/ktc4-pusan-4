@@ -1,6 +1,7 @@
 package com.ktc4.pusan4.judgment.rule;
 
 import com.ktc4.pusan4.judgment.domain.QuestionEffect;
+import com.ktc4.pusan4.judgment.domain.Gate;
 import com.ktc4.pusan4.judgment.domain.RuleCard;
 import com.ktc4.pusan4.judgment.domain.Verdict;
 import org.junit.jupiter.api.Test;
@@ -27,7 +28,7 @@ class RuleCardLoaderTest {
         Files.writeString(root.resolve("cards/R-020.yaml"), cardYaml("R-020", 300));
         Files.writeString(root.resolve("cards/R-010.yaml"), cardYaml("R-010", 900));
 
-        List<RuleCard> cards = new RuleCardLoader().load(root);
+        List<RuleCard> cards = new RuleCardLoader().load(root).get(Gate.G1);
 
         assertThat(cards).extracting(RuleCard::id).containsExactly("R-010", "R-020");
     }
@@ -67,7 +68,7 @@ class RuleCardLoaderTest {
             review: { by: 외부자문, date: 2026-09-05 }
             """);
 
-        RuleCard card = new RuleCardLoader().load(root).getFirst();
+        RuleCard card = new RuleCardLoader().load(root).get(Gate.G3).getFirst();
 
         assertThat(card.questions().getFirst().effects()).containsEntry(
             "업무미팅",
@@ -83,7 +84,7 @@ class RuleCardLoaderTest {
     void loads_g4_asset_card_from_test_resource() throws Exception {
         Path rulesDirectory = Path.of(getClass().getResource("/cards").toURI()).getParent();
 
-        RuleCard card = new RuleCardLoader().load(rulesDirectory).stream()
+        RuleCard card = new RuleCardLoader().load(rulesDirectory).get(Gate.G4).stream()
             .filter(loaded -> loaded.id().equals("R-051"))
             .findFirst()
             .orElseThrow();

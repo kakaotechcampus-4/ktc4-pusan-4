@@ -1,6 +1,5 @@
 package com.ktc4.pusan4.judgment.domain;
 
-import java.util.Comparator;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -9,15 +8,6 @@ import java.util.Map;
 
 public final class JudgmentEngine {
 
-    private static final Comparator<RuleCard> PRIORITY = Comparator
-        .comparingInt(RuleCard::priority).reversed()
-        .thenComparing(RuleCard::id);
-
-    private static final Comparator<RuleCard> WINNER = Comparator
-        .comparingInt(RuleCard::priority).reversed()
-        .thenComparing(Comparator.comparingInt(JudgmentEngine::specificity).reversed())
-        .thenComparing(RuleCard::id);
-
     private JudgmentEngine() {
     }
 
@@ -25,13 +15,11 @@ public final class JudgmentEngine {
         TransactionInput transaction,
         UserContext context,
         List<UserFact> facts,
-        List<RuleCard> rules
+        RuleSet rules
     ) {
-        Judgment blocked = rules.stream()
-            .filter(rule -> rule.gate() == Gate.G1)
+        Judgment blocked = rules.get(Gate.G1).stream()
             .filter(rule -> rule.isEffectiveOn(transaction.approvedAt()))
             .filter(rule -> matches(rule.match(), transaction, context))
-            .sorted(PRIORITY)
             .findFirst()
             .map(rule -> new Judgment(
                 Verdict.UNAVAILABLE,
@@ -50,11 +38,9 @@ public final class JudgmentEngine {
             return blocked;
         }
 
-        RuleCard winner = rules.stream()
-            .filter(rule -> rule.gate() == Gate.G2)
+        RuleCard winner = rules.get(Gate.G2).stream()
             .filter(rule -> rule.isEffectiveOn(transaction.approvedAt()))
             .filter(rule -> matches(rule.match(), transaction, context))
-            .sorted(WINNER)
             .findFirst()
             .orElse(null);
         if (winner == null) {
@@ -76,11 +62,9 @@ public final class JudgmentEngine {
         List<RuleCard> pipeline = new ArrayList<>();
         pipeline.add(winner);
         for (Gate gate : List.of(Gate.G3, Gate.G4, Gate.G5, Gate.G6)) {
-            rules.stream()
-                .filter(rule -> rule.gate() == gate)
+            rules.get(gate).stream()
                 .filter(rule -> rule.isEffectiveOn(transaction.approvedAt()))
                 .filter(rule -> matches(rule.match(), transaction, context))
-                .sorted(WINNER)
                 .forEach(pipeline::add);
         }
 
@@ -142,24 +126,6 @@ public final class JudgmentEngine {
             return false;
         }
         return match.industries().isEmpty() || match.industries().contains(context.industryCode());
-    }
-
-    static int specificity(RuleCard card) {
-        RuleMatch match = card.match();
-        int score = 0;
-        if (!match.keywords().isEmpty()) {
-            score += 100;
-        }
-        if (!match.categories().isEmpty()) {
-            score += 50;
-        }
-        if (!match.industries().isEmpty()) {
-            score += 30;
-        }
-        if (match.amountMin() != null || match.amountMax() != null) {
-            score += 20;
-        }
-        return score;
     }
 
     private static void mergeAttributes(
