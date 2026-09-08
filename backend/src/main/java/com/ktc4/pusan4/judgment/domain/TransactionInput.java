@@ -7,7 +7,17 @@ public record TransactionInput(
     UUID id,
     LocalDate approvedAt,
     String merchantRaw,
+    String merchantNorm,
     String merchantCategory,
     long amount
 ) {
+    public TransactionInput(
+        UUID id,
+        LocalDate approvedAt,
+        String merchantRaw,
+        String merchantCategory,
+        long amount
+    ) {
+        this(id, approvedAt, merchantRaw, merchantRaw, merchantCategory, amount);
+    }
 }

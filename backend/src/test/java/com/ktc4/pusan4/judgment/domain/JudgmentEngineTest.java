@@ -171,6 +171,129 @@ class JudgmentEngineTest {
         assertThat(result.unmatchedReason()).isEqualTo(UnmatchedReason.RULE_NOT_FOUND);
     }
 
+    @Test
+    void matching_user_fact_prevents_repeating_attribute_question() {
+        UUID transactionId = UUID.randomUUID();
+        RuleCard g2 = card("R-020", Gate.G2, Verdict.AVAILABLE, Map.of(), List.of());
+        RuleCard g3 = card(
+            "R-027",
+            Gate.G3,
+            null,
+            Map.of(),
+            List.of(new QuestionSpec(
+                "PURPOSE",
+                "이 결제는 어떤 용도였나요?",
+                "용도",
+                "transaction",
+                List.of("업무미팅", "혼자작업", "개인")
+            ))
+        );
+        TransactionInput transaction = new TransactionInput(
+            transactionId, LocalDate.of(2025, 3, 14), "스타벅스", "카페", 20_000
+        );
+        UserFact fact = new UserFact(
+            "transaction:" + transactionId,
+            "용도",
+            Map.of("value", "혼자작업")
+        );
+
+        Judgment result = JudgmentEngine.judge(
+            transaction,
+            new UserContext("940909", false, null),
+            List.of(fact),
+            List.of(g3, g2)
+        );
+
+        assertThat(result)
+            .extracting(Judgment::verdict, Judgment::questions)
+            .containsExactly(Verdict.AVAILABLE, List.of());
+    }
+
+    @Test
+    void matching_user_fact_applies_question_option_effects() {
+        UUID transactionId = UUID.randomUUID();
+        RuleCard g2 = card("R-020", Gate.G2, Verdict.AVAILABLE, Map.of(), List.of());
+        QuestionSpec purposeQuestion = new QuestionSpec(
+            "PURPOSE",
+            "이 결제는 어떤 용도였나요?",
+            "용도",
+            "transaction",
+            List.of("업무미팅", "개인"),
+            Map.of(
+                "업무미팅",
+                new QuestionEffect(
+                    Verdict.AVAILABLE,
+                    "접대비",
+                    Map.of("limit_bucket", "접대비")
+                ),
+                "개인",
+                new QuestionEffect(Verdict.UNAVAILABLE, null, Map.of())
+            )
+        );
+        RuleCard g3 = card("R-027", Gate.G3, null, Map.of(), List.of(purposeQuestion));
+        TransactionInput transaction = new TransactionInput(
+            transactionId, LocalDate.of(2025, 3, 14), "스타벅스", "카페", 20_000
+        );
+        UserFact fact = new UserFact(
+            "transaction:" + transactionId,
+            "용도",
+            Map.of("value", "업무미팅")
+        );
+
+        Judgment result = JudgmentEngine.judge(
+            transaction,
+            new UserContext("940909", false, null),
+            List.of(fact),
+            List.of(g3, g2)
+        );
+
+        assertThat(result)
+            .extracting(
+                Judgment::verdict,
+                Judgment::account,
+                Judgment::attributes,
+                Judgment::questions
+            )
+            .containsExactly(
+                Verdict.AVAILABLE,
+                "접대비",
+                Map.of("limit_bucket", "접대비"),
+                List.of()
+            );
+    }
+
+    @Test
+    void merchant_scoped_fact_uses_normalized_merchant_name() {
+        RuleCard g2 = card("R-020", Gate.G2, Verdict.AVAILABLE, Map.of(), List.of());
+        RuleCard g3 = card(
+            "R-027",
+            Gate.G3,
+            null,
+            Map.of(),
+            List.of(new QuestionSpec(
+                "PURPOSE", "용도는 무엇인가요?", "용도", "merchant_norm", List.of("업무")
+            ))
+        );
+        TransactionInput transaction = new TransactionInput(
+            UUID.randomUUID(),
+            LocalDate.of(2025, 3, 14),
+            "스타벅스 부산대점",
+            "스타벅스",
+            "카페",
+            20_000
+        );
+        UserFact fact = new UserFact("merchant:스타벅스", "용도", Map.of("value", "업무"));
+
+        Judgment result = JudgmentEngine.judge(
+            transaction,
+            new UserContext("940909", false, null),
+            List.of(fact),
+            List.of(g3, g2)
+        );
+
+        assertThat(result.questions()).isEmpty();
+    }
+
     private static RuleCard card(
         String id,
         Gate gate,

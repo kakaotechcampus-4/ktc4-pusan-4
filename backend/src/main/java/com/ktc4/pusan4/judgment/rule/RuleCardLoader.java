@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.ktc4.pusan4.judgment.domain.Citation;
 import com.ktc4.pusan4.judgment.domain.Gate;
+import com.ktc4.pusan4.judgment.domain.QuestionEffect;
 import com.ktc4.pusan4.judgment.domain.QuestionSpec;
 import com.ktc4.pusan4.judgment.domain.RuleCard;
 import com.ktc4.pusan4.judgment.domain.RuleMatch;
@@ -92,7 +93,7 @@ public final class RuleCardLoader {
         );
 
         Verdict verdict = root.hasNonNull("verdict")
-            ? enumValue(Verdict.class, root.get("verdict").asText(), "verdict")
+            ? verdictValue(root.get("verdict").asText())
             : null;
         if ((gate == Gate.G1 || gate == Gate.G2) && verdict == null) {
             throw new RuleCardValidationException(id + ": blocking gate requires verdict");
@@ -214,15 +215,31 @@ public final class RuleCardLoader {
             return List.of();
         }
         List<String> options = new ArrayList<>();
-        question.path("options").forEach(option ->
-            options.add(option.isTextual() ? option.asText() : requiredText(option, "value"))
-        );
+        Map<String, QuestionEffect> effects = new java.util.LinkedHashMap<>();
+        question.path("options").forEach(option -> {
+            String value = option.isTextual() ? option.asText() : requiredText(option, "value");
+            options.add(value);
+            if (option.isObject()) {
+                Map<String, Object> attributes = new java.util.LinkedHashMap<>(objectMap(option));
+                attributes.remove("value");
+                attributes.remove("verdict");
+                attributes.remove("account");
+                effects.put(value, new QuestionEffect(
+                    option.hasNonNull("verdict")
+                        ? verdictValue(option.get("verdict").asText())
+                        : null,
+                    optionalText(option, "account"),
+                    attributes
+                ));
+            }
+        });
         return List.of(new QuestionSpec(
             optionalText(question, "code") == null ? "RULE_QUESTION" : optionalText(question, "code"),
             requiredText(question, "text"),
             requiredText(question, "fact_type"),
             requiredText(question, "group_by"),
-            options
+            options,
+            effects
         ));
     }
 
@@ -297,5 +314,14 @@ public final class RuleCardLoader {
         } catch (IllegalArgumentException exception) {
             throw new RuleCardValidationException("Invalid " + field + ": " + value);
         }
+    }
+
+    private static Verdict verdictValue(String value) {
+        return switch (value) {
+            case "가능" -> Verdict.AVAILABLE;
+            case "불가" -> Verdict.UNAVAILABLE;
+            case "확인필요", "확인 필요" -> Verdict.NEEDS_REVIEW;
+            default -> enumValue(Verdict.class, value, "verdict");
+        };
     }
 }

@@ -68,25 +68,41 @@ public final class JudgmentEngine {
         List<String> appliedRuleIds = new ArrayList<>(List.of(winner.id()));
         List<Integer> appliedRuleVersions = new ArrayList<>(List.of(winner.version()));
         LinkedHashSet<Citation> citations = new LinkedHashSet<>(winner.citations());
+        Verdict resolvedVerdict = winner.verdict();
+        String resolvedAccount = winner.account();
 
         for (Gate gate : List.of(Gate.G3, Gate.G4, Gate.G5, Gate.G6)) {
-            rules.stream()
+            List<RuleCard> matchedRules = rules.stream()
                 .filter(rule -> rule.gate() == gate)
                 .filter(rule -> rule.isEffectiveOn(transaction.approvedAt()))
                 .filter(rule -> matches(rule.match(), transaction, context))
                 .sorted(WINNER)
-                .forEach(rule -> {
-                    mergeAttributes(attributes, rule);
-                    questions.addAll(rule.questions());
-                    appliedRuleIds.add(rule.id());
-                    appliedRuleVersions.add(rule.version());
-                    citations.addAll(rule.citations());
-                });
+                .toList();
+            for (RuleCard rule : matchedRules) {
+                mergeAttributes(attributes, rule.attributes(), rule.id());
+                for (QuestionSpec question : rule.questions()) {
+                    QuestionEffect effect = resolvedEffect(question, transaction, facts);
+                    if (effect == null) {
+                        questions.add(resolveGroupKey(question, transaction));
+                        continue;
+                    }
+                    mergeAttributes(attributes, effect.attributes(), rule.id() + ":" + question.code());
+                    if (effect.verdict() != null) {
+                        resolvedVerdict = effect.verdict();
+                    }
+                    if (effect.account() != null) {
+                        resolvedAccount = effect.account();
+                    }
+                }
+                appliedRuleIds.add(rule.id());
+                appliedRuleVersions.add(rule.version());
+                citations.addAll(rule.citations());
+            }
         }
 
-        Verdict verdict = questions.isEmpty() ? winner.verdict() : Verdict.NEEDS_REVIEW;
+        Verdict verdict = questions.isEmpty() ? resolvedVerdict : Verdict.NEEDS_REVIEW;
         return new Judgment(
-            verdict, null, false, null, winner.account(), appliedRuleIds, appliedRuleVersions,
+            verdict, null, false, null, resolvedAccount, appliedRuleIds, appliedRuleVersions,
             List.copyOf(citations), attributes, questions
         );
     }
@@ -130,14 +146,57 @@ public final class JudgmentEngine {
         return score;
     }
 
-    private static void mergeAttributes(Map<String, Object> target, RuleCard rule) {
-        rule.attributes().forEach((key, value) -> {
+    private static void mergeAttributes(
+        Map<String, Object> target,
+        Map<String, Object> additions,
+        String source
+    ) {
+        additions.forEach((key, value) -> {
             Object previous = target.putIfAbsent(key, value);
             if (previous != null && !previous.equals(value)) {
                 throw new IllegalStateException(
-                    "Conflicting attribute '%s' in rule %s".formatted(key, rule.id())
+                    "Conflicting attribute '%s' in %s".formatted(key, source)
                 );
             }
         });
+    }
+
+    private static QuestionEffect resolvedEffect(
+        QuestionSpec question,
+        TransactionInput transaction,
+        List<UserFact> facts
+    ) {
+        return facts.stream()
+            .filter(fact ->
+                fact.scopeKey().equals(scopeKey(question.groupBy(), transaction))
+                    && fact.factType().equals(question.factType())
+            )
+            .map(UserFact::selectedValue)
+            .map(question::effectFor)
+            .filter(java.util.Objects::nonNull)
+            .findFirst()
+            .orElse(null);
+    }
+
+    private static QuestionSpec resolveGroupKey(
+        QuestionSpec question,
+        TransactionInput transaction
+    ) {
+        return new QuestionSpec(
+            question.code(),
+            question.text(),
+            question.factType(),
+            scopeKey(question.groupBy(), transaction),
+            question.options(),
+            question.effects()
+        );
+    }
+
+    private static String scopeKey(String groupBy, TransactionInput transaction) {
+        return switch (groupBy) {
+            case "transaction" -> "transaction:" + transaction.id();
+            case "merchant", "merchant_norm" -> "merchant:" + transaction.merchantNorm();
+            default -> groupBy;
+        };
     }
 }

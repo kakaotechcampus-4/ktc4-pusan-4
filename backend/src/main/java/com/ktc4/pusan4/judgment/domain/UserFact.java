@@ -6,4 +6,9 @@ public record UserFact(String scopeKey, String factType, Map<String, Object> val
     public UserFact {
         value = value == null ? Map.of() : Map.copyOf(value);
     }
+
+    public String selectedValue() {
+        Object selected = value.containsKey("value") ? value.get("value") : value.get("answer");
+        return selected instanceof String string ? string : null;
+    }
 }

@@ -1,6 +1,8 @@
 package com.ktc4.pusan4.judgment.rule;
 
+import com.ktc4.pusan4.judgment.domain.QuestionEffect;
 import com.ktc4.pusan4.judgment.domain.RuleCard;
+import com.ktc4.pusan4.judgment.domain.Verdict;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -8,6 +10,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -39,6 +42,41 @@ class RuleCardLoaderTest {
             .isInstanceOf(RuleCardValidationException.class)
             .hasMessageContaining("R-010")
             .hasMessageContaining("R-020");
+    }
+
+    @Test
+    void loads_question_option_effects() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("cards/R-027.yaml"), """
+            id: R-027
+            version: 1
+            gate: G3
+            priority: 400
+            effective_period: { start: 2025-01-01, end: null }
+            match:
+              category: [카페]
+            question:
+              code: PURPOSE
+              text: 이 결제는 어떤 용도였나요?
+              fact_type: 용도
+              group_by: merchant_norm
+              options:
+                - { value: 업무미팅, verdict: 가능, account: 접대비, limit_bucket: 접대비 }
+                - { value: 개인, verdict: 불가 }
+            citations: [소득세법-33-1-5]
+            review: { by: 외부자문, date: 2026-09-05 }
+            """);
+
+        RuleCard card = new RuleCardLoader().load(root).getFirst();
+
+        assertThat(card.questions().getFirst().effects()).containsEntry(
+            "업무미팅",
+            new QuestionEffect(
+                Verdict.AVAILABLE,
+                "접대비",
+                Map.of("limit_bucket", "접대비")
+            )
+        );
     }
 
     private static String cardYaml(String id, int priority) {

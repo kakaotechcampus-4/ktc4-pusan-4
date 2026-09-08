@@ -10,6 +10,7 @@ import org.hibernate.type.SqlTypes;
 
 import java.util.List;
 import java.util.UUID;
+import java.time.OffsetDateTime;
 
 @Entity
 @Table(name = "question_queue")
@@ -30,9 +31,18 @@ class QuestionQueueEntity {
     @Column(name = "group_key", nullable = false)
     private String groupKey;
 
+    @Column(name = "answered_fact_id")
+    private UUID answeredFactId;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(nullable = false, columnDefinition = "jsonb")
     private List<String> options;
+
+    @Column(nullable = false)
+    private String status;
+
+    @Column(name = "answered_at")
+    private OffsetDateTime answeredAt;
 
     protected QuestionQueueEntity() {
     }
@@ -44,5 +54,15 @@ class QuestionQueueEntity {
         this.questionText = question.text();
         this.groupKey = question.groupBy();
         this.options = question.options();
+        this.status = "대기";
+    }
+
+    void answer(UUID factId, OffsetDateTime answeredAt) {
+        if (!"대기".equals(status)) {
+            throw new IllegalStateException("Question is not pending: " + id);
+        }
+        this.answeredFactId = factId;
+        this.answeredAt = answeredAt;
+        this.status = "응답";
     }
 }

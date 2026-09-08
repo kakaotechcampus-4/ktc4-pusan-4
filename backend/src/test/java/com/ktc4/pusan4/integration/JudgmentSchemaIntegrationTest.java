@@ -14,6 +14,8 @@ import com.ktc4.pusan4.judgment.limit.LimitAllocation;
 import com.ktc4.pusan4.judgment.persistence.JudgmentPersistenceService;
 import com.ktc4.pusan4.judgment.persistence.LimitBucketPersistenceService;
 import com.ktc4.pusan4.judgment.persistence.SaveJudgmentCommand;
+import com.ktc4.pusan4.judgment.persistence.UserFactPersistenceService;
+import jakarta.persistence.NoResultException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -51,6 +53,9 @@ class JudgmentSchemaIntegrationTest {
 
     @Autowired
     private LimitBucketPersistenceService limitBucketPersistenceService;
+
+    @Autowired
+    private UserFactPersistenceService userFactPersistenceService;
 
     @Test
     void flyway_creates_judgment_core_tables() {
@@ -275,6 +280,97 @@ class JudgmentSchemaIntegrationTest {
             .containsEntry("allowed_total", 250_000L)
             .containsEntry("state", "잠정")
             .containsEntry("max_state", "잠정");
+    }
+
+    @Test
+    void user_facts_are_versioned_and_latest_answer_is_loaded() {
+        UUID userId = UUID.randomUUID();
+        jdbcTemplate.update(
+            "insert into app_user(id, email) values (?, ?)", userId, userId + "@example.com"
+        );
+        UserFact first = new UserFact(
+            "merchant:스타벅스", "용도", Map.of("value", "개인")
+        );
+        UserFact corrected = new UserFact(
+            "merchant:스타벅스", "용도", Map.of("value", "업무미팅")
+        );
+
+        UUID firstFactId = userFactPersistenceService.save(userId, first);
+        UUID correctedFactId = userFactPersistenceService.save(userId, corrected);
+
+        assertThat(firstFactId.version()).isEqualTo(7);
+        assertThat(correctedFactId.version()).isEqualTo(7);
+        assertThat(userFactPersistenceService.findLatest(
+            userId, "merchant:스타벅스", "용도"
+        )).contains(corrected);
+        assertThat(jdbcTemplate.queryForList("""
+            select version
+            from user_fact
+            where user_id = ? and scope_key = 'merchant:스타벅스' and fact_type = '용도'
+            order by version
+            """, Integer.class, userId)).containsExactly(1, 2);
+    }
+
+    @Test
+    void answering_question_creates_fact_and_marks_queue_entry_answered() {
+        UUID userId = UUID.randomUUID();
+        UUID batchId = UUID.randomUUID();
+        UUID transactionId = UUID.randomUUID();
+        UUID judgmentId = UUID.randomUUID();
+        UUID questionId = UUID.randomUUID();
+        insertJudgmentFixture(userId, batchId, transactionId, judgmentId, "fact-answer");
+        jdbcTemplate.update("""
+            insert into question_queue(
+                id, judgment_id, reason_code, question_text, group_key, options
+            ) values (?, ?, 'PURPOSE', '용도는 무엇인가요?', 'merchant:스타벅스', '["업무", "개인"]')
+            """, questionId, judgmentId);
+        UserFact answer = new UserFact(
+            "merchant:스타벅스", "용도", Map.of("value", "업무")
+        );
+
+        UUID factId = userFactPersistenceService.answerQuestion(questionId, userId, answer);
+
+        assertThat(jdbcTemplate.queryForMap("""
+            select status, answered_fact_id, answered_at is not null as has_answered_at
+            from question_queue
+            where id = ?
+            """, questionId))
+            .containsEntry("status", "응답")
+            .containsEntry("answered_fact_id", factId)
+            .containsEntry("has_answered_at", true);
+    }
+
+    @Test
+    void answering_another_users_question_is_rejected_without_creating_a_fact() {
+        UUID ownerId = UUID.randomUUID();
+        UUID otherUserId = UUID.randomUUID();
+        UUID batchId = UUID.randomUUID();
+        UUID transactionId = UUID.randomUUID();
+        UUID judgmentId = UUID.randomUUID();
+        UUID questionId = UUID.randomUUID();
+        insertJudgmentFixture(ownerId, batchId, transactionId, judgmentId, "foreign-question");
+        jdbcTemplate.update(
+            "insert into app_user(id, email) values (?, ?)",
+            otherUserId, otherUserId + "@example.com"
+        );
+        jdbcTemplate.update("""
+            insert into question_queue(
+                id, judgment_id, reason_code, question_text, group_key, options
+            ) values (?, ?, 'PURPOSE', '용도는 무엇인가요?', 'merchant:스타벅스', '["업무", "개인"]')
+            """, questionId, judgmentId);
+        UserFact answer = new UserFact(
+            "merchant:스타벅스", "용도", Map.of("value", "업무")
+        );
+
+        assertThatThrownBy(() ->
+            userFactPersistenceService.answerQuestion(questionId, otherUserId, answer)
+        ).isInstanceOf(NoResultException.class);
+        assertThat(jdbcTemplate.queryForObject(
+            "select count(*) from user_fact where user_id = ?", Integer.class, otherUserId
+        )).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+            "select status from question_queue where id = ?", String.class, questionId
+        )).isEqualTo("대기");
     }
 
     private void insertBatch(UUID batchId, UUID userId, String fileHash) {
