@@ -294,6 +294,107 @@ class JudgmentEngineTest {
         assertThat(result.questions()).isEmpty();
     }
 
+    @Test
+    void g4_forces_asset_question_above_one_million_for_ambiguous_category() {
+        Judgment result = JudgmentEngine.judge(
+            subscription("구독", 1_200_000),
+            new UserContext("940909", false, null),
+            List.of(),
+            List.of(g2Available(), g4AssetCard())
+        );
+
+        assertThat(result)
+            .extracting(Judgment::verdict,
+                judgment -> judgment.questions().stream().map(QuestionSpec::code).toList())
+            .containsExactly(Verdict.NEEDS_REVIEW, List.of("ASSET_OR_EXPENSE"));
+    }
+
+    @Test
+    void g4_does_not_force_question_below_one_million() {
+        Judgment result = JudgmentEngine.judge(
+            subscription("구독", 900_000),
+            new UserContext("940909", false, null),
+            List.of(),
+            List.of(g2Available(), g4AssetCard())
+        );
+
+        assertThat(result)
+            .extracting(Judgment::verdict, Judgment::questions)
+            .containsExactly(Verdict.AVAILABLE, List.of());
+    }
+
+    @Test
+    void g4_does_not_force_question_for_excluded_category() {
+        Judgment result = JudgmentEngine.judge(
+            subscription("카페", 1_200_000),
+            new UserContext("940909", false, null),
+            List.of(),
+            List.of(g2Available(), g4AssetCard())
+        );
+
+        assertThat(result)
+            .extracting(Judgment::verdict, Judgment::questions)
+            .containsExactly(Verdict.AVAILABLE, List.of());
+    }
+
+    @Test
+    void answering_g4_asset_question_resolves_forced_review() {
+        TransactionInput transaction = subscription("구독", 1_200_000);
+        UserFact fact = new UserFact(
+            "transaction:" + transaction.id(), "자산여부", Map.of("value", "당기비용")
+        );
+
+        Judgment result = JudgmentEngine.judge(
+            transaction,
+            new UserContext("940909", false, null),
+            List.of(fact),
+            List.of(g2Available(), g4AssetCard())
+        );
+
+        assertThat(result)
+            .extracting(Judgment::verdict, Judgment::account, Judgment::questions)
+            .containsExactly(Verdict.AVAILABLE, "소모품비", List.of());
+    }
+
+    private static TransactionInput subscription(String category, long amount) {
+        return new TransactionInput(
+            UUID.randomUUID(), LocalDate.of(2025, 3, 14), "가맹점", category, amount
+        );
+    }
+
+    private static RuleCard g2Available() {
+        return new RuleCard(
+            "R-020", 1, Gate.G2, 500,
+            new RuleMatch(List.of(), List.of(), List.of(), null, null, List.of()),
+            Verdict.AVAILABLE, "소모품비",
+            List.of(new Citation("소득세법-27-1")),
+            Map.of(), List.of()
+        );
+    }
+
+    private static RuleCard g4AssetCard() {
+        QuestionSpec assetQuestion = new QuestionSpec(
+            "ASSET_OR_EXPENSE",
+            "취득가액이 100만원을 넘습니다. 자산으로 처리할까요?",
+            "자산여부",
+            "transaction",
+            List.of("자산", "당기비용"),
+            Map.of(
+                "자산", new QuestionEffect(
+                    Verdict.NEEDS_REVIEW, null, Map.of("자산", true, "내용연수", 5)
+                ),
+                "당기비용", new QuestionEffect(Verdict.AVAILABLE, "소모품비", Map.of())
+            )
+        );
+        return new RuleCard(
+            "R-051", 1, Gate.G4, 500,
+            new RuleMatch(List.of(), List.of("소모품", "식음료", "카페"), List.of(), 1_000_001L, null, List.of()),
+            null, null,
+            List.of(new Citation("소득세법시행령-67-4")),
+            Map.of(), List.of(assetQuestion)
+        );
+    }
+
     private static RuleCard card(
         String id,
         Gate gate,

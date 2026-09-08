@@ -79,6 +79,40 @@ class RuleCardLoaderTest {
         );
     }
 
+    @Test
+    void loads_g4_asset_card_with_amount_threshold_and_exclusions() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("cards/R-051.yaml"), """
+            id: R-051
+            version: 1
+            gate: G4
+            priority: 500
+            effective_period: { start: 2025-01-01, end: null }
+            match:
+              amount_min: 1000001
+              exclude_category: [소모품, 식음료, 카페]
+            question:
+              code: ASSET_OR_EXPENSE
+              text: 취득가액이 100만원을 넘습니다. 자산으로 처리할까요?
+              fact_type: 자산여부
+              group_by: transaction
+              options:
+                - { value: 자산, 내용연수: 5 }
+                - { value: 당기비용, verdict: 가능, account: 소모품비 }
+            citations: [소득세법시행령-67-4]
+            review: { by: 외부자문, date: 2026-09-05 }
+            """);
+
+        RuleCard card = new RuleCardLoader().load(root).getFirst();
+
+        assertThat(card.match().amountMin()).isEqualTo(1_000_001L);
+        assertThat(card.match().excludedCategories()).containsExactly("소모품", "식음료", "카페");
+        assertThat(card.questions().getFirst())
+            .extracting(question -> question.code(), question -> question.factType(),
+                question -> question.groupBy())
+            .containsExactly("ASSET_OR_EXPENSE", "자산여부", "transaction");
+    }
+
     private static String cardYaml(String id, int priority) {
         return """
             id: %s
