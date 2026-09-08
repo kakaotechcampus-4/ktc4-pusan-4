@@ -45,12 +45,42 @@ CHECKS = [
         """SELECT statute_id FROM statute_version WHERE length(trim(body)) < 5""",
     ),
     (
+        # 조문 껍데기만 잡는다. 심판례 본문은 '단서규정이 삭제되었으므로'처럼
+        # 정상적으로 그런 문구로 시작할 수 있다.
         "삭제 조문 잔존",
-        r"""SELECT statute_id FROM statute_version WHERE body ~ '^\S{1,8}\s*삭제'""",
+        r"""SELECT statute_id FROM statute_version
+            WHERE unit_level <> '문서'
+              AND body ~ '^제\d+조(의\d+)?\s*[(<]?\s*삭제'""",
     ),
     (
         "편장절 제목 혼입",
-        """SELECT statute_id FROM statute_version WHERE body LIKE '%제1장 총칙%'""",
+        """SELECT statute_id FROM statute_version
+            WHERE unit_level <> '문서' AND body LIKE '제1장 총칙%'""",
+    ),
+    (
+        # 원고 주장이 결론으로 읽히면 패소 판례가 '가능'의 근거가 된다
+        "판례에 당사자 주장 혼입",
+        """SELECT statute_id FROM statute_version
+            WHERE doc_type = '판례'
+              AND (body LIKE '%【청구취지%' OR body LIKE '%【원고%' OR body LIKE '%【원심판결%')""",
+    ),
+    (
+        # 국세청 출처 판례는 본문이 없다. 새어 들어오면 껍데기만 색인된다
+        "판례 출처 오염",
+        """SELECT statute_id FROM statute_version
+            WHERE doc_type = '판례' AND COALESCE(meta ->> '데이터출처명', '') <> '대법원'""",
+    ),
+    (
+        # 심판례 본문 응답의 청구번호는 빈 문자열이다. 목록 머지가 깨지면 비어버린다
+        "심판례 청구번호 누락",
+        """SELECT statute_id FROM statute_version
+            WHERE hierarchy = '심판례' AND COALESCE(doc_no, '') = ''""",
+    ),
+    (
+        "문서 단위 오분류",
+        """SELECT statute_id FROM statute_version
+            WHERE (doc_type IN ('판례', '심판례해석') AND unit_level <> '문서')
+               OR (doc_type = '법령' AND unit_level = '문서')""",
     ),
 ]
 

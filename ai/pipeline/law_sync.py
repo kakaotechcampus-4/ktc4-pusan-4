@@ -55,6 +55,8 @@ KEYWORDS = [
 # 대법원 판례에도 민사·형사가 섞여 온다. 세무 도메인만 남긴다.
 PREC_CASE_TYPES = {"세무", "일반행정"}
 
+COMMIT_EVERY = 500
+
 TARGETS = ["law", "admrul", "expc", "decc", "prec"]
 DOC_TYPES = {
     "law": "법령", "admrul": "행정규칙",
@@ -208,7 +210,8 @@ def main() -> int:
 
     with psycopg.connect(settings.database_url) as conn:
         for target in targets:
-            changed: list[str] = []
+            sample: list[str] = []
+            n_changed = seen = 0
             hashes: dict[str, str] = {}
             clashes: list[str] = []
             try:
@@ -217,21 +220,28 @@ def main() -> int:
                     if hashes.setdefault(unit.statute_id, unit.body_hash) != unit.body_hash:
                         clashes.append(unit.statute_id)
                     if upsert(conn, unit):
-                        changed.append(unit.statute_id)
-                    if len(hashes) % 500 == 0:
-                        print(f"{target:<8} {len(hashes):6d}행 ...", flush=True)
+                        n_changed += 1
+                        if len(sample) < 200:
+                            sample.append(unit.statute_id)
+                    seen += 1
+                    # 수만 건을 한 트랜잭션에 담으면 메모리가 터진다.
+                    # upsert가 멱등이라 중간에 죽어도 재실행하면 이어진다.
+                    if seen % COMMIT_EVERY == 0:
+                        if not args.dry_run:
+                            conn.commit()
+                        print(f"{target:<8} {seen:6d}행 ...", flush=True)
             except NotApproved:
                 print(f"{target:<8} 건너뜀 — OC에 미신청된 API. open.law.go.kr 에서 신청 필요")
                 continue
-            total += len(changed)
-            print(f"{target:<8} {len(hashes):6d}행  변경 {len(changed):6d}")
+            total += n_changed
+            print(f"{target:<8} {len(hashes):6d}행  변경 {n_changed:6d}")
             if clashes:
                 print(f"         ⚠️ statute_id 충돌 {len(clashes)}건 — {clashes[:3]}")
 
             conn.execute(
                 "INSERT INTO law_sync_log (target_law, doc_type, changed, changed_statutes)"
                 " VALUES (%s, %s, %s, %s)",
-                (target, DOC_TYPES[target], bool(changed), Json(changed[:200])),
+                (target, DOC_TYPES[target], bool(n_changed), Json(sample)),
             )
 
         if args.dry_run:
