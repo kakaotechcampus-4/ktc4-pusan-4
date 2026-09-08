@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """적재된 법령 코퍼스 검증. 하나라도 깨지면 exit 1.
 
 사용: python -m pipeline.verify
