@@ -13,7 +13,9 @@ import com.ktc4.pusan4.judgment.limit.FinalizationConditions;
 import com.ktc4.pusan4.judgment.limit.LimitAllocation;
 import com.ktc4.pusan4.judgment.persistence.JudgmentPersistenceService;
 import com.ktc4.pusan4.judgment.persistence.LimitBucketPersistenceService;
+import com.ktc4.pusan4.judgment.persistence.RuleCandidatePersistenceService;
 import com.ktc4.pusan4.judgment.persistence.SaveJudgmentCommand;
+import com.ktc4.pusan4.judgment.persistence.SaveRuleCandidateCommand;
 import com.ktc4.pusan4.judgment.persistence.UserFactPersistenceService;
 import jakarta.persistence.NoResultException;
 import org.junit.jupiter.api.Test;
@@ -57,6 +59,9 @@ class JudgmentSchemaIntegrationTest {
     @Autowired
     private UserFactPersistenceService userFactPersistenceService;
 
+    @Autowired
+    private RuleCandidatePersistenceService ruleCandidatePersistenceService;
+
     @Test
     void flyway_creates_judgment_core_tables() {
         List<String> tables = jdbcTemplate.queryForList("""
@@ -77,8 +82,38 @@ class JudgmentSchemaIntegrationTest {
             "user_fact",
             "question_queue",
             "unmatched_log",
-            "merchant_dict"
+            "merchant_dict",
+            "rule_candidate"
         );
+    }
+
+    @Test
+    void rule_candidate_is_stored_as_pending_with_suggested_docs() {
+        long candidateId = ruleCandidatePersistenceService.save(new SaveRuleCandidateCommand(
+            "구독", "620100", 3, 12,
+            List.of("소득세법-33-1-6", "소득세법시행령-67-4"),
+            "시행령", "draft"
+        ));
+
+        Map<String, Object> stored = jdbcTemplate.queryForMap("""
+            select status, merchant_category, distinct_users,
+                   suggested_docs ->> 0 as first_doc
+            from rule_candidate
+            where id = ?
+            """, candidateId);
+        assertThat(stored)
+            .containsEntry("status", "대기")
+            .containsEntry("merchant_category", "구독")
+            .containsEntry("distinct_users", 3)
+            .containsEntry("first_doc", "소득세법-33-1-6");
+    }
+
+    @Test
+    void rule_candidate_rejects_unknown_status() {
+        assertThatThrownBy(() -> jdbcTemplate.update("""
+            insert into rule_candidate(merchant_category, industry_code, distinct_users, occurrence_count, status)
+            values ('구독', '620100', 3, 12, '알수없음')
+            """)).isInstanceOf(DataAccessException.class);
     }
 
     @Test
