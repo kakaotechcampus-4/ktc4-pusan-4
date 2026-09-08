@@ -312,6 +312,34 @@ class JudgmentSchemaIntegrationTest {
     }
 
     @Test
+    void loads_only_the_latest_version_of_each_user_fact() {
+        UUID userId = UUID.randomUUID();
+        UUID otherUserId = UUID.randomUUID();
+        jdbcTemplate.update(
+            "insert into app_user(id, email) values (?, ?), (?, ?)",
+            userId, userId + "@example.com", otherUserId, otherUserId + "@example.com"
+        );
+        UserFact latestPurpose = new UserFact(
+            "merchant:스타벅스", "용도", Map.of("value", "업무미팅")
+        );
+        UserFact dedicatedLine = new UserFact(
+            "merchant:통신사", "전용여부", Map.of("value", "전용")
+        );
+        userFactPersistenceService.save(userId, new UserFact(
+            "merchant:스타벅스", "용도", Map.of("value", "개인")
+        ));
+        userFactPersistenceService.save(userId, latestPurpose);
+        userFactPersistenceService.save(userId, dedicatedLine);
+        userFactPersistenceService.save(otherUserId, new UserFact(
+            "merchant:스타벅스", "용도", Map.of("value", "개인")
+        ));
+
+        List<UserFact> result = userFactPersistenceService.findAllLatest(userId);
+
+        assertThat(result).containsExactlyInAnyOrder(latestPurpose, dedicatedLine);
+    }
+
+    @Test
     void answering_question_creates_fact_and_marks_queue_entry_answered() {
         UUID userId = UUID.randomUUID();
         UUID batchId = UUID.randomUUID();
@@ -367,6 +395,64 @@ class JudgmentSchemaIntegrationTest {
         ).isInstanceOf(NoResultException.class);
         assertThat(jdbcTemplate.queryForObject(
             "select count(*) from user_fact where user_id = ?", Integer.class, otherUserId
+        )).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+            "select status from question_queue where id = ?", String.class, questionId
+        )).isEqualTo("대기");
+    }
+
+    @Test
+    void answering_question_with_a_different_fact_scope_is_rejected() {
+        UUID userId = UUID.randomUUID();
+        UUID batchId = UUID.randomUUID();
+        UUID transactionId = UUID.randomUUID();
+        UUID judgmentId = UUID.randomUUID();
+        UUID questionId = UUID.randomUUID();
+        insertJudgmentFixture(userId, batchId, transactionId, judgmentId, "wrong-fact-scope");
+        jdbcTemplate.update("""
+            insert into question_queue(
+                id, judgment_id, reason_code, question_text, group_key, options
+            ) values (?, ?, 'PURPOSE', '용도는 무엇인가요?', 'merchant:스타벅스', '["업무", "개인"]')
+            """, questionId, judgmentId);
+        UserFact wrongScope = new UserFact(
+            "merchant:다른가맹점", "용도", Map.of("value", "업무")
+        );
+
+        assertThatThrownBy(() ->
+            userFactPersistenceService.answerQuestion(questionId, userId, wrongScope)
+        ).isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("scope");
+        assertThat(jdbcTemplate.queryForObject(
+            "select count(*) from user_fact where user_id = ?", Integer.class, userId
+        )).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+            "select status from question_queue where id = ?", String.class, questionId
+        )).isEqualTo("대기");
+    }
+
+    @Test
+    void answering_question_with_an_unknown_option_is_rejected() {
+        UUID userId = UUID.randomUUID();
+        UUID batchId = UUID.randomUUID();
+        UUID transactionId = UUID.randomUUID();
+        UUID judgmentId = UUID.randomUUID();
+        UUID questionId = UUID.randomUUID();
+        insertJudgmentFixture(userId, batchId, transactionId, judgmentId, "unknown-option");
+        jdbcTemplate.update("""
+            insert into question_queue(
+                id, judgment_id, reason_code, question_text, group_key, options
+            ) values (?, ?, 'PURPOSE', '용도는 무엇인가요?', 'merchant:스타벅스', '["업무", "개인"]')
+            """, questionId, judgmentId);
+        UserFact unknownOption = new UserFact(
+            "merchant:스타벅스", "용도", Map.of("value", "선물")
+        );
+
+        assertThatThrownBy(() ->
+            userFactPersistenceService.answerQuestion(questionId, userId, unknownOption)
+        ).isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("option");
+        assertThat(jdbcTemplate.queryForObject(
+            "select count(*) from user_fact where user_id = ?", Integer.class, userId
         )).isZero();
         assertThat(jdbcTemplate.queryForObject(
             "select status from question_queue where id = ?", String.class, questionId

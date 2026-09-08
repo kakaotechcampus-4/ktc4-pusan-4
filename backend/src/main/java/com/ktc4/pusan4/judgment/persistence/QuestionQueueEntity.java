@@ -1,6 +1,7 @@
 package com.ktc4.pusan4.judgment.persistence;
 
 import com.ktc4.pusan4.judgment.domain.QuestionSpec;
+import com.ktc4.pusan4.judgment.domain.UserFact;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -57,9 +58,19 @@ class QuestionQueueEntity {
         this.status = "대기";
     }
 
-    void answer(UUID factId, OffsetDateTime answeredAt) {
+    void answer(UUID factId, UserFact fact, OffsetDateTime answeredAt) {
         if (!"대기".equals(status)) {
             throw new IllegalStateException("Question is not pending: " + id);
+        }
+        if (!groupKey.equals(fact.scopeKey())) {
+            throw new IllegalArgumentException(
+                "Fact scope does not match question group: " + fact.scopeKey()
+            );
+        }
+        if (!options.isEmpty() && !options.contains(fact.selectedValue())) {
+            throw new IllegalArgumentException(
+                "Fact option is not allowed for question: " + fact.selectedValue()
+            );
         }
         this.answeredFactId = factId;
         this.answeredAt = answeredAt;

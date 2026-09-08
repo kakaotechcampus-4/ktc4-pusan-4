@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -60,6 +61,29 @@ public class UserFactPersistenceService {
             .map(UserFactEntity::toDomain);
     }
 
+    @Transactional(readOnly = true)
+    public List<UserFact> findAllLatest(UUID userId) {
+        return entityManager.createQuery("""
+                select fact
+                from UserFactEntity fact
+                where fact.userId = :userId
+                  and not exists (
+                    select newer.id
+                    from UserFactEntity newer
+                    where newer.userId = fact.userId
+                      and newer.scopeKey = fact.scopeKey
+                      and newer.factType = fact.factType
+                      and newer.version > fact.version
+                  )
+                order by fact.scopeKey, fact.factType
+                """, UserFactEntity.class)
+            .setParameter("userId", userId)
+            .getResultList()
+            .stream()
+            .map(UserFactEntity::toDomain)
+            .toList();
+    }
+
     @Transactional
     public UUID answerQuestion(UUID questionId, UUID userId, UserFact answer) {
         QuestionQueueEntity question = findQuestionForUser(questionId, userId);
@@ -70,7 +94,7 @@ public class UserFactPersistenceService {
             answer,
             nextVersion(userId, answer.scopeKey(), answer.factType())
         ));
-        question.answer(factId, OffsetDateTime.now(clock));
+        question.answer(factId, answer, OffsetDateTime.now(clock));
         return factId;
     }
 
