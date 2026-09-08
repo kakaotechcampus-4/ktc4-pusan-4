@@ -12,7 +12,7 @@ question:
   fact_type: 자산여부
   group_by: transaction
   options:
-    - { value: 자산, 내용연수: 5 }
+    - { value: 자산, verdict: 확인필요, 자산: true, 내용연수: 5 }
     - { value: 당기비용, verdict: 가능, account: 소모품비 }
 citations: [소득세법시행령-67-4]
 review: { by: 외부자문, date: 2026-09-05 }

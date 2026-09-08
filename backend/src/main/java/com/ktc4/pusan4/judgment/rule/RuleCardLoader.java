@@ -104,13 +104,23 @@ public final class RuleCardLoader {
             throw new RuleCardValidationException(id + ": final verdict requires citation");
         }
 
+        List<QuestionSpec> questions = questions(root);
+        boolean hasFinalEffectVerdict = questions.stream()
+            .flatMap(question -> question.effects().values().stream())
+            .map(QuestionEffect::verdict)
+            .anyMatch(effectVerdict ->
+                effectVerdict == Verdict.AVAILABLE || effectVerdict == Verdict.UNAVAILABLE);
+        if (hasFinalEffectVerdict && citations.isEmpty()) {
+            throw new RuleCardValidationException(id + ": effect verdict requires citation");
+        }
+
         JsonNode review = root.path("review");
         String reviewedBy = requiredText(review, "by");
         LocalDate reviewedAt = LocalDate.parse(requiredText(review, "date"));
 
         return new RuleCard(
             id, version, gate, priority, ruleMatch, verdict, optionalText(root, "account"), citations,
-            objectMap(root.path("attributes")), questions(root),
+            objectMap(root.path("attributes")), questions,
             effectiveFrom, effectiveTo, reviewedBy, reviewedAt
         );
     }
@@ -300,8 +310,11 @@ public final class RuleCardLoader {
 
     private static List<String> strings(JsonNode node, String field) {
         JsonNode values = node.path(field);
-        if (!values.isArray()) {
+        if (values.isMissingNode() || values.isNull()) {
             return List.of();
+        }
+        if (!values.isArray()) {
+            throw new RuleCardValidationException(field + " must be a list");
         }
         List<String> result = new ArrayList<>();
         values.forEach(value -> result.add(value.asText()));

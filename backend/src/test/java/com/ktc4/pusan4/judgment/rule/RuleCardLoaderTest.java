@@ -94,6 +94,60 @@ class RuleCardLoaderTest {
             .extracting(question -> question.code(), question -> question.factType(),
                 question -> question.groupBy())
             .containsExactly("ASSET_OR_EXPENSE", "자산여부", "transaction");
+        assertThat(card.questions().getFirst().effects())
+            .containsEntry("자산", new QuestionEffect(
+                Verdict.NEEDS_REVIEW, null, Map.of("자산", true, "내용연수", 5)))
+            .containsEntry("당기비용", new QuestionEffect(
+                Verdict.AVAILABLE, "소모품비", Map.of()));
+    }
+
+    @Test
+    void rejects_scalar_where_match_field_expects_a_list() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("cards/R-010.yaml"), """
+            id: R-010
+            version: 1
+            gate: G1
+            priority: 900
+            effective_period: { start: 2025-01-01, end: null }
+            match:
+              category: 카페
+            verdict: 불가
+            citations: [소득세법-33-1-2]
+            review: { by: 외부자문, date: 2026-09-05 }
+            """);
+
+        assertThatThrownBy(() -> new RuleCardLoader().load(root))
+            .isInstanceOf(RuleCardValidationException.class)
+            .hasMessageContaining("category");
+    }
+
+    @Test
+    void rejects_effect_verdict_without_citation() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("cards/R-027.yaml"), """
+            id: R-027
+            version: 1
+            gate: G2
+            priority: 500
+            effective_period: { start: 2025-01-01, end: null }
+            match:
+              category: [카페]
+            verdict: 확인필요
+            question:
+              code: PURPOSE
+              text: 용도는?
+              fact_type: 용도
+              group_by: transaction
+              options:
+                - { value: 업무, verdict: 가능, account: 소모품비 }
+                - { value: 개인, verdict: 불가 }
+            review: { by: 외부자문, date: 2026-09-05 }
+            """);
+
+        assertThatThrownBy(() -> new RuleCardLoader().load(root))
+            .isInstanceOf(RuleCardValidationException.class)
+            .hasMessageContaining("citation");
     }
 
     private static String cardYaml(String id, int priority) {
