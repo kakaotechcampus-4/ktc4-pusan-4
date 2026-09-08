@@ -48,6 +48,7 @@ public final class RuleCardLoader {
         }
         validateUniqueIds(cards);
         validateBlockingConflicts(cards);
+        validateAttributeConflicts(cards);
         return cards;
     }
 
@@ -150,6 +151,33 @@ public final class RuleCardLoader {
                     throw new RuleCardValidationException(
                         "Conflicting blocking rules: " + left.id() + " and " + right.id()
                     );
+                }
+            }
+        }
+    }
+
+    private void validateAttributeConflicts(List<RuleCard> cards) {
+        for (int leftIndex = 0; leftIndex < cards.size(); leftIndex++) {
+            RuleCard left = cards.get(leftIndex);
+            if (left.gate() == Gate.G1 || left.gate() == Gate.G2) {
+                continue;
+            }
+            for (int rightIndex = leftIndex + 1; rightIndex < cards.size(); rightIndex++) {
+                RuleCard right = cards.get(rightIndex);
+                if (right.gate() == Gate.G1 || right.gate() == Gate.G2) {
+                    continue;
+                }
+                if (!periodsOverlap(left, right) || !matchesOverlap(left.match(), right.match())) {
+                    continue;
+                }
+                for (Map.Entry<String, Object> entry : left.attributes().entrySet()) {
+                    Object rightValue = right.attributes().get(entry.getKey());
+                    if (rightValue != null && !rightValue.equals(entry.getValue())) {
+                        throw new RuleCardValidationException(
+                            "Conflicting attribute '" + entry.getKey() + "' in "
+                                + left.id() + " and " + right.id()
+                        );
+                    }
                 }
             }
         }

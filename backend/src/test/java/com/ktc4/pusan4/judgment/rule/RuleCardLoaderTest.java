@@ -150,6 +150,39 @@ class RuleCardLoaderTest {
             .hasMessageContaining("citation");
     }
 
+    @Test
+    void rejects_conflicting_attribute_cards() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("cards/R-030.yaml"), """
+            id: R-030
+            version: 1
+            gate: G3
+            priority: 500
+            effective_period: { start: 2025-01-01, end: null }
+            match:
+              category: [카페]
+            attributes:
+              evidence: 업무목적
+            review: { by: 외부자문, date: 2026-09-05 }
+            """);
+        Files.writeString(root.resolve("cards/R-050.yaml"), """
+            id: R-050
+            version: 1
+            gate: G5
+            priority: 500
+            effective_period: { start: 2025-01-01, end: null }
+            match:
+              category: [카페]
+            attributes:
+              evidence: 카드매출전표
+            review: { by: 외부자문, date: 2026-09-05 }
+            """);
+
+        assertThatThrownBy(() -> new RuleCardLoader().load(root))
+            .isInstanceOf(RuleCardValidationException.class)
+            .hasMessageContaining("evidence");
+    }
+
     private static String cardYaml(String id, int priority) {
         return """
             id: %s
