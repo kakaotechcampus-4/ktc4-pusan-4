@@ -28,10 +28,17 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-import java.util.List;
-import java.util.UUID;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -217,6 +224,34 @@ class JudgmentSchemaIntegrationTest {
     }
 
     @Test
+    void concurrent_judgment_saves_assign_distinct_revisions() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID batchId = UUID.randomUUID();
+        UUID transactionId = UUID.randomUUID();
+        jdbcTemplate.update(
+            "insert into app_user(id, email) values (?, ?)", userId, userId + "@example.com"
+        );
+        insertBatch(batchId, userId, "concurrent-judgment-file-hash");
+        insertTransaction(transactionId, batchId, "concurrent-judgment-natural-key");
+        Judgment judgment = new Judgment(
+            Verdict.AVAILABLE, null, false, null, null,
+            List.of(), List.of(), Map.of(), List.of()
+        );
+        SaveJudgmentCommand command = new SaveJudgmentCommand(
+            transactionId, "concurrent-revisions", 1, 2025, LocalDate.of(2025, 12, 31),
+            List.of(), judgment
+        );
+        runConcurrently(8, () -> judgmentPersistenceService.save(command));
+
+        assertThat(jdbcTemplate.queryForList("""
+            select revision
+            from judgment
+            where transaction_id = ?
+            order by revision
+            """, Integer.class, transactionId)).containsExactly(1, 2, 3, 4, 5, 6, 7, 8);
+    }
+
+    @Test
     void saves_judgment_snapshot_question_and_unmatched_log() {
         UUID userId = UUID.randomUUID();
         UUID batchId = UUID.randomUUID();
@@ -344,6 +379,25 @@ class JudgmentSchemaIntegrationTest {
             where user_id = ? and scope_key = 'merchant:스타벅스' and fact_type = '용도'
             order by version
             """, Integer.class, userId)).containsExactly(1, 2);
+    }
+
+    @Test
+    void concurrent_user_fact_saves_assign_distinct_versions() throws Exception {
+        UUID userId = UUID.randomUUID();
+        jdbcTemplate.update(
+            "insert into app_user(id, email) values (?, ?)", userId, userId + "@example.com"
+        );
+        UserFact fact = new UserFact(
+            "merchant:스타벅스", "용도", Map.of("value", "업무")
+        );
+        runConcurrently(8, () -> userFactPersistenceService.save(userId, fact));
+
+        assertThat(jdbcTemplate.queryForList("""
+            select version
+            from user_fact
+            where user_id = ? and scope_key = 'merchant:스타벅스' and fact_type = '용도'
+            order by version
+            """, Integer.class, userId)).containsExactly(1, 2, 3, 4, 5, 6, 7, 8);
     }
 
     @Test
@@ -521,6 +575,32 @@ class JudgmentSchemaIntegrationTest {
         assertThat(jdbcTemplate.queryForObject(
             "select status from question_queue where id = ?", String.class, questionId
         )).isEqualTo("대기");
+    }
+
+    private void runConcurrently(int taskCount, Callable<?> task) throws Exception {
+        ExecutorService executor = Executors.newFixedThreadPool(taskCount);
+        CountDownLatch ready = new CountDownLatch(taskCount);
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<?>> futures = new ArrayList<>();
+
+        try {
+            for (int i = 0; i < taskCount; i++) {
+                futures.add(executor.submit(() -> {
+                    ready.countDown();
+                    start.await();
+                    return task.call();
+                }));
+            }
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            for (Future<?> future : futures) {
+                future.get(10, TimeUnit.SECONDS);
+            }
+        } finally {
+            start.countDown();
+            executor.shutdownNow();
+            executor.awaitTermination(10, TimeUnit.SECONDS);
+        }
     }
 
     private void insertBatch(UUID batchId, UUID userId, String fileHash) {

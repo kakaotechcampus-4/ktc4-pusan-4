@@ -99,6 +99,7 @@ public class UserFactPersistenceService {
     }
 
     private int nextVersion(UUID userId, String scopeKey, String factType) {
+        lockUser(userId);
         return entityManager.createQuery("""
                 select coalesce(max(fact.version), 0) + 1
                 from UserFactEntity fact
@@ -109,6 +110,12 @@ public class UserFactPersistenceService {
             .setParameter("userId", userId)
             .setParameter("scopeKey", scopeKey)
             .setParameter("factType", factType)
+            .getSingleResult();
+    }
+
+    private void lockUser(UUID userId) {
+        entityManager.createNativeQuery("select id from app_user where id = :userId for update")
+            .setParameter("userId", userId)
             .getSingleResult();
     }
 

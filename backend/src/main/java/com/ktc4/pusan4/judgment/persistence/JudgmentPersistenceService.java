@@ -4,6 +4,7 @@ import com.ktc4.pusan4.judgment.domain.Citation;
 import com.ktc4.pusan4.judgment.domain.Judgment;
 import com.ktc4.pusan4.shared.UuidGenerator;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,12 +46,24 @@ public class JudgmentPersistenceService {
     }
 
     private int nextRevision(UUID transactionId) {
+        lockTransaction(transactionId);
         return entityManager.createQuery("""
                 select coalesce(max(judgment.revision), 0) + 1
                 from JudgmentEntity judgment
                 where judgment.transactionId = :transactionId
                 """, Integer.class)
             .setParameter("transactionId", transactionId)
+            .getSingleResult();
+    }
+
+    private void lockTransaction(UUID transactionId) {
+        entityManager.createQuery("""
+                select transaction
+                from TransactionRecordEntity transaction
+                where transaction.id = :transactionId
+                """, TransactionRecordEntity.class)
+            .setParameter("transactionId", transactionId)
+            .setLockMode(LockModeType.PESSIMISTIC_WRITE)
             .getSingleResult();
     }
 
