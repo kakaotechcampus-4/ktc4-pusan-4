@@ -32,6 +32,9 @@ class QuestionQueueEntity {
     @Column(name = "group_key", nullable = false)
     private String groupKey;
 
+    @Column(name = "fact_type", nullable = false)
+    private String factType;
+
     @Column(name = "answered_fact_id")
     private UUID answeredFactId;
 
@@ -54,6 +57,7 @@ class QuestionQueueEntity {
         this.reasonCode = question.code();
         this.questionText = question.text();
         this.groupKey = question.groupBy();
+        this.factType = question.factType();
         this.options = question.options();
         this.status = "대기";
     }
@@ -65,6 +69,11 @@ class QuestionQueueEntity {
         if (!groupKey.equals(fact.scopeKey())) {
             throw new IllegalArgumentException(
                 "Fact scope does not match question group: " + fact.scopeKey()
+            );
+        }
+        if (!factType.equals(fact.factType())) {
+            throw new IllegalArgumentException(
+                "Fact type does not match question: " + fact.factType()
             );
         }
         if (!options.isEmpty() && !options.contains(fact.selectedValue())) {

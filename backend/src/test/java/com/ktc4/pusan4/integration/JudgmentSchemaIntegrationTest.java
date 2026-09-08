@@ -384,8 +384,8 @@ class JudgmentSchemaIntegrationTest {
         insertJudgmentFixture(userId, batchId, transactionId, judgmentId, "fact-answer");
         jdbcTemplate.update("""
             insert into question_queue(
-                id, judgment_id, reason_code, question_text, group_key, options
-            ) values (?, ?, 'PURPOSE', '용도는 무엇인가요?', 'merchant:스타벅스', '["업무", "개인"]')
+                id, judgment_id, reason_code, question_text, group_key, fact_type, options
+            ) values (?, ?, 'PURPOSE', '용도는 무엇인가요?', 'merchant:스타벅스', '용도', '["업무", "개인"]')
             """, questionId, judgmentId);
         UserFact answer = new UserFact(
             "merchant:스타벅스", "용도", Map.of("value", "업무")
@@ -418,8 +418,8 @@ class JudgmentSchemaIntegrationTest {
         );
         jdbcTemplate.update("""
             insert into question_queue(
-                id, judgment_id, reason_code, question_text, group_key, options
-            ) values (?, ?, 'PURPOSE', '용도는 무엇인가요?', 'merchant:스타벅스', '["업무", "개인"]')
+                id, judgment_id, reason_code, question_text, group_key, fact_type, options
+            ) values (?, ?, 'PURPOSE', '용도는 무엇인가요?', 'merchant:스타벅스', '용도', '["업무", "개인"]')
             """, questionId, judgmentId);
         UserFact answer = new UserFact(
             "merchant:스타벅스", "용도", Map.of("value", "업무")
@@ -446,8 +446,8 @@ class JudgmentSchemaIntegrationTest {
         insertJudgmentFixture(userId, batchId, transactionId, judgmentId, "wrong-fact-scope");
         jdbcTemplate.update("""
             insert into question_queue(
-                id, judgment_id, reason_code, question_text, group_key, options
-            ) values (?, ?, 'PURPOSE', '용도는 무엇인가요?', 'merchant:스타벅스', '["업무", "개인"]')
+                id, judgment_id, reason_code, question_text, group_key, fact_type, options
+            ) values (?, ?, 'PURPOSE', '용도는 무엇인가요?', 'merchant:스타벅스', '용도', '["업무", "개인"]')
             """, questionId, judgmentId);
         UserFact wrongScope = new UserFact(
             "merchant:다른가맹점", "용도", Map.of("value", "업무")
@@ -475,8 +475,8 @@ class JudgmentSchemaIntegrationTest {
         insertJudgmentFixture(userId, batchId, transactionId, judgmentId, "unknown-option");
         jdbcTemplate.update("""
             insert into question_queue(
-                id, judgment_id, reason_code, question_text, group_key, options
-            ) values (?, ?, 'PURPOSE', '용도는 무엇인가요?', 'merchant:스타벅스', '["업무", "개인"]')
+                id, judgment_id, reason_code, question_text, group_key, fact_type, options
+            ) values (?, ?, 'PURPOSE', '용도는 무엇인가요?', 'merchant:스타벅스', '용도', '["업무", "개인"]')
             """, questionId, judgmentId);
         UserFact unknownOption = new UserFact(
             "merchant:스타벅스", "용도", Map.of("value", "선물")
@@ -486,6 +486,35 @@ class JudgmentSchemaIntegrationTest {
             userFactPersistenceService.answerQuestion(questionId, userId, unknownOption)
         ).isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("option");
+        assertThat(jdbcTemplate.queryForObject(
+            "select count(*) from user_fact where user_id = ?", Integer.class, userId
+        )).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+            "select status from question_queue where id = ?", String.class, questionId
+        )).isEqualTo("대기");
+    }
+
+    @Test
+    void answering_question_with_a_different_fact_type_is_rejected() {
+        UUID userId = UUID.randomUUID();
+        UUID batchId = UUID.randomUUID();
+        UUID transactionId = UUID.randomUUID();
+        UUID judgmentId = UUID.randomUUID();
+        UUID questionId = UUID.randomUUID();
+        insertJudgmentFixture(userId, batchId, transactionId, judgmentId, "wrong-fact-type");
+        jdbcTemplate.update("""
+            insert into question_queue(
+                id, judgment_id, reason_code, question_text, group_key, fact_type, options
+            ) values (?, ?, 'PURPOSE', '용도는 무엇인가요?', 'merchant:스타벅스', '용도', '["업무", "개인"]')
+            """, questionId, judgmentId);
+        UserFact wrongFactType = new UserFact(
+            "merchant:스타벅스", "전용여부", Map.of("value", "업무")
+        );
+
+        assertThatThrownBy(() ->
+            userFactPersistenceService.answerQuestion(questionId, userId, wrongFactType)
+        ).isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Fact type");
         assertThat(jdbcTemplate.queryForObject(
             "select count(*) from user_fact where user_id = ?", Integer.class, userId
         )).isZero();
