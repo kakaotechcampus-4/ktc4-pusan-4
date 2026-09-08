@@ -11,7 +11,7 @@ import com.ktc4.pusan4.judgment.domain.UserFact;
 import com.ktc4.pusan4.judgment.domain.Verdict;
 import com.ktc4.pusan4.judgment.limit.FinalizationConditions;
 import com.ktc4.pusan4.judgment.limit.LimitAllocation;
-import com.ktc4.pusan4.judgment.persistence.JudgmentPersistenceService;
+import com.ktc4.pusan4.judgment.persistence.JudgmentService;
 import com.ktc4.pusan4.judgment.persistence.LimitBucketPersistenceService;
 import com.ktc4.pusan4.judgment.persistence.RuleCandidatePersistenceService;
 import com.ktc4.pusan4.judgment.persistence.SaveJudgmentCommand;
@@ -58,7 +58,7 @@ class JudgmentSchemaIntegrationTest {
     private MerchantDictionaryRepository merchantDictionaryRepository;
 
     @Autowired
-    private JudgmentPersistenceService judgmentPersistenceService;
+    private JudgmentService judgmentService;
 
     @Autowired
     private LimitBucketPersistenceService limitBucketPersistenceService;
@@ -210,7 +210,7 @@ class JudgmentSchemaIntegrationTest {
             Map.of("reason", "과태료"), List.of()
         );
 
-        UUID judgmentId = judgmentPersistenceService.save(new SaveJudgmentCommand(
+        UUID judgmentId = judgmentService.save(new SaveJudgmentCommand(
             transactionId, "abc123", 1, 2025, LocalDate.of(2025, 12, 31),
             List.of(), result
         ));
@@ -241,7 +241,7 @@ class JudgmentSchemaIntegrationTest {
             transactionId, "concurrent-revisions", 1, 2025, LocalDate.of(2025, 12, 31),
             List.of(), judgment
         );
-        runConcurrently(8, () -> judgmentPersistenceService.save(command));
+        runConcurrently(8, () -> judgmentService.save(command));
 
         assertThat(jdbcTemplate.queryForList("""
             select revision
@@ -269,7 +269,7 @@ class JudgmentSchemaIntegrationTest {
             ))
         );
 
-        UUID judgmentId = judgmentPersistenceService.save(new SaveJudgmentCommand(
+        UUID judgmentId = judgmentService.save(new SaveJudgmentCommand(
             transactionId, "def456", 3, 2025, LocalDate.of(2025, 3, 14),
             "기타", "미분류 가맹점", "940909",
             List.of(new UserFact("merchant:미분류", "purpose", Map.of("answer", "업무"))),
@@ -297,6 +297,36 @@ class JudgmentSchemaIntegrationTest {
         assertThat(jdbcTemplate.queryForObject(
             "select merchant_raw from unmatched_log where judgment_id = ?", String.class, judgmentId
         )).isEqualTo("미분류 가맹점");
+    }
+
+    @Test
+    void judgment_save_rolls_back_all_rows_when_unmatched_context_is_missing() {
+        UUID userId = UUID.randomUUID();
+        UUID batchId = UUID.randomUUID();
+        UUID transactionId = UUID.randomUUID();
+        jdbcTemplate.update(
+            "insert into app_user(id, email) values (?, ?)", userId, userId + "@example.com"
+        );
+        insertBatch(batchId, userId, "rollback-file-hash");
+        insertTransaction(transactionId, batchId, "rollback-natural-key");
+        jdbcTemplate.update("""
+            insert into statute_version(
+                statute_id, doc_type, hierarchy, effective_from, body, body_hash
+            ) values ('rollback-statute', '법령', '법률', '2025-01-01', '원문', 'rollback-hash')
+            """);
+        Judgment judgment = new Judgment(
+            Verdict.NEEDS_REVIEW, Gate.G2, false, UnmatchedReason.RULE_NOT_FOUND, null,
+            List.of(), List.of(), List.of(new Citation("rollback-statute")), Map.of(), List.of()
+        );
+
+        assertThatThrownBy(() -> judgmentService.save(new SaveJudgmentCommand(
+            transactionId, "rollback", 1, 2025, LocalDate.of(2025, 12, 31),
+            List.of(), judgment
+        ))).isInstanceOf(NullPointerException.class);
+
+        assertThat(jdbcTemplate.queryForObject(
+            "select count(*) from judgment where transaction_id = ?", Integer.class, transactionId
+        )).isZero();
     }
 
     @Test
