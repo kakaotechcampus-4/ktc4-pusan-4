@@ -62,6 +62,8 @@ DOC_TYPES = {
     "law": "법령", "admrul": "행정규칙",
     "expc": "심판례해석", "decc": "심판례해석", "prec": "판례",
 }
+# expc와 decc는 doc_type이 같아 일련번호 공간이 섞인다. hierarchy로 가른다.
+HIERARCHIES = {"expc": "해석례", "decc": "심판례", "prec": "판례"}
 
 _INSERT = """
 INSERT INTO statute_version (
@@ -149,7 +151,8 @@ def _rows(oc: str, target: str, key: str, limit: int | None, **params) -> Iterat
 
 
 def _keyword_rows(
-    oc: str, target: str, key: str, id_field: str, limit: int | None, **params
+    oc: str, target: str, key: str, id_field: str, limit: int | None,
+    known: set[str], **params,
 ) -> Iterator[dict]:
     """키워드별 본문검색 결과의 합집합. 한 문서가 여러 키워드에 걸린다."""
     seen: set[str] = set()
@@ -159,12 +162,17 @@ def _keyword_rows(
             if not doc_id or doc_id in seen:
                 continue
             seen.add(doc_id)
+            # --resume: 이미 적재된 문서는 본문을 받지 않는다
+            if doc_id in known:
+                continue
             yield row
             if limit and len(seen) >= limit:
                 return
 
 
-def collect(oc: str, target: str, limit: int | None, laws: list[str]) -> Iterator[Unit]:
+def collect(
+    oc: str, target: str, limit: int | None, laws: list[str], known: set[str]
+) -> Iterator[Unit]:
     if target == "law":
         for law_id in laws:
             yield from parse_law(service(oc, "law", ID=law_id))
@@ -179,17 +187,17 @@ def collect(oc: str, target: str, limit: int | None, laws: list[str]) -> Iterato
                 yield from parse_admrul(service(oc, "admrul", ID=row["행정규칙일련번호"]))
 
     elif target == "expc":
-        for row in _keyword_rows(oc, "expc", "expc", "법령해석례일련번호", limit):
+        for row in _keyword_rows(oc, "expc", "expc", "법령해석례일련번호", limit, known):
             body = service(oc, "expc", ID=row["법령해석례일련번호"])
             yield from parse_expc(body, row)
 
     elif target == "decc":
         field = "특별행정심판재결례일련번호"
-        for row in _keyword_rows(oc, "ttSpecialDecc", "decc", field, limit):
+        for row in _keyword_rows(oc, "ttSpecialDecc", "decc", field, limit, known):
             yield from parse_decc(service(oc, "ttSpecialDecc", ID=row[field]), row)
 
     elif target == "prec":
-        rows = _keyword_rows(oc, "prec", "prec", "판례일련번호", limit, datSrcNm="대법원")
+        rows = _keyword_rows(oc, "prec", "prec", "판례일련번호", limit, known, datSrcNm="대법원")
         for row in rows:
             # 본문 조회 전에 거른다. 민사·형사가 절반이 넘는다.
             if row.get("사건종류명") not in PREC_CASE_TYPES:
@@ -203,6 +211,12 @@ def main() -> int:
     ap.add_argument("--law", action="append", metavar="법령ID", help="생략하면 LAWS 전체")
     ap.add_argument("--limit", type=int, metavar="N", help="타깃별 최대 문서 수(시험용)")
     ap.add_argument("--dry-run", action="store_true", help="변경 건수만 출력하고 롤백")
+    ap.add_argument(
+        "--resume",
+        action="store_true",
+        help="이미 적재된 판례·해석례·심판례는 본문을 받지 않는다. "
+        "불변 문서라 안전하지만 파서를 고친 뒤에는 쓰지 말 것",
+    )
     args = ap.parse_args()
 
     targets = TARGETS if args.target == "all" else [args.target]
@@ -214,8 +228,21 @@ def main() -> int:
             n_changed = seen = 0
             hashes: dict[str, str] = {}
             clashes: list[str] = []
+            known: set[str] = set()
+            if args.resume and target in ("expc", "decc", "prec"):
+                known = {
+                    r[0]
+                    for r in conn.execute(
+                        "SELECT doc_id FROM statute_version WHERE hierarchy = %s",
+                        (HIERARCHIES[target],),
+                    ).fetchall()
+                }
+                print(f"{target:<8} 적재됨 {len(known)}건 건너뜀")
+
             try:
-                for unit in collect(settings.law_api_oc, target, args.limit, args.law or LAWS):
+                for unit in collect(
+                    settings.law_api_oc, target, args.limit, args.law or LAWS, known
+                ):
                     # 같은 statute_id가 다른 내용으로 두 번 나오면 하나가 조용히 사라진다
                     if hashes.setdefault(unit.statute_id, unit.body_hash) != unit.body_hash:
                         clashes.append(unit.statute_id)
