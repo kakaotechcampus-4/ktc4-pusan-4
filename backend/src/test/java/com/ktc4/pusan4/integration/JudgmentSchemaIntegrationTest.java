@@ -9,7 +9,10 @@ import com.ktc4.pusan4.judgment.domain.QuestionSpec;
 import com.ktc4.pusan4.judgment.domain.UnmatchedReason;
 import com.ktc4.pusan4.judgment.domain.UserFact;
 import com.ktc4.pusan4.judgment.domain.Verdict;
+import com.ktc4.pusan4.judgment.limit.FinalizationConditions;
+import com.ktc4.pusan4.judgment.limit.LimitAllocation;
 import com.ktc4.pusan4.judgment.persistence.JudgmentPersistenceService;
+import com.ktc4.pusan4.judgment.persistence.LimitBucketPersistenceService;
 import com.ktc4.pusan4.judgment.persistence.SaveJudgmentCommand;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,6 +48,9 @@ class JudgmentSchemaIntegrationTest {
 
     @Autowired
     private JudgmentPersistenceService judgmentPersistenceService;
+
+    @Autowired
+    private LimitBucketPersistenceService limitBucketPersistenceService;
 
     @Test
     void flyway_creates_judgment_core_tables() {
@@ -218,6 +224,59 @@ class JudgmentSchemaIntegrationTest {
         )).isEqualTo("미분류 가맹점");
     }
 
+    @Test
+    void recalculation_replaces_limit_allocations_and_reverts_them_to_provisional() {
+        UUID userId = UUID.randomUUID();
+        UUID batchId = UUID.randomUUID();
+        UUID firstTransactionId = UUID.randomUUID();
+        UUID secondTransactionId = UUID.randomUUID();
+        UUID firstJudgmentId = UUID.randomUUID();
+        UUID secondJudgmentId = UUID.randomUUID();
+        insertJudgmentFixture(
+            userId, batchId, firstTransactionId, firstJudgmentId, "limit-first"
+        );
+        insertTransaction(secondTransactionId, batchId, "limit-second-natural-key");
+        insertBareJudgment(secondJudgmentId, secondTransactionId);
+        List<LimitAllocation> initial = List.of(
+            new LimitAllocation(firstJudgmentId, 700_000, 700_000),
+            new LimitAllocation(secondJudgmentId, 700_000, 300_000)
+        );
+
+        limitBucketPersistenceService.replaceProvisional(
+            userId, 2025, "BUSINESS_PROMOTION", initial
+        );
+        assertThatThrownBy(() -> limitBucketPersistenceService.finalizeEntries(
+            userId, 2025, "BUSINESS_PROMOTION", new FinalizationConditions(false, 1, 0)
+        )).isInstanceOf(IllegalStateException.class);
+        limitBucketPersistenceService.finalizeEntries(
+            userId, 2025, "BUSINESS_PROMOTION", new FinalizationConditions(true, 0, 0)
+        );
+        assertThat(jdbcTemplate.queryForObject("""
+            select count(*)
+            from limit_bucket_entry
+            where user_id = ? and tax_year = 2025
+              and bucket_code = 'BUSINESS_PROMOTION' and state = '확정'
+            """, Integer.class, userId)).isEqualTo(2);
+
+        limitBucketPersistenceService.replaceProvisional(
+            userId,
+            2025,
+            "BUSINESS_PROMOTION",
+            List.of(new LimitAllocation(firstJudgmentId, 250_000, 250_000))
+        );
+
+        assertThat(jdbcTemplate.queryForMap("""
+            select count(*) as entry_count, sum(allowed_amount)::bigint as allowed_total,
+                   min(state) as state, max(state) as max_state
+            from limit_bucket_entry
+            where user_id = ? and tax_year = 2025 and bucket_code = 'BUSINESS_PROMOTION'
+            """, userId))
+            .containsEntry("entry_count", 1L)
+            .containsEntry("allowed_total", 250_000L)
+            .containsEntry("state", "잠정")
+            .containsEntry("max_state", "잠정");
+    }
+
     private void insertBatch(UUID batchId, UUID userId, String fileHash) {
         jdbcTemplate.update("""
             insert into upload_batch(
@@ -233,5 +292,29 @@ class JudgmentSchemaIntegrationTest {
                 merchant_category, amount, natural_key, status
             ) values (?, ?, '2025-03-14', '가맹점', '가맹점', '기타', 10000, ?, '판정대상')
             """, transactionId, batchId, naturalKey);
+    }
+
+    private void insertJudgmentFixture(
+        UUID userId,
+        UUID batchId,
+        UUID transactionId,
+        UUID judgmentId,
+        String keySuffix
+    ) {
+        jdbcTemplate.update(
+            "insert into app_user(id, email) values (?, ?)", userId, userId + "@example.com"
+        );
+        insertBatch(batchId, userId, keySuffix + "-file-hash");
+        insertTransaction(transactionId, batchId, keySuffix + "-natural-key");
+        insertBareJudgment(judgmentId, transactionId);
+    }
+
+    private void insertBareJudgment(UUID judgmentId, UUID transactionId) {
+        jdbcTemplate.update("""
+            insert into judgment(
+                id, transaction_id, revision, rules_commit_sha, user_context_version,
+                tax_year, verdict, is_inference
+            ) values (?, ?, 1, 'fixture', 1, 2025, 'AVAILABLE', false)
+            """, judgmentId, transactionId);
     }
 }
