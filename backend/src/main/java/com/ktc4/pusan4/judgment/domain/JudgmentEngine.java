@@ -29,6 +29,7 @@ public final class JudgmentEngine {
     ) {
         Judgment blocked = rules.stream()
             .filter(rule -> rule.gate() == Gate.G1)
+            .filter(rule -> rule.isEffectiveOn(transaction.approvedAt()))
             .filter(rule -> matches(rule.match(), transaction, context))
             .sorted(PRIORITY)
             .findFirst()
@@ -50,6 +51,7 @@ public final class JudgmentEngine {
 
         RuleCard winner = rules.stream()
             .filter(rule -> rule.gate() == Gate.G2)
+            .filter(rule -> rule.isEffectiveOn(transaction.approvedAt()))
             .filter(rule -> matches(rule.match(), transaction, context))
             .sorted(WINNER)
             .findFirst()
@@ -68,6 +70,7 @@ public final class JudgmentEngine {
         for (Gate gate : List.of(Gate.G3, Gate.G4, Gate.G5, Gate.G6)) {
             rules.stream()
                 .filter(rule -> rule.gate() == gate)
+                .filter(rule -> rule.isEffectiveOn(transaction.approvedAt()))
                 .filter(rule -> matches(rule.match(), transaction, context))
                 .sorted(WINNER)
                 .forEach(rule -> {

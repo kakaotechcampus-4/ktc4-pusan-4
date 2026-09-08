@@ -48,6 +48,7 @@ NORMALIZE_YAML = ROOT / "rules" / "normalize.yaml"
 PG_BLOCKLIST_YAML = ROOT / "rules" / "pg_blocklist.yaml"
 KEYWORD_RULES_YAML = ROOT / "rules" / "keyword_rules.yaml"
 MERCHANT_SEED_CSV = ROOT / "seeds" / "merchant_seed.csv"
+RULECARD_DIRECTORY = ROOT / "rules" / "cards"
 RULECARD_GLOB = "R-*.yaml"
 
 # ---------------------------------------------------------------- category enum
@@ -387,8 +388,8 @@ def check_pg_vs_seed(rep: Report, pg, rows):
 
 
 def check_rulecards(rep: Report):
-    print("[T6] rules/R-*.yaml")
-    files = sorted((ROOT / "rules").glob(RULECARD_GLOB))
+    print("[T6] rules/cards/R-*.yaml")
+    files = sorted(RULECARD_DIRECTORY.glob(RULECARD_GLOB))
     if not files:
         rep.info("SKIP - 룰카드 없음 (T6 미완)")
         return

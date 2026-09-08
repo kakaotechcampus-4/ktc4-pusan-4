@@ -146,6 +146,30 @@ class JudgmentEngineTest {
             );
     }
 
+    @Test
+    void ignores_rule_outside_transaction_effective_period() {
+        RuleCard expired = new RuleCard(
+            "R-004", 1, Gate.G1, 900,
+            RuleMatch.categories("지자체_과태료"), Verdict.UNAVAILABLE, null,
+            List.of(new Citation("소득세법-33-1-2")), Map.of(), List.of(),
+            LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31),
+            "외부자문", LocalDate.of(2024, 1, 1)
+        );
+        TransactionInput transaction = new TransactionInput(
+            UUID.randomUUID(), LocalDate.of(2025, 3, 14),
+            "부산광역시청 주정차위반과태료", "지자체_과태료", 50_000
+        );
+
+        Judgment result = JudgmentEngine.judge(
+            transaction,
+            new UserContext("940909", false, null),
+            List.of(),
+            List.of(expired)
+        );
+
+        assertThat(result.unmatchedReason()).isEqualTo(UnmatchedReason.RULE_NOT_FOUND);
+    }
+
     private static RuleCard card(
         String id,
         Gate gate,
