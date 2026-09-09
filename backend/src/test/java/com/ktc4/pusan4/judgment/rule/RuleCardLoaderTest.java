@@ -90,7 +90,7 @@ class RuleCardLoaderTest {
             .orElseThrow();
 
         assertThat(card.match().amountMin()).isEqualTo(1_000_001L);
-        assertThat(card.match().excludedCategories()).containsExactly("소모품", "식음료", "카페");
+        assertThat(card.match().excludedCategories()).containsExactly("카페", "음식점", "음식배달");
         assertThat(card.questions().getFirst())
             .extracting(question -> question.code(), question -> question.factType(),
                 question -> question.groupBy())
@@ -182,6 +182,60 @@ class RuleCardLoaderTest {
         assertThatThrownBy(() -> new RuleCardLoader().load(root))
             .isInstanceOf(RuleCardValidationException.class)
             .hasMessageContaining("evidence");
+    }
+
+    @Test
+    void rejects_category_outside_vocabulary_when_categories_file_present() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("categories.yaml"), """
+            categories:
+              - 카페
+              - 음식점
+            """);
+        Files.writeString(root.resolve("cards/R-051.yaml"), """
+            id: R-051
+            version: 1
+            gate: G4
+            priority: 500
+            effective_period: { start: 2025-01-01, end: null }
+            match:
+              amount_min: 1000001
+              exclude_category: [소모품]
+            attributes:
+              자산: true
+            review: { by: 외부자문, date: 2026-09-05 }
+            """);
+
+        assertThatThrownBy(() -> new RuleCardLoader().load(root))
+            .isInstanceOf(RuleCardValidationException.class)
+            .hasMessageContaining("소모품");
+    }
+
+    @Test
+    void accepts_categories_within_vocabulary_when_categories_file_present() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("categories.yaml"), """
+            categories:
+              - 카페
+              - 음식점
+            """);
+        Files.writeString(root.resolve("cards/R-051.yaml"), """
+            id: R-051
+            version: 1
+            gate: G4
+            priority: 500
+            effective_period: { start: 2025-01-01, end: null }
+            match:
+              amount_min: 1000001
+              exclude_category: [카페, 음식점]
+            attributes:
+              자산: true
+            review: { by: 외부자문, date: 2026-09-05 }
+            """);
+
+        List<RuleCard> cards = new RuleCardLoader().load(root).get(Gate.G4);
+
+        assertThat(cards).extracting(RuleCard::id).containsExactly("R-051");
     }
 
     private static String cardYaml(String id, int priority) {

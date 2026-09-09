@@ -33,11 +33,16 @@ public final class RuleCardLoader {
 
     private final ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
 
+    // 허용 어휘의 단일 원본은 rules/categories.yaml 이다(Python 검증기와 공유).
+    // 파일이 없으면 빈 집합으로 두어 카테고리 검증을 건너뛴다.
+    private Set<String> categoryVocabulary = Set.of();
+
     public RuleSet load(Path rulesDirectory) throws IOException {
         Path cardsDirectory = rulesDirectory.resolve("cards");
         if (!Files.isDirectory(cardsDirectory)) {
             throw new RuleCardValidationException("Rule cards directory does not exist: " + cardsDirectory);
         }
+        categoryVocabulary = loadCategoryVocabulary(rulesDirectory.resolve("categories.yaml"));
 
         List<RuleCard> cards;
         try (Stream<Path> files = Files.list(cardsDirectory)) {
@@ -93,6 +98,7 @@ public final class RuleCardLoader {
             optionalLong(match, "amount_max"),
             strings(match, "industry")
         );
+        validateCategories(id, ruleMatch);
 
         Verdict verdict = root.hasNonNull("verdict")
             ? verdictValue(root.get("verdict").asText())
@@ -335,6 +341,36 @@ public final class RuleCardLoader {
     private static LocalDate optionalDate(JsonNode node, String... fields) {
         JsonNode value = first(node, fields);
         return value == null || value.isNull() ? null : LocalDate.parse(value.asText());
+    }
+
+    private Set<String> loadCategoryVocabulary(Path categoriesFile) throws IOException {
+        if (!Files.exists(categoriesFile)) {
+            return Set.of();
+        }
+        JsonNode names = mapper.readTree(categoriesFile.toFile()).path("categories");
+        if (!names.isArray()) {
+            throw new RuleCardValidationException("categories.yaml: categories must be a list");
+        }
+        Set<String> vocabulary = new HashSet<>();
+        names.forEach(name -> vocabulary.add(name.asText()));
+        return Set.copyOf(vocabulary);
+    }
+
+    private void validateCategories(String id, RuleMatch match) {
+        if (categoryVocabulary.isEmpty()) {
+            return;
+        }
+        for (String category : match.categories()) {
+            if (!categoryVocabulary.contains(category)) {
+                throw new RuleCardValidationException(id + ": category '" + category + "' not in vocabulary");
+            }
+        }
+        for (String category : match.excludedCategories()) {
+            if (!categoryVocabulary.contains(category)) {
+                throw new RuleCardValidationException(
+                    id + ": exclude_category '" + category + "' not in vocabulary");
+            }
+        }
     }
 
     private static List<String> strings(JsonNode node, String field) {

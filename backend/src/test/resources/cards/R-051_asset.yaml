@@ -5,7 +5,7 @@ priority: 500
 effective_period: { start: 2025-01-01, end: null }
 match:
   amount_min: 1000001
-  exclude_category: [소모품, 식음료, 카페]
+  exclude_category: [카페, 음식점, 음식배달]
 question:
   code: ASSET_OR_EXPENSE
   text: 취득가액이 100만원을 넘습니다. 자산으로 처리할까요?

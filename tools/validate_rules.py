@@ -47,24 +47,25 @@ ROOT = Path(__file__).resolve().parent.parent
 NORMALIZE_YAML = ROOT / "rules" / "normalize.yaml"
 PG_BLOCKLIST_YAML = ROOT / "rules" / "pg_blocklist.yaml"
 KEYWORD_RULES_YAML = ROOT / "rules" / "keyword_rules.yaml"
+CATEGORIES_YAML = ROOT / "rules" / "categories.yaml"
 MERCHANT_SEED_CSV = ROOT / "seeds" / "merchant_seed.csv"
 RULECARD_DIRECTORY = ROOT / "rules" / "cards"
 RULECARD_GLOB = "R-*.yaml"
 
 # ---------------------------------------------------------------- category enum
-CATEGORY_ENUM = [
-    "카페", "음식점", "편의점", "온라인쇼핑", "음식배달",
-    "해외SaaS", "국내SW", "통신", "수도광열", "여비교통", "차량",
-    "도서", "교육", "광고", "사무용품", "의료", "금융",
-    "지자체_과태료", "경찰청_범칙금", "조세", "PG_미상", "기타",
-    # T3 에서 추가 (PM 승인). 업종 세분화가 아니라 G2(사업관련성)에서
-    # 다르게 처리되는지가 분리 기준이다.
-    #   게임·여가·미용  -> 사업 무관 후보
-    #   구독서비스      -> 업무용 가능
-    #   생활용품        -> 사업/개인 혼재
-    # 노래방·PC방·볼링은 세무 판정이 같으므로 '여가' 하나로 묶는다. 업종별로 쪼개지 않는다.
-    "게임", "구독서비스", "여가", "미용", "생활용품",
-]
+# 허용 어휘의 단일 원본은 rules/categories.yaml 이다. Java 로더도 같은 파일을 읽는다.
+def _load_category_enum() -> list:
+    if not CATEGORIES_YAML.exists():
+        sys.exit("rules/categories.yaml 이 없습니다 (카테고리 어휘 단일 원본)")
+    with open(CATEGORIES_YAML, encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+    names = data.get("categories")
+    if not isinstance(names, list) or not names:
+        sys.exit("rules/categories.yaml 의 categories 목록이 비어 있거나 형식이 잘못됨")
+    return names
+
+
+CATEGORY_ENUM = _load_category_enum()
 
 
 # 카테고리 메타. enum 과 같은 파일에 두어 단일 원본을 유지한다.
@@ -401,6 +402,13 @@ def check_rulecards(rep: Report):
         gate = card.get("gate")
         prio = card.get("priority")
         cits = card.get("citations") or []
+
+        match = card.get("match") or {}
+        for field in ("category", "exclude_category"):
+            for name in (match.get(field) or []):
+                if name not in CATEGORY_ENUM:
+                    rep.error("%s: match.%s '%s' 가 enum 밖 (rules/categories.yaml)"
+                              % (rid, field, name))
 
         if ctype == "learned":
             if isinstance(prio, int) and prio > 400:
