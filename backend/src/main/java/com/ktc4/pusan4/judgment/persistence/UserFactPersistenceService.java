@@ -2,7 +2,7 @@ package com.ktc4.pusan4.judgment.persistence;
 
 import com.ktc4.pusan4.judgment.domain.UserFact;
 import com.ktc4.pusan4.shared.UuidGenerator;
-import jakarta.persistence.EntityManager;
+import jakarta.persistence.NoResultException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,16 +15,19 @@ import java.util.UUID;
 @Service
 public class UserFactPersistenceService {
 
-    private final EntityManager entityManager;
+    private final UserFactRepository userFactRepository;
+    private final QuestionQueueRepository questionRepository;
     private final UuidGenerator uuidGenerator;
     private final Clock clock;
 
     public UserFactPersistenceService(
-        EntityManager entityManager,
+        UserFactRepository userFactRepository,
+        QuestionQueueRepository questionRepository,
         UuidGenerator uuidGenerator,
         Clock clock
     ) {
-        this.entityManager = entityManager;
+        this.userFactRepository = userFactRepository;
+        this.questionRepository = questionRepository;
         this.uuidGenerator = uuidGenerator;
         this.clock = clock;
     }
@@ -32,7 +35,7 @@ public class UserFactPersistenceService {
     @Transactional
     public UUID save(UUID userId, UserFact fact) {
         UUID factId = uuidGenerator.generate();
-        entityManager.persist(new UserFactEntity(
+        userFactRepository.save(new UserFactEntity(
             factId,
             userId,
             fact,
@@ -43,52 +46,24 @@ public class UserFactPersistenceService {
 
     @Transactional(readOnly = true)
     public Optional<UserFact> findLatest(UUID userId, String scopeKey, String factType) {
-        return entityManager.createQuery("""
-                select fact
-                from UserFactEntity fact
-                where fact.userId = :userId
-                  and fact.scopeKey = :scopeKey
-                  and fact.factType = :factType
-                order by fact.version desc
-                """, UserFactEntity.class)
-            .setParameter("userId", userId)
-            .setParameter("scopeKey", scopeKey)
-            .setParameter("factType", factType)
-            .setMaxResults(1)
-            .getResultList()
-            .stream()
-            .findFirst()
+        return userFactRepository
+            .findFirstByUserIdAndScopeKeyAndFactTypeOrderByVersionDesc(userId, scopeKey, factType)
             .map(UserFactEntity::toDomain);
     }
 
     @Transactional(readOnly = true)
     public List<UserFact> findAllLatest(UUID userId) {
-        return entityManager.createQuery("""
-                select fact
-                from UserFactEntity fact
-                where fact.userId = :userId
-                  and not exists (
-                    select newer.id
-                    from UserFactEntity newer
-                    where newer.userId = fact.userId
-                      and newer.scopeKey = fact.scopeKey
-                      and newer.factType = fact.factType
-                      and newer.version > fact.version
-                  )
-                order by fact.scopeKey, fact.factType
-                """, UserFactEntity.class)
-            .setParameter("userId", userId)
-            .getResultList()
-            .stream()
+        return userFactRepository.findAllLatest(userId).stream()
             .map(UserFactEntity::toDomain)
             .toList();
     }
 
     @Transactional
     public UUID answerQuestion(UUID questionId, UUID userId, UserFact answer) {
-        QuestionQueueEntity question = findQuestionForUser(questionId, userId);
+        QuestionQueueEntity question = questionRepository.findForUser(questionId, userId)
+            .orElseThrow(NoResultException::new);
         UUID factId = uuidGenerator.generate();
-        entityManager.persist(new UserFactEntity(
+        userFactRepository.save(new UserFactEntity(
             factId,
             userId,
             answer,
@@ -99,41 +74,7 @@ public class UserFactPersistenceService {
     }
 
     private int nextVersion(UUID userId, String scopeKey, String factType) {
-        lockUser(userId);
-        return entityManager.createQuery("""
-                select coalesce(max(fact.version), 0) + 1
-                from UserFactEntity fact
-                where fact.userId = :userId
-                  and fact.scopeKey = :scopeKey
-                  and fact.factType = :factType
-                """, Integer.class)
-            .setParameter("userId", userId)
-            .setParameter("scopeKey", scopeKey)
-            .setParameter("factType", factType)
-            .getSingleResult();
-    }
-
-    private void lockUser(UUID userId) {
-        entityManager.createNativeQuery("select id from app_user where id = :userId for update")
-            .setParameter("userId", userId)
-            .getSingleResult();
-    }
-
-    private QuestionQueueEntity findQuestionForUser(UUID questionId, UUID userId) {
-        return entityManager.createQuery("""
-                select question
-                from QuestionQueueEntity question,
-                     JudgmentEntity judgment,
-                     TransactionRecordEntity transaction,
-                     UploadBatchEntity batch
-                where question.id = :questionId
-                  and question.judgmentId = judgment.id
-                  and judgment.transactionId = transaction.id
-                  and transaction.batchId = batch.id
-                  and batch.userId = :userId
-                """, QuestionQueueEntity.class)
-            .setParameter("questionId", questionId)
-            .setParameter("userId", userId)
-            .getSingleResult();
+        userFactRepository.lockUser(userId).orElseThrow(NoResultException::new);
+        return userFactRepository.findNextVersion(userId, scopeKey, factType);
     }
 }
