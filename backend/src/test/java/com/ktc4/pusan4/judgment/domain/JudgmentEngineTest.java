@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class JudgmentEngineTest {
 
@@ -108,11 +109,12 @@ class JudgmentEngineTest {
         );
 
         assertThat(result)
-            .extracting(Judgment::verdict, Judgment::attributes,
+            .extracting(Judgment::verdict, Judgment::account, Judgment::attributes,
                 judgment -> judgment.questions().stream().map(QuestionSpec::code).toList(),
                 Judgment::appliedRuleIds, Judgment::appliedRuleVersions)
             .containsExactly(
                 Verdict.NEEDS_REVIEW,
+                "접대비",
                 Map.of(
                     "businessRatio", 20,
                     "assetReview", true,
@@ -123,6 +125,159 @@ class JudgmentEngineTest {
                 List.of("R-020", "R-030", "R-040", "R-050", "R-060"),
                 List.of(1, 1, 1, 1, 1)
             );
+    }
+
+    @Test
+    void g2_account_is_preserved_as_the_default_when_a_later_gate_has_an_account() {
+        RuleCard g2 = new RuleCard(
+            "R-020", 1, Gate.G2, 500, RuleMatch.categories("카페"),
+            Verdict.AVAILABLE, "지급수수료", List.of(), Map.of(), List.of()
+        );
+        RuleCard g3 = new RuleCard(
+            "R-030", 1, Gate.G3, 500, RuleMatch.categories("카페"),
+            null, "접대비", List.of(), Map.of(), List.of()
+        );
+
+        Judgment result = JudgmentEngine.judge(
+            subscription("카페", 20_000),
+            new UserContext("940909", false, null),
+            List.of(),
+            new RuleSet(List.of(g3, g2))
+        );
+
+        assertThat(result.account()).isEqualTo("지급수수료");
+    }
+
+    @Test
+    void first_non_null_account_in_the_pipeline_is_used_as_the_default() {
+        RuleCard g2 = new RuleCard(
+            "R-020", 1, Gate.G2, 500, RuleMatch.categories("카페"),
+            Verdict.AVAILABLE, null, List.of(), Map.of(), List.of()
+        );
+        RuleCard g3 = new RuleCard(
+            "R-030", 1, Gate.G3, 500, RuleMatch.categories("카페"),
+            null, "소모품비", List.of(), Map.of(), List.of()
+        );
+        RuleCard g4 = new RuleCard(
+            "R-040", 1, Gate.G4, 500, RuleMatch.categories("카페"),
+            null, "접대비", List.of(), Map.of(), List.of()
+        );
+
+        Judgment result = JudgmentEngine.judge(
+            subscription("카페", 20_000),
+            new UserContext("940909", false, null),
+            List.of(),
+            new RuleSet(List.of(g4, g2, g3))
+        );
+
+        assertThat(result.account()).isEqualTo("소모품비");
+    }
+
+    @Test
+    void higher_priority_account_wins_within_an_attribute_gate_regardless_of_input_order() {
+        RuleCard g2 = new RuleCard(
+            "R-020", 1, Gate.G2, 500, RuleMatch.categories("카페"),
+            Verdict.AVAILABLE, null, List.of(), Map.of(), List.of()
+        );
+        RuleCard higherPriority = new RuleCard(
+            "R-030", 1, Gate.G3, 600, RuleMatch.categories("카페"),
+            null, "소모품비", List.of(), Map.of(), List.of()
+        );
+        RuleCard lowerPriority = new RuleCard(
+            "R-031", 1, Gate.G3, 500, RuleMatch.categories("카페"),
+            null, "접대비", List.of(), Map.of(), List.of()
+        );
+
+        List<String> accounts = List.of(
+            new RuleSet(List.of(g2, lowerPriority, higherPriority)),
+            new RuleSet(List.of(higherPriority, g2, lowerPriority))
+        ).stream()
+            .map(rules -> JudgmentEngine.judge(
+                subscription("카페", 20_000),
+                new UserContext("940909", false, null),
+                List.of(), rules
+            ).account())
+            .toList();
+
+        assertThat(accounts).containsExactly("소모품비", "소모품비");
+    }
+
+    @Test
+    void answered_accounts_override_the_default_and_allow_the_same_value_from_multiple_questions() {
+        UUID transactionId = UUID.randomUUID();
+        RuleCard g2 = new RuleCard(
+            "R-020", 1, Gate.G2, 500, RuleMatch.categories("카페"),
+            Verdict.AVAILABLE, "지급수수료", List.of(), Map.of(), List.of()
+        );
+        RuleCard g3 = new RuleCard(
+            "R-030", 1, Gate.G3, 500, RuleMatch.categories("카페"),
+            null, null, List.of(), Map.of(), List.of(question(
+                "PURPOSE", "용도", "접대비"
+            ))
+        );
+        RuleCard g4 = new RuleCard(
+            "R-040", 1, Gate.G4, 500, RuleMatch.categories("카페"),
+            null, null, List.of(), Map.of(), List.of(question(
+                "TYPE", "유형", "접대비"
+            ))
+        );
+
+        Judgment result = JudgmentEngine.judge(
+            new TransactionInput(transactionId, LocalDate.of(2025, 3, 14), "가맹점", "카페", 20_000),
+            new UserContext("940909", false, null),
+            List.of(
+                new UserFact("transaction:" + transactionId, "용도", Map.of("value", "업무")),
+                new UserFact("transaction:" + transactionId, "유형", Map.of("value", "업무"))
+            ),
+            new RuleSet(List.of(g4, g2, g3))
+        );
+
+        assertThat(result)
+            .extracting(Judgment::account, Judgment::questions)
+            .containsExactly("접대비", List.of());
+    }
+
+    @Test
+    void conflicting_answered_accounts_name_both_question_sources() {
+        UUID transactionId = UUID.randomUUID();
+        RuleCard g2 = new RuleCard(
+            "R-020", 1, Gate.G2, 500, RuleMatch.categories("카페"),
+            Verdict.AVAILABLE, "지급수수료", List.of(), Map.of(), List.of()
+        );
+        RuleCard g3 = new RuleCard(
+            "R-030", 1, Gate.G3, 500, RuleMatch.categories("카페"),
+            null, null, List.of(), Map.of(), List.of(question(
+                "PURPOSE", "용도", "접대비"
+            ))
+        );
+        RuleCard g4 = new RuleCard(
+            "R-040", 1, Gate.G4, 500, RuleMatch.categories("카페"),
+            null, null, List.of(), Map.of(), List.of(question(
+                "TYPE", "유형", "소모품비"
+            ))
+        );
+
+        TransactionInput transaction = new TransactionInput(
+            transactionId, LocalDate.of(2025, 3, 14), "가맹점", "카페", 20_000
+        );
+        List<UserFact> facts = List.of(
+            new UserFact("transaction:" + transactionId, "용도", Map.of("value", "업무")),
+            new UserFact("transaction:" + transactionId, "유형", Map.of("value", "업무"))
+        );
+
+        for (RuleSet rules : List.of(
+            new RuleSet(List.of(g4, g2, g3)),
+            new RuleSet(List.of(g3, g4, g2))
+        )) {
+            assertThatThrownBy(() -> JudgmentEngine.judge(
+                transaction,
+                new UserContext("940909", false, null), facts, rules
+            ))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage(
+                    "Conflicting answered accounts: R-030:PURPOSE=접대비, R-040:TYPE=소모품비"
+                );
+        }
     }
 
     @Test
@@ -482,6 +637,13 @@ class JudgmentEngineTest {
             null, null,
             List.of(new Citation("소득세법시행령-67-4")),
             Map.of(), List.of(assetQuestion)
+        );
+    }
+
+    private static QuestionSpec question(String code, String factType, String account) {
+        return new QuestionSpec(
+            code, code + " 질문", factType, "transaction", List.of("업무"),
+            Map.of("업무", new QuestionEffect(Verdict.AVAILABLE, account, Map.of()))
         );
     }
 
