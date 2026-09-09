@@ -46,6 +46,8 @@ interface UserFactRepository extends Repository<UserFactEntity, UUID> {
     );
 
     // app_user 는 매핑 엔티티가 없어 native 로 행을 잠근다(채번 직렬화용).
-    @Query(value = "select id from app_user where id = :userId for update", nativeQuery = true)
+    // for no key update: 채번끼리는 여전히 상호배제하되, 키를 안 건드린다고 선언해
+    // 같은 사용자의 자식행 INSERT(FK 검사의 for key share)를 막지 않는다.
+    @Query(value = "select id from app_user where id = :userId for no key update", nativeQuery = true)
     Optional<UUID> lockUser(@Param("userId") UUID userId);
 }
