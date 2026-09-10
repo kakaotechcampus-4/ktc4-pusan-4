@@ -114,14 +114,10 @@ def upsert(conn: psycopg.Connection, u: Unit) -> bool:
         return False
 
     # 시행일이 같은데 본문이 다르면 개정이 아니라 원문 정정이다.
-    # 옛 행을 닫으면 effective_to = effective_from 이 되어 CHECK 제약에 걸린다.
+    # statute_version 은 append-only 라(백엔드 트리거) 기존 행의 body 를 못 고치고,
+    # UNIQUE(statute_id, effective_from) 때문에 새 행도 못 넣는다. 건너뛴다.
     if effective_from == u.effective_from:
-        conn.execute(
-            "UPDATE statute_version SET body = %s, body_hash = %s, fetched_at = now()"
-            " WHERE id = %s",
-            (u.body, u.body_hash, row_id),
-        )
-        return True
+        return False
 
     conn.execute(
         "UPDATE statute_version SET effective_to = %s, is_superseded = true WHERE id = %s",

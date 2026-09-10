@@ -1,13 +1,28 @@
 # DB 스키마
 
-`schema.sql` 한 파일이 전체 스키마다.
+스키마 소유권이 둘로 나뉜다.
+
+| 소유 | 무엇 | 어디 |
+|---|---|---|
+| **백엔드 Flyway** | `statute_version` 등 판정 코어 | `backend/src/main/resources/db/migration/V*.sql` |
+| **이 디렉터리** | `law_sync_log` | `db/schema.sql` |
+
+`statute_version`이 `judgment_citation.statute_version_id`의 FK 대상이라 저쪽이 만든다.
+양쪽이 같이 만들면 initdb가 먼저 돌아 Flyway가 "이미 존재한다"로 실패하고 앱이 안 뜬다.
 
 ## 적용
 
-**로컬 · CI** — 자동이다. `compose.yaml`이 `20-schema.sql`로 마운트해서 컨테이너 최초 기동 시 실행된다.
+**순서가 있다.** Flyway가 먼저다.
 
 ```bash
-docker compose up -d postgres
+docker compose up -d postgres          # 1) 확장 + law_sync.sql
+./gradlew :backend:bootRun             # 2) Flyway 마이그레이션 (또는 아래 수동 적용)
+```
+
+백엔드를 띄우지 않고 AI 쪽만 작업할 때는 V1을 직접 넣는다.
+
+```bash
+docker exec -i <postgres> psql -U ktc4 -d ktc4   < backend/src/main/resources/db/migration/V1__create_judgment_core.sql
 ```
 
 > ⚠️ `docker-entrypoint-initdb.d`는 **데이터 디렉터리가 비어 있을 때만** 실행된다.
@@ -35,25 +50,18 @@ CREATE EXTENSION IF NOT EXISTS vector;
 CREATE EXTENSION IF NOT EXISTS pg_bigm;
 ```
 
-## 마이그레이션 도구가 없는 이유
+## 마이그레이션은 Flyway가 한다
 
-지금은 스키마가 안 굳었다. 도구를 먼저 넣으면 확정되지도 않은 스키마에 `V1`, `V2`, `V3`를 남발하게 된다.
-파일 하나를 고쳐 나가는 편이 낫다.
+판정 코어 테이블은 `V1`, `V2`, ... 로 쌓는다. **살아 있는 DB에 직접 `ALTER TABLE`을 치지 말 것.**
+재현이 안 되는 스키마가 된다.
 
-**언제 도구를 넣는가 — 기준을 미리 정해 둔다.**
+`law_sync_log`만 여기 남았고 아직 마이그레이션 번호가 없다.
+이 테이블에 `ALTER TABLE`이 필요해지면 그때 Flyway로 옮긴다.
 
-> **살아 있는 RDS에 `ALTER TABLE`이 필요해지는 첫 순간에 Flyway를 도입한다.**
+## ddl-auto: validate
 
-그전에는 `schema.sql`을 고치고 로컬 볼륨을 재생성하면 된다.
-그 시점이 오면 비용은 `backend/build.gradle.kts` 한 줄 + `schema.sql`을
-`backend/src/main/resources/db/migration/V1__init.sql`로 옮기는 것뿐이다. 나중에 넣어도 싸다.
-
-**그때까지 살아 있는 DB에 직접 `ALTER TABLE`을 치지 말 것.** 재현이 안 되는 스키마가 된다.
-
-## 스키마 소유권
-
-`backend`는 `application.yml`에서 `ddl-auto: validate`다. **백엔드는 테이블을 만들지 않는다.**
-스키마 소유권이 이 디렉터리에 있다는 뜻이고, 이 설정은 유지해야 한다.
+`backend`는 `application.yml`에서 `ddl-auto: validate`다. **JPA는 테이블을 만들지 않는다.**
+만드는 건 Flyway고 JPA는 대조만 한다. 이 설정은 유지해야 한다.
 
 백엔드 부팅이 스키마 불일치로 실패하면 그건 버그가 아니라 **안전장치가 작동한 것**이다.
 `schema.sql`을 먼저 맞춰라.
@@ -62,7 +70,7 @@ CREATE EXTENSION IF NOT EXISTS pg_bigm;
 
 | 테이블 | 용도 |
 |---|---|
-| `statute_version` | 법령·행정규칙·심판례해석·판례 원문. **append-only** |
+| `statute_version` | 법령·행정규칙·심판례해석·판례 원문. **append-only**. *Flyway 소유* |
 | `law_sync_log` | 동기화 실행 기록. 변경이 없어도 한 줄 남긴다 |
 
 `legal_chunk`(임베딩 산출물)는 아직 없다. 청킹·색인 작업 때 추가한다.
@@ -72,5 +80,8 @@ CREATE EXTENSION IF NOT EXISTS pg_bigm;
 - **기존 행을 UPDATE 하지 않는다.** 개정 시 옛 행의 `effective_to`를 채우고 새 행을 INSERT 한다.
 - `statute_version_current_idx`가 "`statute_id`당 현행 행 최대 1개"를 **DB 레벨에서 강제**한다.
   이 인덱스 위반이 뜨면 적재 로직에 버그가 있는 것이다. 인덱스를 지우지 말고 로직을 고쳐라.
+- `trg_statute_version_append_only` 트리거가 `body`·`meta` 등 내용 컬럼의 UPDATE를 막는다.
+  `effective_to`·`is_superseded`만 열려 있어 버전 닫기는 통과한다.
+  시행일이 같은데 본문만 다른 원문 정정은 표현할 방법이 없어 적재가 건너뛴다.
 - `body`는 `NOT NULL`이다. 본문 없는 자료(국세청 법령해석, 국세청 출처 판례)는
   수집 대상이 아니며 이 테이블에 들어오지 않는다.
