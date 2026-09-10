@@ -15,7 +15,7 @@ public final class RuleSet {
 
     private static final Comparator<RuleCard> WINNER = Comparator
         .comparingInt(RuleCard::priority).reversed()
-        .thenComparing(Comparator.comparingInt(RuleSet::specificity).reversed())
+        .thenComparing(Comparator.comparingInt((RuleCard card) -> card.match().specificity()).reversed())
         .thenComparing(RuleCard::id);
 
     private final Map<Gate, List<RuleCard>> rulesByGate;
@@ -33,24 +33,5 @@ public final class RuleSet {
 
     public List<RuleCard> get(Gate gate) {
         return rulesByGate.getOrDefault(gate, List.of());
-    }
-
-    // 이 점수표의 사람용 설명은 CONTEXT.md "승자 정렬" 섹션이 단일 기준이다 (동일 식이 RuleCardLoader에도 있음).
-    private static int specificity(RuleCard card) {
-        RuleMatch match = card.match();
-        int score = 0;
-        if (!match.keywords().isEmpty()) {
-            score += 100;
-        }
-        if (!match.categories().isEmpty()) {
-            score += 50;
-        }
-        if (!match.industries().isEmpty()) {
-            score += 30;
-        }
-        if (match.amountMin() != null || match.amountMax() != null) {
-            score += 20;
-        }
-        return score;
     }
 }

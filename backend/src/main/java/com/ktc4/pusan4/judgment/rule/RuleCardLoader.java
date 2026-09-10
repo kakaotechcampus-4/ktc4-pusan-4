@@ -152,7 +152,7 @@ public final class RuleCardLoader {
                 RuleCard right = cards.get(rightIndex);
                 if (left.gate() == right.gate()
                     && left.priority() == right.priority()
-                    && specificity(left) == specificity(right)
+                    && left.match().specificity() == right.match().specificity()
                     && periodsOverlap(left, right)
                     && matchesOverlap(left.match(), right.match())) {
                     throw new RuleCardValidationException(
@@ -235,23 +235,6 @@ public final class RuleCardLoader {
         long effectiveRightMin = rightMin == null ? Long.MIN_VALUE : rightMin;
         long effectiveRightMax = rightMax == null ? Long.MAX_VALUE : rightMax;
         return effectiveLeftMin <= effectiveRightMax && effectiveRightMin <= effectiveLeftMax;
-    }
-
-    private static int specificity(RuleCard card) {
-        int score = 0;
-        if (!card.match().keywords().isEmpty()) {
-            score += 100;
-        }
-        if (!card.match().categories().isEmpty()) {
-            score += 50;
-        }
-        if (!card.match().industries().isEmpty()) {
-            score += 30;
-        }
-        if (card.match().amountMin() != null || card.match().amountMax() != null) {
-            score += 20;
-        }
-        return score;
     }
 
     private List<QuestionSpec> questions(JsonNode root) {
