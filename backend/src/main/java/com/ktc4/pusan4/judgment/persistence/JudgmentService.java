@@ -64,6 +64,8 @@ public class JudgmentService {
         return judgmentId;
     }
 
+    // 락 획득 순서 불변식: user(app_user) → transaction. 여기서 잡는 transaction 락은
+    // 항상 user 락(UserFactPersistenceService.nextVersion) 다음에만 잡는다(데드락 방지).
     private int nextRevision(UUID transactionId) {
         transactionRepository.findByIdForUpdate(transactionId)
             .orElseThrow(NoResultException::new);
