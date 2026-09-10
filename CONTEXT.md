@@ -822,6 +822,18 @@ evidence: [자산대장 등재]
 **속성형(G3~G6):** `attributes` (`verdict` 없음)
 **되묻기 있으면:** `question` (`fact_type`, `group_by`, `options`)
 
+### 승자 정렬 — 같은 priority면 구체적인 카드가 이긴다
+
+`priority`가 같으면 **`match` 조건이 더 구체적인 카드**가 이긴다. 구체성은 조건별 점수 합으로 매기며, 점수까지 같으면 최종적으로 `id` 오름차순으로 갈린다. 이 정렬(priority → specificity → id)은 **G2~G6 승자 선택**에 적용되고, G1 차단 관문은 priority → id 만 쓴다.
+
+| 조건 | 점수 |
+|---|---|
+| `keyword` | +100 |
+| `category` | +50 |
+| `industry` | +30 |
+| `amount_min`/`amount_max` (하나라도) | +20 |
+| 조건 없음 | 0 |
+
 ### 근거 위계 — 화면 표시가 달라진다
 
 ```

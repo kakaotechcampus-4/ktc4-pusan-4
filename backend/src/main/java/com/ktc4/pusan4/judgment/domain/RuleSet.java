@@ -35,6 +35,7 @@ public final class RuleSet {
         return rulesByGate.getOrDefault(gate, List.of());
     }
 
+    // 이 점수표의 사람용 설명은 CONTEXT.md "승자 정렬" 섹션이 단일 기준이다 (동일 식이 RuleCardLoader에도 있음).
     private static int specificity(RuleCard card) {
         RuleMatch match = card.match();
         int score = 0;
