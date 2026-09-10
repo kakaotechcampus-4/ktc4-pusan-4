@@ -25,7 +25,7 @@ class RuleCardLoaderTest {
     void loads_only_cards_directory_in_priority_order() throws IOException {
         Files.createDirectories(root.resolve("cards"));
         Files.writeString(root.resolve("normalize.yaml"), "not: a-card");
-        Files.writeString(root.resolve("cards/R-020.yaml"), cardYaml("R-020", 300));
+        Files.writeString(root.resolve("cards/R-020.yaml"), cardYaml("R-020", 450));
         Files.writeString(root.resolve("cards/R-010.yaml"), cardYaml("R-010", 900));
 
         List<RuleCard> cards = new RuleCardLoader().load(root).get(Gate.G1);
@@ -46,13 +46,24 @@ class RuleCardLoaderTest {
     }
 
     @Test
+    void rejects_priority_below_401() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("cards/R-010.yaml"), cardYaml("R-010", 400));
+
+        assertThatThrownBy(() -> new RuleCardLoader().load(root))
+            .isInstanceOf(RuleCardValidationException.class)
+            .hasMessageContaining("R-010")
+            .hasMessageContaining("priority");
+    }
+
+    @Test
     void loads_question_option_effects() throws IOException {
         Files.createDirectories(root.resolve("cards"));
         Files.writeString(root.resolve("cards/R-027.yaml"), """
             id: R-027
             version: 1
             gate: G3
-            priority: 400
+            priority: 401
             effective_period: { start: 2025-01-01, end: null }
             match:
               category: [카페]

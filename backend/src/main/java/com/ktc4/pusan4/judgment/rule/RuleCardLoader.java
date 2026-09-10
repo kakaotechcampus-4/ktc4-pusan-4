@@ -75,6 +75,12 @@ public final class RuleCardLoader {
         int version = requiredInt(root, "version");
         Gate gate = enumValue(Gate.class, requiredText(root, "gate"), "gate");
         int priority = requiredInt(root, "priority");
+        // 기본룰(큐레이션 카드)은 401 이상. 400 이하는 학습룰 대역이라, 검증된 카드가
+        // 학습룰에 밀리지 않도록 로딩 시 거부한다.
+        if (priority < 401) {
+            throw new RuleCardValidationException(
+                id + ": priority must be 401 or higher (401+ is reserved for base rules)");
+        }
 
         JsonNode period = first(root, "effective_period", "효력기간");
         if (period == null || period.isMissingNode()) {
