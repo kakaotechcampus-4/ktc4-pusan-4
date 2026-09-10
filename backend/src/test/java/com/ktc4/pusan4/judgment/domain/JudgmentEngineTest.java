@@ -527,6 +527,49 @@ class JudgmentEngineTest {
     }
 
     @Test
+    void unavailable_verdict_drops_unresolved_questions() {
+        UUID transactionId = UUID.randomUUID();
+        QuestionSpec purposeQuestion = new QuestionSpec(
+            "PURPOSE", "용도는?", "용도", "transaction",
+            List.of("업무", "개인"),
+            Map.of(
+                "업무", new QuestionEffect(Verdict.AVAILABLE, "소모품비", Map.of()),
+                "개인", new QuestionEffect(Verdict.UNAVAILABLE, null, Map.of())
+            )
+        );
+        RuleCard g2 = new RuleCard(
+            "R-020", 1, Gate.G2, 500, RuleMatch.categories("카페"),
+            Verdict.AVAILABLE, null, List.of(new Citation("소득세법-27-1")),
+            Map.of(), List.of(purposeQuestion)
+        );
+        RuleCard g4 = new RuleCard(
+            "R-051", 1, Gate.G4, 500, RuleMatch.categories("카페"),
+            null, null, List.of(new Citation("소득세법시행령-67-4")), Map.of(),
+            List.of(new QuestionSpec(
+                "ASSET_OR_EXPENSE", "자산?", "자산여부", "transaction",
+                List.of("자산", "당기비용"),
+                Map.of("당기비용", new QuestionEffect(Verdict.AVAILABLE, "소모품비", Map.of()))
+            ))
+        );
+        TransactionInput transaction = new TransactionInput(
+            transactionId, LocalDate.of(2025, 3, 14), "스타벅스", "카페", 20_000
+        );
+        // 앞 관문 질문에 "개인"으로 답해 불가 확정. 뒤 관문 자산 질문은 미응답으로 남는다.
+        List<UserFact> facts = List.of(
+            new UserFact("transaction:" + transactionId, "용도", Map.of("value", "개인"))
+        );
+
+        Judgment result = JudgmentEngine.judge(
+            transaction, new UserContext("940909", false, null), facts, new RuleSet(List.of(g4, g2))
+        );
+
+        // 이미 불가로 확정됐으므로 미해소 질문을 되묻지 않는다.
+        assertThat(result)
+            .extracting(Judgment::verdict, Judgment::questions)
+            .containsExactly(Verdict.UNAVAILABLE, List.of());
+    }
+
+    @Test
     void g4_forces_asset_question_above_one_million_for_ambiguous_category() {
         Judgment result = JudgmentEngine.judge(
             subscription("구독", 1_200_000),

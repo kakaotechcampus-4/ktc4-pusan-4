@@ -31,7 +31,7 @@ public final class JudgmentEngine {
                 List.of(rule.version()),
                 rule.citations(),
                 rule.attributes(),
-                rule.questions()
+                List.of()
             ))
             .orElse(null);
         if (blocked != null) {
@@ -99,6 +99,10 @@ public final class JudgmentEngine {
             citations.addAll(rule.citations());
         }
 
+        // 이미 불가로 확정된 거래는 되묻지 않는다: 미해소 질문을 버려 되묻기 예산 낭비를 막는다.
+        if (resolvedVerdict == Verdict.UNAVAILABLE) {
+            questions.clear();
+        }
         Verdict verdict = questions.isEmpty()
             ? resolvedVerdict
             : moreRestrictive(resolvedVerdict, Verdict.NEEDS_REVIEW);
