@@ -63,10 +63,25 @@ CREATE TABLE statute_version (
     is_superseded boolean NOT NULL DEFAULT false,
     body text NOT NULL,
     body_hash varchar(128) NOT NULL,
-    created_at timestamptz NOT NULL DEFAULT now(),
+    doc_id varchar(20) NOT NULL,
+    unit_level varchar(4) NOT NULL CHECK (unit_level IN ('조', '항', '호', '문서')),
+    title text NOT NULL,
+    doc_no varchar(20),
+    source_url text NOT NULL,
+    meta jsonb NOT NULL DEFAULT '{}'::jsonb,
+    fetched_at timestamptz NOT NULL DEFAULT now(),
     CHECK (effective_to IS NULL OR effective_to > effective_from),
     UNIQUE (statute_id, effective_from)
 );
+
+CREATE UNIQUE INDEX statute_version_current_idx
+    ON statute_version (statute_id) WHERE effective_to IS NULL;
+
+CREATE INDEX statute_version_lookup_idx
+    ON statute_version (statute_id, effective_from DESC);
+
+CREATE INDEX statute_version_source_idx
+    ON statute_version (doc_type, doc_id);
 
 CREATE FUNCTION protect_statute_version_content()
 RETURNS trigger
@@ -81,7 +96,13 @@ BEGIN
         OR NEW.issued_at IS DISTINCT FROM OLD.issued_at
         OR NEW.body IS DISTINCT FROM OLD.body
         OR NEW.body_hash IS DISTINCT FROM OLD.body_hash
-        OR NEW.created_at IS DISTINCT FROM OLD.created_at THEN
+        OR NEW.doc_id IS DISTINCT FROM OLD.doc_id
+        OR NEW.unit_level IS DISTINCT FROM OLD.unit_level
+        OR NEW.title IS DISTINCT FROM OLD.title
+        OR NEW.doc_no IS DISTINCT FROM OLD.doc_no
+        OR NEW.source_url IS DISTINCT FROM OLD.source_url
+        OR NEW.meta IS DISTINCT FROM OLD.meta
+        OR NEW.fetched_at IS DISTINCT FROM OLD.fetched_at THEN
         RAISE EXCEPTION 'statute_version content is append-only';
     END IF;
     RETURN NEW;

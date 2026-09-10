@@ -150,8 +150,10 @@ class JudgmentSchemaIntegrationTest {
     void statute_versions_reject_content_updates() {
         Long statuteVersionId = jdbcTemplate.queryForObject("""
             insert into statute_version(
-                statute_id, doc_type, hierarchy, effective_from, body, body_hash
-            ) values ('소득세법-33-1-2-append-only', '법령', '법률', '2025-01-01', '원문', 'hash-1')
+                statute_id, doc_type, hierarchy, effective_from, body, body_hash,
+                doc_id, unit_level, title, source_url
+            ) values ('소득세법-33-1-2-append-only', '법령', '법률', '2025-01-01', '원문', 'hash-1',
+                'DOC-1', '조', '소득세법 제33조', 'https://law.go.kr/test')
             returning id
             """, Long.class);
 
@@ -200,8 +202,10 @@ class JudgmentSchemaIntegrationTest {
         insertTransaction(transactionId, batchId, "judgment-natural-key");
         Long statuteVersionId = jdbcTemplate.queryForObject("""
             insert into statute_version(
-                statute_id, doc_type, hierarchy, effective_from, body, body_hash
-            ) values ('소득세법-33-1-2', '법령', '법률', '2025-01-01', '원문', 'judgment-hash')
+                statute_id, doc_type, hierarchy, effective_from, body, body_hash,
+                doc_id, unit_level, title, source_url
+            ) values ('소득세법-33-1-2', '법령', '법률', '2025-01-01', '원문', 'judgment-hash',
+                'DOC-2', '조', '소득세법 제33조', 'https://law.go.kr/test')
             returning id
             """, Long.class);
         Judgment result = new Judgment(
@@ -311,8 +315,10 @@ class JudgmentSchemaIntegrationTest {
         insertTransaction(transactionId, batchId, "rollback-natural-key");
         jdbcTemplate.update("""
             insert into statute_version(
-                statute_id, doc_type, hierarchy, effective_from, body, body_hash
-            ) values ('rollback-statute', '법령', '법률', '2025-01-01', '원문', 'rollback-hash')
+                statute_id, doc_type, hierarchy, effective_from, body, body_hash,
+                doc_id, unit_level, title, source_url
+            ) values ('rollback-statute', '법령', '법률', '2025-01-01', '원문', 'rollback-hash',
+                'DOC-3', '조', '롤백 테스트', 'https://law.go.kr/test')
             """);
         Judgment judgment = new Judgment(
             Verdict.NEEDS_REVIEW, Gate.G2, false, UnmatchedReason.RULE_NOT_FOUND, null,
