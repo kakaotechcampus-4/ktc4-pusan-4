@@ -8,7 +8,6 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class JudgmentEngineTest {
 
@@ -238,7 +237,7 @@ class JudgmentEngineTest {
     }
 
     @Test
-    void conflicting_answered_accounts_name_both_question_sources() {
+    void conflicting_answered_accounts_degrade_transaction_to_review() {
         UUID transactionId = UUID.randomUUID();
         RuleCard g2 = new RuleCard(
             "R-020", 1, Gate.G2, 500, RuleMatch.categories("카페"),
@@ -265,19 +264,61 @@ class JudgmentEngineTest {
             new UserFact("transaction:" + transactionId, "유형", Map.of("value", "업무"))
         );
 
+        // 답변끼리 계정과목이 엇갈리면 배치를 세우지 않고 이 거래만 검토로 떨어뜨린다.
+        // 두 정렬 순서 모두에서 동일 결과여야 한다(순서 무관).
         for (RuleSet rules : List.of(
             new RuleSet(List.of(g4, g2, g3)),
             new RuleSet(List.of(g3, g4, g2))
         )) {
-            assertThatThrownBy(() -> JudgmentEngine.judge(
-                transaction,
-                new UserContext("940909", false, null), facts, rules
-            ))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage(
-                    "Conflicting answered accounts: R-030:PURPOSE=접대비, R-040:TYPE=소모품비"
-                );
+            Judgment result = JudgmentEngine.judge(
+                transaction, new UserContext("940909", false, null), facts, rules
+            );
+
+            assertThat(result)
+                .extracting(Judgment::verdict, Judgment::account)
+                .containsExactly(Verdict.NEEDS_REVIEW, null);
+            assertThat(result.appliedRuleIds())
+                .containsExactlyInAnyOrder("R-020", "R-030", "R-040");
         }
+    }
+
+    @Test
+    void same_answered_account_across_cards_is_not_a_conflict() {
+        UUID transactionId = UUID.randomUUID();
+        RuleCard g2 = new RuleCard(
+            "R-020", 1, Gate.G2, 500, RuleMatch.categories("카페"),
+            Verdict.AVAILABLE, "지급수수료", List.of(), Map.of(), List.of()
+        );
+        RuleCard g3 = new RuleCard(
+            "R-030", 1, Gate.G3, 500, RuleMatch.categories("카페"),
+            null, null, List.of(), Map.of(), List.of(question(
+                "PURPOSE", "용도", "접대비"
+            ))
+        );
+        RuleCard g4 = new RuleCard(
+            "R-040", 1, Gate.G4, 500, RuleMatch.categories("카페"),
+            null, null, List.of(), Map.of(), List.of(question(
+                "TYPE", "유형", "접대비"
+            ))
+        );
+
+        TransactionInput transaction = new TransactionInput(
+            transactionId, LocalDate.of(2025, 3, 14), "가맹점", "카페", 20_000
+        );
+        List<UserFact> facts = List.of(
+            new UserFact("transaction:" + transactionId, "용도", Map.of("value", "업무")),
+            new UserFact("transaction:" + transactionId, "유형", Map.of("value", "업무"))
+        );
+
+        Judgment result = JudgmentEngine.judge(
+            transaction, new UserContext("940909", false, null), facts,
+            new RuleSet(List.of(g2, g3, g4))
+        );
+
+        // 서로 다른 카드가 같은 계정과목을 답으로 내면 충돌이 아니다.
+        assertThat(result)
+            .extracting(Judgment::verdict, Judgment::account)
+            .containsExactly(Verdict.AVAILABLE, "접대비");
     }
 
     @Test

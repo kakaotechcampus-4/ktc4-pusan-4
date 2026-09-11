@@ -56,7 +56,8 @@ public final class JudgmentEngine {
         LinkedHashSet<Citation> citations = new LinkedHashSet<>();
         Verdict resolvedVerdict = null;
         String defaultAccount = null;
-        AccountAssignment answeredAccount = null;
+        String answeredAccount = null;
+        boolean answeredAccountConflict = false;
 
         // 승자(G2)와 속성 관문(G3~G6) 카드를 한 파이프라인으로 동일하게 처리한다.
         // 되묻기는 어느 관문에 있든 user_fact로 해소된다.
@@ -87,9 +88,12 @@ public final class JudgmentEngine {
                     cardVerdict = effect.verdict();
                 }
                 if (effect.account() != null) {
-                    answeredAccount = mergeAnsweredAccount(
-                        answeredAccount, effect.account(), rule.id(), question.code()
-                    );
+                    if (answeredAccount == null) {
+                        answeredAccount = effect.account();
+                    } else if (!answeredAccount.equals(effect.account())) {
+                        // 답변끼리 계정과목이 엇갈리면 이 거래만 검토로 돌린다(배치 중단 방지).
+                        answeredAccountConflict = true;
+                    }
                 }
             }
             // 관문 간에는 더 제한적인 판정이 이긴다(뒤 관문이 앞 판정을 완화하지 못함).
@@ -103,12 +107,14 @@ public final class JudgmentEngine {
         if (resolvedVerdict == Verdict.UNAVAILABLE) {
             questions.clear();
         }
-        Verdict verdict = questions.isEmpty()
-            ? resolvedVerdict
-            : moreRestrictive(resolvedVerdict, Verdict.NEEDS_REVIEW);
-        String account = verdict == Verdict.UNAVAILABLE
+        // 미해소 질문 또는 답변 계정과목 충돌이 있으면 이 거래를 검토로 전환한다.
+        boolean review = !questions.isEmpty() || answeredAccountConflict;
+        Verdict verdict = review
+            ? moreRestrictive(resolvedVerdict, Verdict.NEEDS_REVIEW)
+            : resolvedVerdict;
+        String account = verdict == Verdict.UNAVAILABLE || answeredAccountConflict
             ? null
-            : answeredAccount == null ? defaultAccount : answeredAccount.account();
+            : answeredAccount == null ? defaultAccount : answeredAccount;
         return new Judgment(
             verdict, null, false, null, account, appliedRuleIds, appliedRuleVersions,
             List.copyOf(citations), attributes, questions
@@ -169,23 +175,6 @@ public final class JudgmentEngine {
         };
     }
 
-    private static AccountAssignment mergeAnsweredAccount(
-        AccountAssignment current,
-        String account,
-        String ruleId,
-        String questionCode
-    ) {
-        AccountAssignment next = new AccountAssignment(account, ruleId + ":" + questionCode);
-        if (current == null || current.account().equals(account)) {
-            return current == null ? next : current;
-        }
-        throw new IllegalStateException(
-            "Conflicting answered accounts: %s=%s, %s=%s".formatted(
-                current.source(), current.account(), next.source(), next.account()
-            )
-        );
-    }
-
     private static QuestionEffect resolvedEffect(
         QuestionSpec question,
         TransactionInput transaction,
@@ -223,8 +212,5 @@ public final class JudgmentEngine {
             case "merchant", "merchant_norm" -> "merchant:" + transaction.merchantNorm();
             default -> groupBy;
         };
-    }
-
-    private record AccountAssignment(String account, String source) {
     }
 }
