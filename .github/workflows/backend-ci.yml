@@ -4,16 +4,12 @@ on:
   pull_request:
     paths:
       - "backend/**"
-      - "rules/cards/**"
-      - "profiles/**"
       - "compose.yaml"
       - ".github/workflows/backend-ci.yml"
   push:
     branches: [develop, main]
     paths:
       - "backend/**"
-      - "rules/cards/**"
-      - "profiles/**"
       - "compose.yaml"
       - ".github/workflows/backend-ci.yml"
 
