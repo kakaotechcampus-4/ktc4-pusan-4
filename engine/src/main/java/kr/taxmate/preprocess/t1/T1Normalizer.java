@@ -3,10 +3,10 @@ package kr.taxmate.preprocess.t1;
 import java.nio.charset.Charset;
 import java.text.Normalizer;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -26,6 +26,11 @@ import java.util.regex.Pattern;
  *       {@code ㈜} 가 {@code (주)} 로 분해되는 것까지 같아야 한다.</li>
  *   <li>절단 판정 바이트 수는 EUC-KR 로 잰다. 인코딩 불가 문자는 {@code ?} 한 바이트가 된다.</li>
  * </ul>
+ *
+ * <p><b>스레드 안전.</b> 이 클래스는 불변이다. 스펙에서 읽은 필드는 생성자에서만 채우고,
+ * 정규식은 생성자의 {@link #precompile()} 이 전부 컴파일해 둔다. 호출마다 바뀌는 상태는
+ * {@link Ctx} 와 {@link Matcher} 뿐이고 둘 다 호출 안에서 새로 만든다.
+ * 따라서 인스턴스 하나를 여러 스레드가 공유해도 된다(예: 스프링 싱글톤 빈).
  */
 public final class T1Normalizer {
 
@@ -34,6 +39,8 @@ public final class T1Normalizer {
     private static final Pattern BARE = Pattern.compile("[\\s.\\-*#/&,'\"()\\[\\]|]", FLAGS);
     private static final Pattern ASCII_LETTER = Pattern.compile("[A-Za-z]");
     private static final Pattern LETTER = Pattern.compile("[A-Za-z가-힣]");
+    /** {@code strip_special} 단계의 {@code chars} 가 비었을 때 쓰는 기본 문자 클래스. */
+    private static final String STRIP_SPECIAL_DEFAULT = "[.*#/&,'\"()\\[\\]_~\\\\]";
 
     private final Map<String, Object> spec;
     private final List<Map<String, Object>> steps;
@@ -41,7 +48,10 @@ public final class T1Normalizer {
     private final List<String> exceptionsBare = new ArrayList<>();
     private final Map<String, Object> truncation;
     private final Map<String, Object> overseas;
-    private final Map<String, Pattern> cache = new LinkedHashMap<>();
+    /** 대소문자 구분 패턴 캐시. {@link #precompile()} 이 채우고 이후에는 읽기만 한다. */
+    private final Map<String, Pattern> cache = new ConcurrentHashMap<>();
+    /** 대소문자 무시 패턴 캐시. 같은 정규식이라도 플래그가 달라 별도 맵으로 둔다. */
+    private final Map<String, Pattern> cacheCi = new ConcurrentHashMap<>();
 
     @SuppressWarnings("unchecked")
     public T1Normalizer(Map<String, Object> spec) {
@@ -54,6 +64,31 @@ public final class T1Normalizer {
         Map<String, Object> detect = (Map<String, Object>) this.spec.getOrDefault("detect", Map.of());
         this.truncation = (Map<String, Object>) detect.getOrDefault("truncation", Map.of());
         this.overseas = (Map<String, Object>) detect.getOrDefault("overseas", Map.of());
+        precompile();
+    }
+
+    /**
+     * YAML 에 적힌 정규식을 로딩 시점에 전부 컴파일한다.
+     *
+     * <p>두 가지를 노린다.
+     * <ul>
+     *   <li>깨진 정규식이 파이프라인 도중이 아니라 생성자에서 {@link java.util.regex.PatternSyntaxException}
+     *       으로 드러난다. 규칙 파일을 고친 사람이 바로 알 수 있다.</li>
+     *   <li>런타임에는 캐시가 읽기 전용이 되어 스레드 간 경쟁이 생기지 않는다.</li>
+     * </ul>
+     *
+     * <p>정규식을 담는 키는 {@code patterns}·{@code preserve}·{@code pg_hints}·{@code chars} 넷뿐이다.
+     * 새 단계가 다른 키로 정규식을 받게 되면 여기에도 추가한다. 빠뜨려도 동작은 한다 —
+     * 캐시가 {@link ConcurrentHashMap} 이라 지연 컴파일로 안전하게 되돌아갈 뿐이다.
+     */
+    private void precompile() {
+        for (Map<String, Object> step : steps) {
+            for (String p : stringList(step.get("patterns"))) pattern(p);   // strip_corp, strip_branch
+            for (String p : stringList(step.get("preserve"))) pattern(p);   // split_delimiters
+            for (String h : stringList(step.get("pg_hints"))) patternCi(h); // split_delimiters
+            Object chars = step.get("chars");                              // strip_special
+            pattern(chars == null ? STRIP_SPECIAL_DEFAULT : String.valueOf(chars));
+        }
     }
 
     public Map<String, Object> spec() { return spec; }
@@ -193,7 +228,7 @@ public final class T1Normalizer {
 
     private String stripSpecial(String s, Map<String, Object> step) {
         Object chars = step.get("chars");
-        String cls = chars == null ? "[.*#/&,'\"()\\[\\]_~\\\\]" : String.valueOf(chars);
+        String cls = chars == null ? STRIP_SPECIAL_DEFAULT : String.valueOf(chars);
         return pattern(cls).matcher(s).replaceAll("");
     }
 
@@ -285,8 +320,8 @@ public final class T1Normalizer {
     }
 
     private Pattern patternCi(String regex) {
-        return cache.computeIfAbsent("(?i) " + regex,
-                r -> Pattern.compile(regex, FLAGS | Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE));
+        return cacheCi.computeIfAbsent(regex,
+                r -> Pattern.compile(r, FLAGS | Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE));
     }
 
     @SuppressWarnings("unchecked")
