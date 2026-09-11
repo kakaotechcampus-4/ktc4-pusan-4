@@ -21,11 +21,9 @@ class RuleSetTest {
             card("R-040", gate, 900, RuleMatch.categories("카페"))
         ));
 
-        assertThat(rules.get(gate)).extracting(RuleCard::id).containsExactlyElementsOf(
-            gate == Gate.G1
-                ? List.of("R-040", "R-010", "R-020", "R-030")
-                : List.of("R-040", "R-020", "R-010", "R-030")
-        );
+        // 모든 관문이 동일하게 priority → specificity → id로 정렬된다(G1도 WINNER 사용).
+        assertThat(rules.get(gate)).extracting(RuleCard::id)
+            .containsExactly("R-040", "R-020", "R-010", "R-030");
     }
 
     private static RuleCard card(String id, Gate gate, int priority, RuleMatch match) {

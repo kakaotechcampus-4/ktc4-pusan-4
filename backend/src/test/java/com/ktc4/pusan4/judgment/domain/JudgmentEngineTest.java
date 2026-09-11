@@ -51,6 +51,42 @@ class JudgmentEngineTest {
     }
 
     @Test
+    void g1_winner_is_the_more_specific_card_on_equal_priority() {
+        RuleCard general = new RuleCard(
+            "R-090", 1, Gate.G1, 500,
+            RuleMatch.categories("카페"),
+            Verdict.UNAVAILABLE, null,
+            List.of(new Citation("근거-일반")),
+            Map.of(), List.of()
+        );
+        RuleCard specific = new RuleCard(
+            "R-091", 1, Gate.G1, 500,
+            new RuleMatch(List.of("카페"), List.of(), List.of("커피"), null, null, List.of()),
+            Verdict.UNAVAILABLE, null,
+            List.of(new Citation("근거-구체")),
+            Map.of(), List.of()
+        );
+        TransactionInput transaction = new TransactionInput(
+            UUID.randomUUID(), LocalDate.of(2025, 3, 14), "커피가맹점", "카페", 20_000
+        );
+
+        // 같은 priority의 G1 카드가 함께 매칭되면 더 구체적인 카드가 이겨,
+        // 인용/사유가 id 알파벳순이 아니라 specificity로 정해진다(로더 충돌기준과 정합).
+        Judgment result = JudgmentEngine.judge(
+            transaction,
+            new UserContext("940909", false, null),
+            List.of(),
+            new RuleSet(List.of(general, specific))
+        );
+
+        assertThat(result)
+            .extracting(Judgment::verdict, Judgment::blockedAtGate, Judgment::citations)
+            .containsExactly(
+                Verdict.UNAVAILABLE, Gate.G1, List.of(new Citation("근거-구체"))
+            );
+    }
+
+    @Test
     void g2_uses_priority_then_specificity_then_id() {
         RuleCard generic = new RuleCard(
             "R-030", 1, Gate.G2, 500,

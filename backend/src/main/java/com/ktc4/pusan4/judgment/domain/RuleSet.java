@@ -9,10 +9,6 @@ import java.util.Map;
 /** 로딩 시 관문별로 정렬해 여러 거래 판정에서 재사용하는 규칙 목록. */
 public final class RuleSet {
 
-    private static final Comparator<RuleCard> PRIORITY = Comparator
-        .comparingInt(RuleCard::priority).reversed()
-        .thenComparing(RuleCard::id);
-
     private static final Comparator<RuleCard> WINNER = Comparator
         .comparingInt(RuleCard::priority).reversed()
         .thenComparing(Comparator.comparingInt((RuleCard card) -> card.match().specificity()).reversed())
@@ -26,7 +22,7 @@ public final class RuleSet {
             grouped.computeIfAbsent(rule.gate(), ignored -> new ArrayList<>()).add(rule);
         }
         grouped.replaceAll((gate, cards) ->
-            cards.stream().sorted(gate == Gate.G1 ? PRIORITY : WINNER).toList()
+            cards.stream().sorted(WINNER).toList()
         );
         rulesByGate = Map.copyOf(grouped);
     }
