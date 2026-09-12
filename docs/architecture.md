@@ -67,7 +67,7 @@ flowchart TD
 
     RESP -.->|"사용자 답변"| FACT
     SAFE -.->|"사용자 답변"| FACT
-    FACT -.->|"G3부터 재실행 (게이트0·G1·G2 생략)"| G36
+    FACT -.->|"갱신된 facts로 judge() 전체 재실행"| G1
 
     classDef block fill:#b23b3b,color:#ffffff,stroke:#7f2626;
     classDef review fill:#b26a00,color:#ffffff,stroke:#7d4a00;
