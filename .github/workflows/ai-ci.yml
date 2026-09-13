@@ -1,0 +1,30 @@
+name: AI CI
+
+on:
+  pull_request:
+    paths:
+      - "ai/**"
+      - ".github/workflows/ai-ci.yml"
+  push:
+    branches: [develop, main]
+    paths:
+      - "ai/**"
+      - ".github/workflows/ai-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ai
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run pytest
