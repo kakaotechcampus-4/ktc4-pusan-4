@@ -50,6 +50,29 @@ java -Dfile.encoding=UTF-8 -cp out kr.taxmate.preprocess.t1.T1Cli \
 `normalize.yaml` 사본을 이 폴더에 두지 않는다. 사본을 두는 순간 두 파일이 갈라진다.
 레포 체크아웃 경로를 인자로 넘긴다.
 
+## 두 테스트의 역할 — 섞지 말 것
+
+이 폴더의 검증은 성격이 다른 두 축으로 나뉜다. 둘 중 하나로 다른 하나를
+대신할 수 없다.
+
+| | `test_cases` (합성) | 43상호 대조 (실측) |
+|---|---|---|
+| 어디 있나 | `rules/normalize.yaml` | 리포트·test_cases 에 등장한 실제 상호 목록 |
+| 무엇을 지키나 | **규칙이 만드는 모든 경로** | **실데이터 회귀** |
+| 누가 실행하나 | 파이썬 `--selftest` + 자바 `--selftest` (같은 파일을 읽는다) | 파이썬 출력 ↔ 자바 출력 16필드 대조 |
+| 새 규칙을 넣으면 | **여기에 케이스를 추가한다** | 자동으로 늘지 않는다 |
+
+**새 규칙이 만드는 경로는 반드시 `test_cases` 로 들어가야 한다.**
+43상호는 실데이터에서 뽑은 **고정 목록**이라, 실데이터에 아직 없는 입력은
+대조에 들어갈 수가 없다. 새 규칙이 만드는 경로를 구조적으로 못 잡는다는 뜻이다.
+
+실제로 그런 일이 있었다. `strip_branch` 가 지점명을 뗀 뒤 꼬리 구분자를 남겨
+`GS25-역삼점` 이 `GS25-` 가 되고 있었는데(`GS25` 와 다른 키), 그런 상호가
+실데이터에 없어서 43상호 대조는 전건 통과했다. 합성 케이스를 넣고서야 드러났다.
+
+반대로 `test_cases` 만으로는 실데이터 회귀를 못 잡는다. 20바이트 절단처럼
+**실제 파일에서만 나오는 형태**가 있기 때문이다. 둘 다 필요하다.
+
 ## 대조 검증 결과 (2026-09-07)
 
 - `normalize.yaml` 의 `test_cases` 19건 전건 통과
@@ -57,6 +80,22 @@ java -Dfile.encoding=UTF-8 -cp out kr.taxmate.preprocess.t1.T1Cli \
   (norm_key / track / string_norm / overseas_norm / tokens / is_truncated / is_overseas /
   enc_bytes / branch_skipped / branch_blocked / protected / pg_hint / cond_split / cond_kept / collapsed)
 - `MiniYaml` 파싱 결과가 파이썬 `yaml.safe_load` 와 구조·값 모두 동일 (정규 JSON 대조)
+
+> 이 대조는 **16필드** 기준이다. 파이썬 `normalize()` 는 이후 `branch` /
+> `branch_raw` 가 추가돼 **18필드**를 반환한다(2026-09-07 머지, 대조 시점 직후).
+> 두 필드는 자바에 아직 없어서 대조 범위 밖이다.
+
+## 파이썬과 갈라져 있는 것 — A 패치에서 맞춘다
+
+아래는 파이썬에만 있고 자바에 없다. 나눠서 고치면 자바를 두 번 손대게 되고
+그 사이마다 갈라질 창이 열리므로 **A 패치에서 한 번에** 처리한다.
+
+| 항목 | 상태 |
+|---|---|
+| `strip_branch.trim_trailing` | 파이썬만 읽는다. 자바가 모르면 `GS25-역삼점` 결과가 갈린다 |
+| `branch` / `branch_raw` | 파이썬만 반환한다 (`T1Result` 에 필드 없음) |
+| `key_strategy` | 양쪽 다 읽지 않는다. 파이썬은 `normalize()` 에 하드코딩 (이슈 #22) |
+| `test_cases` 의 `expect` 블록 | 미도입. `norm_key`·`track`·`is_truncated`·`branch_blocked` 를 단언하도록 확장 예정 |
 
 ## 파이썬과 갈라지기 쉬운 지점 — 손대지 말 것
 
