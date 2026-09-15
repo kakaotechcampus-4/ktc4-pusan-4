@@ -191,8 +191,12 @@ class Normalizer:
             ctx["branch_raw"] = s
             return s
         min_keep = int(step.get("min_keep", 2))
+        trim = step.get("trim_trailing")
         for pat in step.get("patterns") or []:
             cand = re.sub(pat, "", s).strip()
+            if trim:
+                # 지점명을 떼면 앞에 있던 구분자가 꼬리에 남는다 ("GS25-역삼점" -> "GS25-")
+                cand = re.sub(trim, "", cand)
             if cand != s and len(cand) >= min_keep:
                 ctx["branch_pattern"] = pat
                 # 떼어낸 부분이 지점명이다. 버리지 않고 보존한다.
