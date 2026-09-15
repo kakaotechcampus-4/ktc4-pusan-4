@@ -1,0 +1,26 @@
+# G2 · 음식배달 — 940909 통상성[음식배달] = 비통상
+#
+# 자택 배달은 대표자 본인 식대(§33①5)로 보는 게 기본이나, 거래처 식사를 배달로
+# 시킨 경우도 있어 불가로 확정하지 않고 되묻는다. 개인이면 §33①5 불산입.
+# 업무미팅(거래처)이면 §35① 접대비이나 §35 가 개인 판정에 새지 않도록 지금은 §33①5 만
+# 싣고 업무미팅은 verdict 없이 접대비 버킷만 태그한다(음식점 R-301 과 같은 계약).
+id: R-302
+version: 1
+gate: G2
+priority: 500
+effective_period: { start: 2024-01-01, end: null }
+match:
+  category: [음식배달]
+  industry: ["940909"]
+verdict: 확인필요
+citations:
+  - { id: 소득세법-33-1-5, verified: true }
+question:
+  code: DELIVERY_PURPOSE
+  text: "이 배달 음식은 어떤 용도였나요?"
+  fact_type: 용도
+  group_by: transaction
+  options:
+    - { value: 업무미팅, account: 접대비, limit_bucket: 접대비 }
+    - { value: 개인, verdict: 불가 }
+review: { by: 미검수, date: 2026-09-16 }

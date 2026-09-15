@@ -1,0 +1,25 @@
+# G2 · 여가 — 940909 통상성[여가] = 비통상
+#
+# 노래방·PC방·볼링 등 취미·레저. §33①13 직접 업무와 무관하다고 인정되는 지출은 불산입이나
+# '인정'이 필요해 확인필요로 둔다(게임 R-306 과 같은 축). 개인이면 §33①5 불가,
+# 업무 관련이라 답해도 근거가 필요해 확정하지 않는다.
+id: R-307
+version: 1
+gate: G2
+priority: 500
+effective_period: { start: 2024-01-01, end: null }
+match:
+  category: [여가]
+  industry: ["940909"]
+verdict: 확인필요
+citations:
+  - { id: 소득세법-33-1-5, verified: true }
+question:
+  code: LEISURE_PURPOSE
+  text: "이 여가 결제는 개인 용도인가요, 업무와 관련이 있나요?"
+  fact_type: 용도
+  group_by: transaction
+  options:
+    - { value: 개인, verdict: 불가 }
+    - { value: 업무관련 }
+review: { by: 미검수, date: 2026-09-16 }

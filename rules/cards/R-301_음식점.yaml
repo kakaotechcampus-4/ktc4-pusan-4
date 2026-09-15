@@ -1,0 +1,29 @@
+# G2 · 음식점 — 940909 통상성[음식점] = 조건부
+#
+# 대표자 본인 식대면 §33①5 불산입. 거래처 식사면 §35① 기업업무추진비다.
+# ⚠️ 본인 식대에 §35 를 붙이면 접대비 오적용이다(E-027·E-050 함정). §35 는 개인 판정에
+#    새면 안 되는데 citation 은 카드 레벨(모든 답변에 부착)이라, 지금은 카드에 §33①5 만
+#    싣고 업무미팅은 verdict 없이 접대비 버킷만 태그해 후속(집계)으로 넘긴다. 업무 식사를
+#    '가능 §35①'으로 확정하려면 선택지별 citation 지원이 필요하다(엔진 후속 과제).
+#
+# fact_type '용도'/값(업무미팅·개인), group_by transaction 은 E-027·E-046·E-050 을 따른다.
+id: R-301
+version: 1
+gate: G2
+priority: 500
+effective_period: { start: 2024-01-01, end: null }
+match:
+  category: [음식점]
+  industry: ["940909"]
+verdict: 확인필요
+citations:
+  - { id: 소득세법-33-1-5, verified: true }
+question:
+  code: RESTAURANT_PURPOSE
+  text: "이 식사는 어떤 용도였나요?"
+  fact_type: 용도
+  group_by: transaction
+  options:
+    - { value: 업무미팅, account: 접대비, limit_bucket: 접대비 }
+    - { value: 개인, verdict: 불가 }
+review: { by: 미검수, date: 2026-09-16 }
