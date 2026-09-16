@@ -1,0 +1,39 @@
+# G2 · 수도광열 — 프로파일 940909 통상성[수도광열] = 조건부 (확인필요 + 되묻기)
+#
+# 자택 겸 작업실이라 전기·수도·가스가 사업과 가사에 섞인다.
+# 되묻기로 전용/겸용만 가른다. 실제 안분율은 G3(면적 기준, B 담당)가 처리한다.
+#
+# ⚠️ 우리가 비율을 제안하지 않는다. "30%로 하세요"는 세무 조언이고 스펙아웃한
+#    절세 컨설팅에 걸린다. 그래서 '자택 겸용' 선택지에 verdict 를 두지 않는다 —
+#    확인필요를 유지한 채 안분 단계로 넘긴다.
+#
+# ⚠️ fact_type 을 R-101 의 '전용여부'와 다른 이름으로 둔다. 둘 다 group_by 가
+#    merchant_norm 이라 이름까지 같으면 (scope_key, fact_type) 이 겹치는데,
+#    선택지 어휘가 서로 다르다(사업 전용/자택 겸용 vs 업무 전용/개인 전용/혼용).
+#    겹치면 한쪽 답이 다른 쪽 질문을 영영 pending 으로 만들고, 답을 쓰면 서로의
+#    판정을 뒤집는다. R-101 헤더가 정해둔 규칙을 그대로 따른다.
+#
+# citations 는 평가 골든셋 RC-003 이 이 카테고리에 기대하는 조문(§33①5, 시행령 §61①)에
+# 전용일 때의 근거(§27①)를 더한 것이다.
+id: R-103
+version: 1
+gate: G2
+priority: 500
+effective_period: { start: 2024-01-01, end: null }
+match:
+  category: [수도광열]
+  industry: ["940909"]
+verdict: 확인필요
+citations:
+  - { id: 소득세법-27-1, verified: true }
+  - { id: 소득세법-33-1-5, verified: true }
+  - { id: 소득세법시행령-61-1, verified: true }
+question:
+  code: UTILITY_DEDICATION
+  text: "이 요금이 나오는 공간을 사업 전용으로만 쓰나요?"
+  fact_type: 공간전용여부
+  group_by: merchant_norm
+  options:
+    - { value: 사업 전용, verdict: 가능, account: 수도광열비 }
+    - { value: 자택 겸용 }
+review: { by: 미검수, date: 2026-09-14 }

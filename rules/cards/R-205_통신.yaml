@@ -1,0 +1,40 @@
+# G2 · 통신 — 프로파일 940909 통상성[통신] = 조건부 (자택 겸 작업실)
+#
+# ⚠️ 되묻기를 이 G2 카드에 직접 단다. G3 에 따로 두면 안 된다 —
+#    관문 사이에서는 더 제한적인 판정이 이겨서, G2 가 확인필요로 확정하면
+#    G3 의 '전용' 응답이 판정을 가능으로 되돌리지 못한다. 평가셋 E-037 이
+#    그 경로에서 확인필요로 남는다. R-103(수도광열)이 G2 에 되묻기를 둔 것과 같은 이유다.
+#
+# fact_type 과 선택지 값은 평가셋(PR #25)을 따른다 — E-037·E-038 이
+# (merchant, 전용여부, 전용/공용) 으로 답한다. 이름이나 값이 하나라도 어긋나면
+# 답이 카드에 매칭되지 않는다.
+#
+# ⚠️ R-101(구독서비스)도 group_by merchant_norm 에 fact_type '전용여부'를 쓰면서
+#    값은 '업무 전용/개인 전용/업무·개인 혼용' 이다. 같은 이름에 어휘가 둘이라
+#    R-103 헤더가 경고한 상황이다. 평가셋이 통신 쪽 어휘를 먼저 못박았으므로
+#    R-101 을 맞추는 쪽이 맞다고 보고 PR #27 리뷰로 올렸다.
+#
+# ⚠️ '공용' 선택지에 verdict 를 두지 않는다. 비율을 우리가 제안하면 세무 조언이 된다.
+#    확인필요를 유지한 채 안분(B 담당, 면적·사용량 기준)으로 넘긴다.
+id: R-205
+version: 1
+gate: G2
+priority: 500
+effective_period: { start: 2024-01-01, end: null }
+match:
+  category: [통신]
+  industry: ["940909"]
+verdict: 확인필요
+citations:
+  - { id: 소득세법-27-1, verified: true }
+  - { id: 소득세법-33-1-5, verified: true }
+question:
+  code: TELECOM_DEDICATION
+  text: "이 회선은 업무 전용인가요?"
+  fact_type: 전용여부
+  group_by: merchant_norm
+  options:
+    - { value: 전용, verdict: 가능, account: 통신비 }
+    - { value: 공용 }
+    - { value: 개인, verdict: 불가 }
+review: { by: 미검수, date: 2026-09-15 }

@@ -1,0 +1,29 @@
+# G2 · 경조사(화환·경조금) — 상대방에 따라 §35 접대비 vs §33①5 가사
+#
+# 개인 지인이면 §33①5 가사경비다. 거래처 경조금이면 §35① 기업업무추진비(시행령 §83②1 로
+# 20만원까지 증빙 특례)이나, §35 가 개인 판정에 새지 않도록 지금은 §33①5 만 싣고 업무미팅은
+# verdict 없이 접대비 버킷만 태그한다(거래처 확정 '가능 §35①'은 선택지별 citation 후속).
+# 상대방을 결제내역으로 알 수 없어(E-013·E-014) 되묻는다.
+#
+# 카테고리 '기타' + keyword. 같은 '기타' 계열 R-308(비지정 기부금)과 로드 충돌을 피하려
+# 다른 priority(502)를 쓴다. fact_type '용도'/값(업무미팅·개인)은 E-049 를 따른다.
+id: R-309
+version: 1
+gate: G2
+priority: 502
+effective_period: { start: 2024-01-01, end: null }
+match:
+  category: [기타]
+  keyword: [화환, 조의, 축의, 부의, 근조, 경조]
+verdict: 확인필요
+citations:
+  - { id: 소득세법-33-1-5, verified: true }
+question:
+  code: CONDOLENCE_PURPOSE
+  text: "이 경조사비는 거래처를 위한 것인가요, 개인 지인을 위한 것인가요?"
+  fact_type: 용도
+  group_by: transaction
+  options:
+    - { value: 업무미팅, account: 접대비, limit_bucket: 접대비 }
+    - { value: 개인, verdict: 불가 }
+review: { by: 미검수, date: 2026-09-16 }

@@ -1,0 +1,17 @@
+# G2 · 도서 — 프로파일 940909 통상성[도서] = 통상 (기술서적)
+#
+# ⚠️ 업무 무관 도서가 같은 카테고리로 들어온다. 되묻기를 붙일지는 9/18 세무사
+#    확인 대상이다. 평가셋 E-007(본인 교육비)이 같은 축에서 보류다.
+id: R-202
+version: 1
+gate: G2
+priority: 500
+effective_period: { start: 2024-01-01, end: null }
+match:
+  category: [도서]
+  industry: ["940909"]
+verdict: 가능
+account: 도서인쇄비
+citations:
+  - { id: 소득세법-27-1, verified: true }
+review: { by: 미검수, date: 2026-09-15 }

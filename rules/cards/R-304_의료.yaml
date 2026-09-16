@@ -1,0 +1,17 @@
+# G2 · 의료 — 940909 통상성[의료] = 비통상
+#
+# IT 개발·강의 사업자의 의료비는 사업 수행에 필요한 비용이 아니라 개인 의료비(§33①5).
+# 업종코드 940909 로 고정 — 방송·모델 등 신체가 사업수단인 업종이면 달라질 수 있다(E-035
+# 미용과 같은 축).
+id: R-304
+version: 1
+gate: G2
+priority: 500
+effective_period: { start: 2024-01-01, end: null }
+match:
+  category: [의료]
+  industry: ["940909"]
+verdict: 불가
+citations:
+  - { id: 소득세법-33-1-5, verified: true }
+review: { by: 미검수, date: 2026-09-16 }

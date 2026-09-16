@@ -1,0 +1,20 @@
+# G1 · 소득세법 §33①3 — 가산금·강제징수비
+#
+# category 를 걸지 않는다. 가산금은 특정 카테고리에 속하지 않고
+# 상호 원문에 드러나므로 keyword 로만 잡는다.
+# keyword 는 tx.merchant_raw 부분일치이고 서로 OR 다.
+#
+# priority 955 는 R-001(조세, 950)보다 높고 R-004(과태료, 960)보다 낮다.
+#   "국세 체납 가산금"은 분류기가 조세로 보내므로 R-001 보다 먼저 걸려야 3호를 인용한다.
+#   "주정차위반과태료 가산금"은 R-004 가 먼저 걸려 2호를 인용해야 한다(평가셋 E-004, E-026).
+id: R-002
+version: 1
+gate: G1
+priority: 955
+effective_period: { start: 2024-01-01, end: null }
+match:
+  keyword: ["가산금", "강제징수", "체납처분"]
+verdict: 불가
+citations:
+  - { id: 소득세법-33-1-3, verified: true }
+review: { by: 미검수, date: 2026-09-14 }

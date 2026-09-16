@@ -1,0 +1,45 @@
+# G2 · PG_미상 — 결제대행사를 거쳐 실제 가맹점을 알 수 없는 건 (확인필요 + 되묻기)
+#
+# pg_block.py 가 category=PG_미상 / needs_review=true 로 부여한다.
+# 구글플레이 한 줄이 Onedrive·Gemini·GPT 로 갈리고, 나이스정보통신이 실제로는
+# ChatGPT 인 식이라 카테고리만으로 판정이 불가능하다.
+# pg_block.py 가 needs_review 를 세우는 것도 사용자가 실체를 지목하게 하려는 것이고,
+# profiles/940909.yaml 도 이 카테고리를 "되묻기로 간다"로 적어 두었다.
+#
+# industry 를 걸지 않는다. 가맹점 불명은 업종과 무관한 문제라, 모든 업종에서
+# 똑같이 확인필요여야 한다. (다른 (b) 카드와 이 점이 다르다)
+#
+# 가맹점 이름을 받아 다시 분류하는 게 이상적이지만 options[] 는 자유 입력을 못 받는다.
+# 그래서 실체 대신 결론을 가르는 축(사업 관련성)을 직접 묻는다. 무엇을 샀는지 몰라도
+# 업무용인지는 본인이 안다.
+#
+# citations 는 선택지가 확정 판정으로 귀결되기 때문에 채운다(로더가 요구한다).
+# §27①·§33①5 는 "무엇을 샀는지"에 대한 주장이 아니라 업무용/개인용을 가르는 조문이라,
+# 이 카드가 실제로 묻는 것과 정확히 일치한다. 답하기 전에는 verdict 가 확인필요다.
+#
+# ⚠️ 업무용이어도 account 를 배정하지 않는다. 무엇을 샀는지 모르는 채로 계정과목을
+#    찍으면 근거 없는 분개가 된다. 계정과목은 비워 두고 사람이 채운다.
+#
+# fact_type 은 R-104(온라인쇼핑)와 같은 '용도'/transaction 이지만 충돌하지 않는다.
+# 거래 하나는 카테고리가 하나라 두 카드가 같은 거래에 동시에 걸릴 수 없다.
+id: R-105
+version: 1
+gate: G2
+priority: 500
+effective_period: { start: 2024-01-01, end: null }
+match:
+  category: [PG_미상]
+verdict: 확인필요
+citations:
+  - { id: 소득세법-27-1, verified: true }
+  - { id: 소득세법-33-1-5, verified: true }
+question:
+  code: PG_UNKNOWN_PURPOSE
+  text: "결제대행사를 거친 건이라 실제 가맹점을 알 수 없습니다. 사업을 위해 쓴 결제인가요?"
+  fact_type: 용도
+  group_by: transaction
+  options:
+    - { value: 업무용, verdict: 가능 }
+    - { value: 개인용, verdict: 불가 }
+    - { value: 기억나지 않음 }
+review: { by: 미검수, date: 2026-09-14 }

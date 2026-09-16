@@ -1,0 +1,35 @@
+# G2 · 생활용품 — 프로파일 940909 통상성[생활용품] = 비통상
+#
+# ⚠️ 프로파일이 '비통상'인데 불가로 확정하지 않는다. 다이소 한 건에 사무용품과
+#    가사용품이 같이 담기고, 카드 내역에는 품목이 없다. 불가로 확정하면
+#    실제 사무용품 구입이 조용히 부인된다. 되묻기로 사용자에게 가른다.
+#    (keyword_rules 가 다이소를 사무용품이 아니라 생활용품으로 보내는 것도 같은 판단이다)
+#
+# fact_type '용도'/transaction 은 R-104(온라인쇼핑)와 같지만, 거래 하나는
+# 카테고리가 하나라 두 카드가 같은 거래에 동시에 걸리지 않는다.
+#
+# ⚠️ 선택지 값은 평가셋(PR #25) 어휘를 따른다 — 개인용이 아니라 '개인'이다.
+#    E-027·E-040·E-050 이 모두 '개인'으로 답한다. R-104 는 '개인용'을 쓰고 있어
+#    같은 fact_type 에서 어휘가 갈린다. PR #27 리뷰로 올린다.
+id: R-207
+version: 1
+gate: G2
+priority: 500
+effective_period: { start: 2024-01-01, end: null }
+match:
+  category: [생활용품]
+  industry: ["940909"]
+verdict: 확인필요
+citations:
+  - { id: 소득세법-27-1, verified: true }
+  - { id: 소득세법-33-1-5, verified: true }
+question:
+  code: HOUSEHOLD_ITEM_PURPOSE
+  text: "이 건에서 구매한 물품은 업무용인가요?"
+  fact_type: 용도
+  group_by: transaction
+  options:
+    - { value: 업무용, verdict: 가능, account: 소모품비 }
+    - { value: 개인, verdict: 불가 }
+    - { value: 업무·개인 혼재 }
+review: { by: 미검수, date: 2026-09-15 }

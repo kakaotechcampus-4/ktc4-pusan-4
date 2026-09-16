@@ -1,0 +1,32 @@
+# G4 · 국내SW 100만원 초과 — 영구 라이선스(무형자산)인지 기간 선결제(선급비용)인지
+#
+# 카테고리를 국내SW 로 한정한다. 해외SaaS 의 기간 축은 R-107 이, 구독서비스는
+# R-101 이 이미 되묻는다. 겹치면 같은 거래에 질문이 두 번 뜬다.
+#
+# ⚠️ 영구 라이선스 소프트웨어의 내용연수·상각방법은 9/18 세무사 확인 대상이다
+#    (평가셋 E-042 보류). 조문을 원문으로 확인하지 못해 verified 를 달지 않았다.
+#
+# 선택지가 verdict 를 들지 않는다. 100만원 초과 국내SW 는 R-204(amount_max 99999)에
+# 걸리지 않아 G2 미매칭 -> 확인필요로 이미 떨어져 있고, 여기서 정하는 것은 귀속 시기다.
+id: R-242
+version: 1
+gate: G4
+priority: 520
+effective_period: { start: 2024-01-01, end: null }
+match:
+  category: [국내SW]
+  amount_min: 1000001
+citations:
+  - { id: 소득세법-39 }
+  - { id: 소득세법-33-1-14 }
+  - { id: 소득세법시행령-62 }
+question:
+  code: SW_PURCHASE_TYPE
+  text: "이 결제는 영구 라이선스 구매인가요, 기간 구독 선결제인가요?"
+  fact_type: 결제유형
+  group_by: transaction
+  options:
+    - { value: 영구 라이선스, 자산: true, 자산유형: 무형자산_소프트웨어, 내용연수: 5, 상각방법: 정액법 }
+    - { value: 기간 구독 선결제, 선급비용: true, 배분단위: 월 }
+    - { value: 월 단위 결제 }
+review: { by: 미검수, date: 2026-09-15 }

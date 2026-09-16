@@ -1,0 +1,33 @@
+# G2 · 임차료 — 사업장 임차 (카테고리 T4 신설, PM 승인 2026-09-15)
+#
+# ⚠️ 자택 겸용이면 시행령 §61①1 후단 '주택 관련 경비'에 걸리는지가 갈린다.
+#    R-103(수도광열)과 같은 축이고, 우리가 비율을 제안하지 않는 원칙도 같다 —
+#    '자택 겸용' 선택지에 verdict 를 두지 않고 확인필요를 유지한 채 안분으로 넘긴다.
+#    면적 안분(G3)은 B 담당이다.
+#
+# fact_type '사업장형태'는 R-103 의 '공간전용여부'와 다른 이름이다. group_by 가
+# 같아도 선택지 어휘가 다르면 (scope_key, fact_type) 을 겹치게 두지 않는다.
+#
+# industry 를 걸지 않는다 — 프로파일에 '임차료' 칸이 없다.
+id: R-210
+version: 1
+gate: G2
+priority: 500
+effective_period: { start: 2024-01-01, end: null }
+match:
+  category: [임차료]
+verdict: 확인필요
+citations:
+  - { id: 소득세법-27-1, verified: true }
+  - { id: 소득세법-33-1-5, verified: true }
+  - { id: 소득세법시행령-61-1, verified: true }
+question:
+  code: LEASE_WORKPLACE
+  text: "이 임차료는 어떤 공간에 대한 것인가요?"
+  fact_type: 사업장형태
+  group_by: merchant_norm
+  options:
+    - { value: 별도 사무실, verdict: 가능, account: 지급임차료 }
+    - { value: 자택 겸용 }
+    - { value: 주거 전용, verdict: 불가 }
+review: { by: 미검수, date: 2026-09-15 }

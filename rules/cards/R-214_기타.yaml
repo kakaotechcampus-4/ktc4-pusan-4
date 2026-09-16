@@ -1,0 +1,18 @@
+# G2 · 기타 — 분류되지 않은 지출의 안전망
+#
+# ⚠️ profiles/940909.yaml 은 '기타'에 칸을 두지 않았다. "현재 이 값을 부여하는
+#    분류 규칙이 없다"고 적혀 있으나, 시드 사전(T4)·키워드룰이 모두 미스인 건은
+#    결국 여기로 떨어진다. 미매칭을 불가로 보내지 않기 위한 카드다.
+#
+# priority 410: 학습룰 대역(400 이하) 바로 위. 다른 어떤 카드든 이 카드를 이겨야 한다.
+#
+# citations 가 없다. verdict 가 확인필요라 로더가 요구하지 않는다.
+id: R-214
+version: 1
+gate: G2
+priority: 410
+effective_period: { start: 2024-01-01, end: null }
+match:
+  category: [기타]
+verdict: 확인필요
+review: { by: 미검수, date: 2026-09-15 }

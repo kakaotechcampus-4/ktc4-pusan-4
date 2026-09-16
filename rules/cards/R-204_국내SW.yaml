@@ -1,0 +1,19 @@
+# G2 · 국내SW — 프로파일 940909 통상성[국내SW] = 통상
+#
+# R-100(해외SaaS)의 국내판이다. amount_max 를 두는 이유도 같다 —
+# 10만원을 넘으면 기간 선결제일 수 있어 R-107 과 같은 축의 되묻기가 필요한데,
+# 국내SW 용 고액 카드는 아직 없다. 그 구간은 G2 미매칭 -> 확인필요로 떨어진다.
+id: R-204
+version: 1
+gate: G2
+priority: 500
+effective_period: { start: 2024-01-01, end: null }
+match:
+  category: [국내SW]
+  industry: ["940909"]
+  amount_max: 99999
+verdict: 가능
+account: 지급수수료
+citations:
+  - { id: 소득세법-27-1, verified: true }
+review: { by: 미검수, date: 2026-09-15 }

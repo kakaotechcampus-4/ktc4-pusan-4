@@ -1,0 +1,31 @@
+# G2 · 보험 — 민간 보험료 (카테고리 T4 신설). 공단 4대보험은 '금융'에 남긴다
+#
+# ⚠️ 사업장 화재·배상책임 보험과 본인 보장성 보험이 같은 카테고리로 들어온다.
+#    후자는 필요경비가 아니라 보험료공제 대상이라 되묻기로 가른다.
+#    1인 사업자의 보험료 중 필요경비가 되는 범위는 9/18 세무사 확인 대상이다.
+#
+# 공단 건(국민건강보험공단·국민연금공단)은 keyword_rules priority 830 이
+# '금융'으로 먼저 보낸다. 여기로 오면 R-106·R-200 의 근거가 닿지 않는다.
+#
+# industry 를 걸지 않는다 — 프로파일에 '보험' 칸이 없다.
+id: R-213
+version: 1
+gate: G2
+priority: 500
+effective_period: { start: 2024-01-01, end: null }
+match:
+  category: [보험]
+verdict: 확인필요
+citations:
+  - { id: 소득세법-27-1, verified: true }
+  - { id: 소득세법-33-1-5, verified: true }
+question:
+  code: INSURANCE_KIND
+  text: "어떤 보험의 보험료인가요?"
+  fact_type: 보험종류
+  group_by: merchant_norm
+  options:
+    - { value: 사업장 재산·배상책임, verdict: 가능, account: 보험료 }
+    - { value: 본인 보장성, verdict: 불가 }
+    - { value: 모르겠음 }
+review: { by: 미검수, date: 2026-09-15 }

@@ -1,0 +1,26 @@
+# G2 · 편의점 — 940909 통상성[편의점] = 조건부
+#
+# 편의점은 사무 소모품(§27①)과 개인 간식(§33①5)이 섞인다. 품목을 모르면 확정할 수
+# 없어(E-034) 되묻는다. 업무용이면 소모품비, 개인이면 불산입.
+# group_by transaction — 같은 편의점이라도 건마다 산 게 다르다.
+id: R-303
+version: 1
+gate: G2
+priority: 500
+effective_period: { start: 2024-01-01, end: null }
+match:
+  category: [편의점]
+  industry: ["940909"]
+verdict: 확인필요
+citations:
+  - { id: 소득세법-27-1, verified: true }
+  - { id: 소득세법-33-1-5, verified: true }
+question:
+  code: CONVENIENCE_PURPOSE
+  text: "이 편의점 결제에서 산 물품은 업무용인가요?"
+  fact_type: 용도
+  group_by: transaction
+  options:
+    - { value: 업무용, verdict: 가능, account: 소모품비 }
+    - { value: 개인, verdict: 불가 }
+review: { by: 미검수, date: 2026-09-16 }

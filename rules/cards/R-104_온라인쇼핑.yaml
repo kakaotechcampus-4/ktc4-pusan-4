@@ -1,0 +1,35 @@
+# G2 · 온라인쇼핑 — 프로파일 940909 통상성[온라인쇼핑] = 조건부 (확인필요 + 되묻기)
+#
+# 쿠팡에서 산 게 키보드인지 생필품인지에 따라 결론이 갈린다. 가맹점은 확실한데
+# 품목을 모르는 경우라, 카테고리 단위로는 규칙을 세울 수 없다.
+# 평가 골든셋 RC-002 가 요구하는 처리가 정확히 이것이다 — "되묻기로 보내고 보류".
+#
+# ⚠️ group_by 가 transaction 이다. 같은 쿠팡이라도 건마다 산 게 다르므로
+#    가맹점 단위로 묶으면 한 번의 답이 엉뚱한 건까지 확정해 버린다.
+#    scope_key 가 "transaction:<id>" 라서 merchant 스코프의 '용도' fact 와도 겹치지 않는다.
+#
+# ⚠️ RC-002 가 말하는 실패 모습은 "품목 없이 §27 로 온라인쇼핑 전체에 규칙을 세우는 것"이다.
+#    여기서 §27①은 카테고리 전체의 근거가 아니라 '업무용'이라고 답한 건에만 걸리는
+#    선택지 근거다. 답하기 전에는 verdict 가 확인필요로 남는다.
+id: R-104
+version: 1
+gate: G2
+priority: 500
+effective_period: { start: 2024-01-01, end: null }
+match:
+  category: [온라인쇼핑]
+  industry: ["940909"]
+verdict: 확인필요
+citations:
+  - { id: 소득세법-27-1, verified: true }
+  - { id: 소득세법-33-1-5, verified: true }
+question:
+  code: SHOPPING_ITEM_PURPOSE
+  text: "이 건에서 구매한 물품은 업무용인가요?"
+  fact_type: 용도
+  group_by: transaction
+  options:
+    - { value: 업무용, verdict: 가능, account: 소모품비 }
+    - { value: 개인용, verdict: 불가 }
+    - { value: 업무·개인 혼재 }
+review: { by: 미검수, date: 2026-09-14 }

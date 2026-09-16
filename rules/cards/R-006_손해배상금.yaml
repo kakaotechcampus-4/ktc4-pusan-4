@@ -1,0 +1,34 @@
+# G2 · 소득세법 §33①15 — 손해배상금 (확인필요 + 되묻기)
+#
+# §33①15 는 "고의 또는 중대한 과실로" 타인의 권리를 침해해 지급한 손해배상금만
+# 불산입한다. 경과실이면 산입될 수 있는데, 결제내역만으로는 고의·중과실을 알 수 없다.
+# 그래서 불가로 확정하지 않고 되묻는다(평가셋 E-005).
+#
+# ⚠️ G1 이 아니라 G2 에 둔다. JudgmentEngine 의 G1 분기는 카드 verdict 와 무관하게
+#    항상 불가를 반환하므로, G1 에서는 확인필요를 표현할 수 없다.
+#
+# priority 710: R-071(급여·원천세, 700)과 둘 다 keyword 전용이라 specificity 가 같다.
+#    같은 priority 면 로더의 차단 카드 충돌 검사에 걸린다.
+#
+# ⚠️ '그 외' 에 verdict 를 두지 않는다. 경과실 손해배상금이라고 곧바로 필요경비가
+#    되는 것은 아니라(업무 관련성은 따로 본다) 확인필요를 유지한다. 이 되묻기는
+#    불가를 확정하는 쪽으로만 작동하고, 가능 쪽은 사람이 본다.
+id: R-006
+version: 1
+gate: G2
+priority: 710
+effective_period: { start: 2024-01-01, end: null }
+match:
+  keyword: ["손해배상", "배상금"]
+verdict: 확인필요
+citations:
+  - { id: 소득세법-33-1-15, verified: true }
+question:
+  code: DAMAGES_FAULT
+  text: "이 손해배상금은 고의 또는 중대한 과실로 발생한 건인가요?"
+  fact_type: 과실정도
+  group_by: transaction
+  options:
+    - { value: 고의·중대한 과실, verdict: 불가 }
+    - { value: 그 외 }
+review: { by: 미검수, date: 2026-09-14 }

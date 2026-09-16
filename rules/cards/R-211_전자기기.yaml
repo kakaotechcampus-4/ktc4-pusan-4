@@ -1,0 +1,29 @@
+# G2 · 전자기기 — 업무 장비와 개인 기기가 섞인다 (카테고리 T4 신설)
+#
+# 100만원을 넘으면 G4(R-241)가 자산 여부를 이어서 되묻는다. 이 카드는 업무 관련성만 가른다.
+#
+# fact_type '용도'/transaction 은 R-104·R-207 과 같은 축이지만 카테고리가 달라
+# 같은 거래에 동시에 걸리지 않는다. 선택지 값은 평가셋 어휘('개인')를 따른다.
+#
+# industry 를 걸지 않는다 — 프로파일에 '전자기기' 칸이 없다.
+id: R-211
+version: 1
+gate: G2
+priority: 500
+effective_period: { start: 2024-01-01, end: null }
+match:
+  category: [전자기기]
+verdict: 확인필요
+citations:
+  - { id: 소득세법-27-1, verified: true }
+  - { id: 소득세법-33-1-5, verified: true }
+question:
+  code: DEVICE_PURPOSE
+  text: "이 기기는 업무용인가요?"
+  fact_type: 용도
+  group_by: transaction
+  options:
+    - { value: 업무용, verdict: 가능, account: 소모품비 }
+    - { value: 개인, verdict: 불가 }
+    - { value: 업무·개인 혼재 }
+review: { by: 미검수, date: 2026-09-15 }

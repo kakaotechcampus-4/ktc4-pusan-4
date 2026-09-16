@@ -1,0 +1,15 @@
+# G1 · 소득세법 §33①12 — 법령 위반에 따른 공과금
+#
+# 2호(과태료)보다 넓은 조항이라 priority 를 R-004 보다 낮게 둔다.
+# 둘 다 걸리는 지출은 더 구체적인 2호가 인용되어야 한다.
+id: R-005
+version: 1
+gate: G1
+priority: 920
+effective_period: { start: 2024-01-01, end: null }
+match:
+  keyword: ["과징금", "이행강제금", "가산세"]
+verdict: 불가
+citations:
+  - { id: 소득세법-33-1-12, verified: true }
+review: { by: 미검수, date: 2026-09-14 }

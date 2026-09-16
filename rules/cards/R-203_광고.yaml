@@ -1,0 +1,14 @@
+# G2 · 광고 — 프로파일 940909 통상성[광고] = 통상 (본인 서비스 홍보)
+id: R-203
+version: 1
+gate: G2
+priority: 500
+effective_period: { start: 2024-01-01, end: null }
+match:
+  category: [광고]
+  industry: ["940909"]
+verdict: 가능
+account: 광고선전비
+citations:
+  - { id: 소득세법-27-1, verified: true }
+review: { by: 미검수, date: 2026-09-15 }

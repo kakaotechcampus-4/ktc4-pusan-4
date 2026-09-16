@@ -1,0 +1,19 @@
+# G1 · 소득세법 §33①2 — 벌금·과료 (상호 원문 기준)
+#
+# R-004 는 category 전용이라 분류기가 과태료 카테고리로 못 보낸 벌금을 놓친다
+# ("OO지방법원 벌금"은 기타로 분류된다 — 평가셋 E-030).
+# R-004 에 keyword 를 합치면 match 조건이 AND 가 되어 오히려 좁아지므로 카드를 나눈다.
+#
+# priority 958: R-004(960) 바로 아래. 과태료 카테고리 건은 R-004 가 먼저 받는다.
+# "범칙금"·"과태료"에는 "벌금"·"과료"라는 부분 문자열이 없어 가로채지 않는다.
+id: R-007
+version: 1
+gate: G1
+priority: 958
+effective_period: { start: 2024-01-01, end: null }
+match:
+  keyword: ["벌금", "과료"]
+verdict: 불가
+citations:
+  - { id: 소득세법-33-1-2, verified: true }
+review: { by: 미검수, date: 2026-09-14 }

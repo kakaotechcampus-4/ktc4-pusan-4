@@ -1,0 +1,16 @@
+# G2 · 사무용품 — 프로파일 940909 통상성[사무용품] = 통상
+#
+# 100만원을 넘으면 G4(R-241)가 자산 여부를 되묻는다. 이 카드는 경비 인정만 한다.
+id: R-201
+version: 1
+gate: G2
+priority: 500
+effective_period: { start: 2024-01-01, end: null }
+match:
+  category: [사무용품]
+  industry: ["940909"]
+verdict: 가능
+account: 소모품비
+citations:
+  - { id: 소득세법-27-1, verified: true }
+review: { by: 미검수, date: 2026-09-15 }

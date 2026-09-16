@@ -1,0 +1,15 @@
+# G1 · 소득세법 §33①1 — 소득세·개인지방소득세
+#
+# 분류 경로: keyword_rules.yaml priority 950
+#            "소득세|지방소득세|국세|지방세|주민세|재산세" -> 조세
+id: R-001
+version: 1
+gate: G1
+priority: 950
+effective_period: { start: 2024-01-01, end: null }
+match:
+  category: [조세]
+verdict: 불가
+citations:
+  - { id: 소득세법-33-1-1, verified: true }
+review: { by: 미검수, date: 2026-09-14 }

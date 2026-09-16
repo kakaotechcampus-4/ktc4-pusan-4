@@ -4,6 +4,9 @@
 >
 > v2 = 팀 회의 결정 반영 (6관문 복원 · OpenAI 스택 · 룰카드 저장 구조 · 카드사 2종 · (b)안 폐기)
 > 팀: 부산대 4팀 (카카오테크 캠퍼스)
+>
+> 2026-09-15 · 규칙 카드 명세를 13개 필드로 확정. `type`·`reason` 삭제, `question`·`out_of_scope` 도입, `attributes` 존치.
+> 필드 상세의 단일 원본은 [`docs/rule-card-fields.md`](docs/rule-card-fields.md) (§6 필수 요소).
 
 ---
 
@@ -159,7 +162,9 @@ attrs.putAll(result.attrs());   // 누적하고 계속
 
 **속성형을 조기 종료로 만들면 정보가 잘린다.** "증빙 없는 한도 초과 접대비"는 G5와 G6 정보가 둘 다 필요하다.
 
-**속성형은 순서가 결과에 영향을 주면 안 된다.** CI에 "실행 순서를 섞어도 같은 결과인가" property test를 넣어 검증할 것.
+**속성형의 판정과 `attributes` 병합은 순서가 결과에 영향을 주면 안 된다.** 계정과목 기본값은
+명시된 G2→G6 순서와 관문 내부 정렬로 선택한다. CI에 "실행 순서를 섞어도 같은 결과인가"
+property test를 넣어 검증할 것.
 
 ### ⭐ G2 §27은 규칙 카드 매칭으로 구현한다 (팀 결정)
 
@@ -446,6 +451,11 @@ js = settleLimits(js, ctx, Mode.잠정);                                        
 
 **⚠️ 여기서 새로 판단하지 않는다.** 계정과목은 규칙 카드가 이미 지정하고 있어야 한다. 이 단계는 매핑이지 판단이 아니다.
 
+**판정 중 기본값은 G2부터 G6까지 적용 순서에서 처음 만나는 null이 아닌 카드 `account`다.**
+이후 관문의 카드가 이를 덮어쓰지 않는다. 되묻기 응답의 `effect.account`는 기본값보다
+우선하며, 여러 응답이 서로 다른 계정과목을 지정하면 두 규칙·질문 출처를 포함한 오류로
+판정을 중단한다. 최종 판정이 불가면 계정과목은 항상 비운다.
+
 **1차에서는 확정하지 말고 후보 2~3개 제시.** 1,541개 업종의 계정과목 관행을 규칙으로 다 적을 수 없다. F-13이 P2인 게 다행.
 
 ---
@@ -555,6 +565,8 @@ RuleCard hit = matched.get(0);
 | `-priority` | 작성자가 명시한 순서. 최우선 |
 | `-specificity` | 명시 안 했으면 **조건이 좁은 카드**가 이김 |
 | `id` | 동점일 때의 결정론 보장 |
+
+**priority 대역:** 기본룰(큐레이션 카드)은 **401 이상**, 학습룰은 **400 이하**로 나눈다. 검증된 기본룰이 학습룰에 밀리지 않도록 로딩 시 401 미만 카드는 거부한다.
 
 **첫 매치에서 멈추면 뒤에 더 적합한 카드가 있어도 놓친다.** 카드가 늘수록 반드시 발생.
 
@@ -732,88 +744,166 @@ id: R-004
 version: 1
 gate: G1
 priority: 900
-효력기간: { 시작: 2025-01-01, 종료: null }
+effective_period: { start: 2025-01-01, end: null }
 match:
   category: [지자체_과태료, 경찰청_범칙금]
-  keyword: ["과태료", "범칙금", "주정차위반"]
 verdict: 불가
-reason: "업무 중 발생했더라도 법령 위반으로 납부한 금액은 필요경비에서 제외됩니다."
 citations:
-  - { id: 소득세법-33-1-2, 위계: 법률 }
-evidence: []
+  - { id: 소득세법-33-1-2, verified: true }
 review: { by: 외부자문, date: 2026-09-05 }
 ```
 
+> `match` 조건은 전부 AND 다. 위 카드에 `keyword: ["과태료"]` 를 같이 걸면
+> "지자체_과태료로 분류됐지만 상호 원문에 그 단어가 없는 건"이 빠져나간다.
+> 카테고리와 키워드로 동시에 잡으려면 카드를 둘로 나눈다(실물 R-004 / R-007).
+
 ```yaml
-# rules/cards/R-031_서버클라우드.yaml — G2, 프로파일 참조
+# rules/cards/R-031_서버클라우드.yaml — G2, 업종 고정
 id: R-031
 version: 1
 gate: G2
 priority: 500
+effective_period: { start: 2025-01-01, end: null }
 match:
   category: [서버_클라우드]
-verdict_by_profile:          # ← 업종별 답을 프로파일에서
-  통상:   가능
-  조건부: 확인필요
-  비통상: 확인필요
-  미기입: 확인필요           # ⭐ 필수. 프로파일 없는 업종의 안전 기본값
+  industry: ["940909"]
+verdict: 가능
 account: 지급수수료
-reason: "사업 운영에 직접 사용되는 서비스 이용료입니다."
 citations:
-  - { id: 소득세법-27-1, 위계: 법률 }
-evidence: [세금계산서 또는 카드매출전표]
+  - { id: 소득세법-27-1, verified: true }
 review: { by: 외부자문, date: 2026-09-05 }
 ```
 
+> 업종별로 답이 갈리는 카드는 지금 `match.industry` 로 업종을 고정해 카드를 나눈다.
+> 프로파일에서 판정을 끌어오는 `verdict_by_profile` 은 **명세에도 엔진에도 아직 없다.**
+> 도입하려면 명세에 12번째 필드를 추가하는 결정이 먼저다.
+
 ```yaml
-# rules/cards/R-027_카페.yaml — G3 속성형 + 되묻기
+# rules/cards/R-070_업무용승용차.yaml — G2, 범위 밖 핸드오프
+id: R-070
+version: 1
+gate: G2
+priority: 700
+effective_period: { start: 2024-01-01, end: null }
+match:
+  category: [차량]
+verdict: 확인필요
+out_of_scope: true           # ← 판정하지 않고 넘긴다. 불가가 아니다
+citations:
+  - { id: 소득세법-33의2, verified: true }
+review: { by: 외부자문, date: 2026-09-05 }
+```
+
+> 차량은 운행기록부·연간 한도·상각 특례가 한꺼번에 걸려 규칙 카드 몇 장으로 끝나지 않는다.
+> `불가`로 쓰면 사용자가 실제 경비를 포기하고, `확인필요`만 쓰면 되묻기 대기와 구분되지 않는다.
+
+```yaml
+# rules/cards/R-027_카페.yaml — G3 + 되묻기
 id: R-027
 version: 1
 gate: G3
-priority: 400
+priority: 401
+effective_period: { start: 2025-01-01, end: null }
 match:
   category: [카페]
   amount_max: 30000
+citations:
+  - { id: 소득세법-33-1-5, verified: true }
+  - { id: 소득세법기본통칙-33-3, verified: true }
 question:
+  code: CAFE_PURPOSE
   text: "이 결제는 어떤 용도였나요?"
   fact_type: 용도
   group_by: merchant_norm      # 같은 카페 12건을 한 화면에
   options:
-    - { value: 업무미팅, verdict: 가능, account: 접대비,   limit_bucket: 접대비, evidence: [상대방·목적 메모] }
-    - { value: 혼자작업, verdict: 가능, account: 소모품비, evidence: [] }
+    - { value: 업무미팅, verdict: 가능, account: 접대비,   limit_bucket: 접대비 }
+    - { value: 혼자작업, verdict: 가능, account: 소모품비 }
     - { value: 개인,     verdict: 불가 }
-citations:
-  - { id: 소득세법-33-1-5,       위계: 법률 }
-  - { id: 소득세법기본통칙-33-3, 위계: 기본통칙 }
+review: { by: 외부자문, date: 2026-09-05 }
 ```
 
 ```yaml
-# rules/cards/R-051_자산일반.yaml — G4 속성형. verdict 없음
+# rules/cards/R-051_자산일반.yaml — G4. 카드 verdict 없이 되묻기 effect 로만 속성을 남긴다
 id: R-051
 version: 1
 gate: G4
 priority: 500
+effective_period: { start: 2025-01-01, end: null }
 match:
   amount_min: 1000001
   exclude_category: [소모품, 식음료, 카페]
-attributes:                   # ← 판정 대신 이걸 남김
-  자산: true
-  내용연수: 5
-  상각방법: 정액법
-  자산대장_등재: true
-reason: "취득가액이 100만원을 넘어 감가상각자산으로 처리됩니다."
 citations:
-  - { id: 소득세법시행령-62,   위계: 시행령 }
-  - { id: 소득세법시행령-67-4, 위계: 시행령 }
-evidence: [자산대장 등재]
+  - { id: 소득세법시행령-62, verified: true }
+  - { id: 소득세법시행령-67-4, verified: true }
+question:
+  code: ASSET_USEFUL_LIFE
+  text: "이 물품을 1년 넘게 사용하나요?"
+  fact_type: 자산여부
+  group_by: transaction
+  options:
+    # value·verdict·account 를 뺀 나머지 키가 그대로 판정 속성이 된다
+    - { value: 1년 넘게 사용, 자산: true, 내용연수: 5, 상각방법: 정액법, 자산대장_등재: true }
+    - { value: 1년 이내 소모, 자산: false }
+review: { by: 외부자문, date: 2026-09-05 }
 ```
 
 ### 필수 요소
 
-**공통:** `id` `version` `gate` `priority` `match` `효력기간` `review`
-**차단형(G1·G2):** `verdict` 또는 `verdict_by_profile`, `reason`, **`citations`(가능/불가면 필수)**, `account`
-**속성형(G3~G6):** `attributes` (`verdict` 없음)
-**되묻기 있으면:** `question` (`fact_type`, `group_by`, `options`)
+| 필드 | 타입 | 필수 | 비고 |
+|---|---|:---:|---|
+| `id` | string | ✅ | 유니크. 예 `R-051` |
+| `version` | int | ✅ | |
+| `gate` | enum G0~G6 | ✅ | 관문 |
+| `priority` | int | ✅ | **401 이상만** (400 이하는 학습룰 대역이라 로딩 거부) |
+| `effective_period` | {start, end} | ✅ | `end`는 null 가능 |
+| `match` | object | ✅ | `category`, `exclude_category`, `keyword`, `amount_min/max`, `industry` — 전부 **리스트만** |
+| `verdict` | enum | 조건부 | 가능→AVAILABLE, 불가→UNAVAILABLE, 확인필요→NEEDS_REVIEW. 차단형(G1·G2)은 필수 |
+| `out_of_scope` | bool | | 판정하지 않고 세무사에게 넘긴다. `verdict: 확인필요`일 때만 |
+| `account` | string | | 계정과목 (예: 소모품비) |
+| `citations` | list | 조건부 | 확정 verdict(가능·불가)면 필수 |
+| `attributes` | map | | `match`만으로 확정되는 속성. 속성 관문(G3~G6)에 누적된다 |
+| `question` | object | | `code`, `text`, `fact_type`, `group_by`, `options[]` |
+| `review` | {by, date} | ✅ | 검토자/검토일 |
+
+**이 13개가 전부다.** 카드에 다른 최상위 필드를 두지 않는다. 필드별 상세는
+[`docs/rule-card-fields.md`](docs/rule-card-fields.md)가 단일 원본이다.
+
+> ⚠️ **`out_of_scope` — 확인필요 하나에 뭉개진 네 상태를 가른다.**
+> 판정하지 못하는 상태는 넷인데 출력이 전부 `NEEDS_REVIEW`라 할 말이 정반대인 건들이
+> 같은 화면으로 나갔다. 셋은 엔진이 알고, 카드가 선언할 건 ② 하나뿐이다.
+>
+> | | 상태 | 예 | 무엇으로 아는가 |
+> |---|---|---|---|
+> | ① | 되묻기 대기 | R-101 답변 전 | `questions`가 비어 있지 않다 |
+> | ② | **범위 밖 핸드오프** | R-070·R-071 | **`out_of_scope`** |
+> | ③ | 후속 관문 대기 | `업무·개인 혼용`, `자택 겸용`, `연간 일시불` | 답은 있는데 effect에 verdict가 없다 |
+> | ④ | 미매칭 안전망 | G2에서 카드 0장 | `unmatched_reason = RULE_NOT_FOUND` |
+>
+> **verdict의 네 번째 값으로 만들지 않는다.** 관문 간 병합은 제한 강도 순서
+> (가능 < 확인필요 < 불가)로 이긴 쪽을 고른다(`moreRestrictive`). 범위 밖은 불가보다
+> 더/덜 제한적인 게 아니라 축이 다르므로, 강도 한 줄에 끼우면 순서가 깨진다.
+>
+> **`unmatched_reason`도 재사용하지 않는다.** 그 값이 있으면 `unmatched_log`에 행이
+> 쌓이는데(`JudgmentService`), 범위 밖 카드는 매칭에 **성공한** 카드다. 미매칭을 모아
+> 규칙을 학습하는 루프에 섞으면 오염된다.
+>
+> ③이 ②보다 위험하다. ③은 이미 경비로 인정된 건인데 확인필요로 보이면 사용자가 포기한다.
+> 다만 엔진이 아는 상태라 카드가 선언할 게 없다 — 화면 문구를 나누는 건 FE 몫이다.
+
+> ⚠️ **`attributes`와 되묻기 effect의 경계.** 속성을 실을 자리가 둘이라 매번 헷갈린다.
+> 기준은 하나다 — **`match` 조건만으로 값이 정해지면 `attributes`, 답에 따라 갈리면 effect.**
+>
+> - `attributes` — R-060의 `증빙필요: true`. 3만원 초과면 답을 듣기 전에 이미 참이다.
+> - effect — R-051의 `내용연수: 5`. 100만원을 넘어도 1년 이내 소모품이면 자산이 아니다.
+>   금액만 보고 `attributes`에 박으면 소모품에도 감가상각이 붙는다.
+>
+> 되묻기가 귀찮다고 갈리는 값을 `attributes`로 내리면 조용히 틀린 속성이 실린다.
+> 반대로 확정된 값을 effect에만 두면 사용자가 답해야 비로소 화면에 뜨는 과잉 질문이 된다.
+>
+> 두 자리는 같은 맵으로 병합된다(`JudgmentEngine.mergeAttributes`). 같은 키에 다른 값이
+> 들어오면 예외이므로, 한 카드에서 같은 키를 양쪽에 두지 않는다.
+
+> 같은 `priority`에서 어떤 카드가 이기는지(구체성 점수·정렬 규칙)는 위 **"승자 결정 — best-match"** 섹션 참고.
 
 ### 근거 위계 — 화면 표시가 달라진다
 
@@ -1323,7 +1413,8 @@ WHERE statute_id = :id
 **1단계 · 수집** (매일 03:00 KST = UTC 18:00)
 ```
 [E] 국가법령정보 OPEN API (OC 발급 완료)
-      target=law / admrul / expc / prec
+      target=law / admrul / expc / prec / ttSpecialDecc  (본문+목록)
+      target=ntsCgmExpc                              (목록만 · 본문 미제공)
       lawSearch.do (목록), lawService.do (본문)
 [T] 법령·행정규칙 → 공포번호 + 조문 해시 전량 비교 (수백 건)
     판례·심판례    → 신규 생산분만 증분 (수만 건)
@@ -1367,11 +1458,28 @@ chunking 전략 변경(**10월에 반드시 겪음**), 임베딩 모델 교체 �
 ### 2. 참조데이터 적재
 
 ```
-[E] 국세청 고시 XLSX 1,541행 + 업종코드 목록
+[E] 경비율 수치 (⚠️ 수기 입력 — 구조화 파일이 없다)
 [T] 업종코드 6자리 문자열 정규화 (⚠️ 앞자리 0 보존 — 엑셀이 숫자로 먹는다)
     단순/기준경비율 분리, 귀속연도 태깅
 [L] expense_rate_ref, (tax_year, industry_code) UNIQUE + upsert
 ```
+
+> ⚠️ **`고시 XLSX`는 존재하지 않는다 (2026-09-08 확인).** 네 곳을 다 봤다.
+>
+> | 소스 | 형식 |
+> |---|---|
+> | 법령 API 고시 본문 | 조문 4개(367자) + `<img>` 38개. **수치는 이미지다** |
+> | 공공데이터포털 `국세청_기준경비율_단순경비율`(15036323) | HWPX (파일 1개) |
+> | 공공데이터포털 `국세청_기준 단순경비율`(15050748) | PDF |
+> | 국세청 게시판 원본 첨부 | `2025년 귀속 경비율 고시.hwp` |
+>
+> CSV·XLSX·OpenAPI가 없다. `1,541행`은 업종 개수(§4)에서 온 가정이지 실제 파일이 아니다.
+> **1,541행을 다 채울 필요도 없다** — 페르소나(`940909`)와 데모에 필요한 코드 몇 개면 된다.
+> 팀이 다른 경로로 XLSX를 확보했다면 출처를 여기에 적을 것.
+>
+> **고시 조문 자체는 RAG 코퍼스에 들어간다.** 제4조가 페르소나에 직결된다 —
+> "인적용역 사업소득자(**업종코드 940\*\*\***)의 2025년 귀속 수입금액 **4천만원 이하는 단순경비율 기본율**".
+> 즉 근거 조문은 `statute_version`, 수치는 `expense_rate_ref`로 나뉜다.
 **덮어쓰지 않는다.** 2026년에 2025년 귀속 신고를 하므로 여러 연도가 동시에 살아 있어야 한다.
 
 ### 3. 카드내역 정규화
@@ -1492,7 +1600,7 @@ class RuleCardDraft(BaseModel):
 | 다단계·분기 | 충분하면 조기 종료, 없으면 다음 섹션, 끝까지 없으면 보류 |
 | 상태 변화 | 규칙이 늘어 다음 주 판정이 달라짐 |
 
-**절대 자동화하지 않을 것:** 승격은 사람을 거친다. **승인 시점에 `효력기간.시작`을 박고 기본값은 "소급 적용 안 함".**
+**절대 자동화하지 않을 것:** 승격은 사람을 거친다. **승인 시점에 `effective_period.start`를 박고 기본값은 "소급 적용 안 함".**
 
 ### 데이터 흐름
 
@@ -1503,7 +1611,7 @@ class RuleCardDraft(BaseModel):
                             ↓                            ↓
 카드파일 ──[정규화]──> transaction ──[판정]──> judgment   [보고서] [규칙후보]
                                                 │                      │
-고시XLSX ──[참조]──> expense_rate_ref            │                      ↓
+경비율(수기) ─[참조]─> expense_rate_ref            │                      ↓
                                           unmatched_log ─────────> 관리자 승인
                                           override_log                │
                                                                       ↓
@@ -1824,8 +1932,26 @@ docker-compose.yml
 
 - `open.law.go.kr`에서 OC 발급 → **완료**
 - `lawSearch.do?OC={id}&target={대상}&type=XML` (목록), `lawService.do` (본문)
-- target: `law` / `admrul` / `prec` / `expc`
-- **예규·판례까지 같은 API 하나로 커버되는 게 큰 장점**
+- target: `eflaw`(현행법령·시행일 기준) / `law`(현행법령·공포일 기준) / `admrul` / `prec` / `expc`
+- **세무 도메인 전용 target 2종** — `ttSpecialDecc`(조세심판원 심판례), `ntsCgmExpc`(국세청 1차 법령해석)
+- **예규·판례·심판례까지 같은 API 하나로 커버되는 게 큰 장점.** 특히 조세심판원 심판례는 `이유`까지 본문이 통째로 들어온다
+- ⚠️ **국세청 자료 2종은 본문이 안 나온다** — 국세청 법령해석(136,514건), 국세청 출처 판례(49,950건)
+  - 국세법령정보시스템(`taxlaw.nts.go.kr`)에 본문이 있지만 **공식 API가 없어 쓰지 않기로 결정**했다. 내부 엔드포인트를 역이용하는 방식이라 규격 보장이 없고 이용조건도 미확인
+  - **결정: 법령 API로 받을 수 있는 것만 받는다. 두 자료는 수집하지 않는다.** 본문이 없으면 임베딩할 것도, 인용할 것도 없다. 목록이 필요해지면 그때 온디맨드로 부른다
+
+**구현하며 실측으로 확인된 것 (2026-09-08)**
+
+- 🔴 **소득세법 기본통칙이 법제처 API에 없다.** `admrul&query=통칙` → 0건. 국세청 소관 201건 전수에도 없다.
+  §5 위계(…시행규칙 > **기본통칙** > 고시…)에서 이 계층만 소스가 없다 → 필요한 조항만 수동 시드로 넣고 `meta.manual=true`로 표시한다
+- 🔴 **필요경비 판례의 73%가 본문 없는 출처다.** `prec&search=2&query=필요경비` 200건 중 146건이 국세법령정보시스템 출처.
+  실질 판례 코퍼스는 대법원 1,500~2,000건 수준이고, **주력 근거는 판례가 아니라 심판례(9,546건)다**
+- 🔴 **팀 OC(`kakaotech4pusan4`)에 판례 API가 미신청 상태다.** `law`/`admrul`/`expc`/`ttSpecialDecc`는 정상.
+  open.law.go.kr → OPEN API 신청 → 등록된 API에서 **판례** 체크가 필요하다
+- 🟠 **행정규칙명은 유일하지 않다.** `업무용승용차 운행기록 방법에 관한 고시`가 소득세법 근거·법인세법 근거 둘 다 현행이다.
+  `statute_id`에 `행정규칙ID`를 넣어야 서로 덮어쓰지 않는다 (`발령번호`는 개정마다 바뀌어 버전 체인이 끊긴다)
+- 🟠 **경비율 고시 본문은 조문 4개뿐이고 수치표는 `<img>` 38개다.** 아래 §9-2 참조
+
+- 파라미터·응답 필드·주의사항 전체는 [`docs/law_api.md`](docs/law_api.md)
 
 ---
 

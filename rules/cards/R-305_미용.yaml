@@ -1,0 +1,16 @@
+# G2 · 미용 — 940909 통상성[미용] = 비통상
+#
+# §33①5 가사경비. IT 개발·강의 사업자의 미용비는 사업 수행에 필요한 비용이 아니다.
+# 업종코드 940909 로 고정 — 방송·모델 업종이면 달라질 수 있어 케이스를 업종에 묶는다(E-035).
+id: R-305
+version: 1
+gate: G2
+priority: 500
+effective_period: { start: 2024-01-01, end: null }
+match:
+  category: [미용]
+  industry: ["940909"]
+verdict: 불가
+citations:
+  - { id: 소득세법-33-1-5, verified: true }
+review: { by: 미검수, date: 2026-09-16 }

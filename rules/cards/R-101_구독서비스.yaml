@@ -1,0 +1,40 @@
+# G2 · 구독서비스 — 프로파일 940909 통상성[구독서비스] = 조건부 (확인필요 + 되묻기)
+#
+# Figma 와 Netflix 가 같은 카테고리에 들어온다. 카테고리만으로는 갈릴 수 없어
+# 업무 전용 여부를 되묻는다.
+#
+# ⚠️ fact_type 을 '용도'가 아니라 '전용여부'로 둔다. user_fact 는
+#    (user_id, scope_key, fact_type) 으로 유일한데, scope_key 는 group_by 에서 나온다
+#    (merchant_norm -> "merchant:<상호>"). '용도' + merchant_norm 은 카페 카드류가
+#    이미 쓰는 조합이라, 같은 이름을 쓰면 한 가맹점의 답 하나를 두 카드가 공유한다.
+#    그때 QuestionSpec.effectFor 는 자기 options 에 없는 값이면 null 을 돌려주므로
+#    질문이 영영 pending 으로 남는다. 선택지 어휘를 공유할 생각이 아니면 이름을 나눈다.
+#
+# citations 를 채운 것은 되묻기 때문이다. 로더가 확정 verdict 로 귀결되는 선택지에
+# 근거를 요구한다(effect verdict requires citation). 다만 엔진은 답변 전에도
+# 카드 citations 를 그대로 싣으므로, 한쪽 결론으로 읽히지 않게 가능(§27①)과
+# 불가(§33①5) 근거를 함께 둔다.
+#
+# 혼용은 확정하지 않는다. 안분은 판정이 아니라 G3 의 금액 산정이고 B 담당이다.
+id: R-101
+version: 1
+gate: G2
+priority: 500
+effective_period: { start: 2024-01-01, end: null }
+match:
+  category: [구독서비스]
+  industry: ["940909"]
+verdict: 확인필요
+citations:
+  - { id: 소득세법-27-1, verified: true }
+  - { id: 소득세법-33-1-5, verified: true }
+question:
+  code: SUBSCRIPTION_DEDICATION
+  text: "이 구독은 업무 전용인가요?"
+  fact_type: 전용여부
+  group_by: merchant_norm
+  options:
+    - { value: 업무 전용, verdict: 가능, account: 지급수수료 }
+    - { value: 개인 전용, verdict: 불가 }
+    - { value: 업무·개인 혼용 }
+review: { by: 미검수, date: 2026-09-14 }

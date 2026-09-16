@@ -1,0 +1,31 @@
+# G2 · 금융 — 프로파일 940909 통상성[금융] = 조건부
+#
+# 수수료·연회비·이자·개인 금융이 한 카테고리에 섞인다.
+# 공단 4대보험도 이 카테고리로 분류되지만 R-106(가능)·R-200(불가)이
+# keyword 로 specificity 100 을 잡아 먼저 이긴다.
+#
+# ⚠️ fact_type '지출성격'은 이 카드에서 처음 쓴다. 되묻기 어휘 단일 원본이
+#    아직 없어 평가셋·되묻기 API(#23)와 어긋날 수 있다.
+id: R-206
+version: 1
+gate: G2
+priority: 500
+effective_period: { start: 2024-01-01, end: null }
+match:
+  category: [금융]
+  industry: ["940909"]
+verdict: 확인필요
+citations:
+  - { id: 소득세법-27-1, verified: true }
+  - { id: 소득세법-33-1-5, verified: true }
+question:
+  code: FINANCE_KIND
+  text: "이 결제는 어떤 성격인가요?"
+  fact_type: 지출성격
+  group_by: merchant_norm
+  options:
+    - { value: 은행 수수료, verdict: 가능, account: 지급수수료 }
+    - { value: 카드 연회비, verdict: 가능, account: 지급수수료 }
+    - { value: 사업용 대출이자 }
+    - { value: 개인 금융, verdict: 불가 }
+review: { by: 미검수, date: 2026-09-15 }

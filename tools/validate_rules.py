@@ -47,23 +47,25 @@ ROOT = Path(__file__).resolve().parent.parent
 NORMALIZE_YAML = ROOT / "rules" / "normalize.yaml"
 PG_BLOCKLIST_YAML = ROOT / "rules" / "pg_blocklist.yaml"
 KEYWORD_RULES_YAML = ROOT / "rules" / "keyword_rules.yaml"
+CATEGORIES_YAML = ROOT / "rules" / "categories.yaml"
 MERCHANT_SEED_CSV = ROOT / "seeds" / "merchant_seed.csv"
+RULECARD_DIRECTORY = ROOT / "rules" / "cards"
 RULECARD_GLOB = "R-*.yaml"
 
 # ---------------------------------------------------------------- category enum
-CATEGORY_ENUM = [
-    "카페", "음식점", "편의점", "온라인쇼핑", "음식배달",
-    "해외SaaS", "국내SW", "통신", "수도광열", "여비교통", "차량",
-    "도서", "교육", "광고", "사무용품", "의료", "금융",
-    "지자체_과태료", "경찰청_범칙금", "조세", "PG_미상", "기타",
-    # T3 에서 추가 (PM 승인). 업종 세분화가 아니라 G2(사업관련성)에서
-    # 다르게 처리되는지가 분리 기준이다.
-    #   게임·여가·미용  -> 사업 무관 후보
-    #   구독서비스      -> 업무용 가능
-    #   생활용품        -> 사업/개인 혼재
-    # 노래방·PC방·볼링은 세무 판정이 같으므로 '여가' 하나로 묶는다. 업종별로 쪼개지 않는다.
-    "게임", "구독서비스", "여가", "미용", "생활용품",
-]
+# 허용 어휘의 단일 원본은 rules/categories.yaml 이다. Java 로더도 같은 파일을 읽는다.
+def _load_category_enum() -> list:
+    if not CATEGORIES_YAML.exists():
+        sys.exit("rules/categories.yaml 이 없습니다 (카테고리 어휘 단일 원본)")
+    with open(CATEGORIES_YAML, encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+    names = data.get("categories")
+    if not isinstance(names, list) or not names:
+        sys.exit("rules/categories.yaml 의 categories 목록이 비어 있거나 형식이 잘못됨")
+    return names
+
+
+CATEGORY_ENUM = _load_category_enum()
 
 
 # 카테고리 메타. enum 과 같은 파일에 두어 단일 원본을 유지한다.
@@ -86,7 +88,7 @@ CATEGORY_META = {
     "광고": (["구글애즈", "카카오모먼트"], "업무용 가능", ""),
     "사무용품": (["오피스디포", "모나미"], "업무용 가능", "100만원 초과면 비품(자산)"),
     "의료": (["병원", "약국"], "사업 무관 후보", "파서가 상호를 마스킹한다"),
-    "금융": (["보험", "카드 연회비"], "혼재", ""),
+    "금융": (["은행 수수료", "카드 연회비"], "혼재", "국민건강보험공단·국민연금공단은 여기다. 민간 보험은 `보험`"),
     "지자체_과태료": (["주정차위반 과태료", "과태료"], "불산입 후보", "판정은 룰카드 R-004"),
     "경찰청_범칙금": (["범칙금", "교통 범칙금"], "불산입 후보", "판정은 룰카드 R-004"),
     "조세": (["소득세", "지방소득세"], "불산입 후보", ""),
@@ -97,6 +99,12 @@ CATEGORY_META = {
     "여가": (["노래연습장", "볼링장"], "사업 무관 후보", "노래방·PC방·볼링은 판정이 같아 한 카테고리다"),
     "미용": (["미용실", "헤어살롱"], "사업 무관 후보", ""),
     "생활용품": (["다이소", "생활용품점"], "혼재", "사무용품으로 두면 G2 를 자동 통과한다"),
+    # T4 에서 추가 (PM 승인 2026-09-15)
+    "임차료": (["위워크", "공유오피스"], "업무용 가능", "자택 겸용은 안분 대상(G3, B 담당)"),
+    "전자기기": (["애플스토어", "하이마트"], "혼재", "100만원 초과면 자산 판정으로 넘어간다(G4)"),
+    "전문가수수료": (["세무사", "법무사"], "업무용 가능", "원천징수·지급명세서 의무는 별개 축이다"),
+    "보험": (["삼성화재", "손해보험"], "혼재", "민간 보험. 공단 4대보험은 `금융`"),
+    "수리비": (["컴퓨터 수리", "AS센터"], "혼재", "사업용 자산의 수리에 한한다"),
 }
 
 CATEGORIES_DOC = ROOT / "docs" / "categories.md"
@@ -387,8 +395,8 @@ def check_pg_vs_seed(rep: Report, pg, rows):
 
 
 def check_rulecards(rep: Report):
-    print("[T6] rules/R-*.yaml")
-    files = sorted((ROOT / "rules").glob(RULECARD_GLOB))
+    print("[T6] rules/cards/R-*.yaml")
+    files = sorted(RULECARD_DIRECTORY.glob(RULECARD_GLOB))
     if not files:
         rep.info("SKIP - 룰카드 없음 (T6 미완)")
         return
@@ -400,6 +408,13 @@ def check_rulecards(rep: Report):
         gate = card.get("gate")
         prio = card.get("priority")
         cits = card.get("citations") or []
+
+        match = card.get("match") or {}
+        for field in ("category", "exclude_category"):
+            for name in (match.get(field) or []):
+                if name not in CATEGORY_ENUM:
+                    rep.error("%s: match.%s '%s' 가 enum 밖 (rules/categories.yaml)"
+                              % (rid, field, name))
 
         if ctype == "learned":
             if isinstance(prio, int) and prio > 400:

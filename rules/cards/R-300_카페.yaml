@@ -1,0 +1,31 @@
+# G2 · 카페 — 940909 통상성[카페] = 조건부
+#
+# 개인이면 §33①5 가사경비다. 거래처 미팅이면 §35① 기업업무추진비이나, §35 가 개인 판정에
+# 새지 않도록(citation 은 카드 레벨) 지금은 §33①5 만 싣고 업무미팅은 verdict 없이 접대비
+# 버킷만 태그한다(업무 식사 '가능 §35①' 확정은 선택지별 citation 후속 과제).
+# 혼자작업은 조문만으로 갈리지 않아(외부 작업공간 대가 vs 본인 음료) verdict 를 두지
+# 않고 확인필요로 남긴다 — 평가셋 E-028 이 '가능'을 기대하나 보류(치명 아님)다.
+#
+# fact_type '용도' 와 값(업무미팅·개인·혼자작업)은 E-028·E-039·E-040 을 따른다.
+# group_by 는 transaction — 같은 카페라도 건마다 용도가 다르다.
+id: R-300
+version: 1
+gate: G2
+priority: 500
+effective_period: { start: 2024-01-01, end: null }
+match:
+  category: [카페]
+  industry: ["940909"]
+verdict: 확인필요
+citations:
+  - { id: 소득세법-33-1-5, verified: true }
+question:
+  code: CAFE_PURPOSE
+  text: "이 카페 결제는 어떤 용도였나요?"
+  fact_type: 용도
+  group_by: transaction
+  options:
+    - { value: 업무미팅, account: 접대비, limit_bucket: 접대비 }
+    - { value: 개인, verdict: 불가 }
+    - { value: 혼자작업 }
+review: { by: 미검수, date: 2026-09-16 }

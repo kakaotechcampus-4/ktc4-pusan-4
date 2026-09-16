@@ -1,0 +1,18 @@
+# G2 · 전문가수수료 — 세무·법무·회계 용역 대가 (카테고리 T4 신설)
+#
+# ⚠️ 원천징수·지급명세서(§164) 의무가 붙는 축이 따로 있다. 이 카드는 경비 판정만 한다.
+#    R-071(급여·원천세)이 그 축을 확인필요로 잡는다.
+#
+# industry 를 걸지 않는다 — 프로파일에 '전문가수수료' 칸이 없다.
+id: R-212
+version: 1
+gate: G2
+priority: 500
+effective_period: { start: 2024-01-01, end: null }
+match:
+  category: [전문가수수료]
+verdict: 가능
+account: 지급수수료
+citations:
+  - { id: 소득세법-27-1, verified: true }
+review: { by: 미검수, date: 2026-09-15 }

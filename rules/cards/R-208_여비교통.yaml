@@ -1,0 +1,29 @@
+# G2 · 여비교통 — 프로파일 940909 통상성[여비교통] = 조건부
+#
+# 담당: B(지출성격·한도). 팀 분할 문서에서 여비교통은 B 담당으로 확정됐다
+# (profiles/940909.yaml 도 B 로 적혀 있다). A 파트 분담 문서의 중복 항목은 제거했다.
+#
+# ⚠️ fact_type 을 '이동목적' 같은 새 이름으로 두지 않는다. 평가셋 E-033 이
+#    (transaction, 용도, 업무출장) 으로 답한다. fact_type 이나 값이 하나라도
+#    어긋나면 답이 카드에 매칭되지 않는다 — v1 에서 '업무목적'으로 썼다가 났던 오류다.
+id: R-208
+version: 1
+gate: G2
+priority: 500
+effective_period: { start: 2024-01-01, end: null }
+match:
+  category: [여비교통]
+  industry: ["940909"]
+verdict: 확인필요
+citations:
+  - { id: 소득세법-27-1, verified: true }
+  - { id: 소득세법-33-1-5, verified: true }
+question:
+  code: TRAVEL_PURPOSE
+  text: "이 이동은 업무 목적이었나요?"
+  fact_type: 용도
+  group_by: transaction
+  options:
+    - { value: 업무출장, verdict: 가능, account: 여비교통비 }
+    - { value: 개인, verdict: 불가 }
+review: { by: 미검수, date: 2026-09-15 }
