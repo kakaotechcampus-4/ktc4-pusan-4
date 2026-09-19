@@ -1,12 +1,14 @@
 package com.ktc4.pusan4.judgment.domain;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import com.ktc4.pusan4.judgment.domain.AttributeOutcomePolicy;
+
 
 public final class JudgmentEngine {
 
@@ -183,17 +185,13 @@ public final class JudgmentEngine {
         };
     }
 
-    // 답이 당해 경비 '금액'을 바꾸는 속성. 자산화되면 당해 경비는 상각액뿐이라,
-    // 답을 듣기 전에 가능으로 확정하면 사용자가 전액 경비로 읽는다(금액 과대계상).
-    // 가산세_대상 같은 속성은 여기 없다 — 가산세를 계산할 뿐 경비 금액을 건드리지 않는다.
-    private static final Set<String> AMOUNT_BEARING_ATTRIBUTES = Set.of("자산", "즉시상각");
-
-    // 판정·계정과목·금액 중 하나라도 답에 따라 갈리면 확정하지 않는다.
+    // 답변에 따라 판정 결과가 달라질 수 있으면 확정하지 않는다.
     private static boolean changesOutcome(QuestionSpec question) {
         return question.effects().values().stream()
             .anyMatch(effect -> effect.verdict() != null
                 || effect.account() != null
-                || !Collections.disjoint(effect.attributes().keySet(), AMOUNT_BEARING_ATTRIBUTES));
+                || effect.attributes().keySet().stream().anyMatch(AttributeOutcomePolicy::changesOutcome)
+            );
     }
 
     private static QuestionEffect resolvedEffect(
