@@ -9,7 +9,8 @@ import {
 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { useSession } from '../contexts/SessionContext';
-import { JUDGMENT_RUN } from '../mock/judgments';
+import { api } from '../api';
+import type { JudgmentRun } from '../types/domain';
 import { formatNumber } from '../utils/format';
 
 const GATES = [
@@ -33,32 +34,45 @@ const CALL_LOG = [
 
 export function Run() {
   const navigate = useNavigate();
-  const { setRunStatus, counts } = useSession();
-  const [progress, setProgress] = useState(0);
+  const { runId, batchId, contextRef, setRunId } = useSession();
+  const [run, setRun] = useState<JudgmentRun | null>(null);
+  const [counts, setCounts] = useState({ available: 0, needsReview: 0, unavailable: 0 });
   const timer = useRef<number | null>(null);
 
+  // runId 가 없으면 여기서 실행을 만든다 (확인 화면을 거치지 않고 진입한 경우)
   useEffect(() => {
-    timer.current = window.setInterval(() => {
-      setProgress((prev) => {
-        const next = prev + 2;
-        if (next >= 100) {
-          if (timer.current) window.clearInterval(timer.current);
-          return 100;
-        }
-        return next;
-      });
-    }, 70);
+    if (runId || !batchId || !contextRef) return;
+    void api.runs.create({ batchId, contextId: contextRef.id }).then((created) => setRunId(created.id));
+  }, [runId, batchId, contextRef, setRunId]);
+
+  // 1초 폴링. SSE 토큰 방식이 정해지면 교체 (명세 4.3 #9)
+  useEffect(() => {
+    if (!runId) return;
+    const poll = () =>
+    void api.runs.get(runId).then((next) => {
+      setRun(next);
+      if (next.status.code === 'COMPLETED' || next.status.code === 'FAILED' || next.status.code === 'PARTIAL_FAILED') {
+        if (timer.current) window.clearInterval(timer.current);
+        void api.judgments.summary(runId).then((summary) =>
+        setCounts({
+          available: summary.byVerdict.AVAILABLE.count,
+          needsReview: summary.byVerdict.NEEDS_REVIEW.count,
+          unavailable: summary.byVerdict.UNAVAILABLE.count
+        })
+        );
+      }
+    });
+    poll();
+    timer.current = window.setInterval(poll, 1000);
     return () => {
       if (timer.current) window.clearInterval(timer.current);
     };
-  }, []);
+  }, [runId]);
 
-  useEffect(() => {
-    if (progress >= 100) setRunStatus('DONE');
-  }, [progress, setRunStatus]);
-
-  const processed = Math.round(progress / 100 * JUDGMENT_RUN.totalCount);
-  const done = progress >= 100;
+  const total = run?.totalCount ?? 0;
+  const processed = run?.processedCount ?? 0;
+  const progress = total ? Math.round(processed / total * 100) : 0;
+  const done = run?.status.code === 'COMPLETED';
   const activeGate = Math.min(
     GATES.length - 1,
     Math.floor(progress / 100 * GATES.length)
@@ -77,7 +91,7 @@ export function Run() {
           </div>
           <p className="flex items-center gap-1.5 text-[12px] tabular-nums text-muted">
             <RadioIcon className="h-3.5 w-3.5" aria-hidden="true" />
-            run 019e4c · 새로고침해도 이어집니다
+            run {runId?.slice(0, 13) ?? '…'} · 새로고침해도 이어집니다
           </p>
         </header>
 
@@ -87,7 +101,7 @@ export function Run() {
               {formatNumber(processed)}
               <span className="text-[16px] font-medium text-muted">
                 {' '}
-                / {formatNumber(JUDGMENT_RUN.totalCount)}건
+                / {formatNumber(total)}건
               </span>
             </p>
             <p className="text-[13px] tabular-nums text-muted">

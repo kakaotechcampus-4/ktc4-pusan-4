@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRightIcon, CopyIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { useSession } from '../contexts/SessionContext';
-import { JUDGMENT_SUMMARY } from '../mock/judgments';
+import { api, useApi } from '../api';
 import { formatNumber, formatWon } from '../utils/format';
 
 const LIMIT_BUCKETS = [
@@ -32,7 +32,17 @@ const DEPRECIATION = [
 
 
 export function Summary() {
-  const { counts, recognizedAmount, pendingQuestionCount } = useSession();
+  const { runId } = useSession();
+  const summaryQ = useApi(() => runId ? api.judgments.summary(runId) : Promise.resolve(null), [runId]);
+  const questionsQ = useApi(() => api.questions.grouped({ status: 'PENDING' }), []);
+  const JUDGMENT_SUMMARY = summaryQ.data;
+  const counts = {
+    available: JUDGMENT_SUMMARY?.byVerdict.AVAILABLE.count ?? 0,
+    needsReview: JUDGMENT_SUMMARY?.byVerdict.NEEDS_REVIEW.count ?? 0,
+    unavailable: JUDGMENT_SUMMARY?.byVerdict.UNAVAILABLE.count ?? 0
+  };
+  const recognizedAmount = JUDGMENT_SUMMARY?.byVerdict.AVAILABLE.finalAmount ?? 0;
+  const pendingQuestionCount = questionsQ.data?.page.totalElements ?? 0;
   const total = counts.available + counts.needsReview + counts.unavailable;
 
   const distribution = [
@@ -58,7 +68,7 @@ export function Summary() {
           </p>
           <p className="mt-2 text-[13px] tabular-nums text-muted">
             확인 필요 {formatNumber(counts.needsReview)}건은 아직 합계에 넣지
-            않았습니다. (전체 {formatNumber(JUDGMENT_SUMMARY.totalCount)}건)
+            않았습니다. (전체 {formatNumber(JUDGMENT_SUMMARY?.totalCount ?? 0)}건)
           </p>
 
           <div className="mt-6" aria-hidden="true">
@@ -67,7 +77,7 @@ export function Summary() {
               <div
                 key={item.label}
                 className={item.bar}
-                style={{ width: `${item.value / total * 100}%` }} />
+                style={{ width: `${total ? item.value / total * 100 : 0}%` }} />
 
               )}
             </div>

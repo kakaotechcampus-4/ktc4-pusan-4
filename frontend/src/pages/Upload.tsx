@@ -12,6 +12,7 @@ import {
 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { useSession } from '../contexts/SessionContext';
+import { api } from '../api';
 import {
   COLUMN_MAPPING,
   DISCARDED_COLUMNS,
@@ -25,7 +26,7 @@ type Phase = 'IDLE' | 'PARSING' | 'BLOCKED' | 'MAPPING' | 'READY';
 
 export function Upload() {
   const navigate = useNavigate();
-  const { setBatch } = useSession();
+  const { setBatch, setBatchId } = useSession();
   const [phase, setPhase] = useState<Phase>('IDLE');
   const [file, setFile] = useState<SampleFile | null>(null);
   const [progress, setProgress] = useState(0);
@@ -58,8 +59,18 @@ export function Upload() {
     }, 90);
   }, []);
 
-  const confirmMapping = () => {
+  const confirmMapping = async () => {
     if (!file) return;
+    // 브라우저 파싱 결과를 서버에 저장한다. 실제 파서가 붙기 전이라 거래 행은 비워 보낸다.
+    const saved = await api.uploads.create({
+      sourceType: '승인내역',
+      cardIssuer: file.issuer.includes('기업') ? '기업' : '국민',
+      periodStart: file.periodStart,
+      periodEnd: file.periodEnd,
+      fileHash: `sha256:${file.id}`,
+      transactions: []
+    });
+    setBatchId(saved.id);
     setBatch({
       fileName: file.fileName,
       issuer: file.issuer,
@@ -337,7 +348,7 @@ export function Upload() {
                     </button>
                     <button
                     type="button"
-                    onClick={confirmMapping}
+                    onClick={() => void confirmMapping()}
                     className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors duration-150 ease-snap hover:bg-accent-hover">
                     
                       매핑 확정

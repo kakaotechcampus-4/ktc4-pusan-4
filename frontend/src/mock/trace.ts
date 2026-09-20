@@ -18,7 +18,8 @@ export interface ShowcaseTrace {
   verdict: Coded<Verdict>;
   blockedAtGate: GateId | null;
   gateTrace: GateTraceStep[];
-  citation: Citation | null;
+  /** 데모용: 조문 제목까지 들고 있어 API 조회 없이 그린다 */
+  citation: (Citation & { title: string }) | null;
 }
 
 export const SHOWCASE_TRACES: ShowcaseTrace[] = [
@@ -65,7 +66,8 @@ export const SHOWCASE_TRACES: ShowcaseTrace[] = [
     ],
     citation: {
       statuteVersionId: 1418,
-      statuteId: '소득세법-27-1'
+      statuteId: '소득세법-27-1',
+      title: '소득세법 제27조 제1항'
     }
   },
   {
@@ -95,7 +97,8 @@ export const SHOWCASE_TRACES: ShowcaseTrace[] = [
     ],
     citation: {
       statuteVersionId: 1418,
-      statuteId: '소득세법-27-1'
+      statuteId: '소득세법-27-1',
+      title: '소득세법 제27조 제1항'
     }
   },
   {
@@ -125,7 +128,8 @@ export const SHOWCASE_TRACES: ShowcaseTrace[] = [
     ],
     citation: {
       statuteVersionId: 1418,
-      statuteId: '소득세법-27-1'
+      statuteId: '소득세법-27-1',
+      title: '소득세법 제27조 제1항'
     }
   }
 ];

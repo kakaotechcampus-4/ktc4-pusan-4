@@ -13,6 +13,7 @@
 | 부품 | `src/components/ui/` | Button, Card, Badge, SectionHeading, Container, Input/Select/Field, ChoiceGroup |
 | 도메인 부품 | `src/components/` | VerdictBadge, StatuteCitation, AgentPreview — ui 부품 위에 도메인 의미를 얹은 것 |
 | 타입 | `src/types/domain.ts` | API 명세와 1:1. 화면 편의 필드를 여기 추가하지 않는다 |
+| 데이터 | `src/api/` | 화면은 `api.*`만 호출. 서버 상태를 화면·Context에 두지 않는다 |
 | 규칙 | 이 문서 | 코드로 강제 못 하는 것 |
 
 ## 토큰

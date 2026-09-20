@@ -6,7 +6,7 @@ import type {
   Transaction,
   UploadBatch,
   Verdict } from
-'../types/domain';
+'../../types/domain';
 
 /** 백엔드 준비 전 목업. 모양은 API 명세 3.3~3.7 응답과 같다. */
 

@@ -1,4 +1,4 @@
-import type { Statute } from '../types/domain';
+import type { Statute } from '../../types/domain';
 
 /**
  * GET /statutes/{statuteVersionId} 응답 모양 그대로. 귀속연도 2026 기준.
