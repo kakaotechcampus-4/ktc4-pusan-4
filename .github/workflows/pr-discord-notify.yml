@@ -13,9 +13,13 @@ name: PR Discord notify
 # ⚠️ develop → main 은 운영진 notify-discord.yml 이 멘토 채널로 알린다 → branches-ignore: [main]
 # ⚠️ secret 이름을 DISCORD_WEBHOOK 으로 바꾸지 말 것. 운영진 워크플로가 쓰는 이름이다.
 # ⚠️ concurrency 를 넣지 말 것. 연속으로 열린 PR 알림이 조용히 취소된다.
+# ⚠️ pull_request_target 인 이유: fork 에서 온 PR(#52)은 pull_request 이벤트에 secret·variable 이
+#   넘어오지 않아 알림이 실패했다. pull_request_target 은 base 브랜치(develop)의 워크플로·코드로
+#   돌아서 secret 을 쓸 수 있다. 대신 PR head 코드를 checkout·실행하면 안 된다 — 지금은 develop 의
+#   tools/ 만 실행하고 PR 은 API 로 제목·번호만 읽는다. 이 워크플로 수정은 develop 에 머지돼야 반영된다.
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, reopened, ready_for_review, review_requested]
     branches-ignore: [main]
 
