@@ -1,16 +1,11 @@
 package com.ktc4.pusan4.shared.api;
 
-import io.swagger.v3.core.converter.ModelConverters;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
-import io.swagger.v3.oas.models.media.Content;
-import io.swagger.v3.oas.models.media.MediaType;
-import io.swagger.v3.oas.models.media.Schema;
-import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
-import org.springdoc.core.customizers.OpenApiCustomizer;
+import org.springdoc.core.customizers.OperationCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -18,6 +13,7 @@ import org.springframework.context.annotation.Configuration;
 public class OpenApiConfig {
 
     private static final String BEARER = "bearer";
+    private static final String MOCK_RESPONSE_NOTE = "[목 응답] 입력과 상관없이 고정된 값을 반환한다.";
 
     @Bean
     OpenAPI openApi() {
@@ -30,7 +26,7 @@ public class OpenApiConfig {
                     이 문서는 요청·응답 형태와 에러 코드를 보여 주고, 동작 규칙과 흐름
                     (재판정, 상태 전이, 사용자 흐름)은 api.md 를 따른다.
 
-                    구현되지 않은 API 는 `501 NOT_IMPLEMENTED` 를 반환한다.
+                    설명이 `[목 응답]` 으로 시작하는 API 는 서비스가 구현되기 전이라 고정된 값을 반환한다.
                     """))
             .addSecurityItem(new SecurityRequirement().addList(BEARER))
             .components(new Components()
@@ -40,20 +36,17 @@ public class OpenApiConfig {
     }
 
     /**
-     * 모든 API 에 501 응답을 붙인다. 구현이 들어오면 이 커스터마이저를 지운다.
+     * {@link MockResponse} 가 붙은 API 의 설명 앞에 목 응답 표시를 붙인다.
      */
     @Bean
-    OpenApiCustomizer notImplementedResponse() {
-        return openApi -> {
-            ModelConverters.getInstance().read(ErrorResponse.class)
-                .forEach(openApi.getComponents()::addSchemas);
-            ApiResponse notImplemented = new ApiResponse()
-                .description("NOT_IMPLEMENTED — 아직 구현되지 않음")
-                .content(new Content().addMediaType("application/json",
-                    new MediaType().schema(new Schema<>().$ref("#/components/schemas/ErrorResponse"))));
-            openApi.getPaths().values().forEach(path ->
-                path.readOperations().forEach(operation ->
-                    operation.getResponses().addApiResponse("501", notImplemented)));
+    OperationCustomizer mockResponseNote() {
+        return (operation, handlerMethod) -> {
+            if (handlerMethod.hasMethodAnnotation(MockResponse.class)) {
+                String description = operation.getDescription();
+                operation.setDescription(
+                    description == null ? MOCK_RESPONSE_NOTE : MOCK_RESPONSE_NOTE + " " + description);
+            }
+            return operation;
         };
     }
 }

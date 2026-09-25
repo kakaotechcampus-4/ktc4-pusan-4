@@ -1,7 +1,7 @@
 package com.ktc4.pusan4.judgment.api;
 
-import com.ktc4.pusan4.shared.api.ApiException;
 import com.ktc4.pusan4.shared.api.ErrorResponse;
+import com.ktc4.pusan4.shared.api.MockResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -21,6 +21,7 @@ import java.util.UUID;
 @RequestMapping("/judgment-overrides")
 public class JudgmentOverrideController {
 
+    @MockResponse
     @Operation(summary = "사용자 판정 수정 해제",
         description = "Override 와 그 revision 은 삭제하지 않고 active=false, releasedAt 을 기록한다. "
             + "이미 해제된 Override 도 204")
@@ -29,6 +30,6 @@ public class JudgmentOverrideController {
     @DeleteMapping("/{overrideId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void release(@PathVariable UUID overrideId) {
-        throw ApiException.notImplemented();
+        // 목 응답: 지울 데이터가 없다
     }
 }

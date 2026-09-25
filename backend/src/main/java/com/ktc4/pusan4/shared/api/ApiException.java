@@ -16,10 +16,6 @@ public class ApiException extends RuntimeException {
         this.code = code;
     }
 
-    public static ApiException notImplemented() {
-        return new ApiException(HttpStatus.NOT_IMPLEMENTED, "NOT_IMPLEMENTED", "아직 구현되지 않은 API입니다.");
-    }
-
     public HttpStatus getStatus() {
         return status;
     }

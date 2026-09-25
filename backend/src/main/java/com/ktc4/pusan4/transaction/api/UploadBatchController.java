@@ -1,7 +1,7 @@
 package com.ktc4.pusan4.transaction.api;
 
-import com.ktc4.pusan4.shared.api.ApiException;
 import com.ktc4.pusan4.shared.api.ErrorResponse;
+import com.ktc4.pusan4.shared.api.MockResponse;
 import com.ktc4.pusan4.shared.api.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -28,6 +28,13 @@ import java.util.UUID;
 @RequestMapping("/upload-batches")
 public class UploadBatchController {
 
+    private final TransactionMockData mockData;
+
+    public UploadBatchController(TransactionMockData mockData) {
+        this.mockData = mockData;
+    }
+
+    @MockResponse
     @Operation(summary = "카드내역 업로드",
         description = "naturalKey 중복 거래는 건너뛰고(skippedDuplicateCount), 분류 실패 거래는 미분류로 저장한다. "
             + "Idempotency-Key 동작은 api.md 1.6")
@@ -44,30 +51,33 @@ public class UploadBatchController {
         @RequestHeader("Idempotency-Key") String idempotencyKey,
         @RequestBody CreateUploadBatchRequest request
     ) {
-        throw ApiException.notImplemented();
+        return mockData.createUploadBatch();
     }
 
+    @MockResponse
     @Operation(summary = "업로드 배치 목록", description = "정렬: createdAt DESC")
     @GetMapping
     public PageResponse<UploadBatchResponse> list(
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size
     ) {
-        throw ApiException.notImplemented();
+        return mockData.uploadBatches();
     }
 
+    @MockResponse
     @Operation(summary = "배치 상세", description = "목록 items[] 와 같은 형태")
     @GetMapping("/{batchId}")
     public UploadBatchResponse detail(@PathVariable UUID batchId) {
-        throw ApiException.notImplemented();
+        return mockData.uploadBatch();
     }
 
+    @MockResponse
     @Operation(summary = "배치 및 종속 데이터 삭제",
         description = "Transaction, ClassificationReview, JudgmentRun, Judgment, Question, Batch 범위 UserFact, "
             + "JudgmentOverride 를 함께 삭제한다. StatuteVersion 은 삭제하지 않는다")
     @DeleteMapping("/{batchId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable UUID batchId) {
-        throw ApiException.notImplemented();
+        // 목 응답: 지울 데이터가 없다
     }
 }

@@ -1,7 +1,7 @@
 package com.ktc4.pusan4.merchant.api;
 
-import com.ktc4.pusan4.shared.api.ApiException;
 import com.ktc4.pusan4.shared.api.ErrorResponse;
+import com.ktc4.pusan4.shared.api.MockResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -19,6 +19,13 @@ import java.util.UUID;
 @RestController
 public class ClassificationController {
 
+    private final ClassificationMockData mockData;
+
+    public ClassificationController(ClassificationMockData mockData) {
+        this.mockData = mockData;
+    }
+
+    @MockResponse
     @Operation(summary = "미분류 확인 목록",
         description = "정렬: createdAt ASC, id ASC. grouped=true 이면 항목이 그룹 형태로 바뀐다")
     @ApiResponse(responseCode = "200", description = "grouped 값에 따라 두 형태 중 하나",
@@ -32,9 +39,10 @@ public class ClassificationController {
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size
     ) {
-        throw ApiException.notImplemented();
+        return grouped ? mockData.reviewGroups() : mockData.reviews();
     }
 
+    @MockResponse
     @Operation(summary = "미분류 거래 분류 응답",
         description = "Review → RESOLVED, Transaction.merchantCategory 확정. 분류 응답은 UserFact 로 저장하지 않는다")
     @ApiResponse(responseCode = "409", description = "CLASSIFICATION_ALREADY_RESOLVED",
@@ -43,6 +51,6 @@ public class ClassificationController {
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @PostMapping("/classification-responses")
     public ClassificationAnswerResponse answer(@RequestBody ClassificationAnswerRequest request) {
-        throw ApiException.notImplemented();
+        return mockData.answer();
     }
 }

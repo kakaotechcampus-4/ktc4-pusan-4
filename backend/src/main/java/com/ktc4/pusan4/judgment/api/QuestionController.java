@@ -1,7 +1,7 @@
 package com.ktc4.pusan4.judgment.api;
 
-import com.ktc4.pusan4.shared.api.ApiException;
 import com.ktc4.pusan4.shared.api.ErrorResponse;
+import com.ktc4.pusan4.shared.api.MockResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -19,6 +19,13 @@ import java.util.UUID;
 @RestController
 public class QuestionController {
 
+    private final JudgmentMockData mockData;
+
+    public QuestionController(JudgmentMockData mockData) {
+        this.mockData = mockData;
+    }
+
+    @MockResponse
     @Operation(summary = "룰엔진 확인 질문 목록",
         description = "정렬: createdAt ASC, id ASC. runId 는 조회 기준으로 쓰지 않는다. "
             + "grouped=true 이면 항목이 그룹 형태로 바뀐다")
@@ -33,9 +40,10 @@ public class QuestionController {
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size
     ) {
-        throw ApiException.notImplemented();
+        return grouped ? mockData.questionGroups() : mockData.questions();
     }
 
+    @MockResponse
     @Operation(summary = "확인 질문 응답 및 부분 재판정",
         description = "PENDING 은 최초 답변, ANSWERED 는 정정(UserFact 새 version). 새 JudgmentRun 은 만들지 않는다. "
             + "처리 순서는 api.md 3.10")
@@ -45,9 +53,10 @@ public class QuestionController {
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @PostMapping("/question-responses")
     public QuestionAnswerResponse answer(@RequestBody QuestionAnswerRequest request) {
-        throw ApiException.notImplemented();
+        return mockData.answer();
     }
 
+    @MockResponse
     @Operation(summary = "미해소 질문 일괄 응답",
         description = "batchId·PENDING·factType 이 모두 일치하는 질문을 한 번에 닫는다. 대상 중 하나라도 "
             + "answer.value 를 허용하지 않으면 아무것도 바꾸지 않는다. 대상이 0건이면 answeredCount = 0 (에러 아님)")
@@ -57,6 +66,6 @@ public class QuestionController {
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @PostMapping("/questions/bulk-answer")
     public BulkAnswerResponse bulkAnswer(@RequestBody BulkAnswerRequest request) {
-        throw ApiException.notImplemented();
+        return mockData.bulkAnswer();
     }
 }
