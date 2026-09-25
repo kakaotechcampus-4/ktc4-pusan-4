@@ -1,5 +1,6 @@
 package com.ktc4.pusan4.transaction.api;
 
+import com.ktc4.pusan4.shared.api.ApiException;
 import com.ktc4.pusan4.shared.api.ErrorResponse;
 import com.ktc4.pusan4.shared.api.MockResponse;
 import com.ktc4.pusan4.shared.api.PageResponse;
@@ -38,6 +39,8 @@ public class UploadBatchController {
     @Operation(summary = "카드내역 업로드",
         description = "naturalKey 중복 거래는 건너뛰고(skippedDuplicateCount), 분류 실패 거래는 미분류로 저장한다. "
             + "Idempotency-Key 동작은 api.md 1.6")
+    @ApiResponse(responseCode = "400", description = "IDEMPOTENCY_KEY_REQUIRED",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @ApiResponse(responseCode = "409", description = "DUPLICATE_FILE, IDEMPOTENCY_KEY_REUSED",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @ApiResponse(responseCode = "410", description = "IDEMPOTENCY_RESULT_DELETED",
@@ -47,10 +50,14 @@ public class UploadBatchController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public UploadBatchCreatedResponse create(
-        @Parameter(description = "24시간 유효. 같은 키 + 같은 요청이면 최초 응답을 재사용한다")
-        @RequestHeader("Idempotency-Key") String idempotencyKey,
+        // 누락을 Spring 기본 처리(VALIDATION_ERROR)가 아니라 api.md 의 IDEMPOTENCY_KEY_REQUIRED 로 응답하려고 직접 검사한다
+        @Parameter(required = true, description = "24시간 유효. 같은 키 + 같은 요청이면 최초 응답을 재사용한다")
+        @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
         @RequestBody CreateUploadBatchRequest request
     ) {
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "IDEMPOTENCY_KEY_REQUIRED", "Idempotency-Key 헤더가 필요합니다.");
+        }
         return mockData.createUploadBatch();
     }
 

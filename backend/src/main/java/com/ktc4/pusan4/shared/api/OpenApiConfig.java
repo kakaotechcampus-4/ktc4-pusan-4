@@ -22,7 +22,7 @@ public class OpenApiConfig {
                 .title("판정 시스템 API")
                 .version("v1")
                 .description("""
-                    계약 원본은 repo 의 `docs/api.md` 다 (현재 기준: PR #41 의 ce91429). 설명에 붙은 절 번호(예: 3.9)는 api.md 기준이다.
+                    계약 원본은 repo 의 `docs/api.md` 다. 설명에 붙은 절 번호(예: 3.9)는 api.md 기준이다.
                     이 문서는 요청·응답 형태와 에러 코드를 보여 주고, 동작 규칙과 흐름
                     (재판정, 상태 전이, 사용자 흐름)은 api.md 를 따른다.
 

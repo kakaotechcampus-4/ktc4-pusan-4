@@ -159,8 +159,8 @@ class ApiResponseContractTest {
 
     @Test
     void invalid_request_returns_error_format_before_mock_response() throws Exception {
-        // given: 필수 헤더 Idempotency-Key 없이 업로드
-        MockHttpServletRequestBuilder request = request(HttpMethod.POST, "/api/v1/upload-batches")
+        // given: 필수 필드가 모두 빠진 문진
+        MockHttpServletRequestBuilder request = request(HttpMethod.POST, "/api/v1/users/me/contexts")
             .contentType(MediaType.APPLICATION_JSON)
             .content("{}");
 
@@ -170,5 +170,18 @@ class ApiResponseContractTest {
             .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
             .andExpect(jsonPath("$.message").isNotEmpty())
             .andExpect(jsonPath("$.traceId").isNotEmpty());
+    }
+
+    @Test
+    void upload_without_idempotency_key_returns_idempotency_key_required() throws Exception {
+        // given
+        MockHttpServletRequestBuilder request = request(HttpMethod.POST, "/api/v1/upload-batches")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{}");
+
+        // when / then: api.md 3.3
+        mockMvc.perform(request)
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("IDEMPOTENCY_KEY_REQUIRED"));
     }
 }
