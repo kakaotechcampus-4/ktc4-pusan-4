@@ -2,7 +2,6 @@ package com.ktc4.pusan4.judgment.api;
 
 import com.ktc4.pusan4.judgment.domain.Verdict;
 import com.ktc4.pusan4.shared.api.ApiException;
-import com.ktc4.pusan4.shared.api.ContractNotes;
 import com.ktc4.pusan4.shared.api.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -15,7 +14,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Map;
 import java.util.UUID;
 
 @Tag(name = "judgments", description = "판정 결과 (api.md 3.7, 3.8)")
@@ -25,10 +23,9 @@ public class JudgmentController {
 
     @Operation(summary = "판정 목록 및 revision 조회",
         description = "batchId·year 는 거래별 현재 Judgment, runId 는 그 Run 이 실제 생성한 Judgment, "
-            + "transactionId + latestOnly=false 는 전체 revision 이력. 정렬: computedAt DESC, id DESC. "
-            + ContractNotes.SHAPE_UNSPECIFIED)
+            + "transactionId + latestOnly=false 는 전체 revision 이력. 정렬: computedAt DESC, id DESC")
     @GetMapping
-    public PageResponse<Map<String, Object>> list(
+    public PageResponse<JudgmentResponse> list(
         @RequestParam(required = false) UUID transactionId,
         @RequestParam(required = false) UUID batchId,
         @RequestParam(required = false) Integer year,

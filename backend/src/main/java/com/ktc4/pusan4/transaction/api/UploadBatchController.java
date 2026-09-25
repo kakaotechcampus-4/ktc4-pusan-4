@@ -1,7 +1,6 @@
 package com.ktc4.pusan4.transaction.api;
 
 import com.ktc4.pusan4.shared.api.ApiException;
-import com.ktc4.pusan4.shared.api.ContractNotes;
 import com.ktc4.pusan4.shared.api.ErrorResponse;
 import com.ktc4.pusan4.shared.api.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -22,7 +21,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Map;
 import java.util.UUID;
 
 @Tag(name = "upload-batches", description = "카드내역 업로드 (api.md 3.3)")
@@ -49,18 +47,18 @@ public class UploadBatchController {
         throw ApiException.notImplemented();
     }
 
-    @Operation(summary = "업로드 배치 목록", description = "정렬: createdAt DESC. " + ContractNotes.SHAPE_UNSPECIFIED)
+    @Operation(summary = "업로드 배치 목록", description = "정렬: createdAt DESC")
     @GetMapping
-    public PageResponse<Map<String, Object>> list(
+    public PageResponse<UploadBatchResponse> list(
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size
     ) {
         throw ApiException.notImplemented();
     }
 
-    @Operation(summary = "배치 상세", description = "Batch 메타데이터와 거래 수 등. " + ContractNotes.SHAPE_UNSPECIFIED)
+    @Operation(summary = "배치 상세", description = "목록 items[] 와 같은 형태")
     @GetMapping("/{batchId}")
-    public Map<String, Object> detail(@PathVariable UUID batchId) {
+    public UploadBatchResponse detail(@PathVariable UUID batchId) {
         throw ApiException.notImplemented();
     }
 
