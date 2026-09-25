@@ -153,8 +153,9 @@ def unclosed_bracket(s):
 def find_peers(name, pool):
     """절단 복원 대조군. 한쪽이 다른 쪽의 앞부분이어야 한다.
 
-    앞 N 글자 공유로 찾으면 '지에스더프레시'(슈퍼)와 '지에스25'(편의점)가 묶인다.
-    같은 회사지만 브랜드가 달라 카테고리가 갈리므로 접두 일치로는 부족하다.
+    처음에는 앞 N 글자 공유로 찾았는데 '지에스더프레시'(슈퍼)와 '지에스25'(편의점)가
+    묶였다. 같은 회사지만 브랜드가 달라 카테고리가 갈린다. 그래서 접두 일치로 바꿨다 —
+    한쪽이 다른 쪽의 앞부분일 때만 대조군으로 본다.
     """
     a = bare_name(name)
     peers = []
@@ -290,7 +291,137 @@ def selftest_detail():
     assert group_of(dict(base, enc_bytes=19), one) == "D"
     assert group_of(dict(base, enc_bytes=19, 대조군_수=1), one) == "E"
     assert group_of(base, one) == "D"
+    # 키 분열 원인 분리 — 합성. 사업자번호가 다른 GS25 2점 + 사업자번호 없는 GS25 1점.
+    # 키 3개이고, 트랙 분기(bizno+string)와 점포별 사업자번호(bizno 안 2개)가 둘 다 선다.
+    class _FakeNorm:
+        @staticmethod
+        def normalize(raw, biz_no=""):
+            return {"string_norm": "GS25", "branch_blocked": [],
+                    "track": "bizno" if biz_no else "string",
+                    "norm_key": biz_no or "GS25"}
+
+    fake = [{"raw_merchant": "GS25a", "biz_no": "111-11-11111"},
+            {"raw_merchant": "GS25b", "biz_no": "222-22-22222"},
+            {"raw_merchant": "GS25c", "biz_no": ""}]
+    km = measure_key_split(fake, _FakeNorm)
+    assert len(km["split"]["GS25"]) == 3, km["split"]
+    assert km["n_track"] == 1 and km["n_bizno"] == 1, km
+    assert sorted(km["cause"]["GS25"]) == ["bizno", "track"]
+    assert km["excess"] == 2
+    # 사업자번호가 하나뿐이면 아무 원인도 서지 않는다
+    km2 = measure_key_split(fake[:1], _FakeNorm)
+    assert km2["split"] == {} and km2["n_track"] == 0 and km2["n_bizno"] == 0
+    print("selftest_key_split ok")
     print("selftest_detail ok")
+
+# ── 키 분열 지표 ────────────────────────────────────────────────────
+# 미분류율은 키 분열을 못 본다. 같은 브랜드가 여러 norm_key 로 갈려도
+# 각각 정상 분류되면 미분류 0 이다. 그래서 A(브랜드 경계)와 B(트랙 분기)가
+# 실측에서 1건·0건으로 보였다 — 작아서가 아니라 지표가 안 봐서다.
+#
+# 되묻기는 norm_key 단위로 묶이므로, 키가 갈리면 같은 가맹점을 여러 번 묻는다.
+# #22(트랙 분기)와 #35(브랜드 사전)의 효과를 재려면 이 숫자가 있어야 한다.
+
+BLOCKED_CSV = ROOT / "data" / "branch_blocked.csv"
+
+
+def measure_key_split(rows, norm):
+    """string_norm -> norm_key 가 1:N 으로 갈리는 정도와, 그 원인.
+
+    원인이 둘이고 고치는 사람이 다르다.
+      track   트랙 분기 — 같은 상호가 bizno 키와 string 키를 동시에 가진다.
+              사업자번호가 붙은 행과 안 붙은 행이 섞이면 생긴다 (이슈 #22).
+      bizno   점포별 사업자번호 — bizno 트랙 안에서만 여러 키를 가진다.
+              프랜차이즈 각 점포가 별개 사업자라 지점 수만큼 갈린다 (이슈 #35).
+    한 string_norm 이 둘 다 해당할 수 있어 따로 센다.
+    """
+    keys = collections.defaultdict(set)          # sn -> {(track, key)}
+    rowcnt = collections.Counter()
+    blocked = set()
+    for r in rows:
+        res = norm.normalize(r["raw_merchant"], r.get("biz_no", ""))
+        sn = res["string_norm"]
+        keys[sn].add((res["track"], res["norm_key"]))
+        rowcnt[sn] += 1
+        if res["branch_blocked"]:
+            blocked.add(r["raw_merchant"])
+
+    split, cause = {}, {}
+    for sn, tk in keys.items():
+        if len(tk) < 2:
+            continue
+        tracks = {t for t, _ in tk}
+        bizno_keys = {k for t, k in tk if t == "bizno"}
+        c = []
+        if len(tracks) > 1:
+            c.append("track")
+        if len(bizno_keys) > 1:
+            c.append("bizno")
+        split[sn] = tk
+        cause[sn] = c
+
+    return {
+        "n_norm": len(keys),
+        "split": split, "rowcnt": rowcnt, "cause": cause,
+        "excess": sum(len(tk) - 1 for tk in keys.values()),
+        "n_track": sum(1 for c in cause.values() if "track" in c),
+        "n_bizno": sum(1 for c in cause.values() if "bizno" in c),
+        "blocked_merchants": blocked,
+    }
+
+
+def print_key_split(label, m, anon):
+    print("[%s]" % label)
+    # 다른 string_norm 이 같은 사업자번호 키로 묶이기도 해서 전역 개수만으로는
+    # 분열 규모를 못 읽는다. string_norm 단위로 센다.
+    print("  string_norm %d개 / 그중 키가 갈린 것 %d개 (초과 키 %d개)"
+          % (m["n_norm"], len(m["split"]), m["excess"]))
+    print("  원인별  트랙 분기 %d개 (#22) / 점포별 사업자번호 %d개 (#35)"
+          % (m["n_track"], m["n_bizno"]))
+    print("  갈린 거래 %d건" % sum(m["rowcnt"][sn] for sn in m["split"]))
+    for sn, tk in sorted(m["split"].items(), key=lambda kv: -m["rowcnt"][kv[0]]):
+        print("    %-18s 키 %d개 / %d건  원인=%s"
+              % (safe_key(sn, anon)[:18], len(tk), m["rowcnt"][sn],
+                 ",".join(m["cause"][sn]) or "-"))
+    # branch_blocked 는 위 분열에 안 잡힌다. 한 string_norm 이 여러 키로 갈리는 게
+    # 아니라, 지점이 안 떨어져 string_norm 자체가 상호마다 달라지기 때문이다.
+    print("  지점 미분리로 애초에 안 뭉친 상호: %d개 (위 분열에 안 잡힘)"
+          % len(m["blocked_merchants"]))
+    print()
+
+
+BLOCKED_FIELDS = ["raw_merchant", "string_norm", "norm_key", "track", "category",
+                  "거래건수", "합계금액", "branch", "branch_raw", "blocked_patterns",
+                  "enc_bytes", "is_truncated", "source_card"]
+
+
+def blocked_rows(rows, norm, pg, rules):
+    """branch_blocked 전건. 미분류 목록은 이 중 분류 실패한 것만 보여준다."""
+    freq = collections.Counter(r["raw_merchant"] for r in rows)
+    amount = collections.Counter()
+    for r in rows:
+        amount[r["raw_merchant"]] += int(r["amount"] or 0)
+    out, seen = [], set()
+    for r in rows:
+        m = r["raw_merchant"]
+        if m in seen:
+            continue
+        res = norm.normalize(m, r.get("biz_no", ""))
+        if not res["branch_blocked"]:
+            continue
+        seen.add(m)
+        p = kw.pipeline(m, r.get("biz_no", ""), norm, pg, rules)
+        out.append({
+            "raw_merchant": m, "string_norm": res["string_norm"],
+            "norm_key": res["norm_key"], "track": res["track"],
+            "category": p["category"], "거래건수": freq[m], "합계금액": amount[m],
+            "branch": res["branch"], "branch_raw": res["branch_raw"],
+            "blocked_patterns": " | ".join(res["branch_blocked"]),
+            "enc_bytes": res["enc_bytes"], "is_truncated": res["is_truncated"],
+            "source_card": r["source_card"],
+        })
+    out.sort(key=lambda d: (-d["거래건수"], d["raw_merchant"]))
+    return out
 
 def main() -> int:
     ap = argparse.ArgumentParser()
@@ -298,6 +429,8 @@ def main() -> int:
                     help="미분류 순위표 출력 경로 (기본: data/ — gitignore 대상)")
     ap.add_argument("--detail", nargs="?", const=str(DETAIL_CSV), default=None,
                     help="분류를 막는 이유별 상세표를 낸다 (기본: data/ — gitignore 대상)")
+    ap.add_argument("--blocked", nargs="?", const=str(BLOCKED_CSV), default=None,
+                    help="branch_blocked 전건을 CSV 로 (기본: data/ — gitignore 대상)")
     ap.add_argument("--selftest", action="store_true", help="--detail 판정 로직 검사")
     args = ap.parse_args()
 
@@ -331,6 +464,11 @@ def main() -> int:
         print("    %s <- %s" % (safe_key(k, anon), ", ".join(anon.label(x) for x in ms)))
     print()
 
+    print("=== 키 분열 (미분류율이 못 보는 지표) ===")
+    print_key_split("전체 %d건" % len(rows), measure_key_split(rows, norm), anon)
+    print_key_split("제품 경로 %d건" % len(product),
+                    measure_key_split(product, norm), anon)
+
     out = Path(args.csv)
     out.parent.mkdir(parents=True, exist_ok=True)
     m_all = measure(all_res)
@@ -345,6 +483,19 @@ def main() -> int:
                         product_freq.get(mer, 0)])
     # 상호명이 개인 지출 패턴을 드러내므로 레포에 커밋하지 않는다 (data/ 는 gitignore)
     print("순위표 -> %s  (상호명 원문 포함. 커밋 금지)" % out)
+
+    if args.blocked:
+        bl = blocked_rows(rows, norm, pg, rules)
+        dst = Path(args.blocked)
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        with dst.open("w", encoding="utf-8-sig", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=BLOCKED_FIELDS)
+            w.writeheader()
+            w.writerows(bl)
+        print()
+        print("  branch_blocked %d상호 — 그중 분류 실패 %d상호"
+              % (len(bl), sum(1 for d in bl if d["category"] is None)))
+        print("지점 미분리 -> %s  (상호명 원문 포함. 커밋 금지)" % dst)
 
     if args.detail:
         rows_d = detail_rows(product, rows, norm, pg, rules)
