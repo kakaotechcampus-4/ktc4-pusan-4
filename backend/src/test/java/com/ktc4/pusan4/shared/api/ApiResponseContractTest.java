@@ -35,7 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest
 @Import({ApiExceptionHandler.class, UuidV7Generator.class,
     UserMockData.class, TransactionMockData.class, ClassificationMockData.class, JudgmentMockData.class})
-class MockApiContractTest {
+class ApiResponseContractTest {
 
     private static final String ID = "0199c8f2-0000-7000-8000-000000000001";
 

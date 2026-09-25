@@ -76,7 +76,7 @@ bash ./backend/gradlew -p backend bootRun --args='--spring.profiles.active=local
 2. 해당 메서드의 `@MockResponse`를 지웁니다.
 3. `*MockData`의 메서드가 더 이상 쓰이지 않으면 지웁니다. 모든 API가 바뀌면 `MockFixtures`, `MockResponse`까지 지웁니다.
 
-`MockApiContractTest`는 각 API의 상태 코드와 응답 필드 이름만 확인하고 값은 확인하지 않습니다. 그래서 서비스로 바꿔도 계약이 그대로면 통과해야 합니다.
+`ApiResponseContractTest`는 각 API의 상태 코드와 응답 필드 이름만 확인하고 값은 확인하지 않습니다. 그래서 서비스로 바꿔도 계약이 그대로면 통과해야 합니다.
 
 ## 코드 건강도 리포트
 

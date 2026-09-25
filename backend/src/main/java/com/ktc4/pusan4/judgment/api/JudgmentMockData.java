@@ -14,6 +14,7 @@ import java.time.OffsetDateTime;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static com.ktc4.pusan4.shared.api.MockFixtures.BATCH_ID;
 import static com.ktc4.pusan4.shared.api.MockFixtures.CONTEXT_ID;
@@ -73,21 +74,44 @@ public class JudgmentMockData {
     }
 
     public JudgmentResponse judgment() {
-        return new JudgmentResponse(JUDGMENT_ID, TRANSACTION_ID, 1,
-            new JudgmentOrigin(JudgmentOriginType.RUN, RUN_ID),
-            new Coded<>(Verdict.NEEDS_REVIEW, "확인 필요"), Gate.G2, false, "소모품비", null, false, null,
-            Map.of(), "R-300", 1, List.of("R-300"), RULES_COMMIT_SHA, 1,
+        return starbucksRevision(JUDGMENT_ID, 1, new JudgmentOrigin(JudgmentOriginType.RUN, RUN_ID),
+            new Coded<>(Verdict.NEEDS_REVIEW, "확인 필요"),
             "1인 사업자의 단독 카페 이용은 세무 실무에서도 판단이 갈리는 항목입니다. "
                 + "지출 목적이 확인되지 않아 단정하지 않고 확인 필요로 고정합니다.",
-            RUN_COMPLETED_AT, CITATIONS);
+            RUN_COMPLETED_AT);
     }
 
+    /**
+     * {@link #judgment()} 의 다음 revision. Override 는 verdict 만 바꾸고 나머지는 원본에서 이어받는다 (api.md 3.8).
+     */
     public JudgmentResponse override() {
-        return new JudgmentResponse(OVERRIDE_JUDGMENT_ID, TRANSACTION_ID, 2,
-            new JudgmentOrigin(JudgmentOriginType.OVERRIDE, OVERRIDE_ID),
-            new Coded<>(Verdict.UNAVAILABLE, "불가"), Gate.G2, false, "소모품비", null, false, null,
-            Map.of(), "R-300", 1, List.of("R-300"), RULES_COMMIT_SHA, 1,
-            "사용자가 판정을 수정했습니다.", OffsetDateTime.parse("2026-09-12T14:10:00+09:00"), CITATIONS);
+        return starbucksRevision(OVERRIDE_JUDGMENT_ID, 2, new JudgmentOrigin(JudgmentOriginType.OVERRIDE, OVERRIDE_ID),
+            new Coded<>(Verdict.UNAVAILABLE, "불가"),
+            "사용자가 판정을 수정했습니다.",
+            OffsetDateTime.parse("2026-09-12T14:10:00+09:00"));
+    }
+
+    /**
+     * 스타벅스 거래(R-300 카페 카드)의 판정 revision. revision 마다 달라지는 값만 인자로 받는다.
+     */
+    private JudgmentResponse starbucksRevision(
+        UUID id, int revision, JudgmentOrigin origin, Coded<Verdict> verdict, String explanation,
+        OffsetDateTime computedAt
+    ) {
+        return new JudgmentResponse(id, TRANSACTION_ID, revision, origin, verdict,
+            Gate.G2,
+            /* outOfScope */ false,
+            /* account */ "소모품비",
+            /* finalAmount */ null,
+            /* isInference */ false,
+            /* unmatchedReason */ null,
+            /* attributes */ Map.of(),
+            /* ruleCardId */ "R-300",
+            /* ruleCardVersion */ 1,
+            /* appliedRuleIds */ List.of("R-300"),
+            RULES_COMMIT_SHA,
+            /* userContextVersion */ 1,
+            explanation, computedAt, CITATIONS);
     }
 
     public QuestionPage questions() {

@@ -30,6 +30,6 @@ public class JudgmentOverrideController {
     @DeleteMapping("/{overrideId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void release(@PathVariable UUID overrideId) {
-        // 목 응답: 지울 데이터가 없다
+        // 목 응답: 해제할 Override 가 없다
     }
 }
