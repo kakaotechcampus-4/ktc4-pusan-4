@@ -34,3 +34,12 @@
 - 목 응답의 라벨 문자열은 api.md §2 표와 대조했지만 하드코딩이다. 법령 본문은 mock-server 시드를 옮겼고 원문과 대조하지 않았다.
 - api.md §3.10에 추가한 "같은 scope 질문 함께 처리"는 mock-server 리뷰에서 정한 해석이다. 팀 확인이 필요하다.
 - `backend/README.md`가 안내하는 `tools/run_backend_code_health.py`는 없는 파일이다(기존 문제, 이번에 손대지 않음).
+
+## 01:23 Idempotency-Key 누락 에러 코드를 api.md 에 맞춤
+
+- 커밋: 639e4eb
+- `Idempotency-Key` 없이 업로드하면 Spring 기본 처리로 `VALIDATION_ERROR`가 나가고 있었다. api.md §3.3은 `400 IDEMPOTENCY_KEY_REQUIRED`다. 앞 기록의 "남은 것"에 적었던 불일치인데, 에러 형식 테스트가 틀린 코드를 고정하고 있었다.
+- 헤더를 `required = false`로 받고 컨트롤러에서 직접 검사한다. 스웨거에는 `@Parameter(required = true)`로 필수 표시를 유지하고, 400 응답을 추가했다.
+- 일반 검증 실패(`VALIDATION_ERROR`) 테스트는 필수 필드가 빠진 문진 요청으로 옮겼다.
+- 스웨거 설명의 "현재 기준: PR #41 의 ce91429" 표기를 지웠다. api.md가 그 뒤로 바뀌어 낡은 표기였다.
+- 목 응답은 입력 검증 에러(422 등)를 내지 않는다. 고정 응답이라 서비스 구현 때 넣기로 하고 PR #55 본문에 적었다.
