@@ -2,11 +2,7 @@ name: AWS release
 
 on:
   pull_request:
-    branches: [develop]
-    paths:
-      - "deploy/**"
-      - "docker/postgres/**"
-      - ".github/workflows/aws-release.yml"
+    branches: [develop, release]
   push:
     branches: [release]
 
