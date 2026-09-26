@@ -2,9 +2,11 @@ package com.ktc4.pusan4.judgment.domain;
 
 import org.junit.jupiter.api.Test;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -61,7 +63,7 @@ class JudgmentEngineTest {
         );
         RuleCard specific = new RuleCard(
             "R-091", 1, Gate.G1, 500,
-            new RuleMatch(List.of("카페"), List.of(), List.of("커피"), null, null, List.of()),
+            new RuleMatch(List.of("카페"), List.of(), List.of("커피"), null, null, List.of(), Set.of()),
             Verdict.UNAVAILABLE, null,
             List.of(new Citation("근거-구체")),
             Map.of(), List.of()
@@ -99,7 +101,7 @@ class JudgmentEngineTest {
             "R-027", 1, Gate.G2, 500,
             new RuleMatch(
                 List.of("카페"), List.of(), List.of("스타벅스"),
-                null, 30_000L, List.of()
+                null, 30_000L, List.of(), Set.of()
             ),
             Verdict.AVAILABLE, "소모품비",
             List.of(new Citation("소득세법-27-1")),
@@ -648,6 +650,75 @@ class JudgmentEngineTest {
             .containsExactly(Verdict.UNAVAILABLE, List.of());
     }
 
+    // 기본 불가라도 답으로 풀 수 있으면 확정이 아니다: 소명할 질문을 지우지 않는다.
+    @Test
+    void rebuttable_unavailable_default_keeps_its_question() {
+        TransactionInput transaction = restaurant();
+
+        Judgment result = JudgmentEngine.judge(
+            transaction, new UserContext("940909", false, null), List.of(),
+            new RuleSet(List.of(rebuttableUnavailable()))
+        );
+
+        assertThat(result.verdict()).isEqualTo(Verdict.UNAVAILABLE);
+        assertThat(result.questions()).extracting(QuestionSpec::code).containsExactly("REBUTTAL");
+    }
+
+    @Test
+    void rebuttal_answer_replaces_unavailable_default() {
+        TransactionInput transaction = restaurant();
+        List<UserFact> facts = List.of(
+            new UserFact("transaction:" + transaction.id(), "용도", Map.of("value", "업무미팅"))
+        );
+
+        Judgment result = JudgmentEngine.judge(
+            transaction, new UserContext("940909", false, null), facts,
+            new RuleSet(List.of(rebuttableUnavailable()))
+        );
+
+        assertThat(result)
+            .extracting(Judgment::verdict, Judgment::questions)
+            .containsExactly(Verdict.NEEDS_REVIEW, List.of());
+    }
+
+    // 다른 카드가 불가를 확정했으면 소명해도 풀리지 않으므로 되묻지 않는다.
+    @Test
+    void rebuttal_question_is_dropped_when_another_card_confirms_unavailable() {
+        RuleCard confirmed = new RuleCard(
+            "R-030", 1, Gate.G3, 500, RuleMatch.categories("음식점"),
+            Verdict.UNAVAILABLE, null, List.of(new Citation("근거-확정")), Map.of(), List.of()
+        );
+
+        Judgment result = JudgmentEngine.judge(
+            restaurant(), new UserContext("940909", false, null), List.of(),
+            new RuleSet(List.of(rebuttableUnavailable(), confirmed))
+        );
+
+        assertThat(result)
+            .extracting(Judgment::verdict, Judgment::questions)
+            .containsExactly(Verdict.UNAVAILABLE, List.of());
+    }
+
+    private static TransactionInput restaurant() {
+        return new TransactionInput(UUID.randomUUID(), LocalDate.of(2025, 3, 15), "한식당", "음식점", 25_000);
+    }
+
+    private static RuleCard rebuttableUnavailable() {
+        QuestionSpec rebuttal = new QuestionSpec(
+            "REBUTTAL", "거래처 미팅이었나요?", "용도", "transaction",
+            List.of("업무미팅", "개인"),
+            Map.of(
+                "업무미팅", new QuestionEffect(Verdict.NEEDS_REVIEW, "접대비", Map.of()),
+                "개인", new QuestionEffect(Verdict.UNAVAILABLE, null, Map.of())
+            )
+        );
+        return new RuleCard(
+            "R-311", 1, Gate.G2, 505, RuleMatch.categories("음식점"),
+            Verdict.UNAVAILABLE, null, List.of(new Citation("소득세법-33-1-5")),
+            Map.of(), List.of(rebuttal)
+        );
+    }
+
     @Test
     void g4_forces_asset_question_above_one_million_for_ambiguous_category() {
         Judgment result = JudgmentEngine.judge(
@@ -723,6 +794,30 @@ class JudgmentEngineTest {
             .containsExactly(Verdict.NEEDS_REVIEW, Verdict.AVAILABLE, Verdict.AVAILABLE);
     }
 
+    @Test
+    void weekday_match_uses_approved_date_day_of_week() {
+        RuleCard weekend = new RuleCard(
+            "R-061", 1, Gate.G5, 500,
+            new RuleMatch(List.of(), List.of(), List.of(), null, null, List.of(),
+                Set.of(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY)),
+            null, null, List.of(), Map.of("주말결제", true), List.of()
+        );
+        RuleSet rules = new RuleSet(List.of(g2Available(), weekend));
+        UserContext context = new UserContext("940909", false, null);
+
+        Judgment saturday = JudgmentEngine.judge(
+            onDate(LocalDate.of(2025, 3, 15)), context, List.of(), rules);
+        Judgment wednesday = JudgmentEngine.judge(
+            onDate(LocalDate.of(2025, 3, 12)), context, List.of(), rules);
+
+        assertThat(saturday.attributes()).containsEntry("주말결제", true);
+        assertThat(wednesday.attributes()).doesNotContainKey("주말결제");
+    }
+
+    private static TransactionInput onDate(LocalDate approvedAt) {
+        return new TransactionInput(UUID.randomUUID(), approvedAt, "가맹점", "음식점", 20_000);
+    }
+
     private static TransactionInput subscription(String category, long amount) {
         return new TransactionInput(
             UUID.randomUUID(), LocalDate.of(2025, 3, 14), "가맹점", category, amount
@@ -732,7 +827,7 @@ class JudgmentEngineTest {
     private static RuleCard g2Available() {
         return new RuleCard(
             "R-020", 1, Gate.G2, 500,
-            new RuleMatch(List.of(), List.of(), List.of(), null, null, List.of()),
+            new RuleMatch(List.of(), List.of(), List.of(), null, null, List.of(), Set.of()),
             Verdict.AVAILABLE, "소모품비",
             List.of(new Citation("소득세법-27-1")),
             Map.of(), List.of()
@@ -755,7 +850,7 @@ class JudgmentEngineTest {
         );
         return new RuleCard(
             "R-051", 1, Gate.G4, 500,
-            new RuleMatch(List.of(), List.of("소모품", "식음료", "카페"), List.of(), 1_000_001L, null, List.of()),
+            new RuleMatch(List.of(), List.of("소모품", "식음료", "카페"), List.of(), 1_000_001L, null, List.of(), Set.of()),
             null, null,
             List.of(new Citation("소득세법시행령-67-4")),
             Map.of(), List.of(assetQuestion)

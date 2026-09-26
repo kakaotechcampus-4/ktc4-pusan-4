@@ -1,0 +1,27 @@
+# G2 · 주말 음식배달 — 개인 식사로 추정해 불가, 소명하면 평일(R-302)과 같게
+#
+# 근거·구조는 R-311 과 같다. 보고서 Q2 예시는 식당·카페지만 같은 식대(업무미팅 vs 개인 식사)이고
+# R-302 는 R-301 과 계약이 같다.
+id: R-313
+version: 1
+gate: G2
+priority: 505
+effective_period: { start: 2024-01-01, end: null }
+match:
+  category: [음식배달]
+  industry: ["940909"]
+  weekday: [토, 일]
+verdict: 불가
+citations:
+  - { id: 소득세법-33-1-5, verified: true }
+attributes:
+  주말결제: true
+question:
+  code: WEEKEND_DELIVERY_PURPOSE
+  text: "주말 배달 음식이라 개인 식사로 보고 제외했어요. 거래처 미팅이었다면 알려주세요."
+  fact_type: 용도
+  group_by: transaction
+  options:
+    - { value: 업무미팅, verdict: 확인필요, account: 접대비, limit_bucket: 접대비 }
+    - { value: 개인, verdict: 불가 }
+review: { by: 미검수, date: 2026-09-26 }

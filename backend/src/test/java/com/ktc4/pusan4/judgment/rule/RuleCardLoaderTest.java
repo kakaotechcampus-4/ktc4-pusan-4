@@ -10,6 +10,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.DayOfWeek;
 import java.util.List;
 import java.util.Map;
 
@@ -292,6 +293,128 @@ class RuleCardLoaderTest {
         List<RuleCard> cards = new RuleCardLoader().load(root).get(Gate.G4);
 
         assertThat(cards).extracting(RuleCard::id).containsExactly("R-051");
+    }
+
+    @Test
+    void loads_weekday_match_as_days_of_week() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("cards/R-061.yaml"), weekdayCardYaml("[토, 일]", ""));
+
+        RuleCard card = new RuleCardLoader().load(root).get(Gate.G5).getFirst();
+
+        assertThat(card.match().weekdays())
+            .containsExactlyInAnyOrder(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY);
+    }
+
+    @Test
+    void rejects_unknown_weekday_value() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("cards/R-061.yaml"), weekdayCardYaml("[토요일]", ""));
+
+        assertThatThrownBy(() -> new RuleCardLoader().load(root))
+            .isInstanceOf(RuleCardValidationException.class)
+            .hasMessageContaining("토요일");
+    }
+
+    // 요일은 조문이 아니라 추정의 근거다. 요일 카드가 낼 수 있는 판정은 소명으로 풀리는 불가뿐이다.
+    @Test
+    void loads_weekday_unavailable_with_rebuttal_question() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("cards/R-061.yaml"), weekdayCardYaml("[토, 일]", """
+            verdict: 불가
+            citations: [소득세법-33-1-5]
+            question:
+              text: 거래처 미팅이었나요?
+              fact_type: 용도
+              group_by: transaction
+              options:
+                - { value: 업무미팅, verdict: 확인필요 }
+                - { value: 개인, verdict: 불가 }
+            """));
+
+        RuleCard card = new RuleCardLoader().load(root).get(Gate.G5).getFirst();
+
+        assertThat(card.verdict()).isEqualTo(Verdict.UNAVAILABLE);
+    }
+
+    // 소명할 길이 없는 요일 불가는 "주말 = 무조건 불가"다.
+    @Test
+    void rejects_weekday_unavailable_without_question() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("cards/R-061.yaml"), weekdayCardYaml("[토, 일]", """
+            verdict: 불가
+            citations: [소득세법-33-1-5]
+            """));
+
+        assertThatThrownBy(() -> new RuleCardLoader().load(root))
+            .isInstanceOf(RuleCardValidationException.class)
+            .hasMessageContaining("weekday");
+    }
+
+    @Test
+    void rejects_weekday_unavailable_whose_options_cannot_lift_it() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("cards/R-061.yaml"), weekdayCardYaml("[토, 일]", """
+            verdict: 불가
+            citations: [소득세법-33-1-5]
+            question:
+              text: 어떤 용도였나요?
+              fact_type: 용도
+              group_by: transaction
+              options:
+                - { value: 개인, verdict: 불가 }
+                - { value: 모르겠음 }
+            """));
+
+        assertThatThrownBy(() -> new RuleCardLoader().load(root))
+            .isInstanceOf(RuleCardValidationException.class)
+            .hasMessageContaining("weekday");
+    }
+
+    @Test
+    void rejects_weekday_card_with_verdict() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("cards/R-061.yaml"), weekdayCardYaml("[토, 일]", """
+            verdict: 확인필요
+            """));
+
+        assertThatThrownBy(() -> new RuleCardLoader().load(root))
+            .isInstanceOf(RuleCardValidationException.class)
+            .hasMessageContaining("weekday");
+    }
+
+    @Test
+    void rejects_weekday_card_with_option_verdict() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("cards/R-061.yaml"), weekdayCardYaml("[토, 일]", """
+            citations: [소득세법-33-1-5]
+            question:
+              text: 주말 결제입니다. 어떤 용도였나요?
+              fact_type: 용도
+              group_by: transaction
+              options:
+                - { value: 개인, verdict: 불가 }
+            """));
+
+        assertThatThrownBy(() -> new RuleCardLoader().load(root))
+            .isInstanceOf(RuleCardValidationException.class)
+            .hasMessageContaining("weekday");
+    }
+
+    private static String weekdayCardYaml(String weekdays, String extra) {
+        return """
+            id: R-061
+            version: 1
+            gate: G5
+            priority: 500
+            effective_period: { start: 2025-01-01, end: null }
+            match:
+              category: [음식점]
+              weekday: %s
+            attributes:
+              주말결제: true
+            review: { by: 외부자문, date: 2026-09-26 }
+            """.formatted(weekdays) + extra;
     }
 
     private static String cardYaml(String id, int priority) {

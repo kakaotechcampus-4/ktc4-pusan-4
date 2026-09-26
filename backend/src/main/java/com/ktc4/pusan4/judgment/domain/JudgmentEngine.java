@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import com.ktc4.pusan4.judgment.domain.AttributeOutcomePolicy;
 
 
 public final class JudgmentEngine {
@@ -64,6 +63,7 @@ public final class JudgmentEngine {
         String defaultAccount = null;
         String answeredAccount = null;
         boolean answeredAccountConflict = false;
+        boolean confirmedUnavailable = false;
 
         // 승자(G2)와 속성 관문(G3~G6) 카드를 한 파이프라인으로 동일하게 처리한다.
         // 되묻기는 어느 관문에 있든 user_fact로 해소된다.
@@ -81,6 +81,7 @@ public final class JudgmentEngine {
             outOfScope |= rule.outOfScope();
             // 카드의 기본 판정을, 그 카드의 되묻기 응답(effect)이 있으면 대체한다.
             Verdict cardVerdict = rule.verdict();
+            boolean rebuttable = false;
             if (defaultAccount == null && rule.account() != null) {
                 defaultAccount = rule.account();
             }
@@ -88,6 +89,7 @@ public final class JudgmentEngine {
                 QuestionEffect effect = resolvedEffect(question, transaction, facts);
                 if (effect == null) {
                     questions.add(resolveGroupKey(question, transaction));
+                    rebuttable |= question.canLiftUnavailable();
                     continue;
                 }
                 mergeAttributes(attributes, effect.attributes(), rule.id() + ":" + question.code());
@@ -103,6 +105,8 @@ public final class JudgmentEngine {
                     }
                 }
             }
+            // 기본 불가라도 미응답 질문의 답으로 풀릴 수 있으면(소명 대기) 확정이 아니다.
+            confirmedUnavailable |= cardVerdict == Verdict.UNAVAILABLE && !rebuttable;
             // 관문 간에는 더 제한적인 판정이 이긴다(뒤 관문이 앞 판정을 완화하지 못함).
             resolvedVerdict = moreRestrictive(resolvedVerdict, cardVerdict);
             appliedRuleIds.add(rule.id());
@@ -111,7 +115,8 @@ public final class JudgmentEngine {
         }
 
         // 이미 불가로 확정된 거래는 되묻지 않는다: 미해소 질문을 버려 되묻기 예산 낭비를 막는다.
-        if (resolvedVerdict == Verdict.UNAVAILABLE) {
+        // 불가가 전부 소명 대기(예: 주말 식대 추정)면 질문을 남겨 사용자가 풀 수 있게 한다.
+        if (confirmedUnavailable) {
             questions.clear();
         }
         // 미해소 질문이 결과를 바꿀 수 있을 때만 검토로 전환한다. 가산세 플래그만 세우는
@@ -147,6 +152,10 @@ public final class JudgmentEngine {
             return false;
         }
         if (match.amountMax() != null && transaction.amount() > match.amountMax()) {
+            return false;
+        }
+        if (!match.weekdays().isEmpty()
+            && !match.weekdays().contains(transaction.approvedAt().getDayOfWeek())) {
             return false;
         }
         return match.industries().isEmpty() || match.industries().contains(context.industryCode());

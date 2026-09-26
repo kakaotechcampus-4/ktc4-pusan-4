@@ -5,6 +5,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -17,7 +18,7 @@ class RuleSetTest {
             card("R-030", gate, 500, RuleMatch.categories("카페")),
             card("R-010", gate, 500, RuleMatch.categories("카페")),
             card("R-020", gate, 500,
-                new RuleMatch(List.of("카페"), List.of(), List.of("커피"), null, null, List.of())),
+                new RuleMatch(List.of("카페"), List.of(), List.of("커피"), null, null, List.of(), Set.of())),
             card("R-040", gate, 900, RuleMatch.categories("카페"))
         ));
 
