@@ -270,6 +270,8 @@ size    기본 20, 최대 100
 
 분기는 `code`, 화면 표시는 `label`을 사용한다.
 
+예외: `userInclusion`(§2.3)은 §3.4 응답 예시대로 값을 그대로(`"EXCLUDED"`) 응답한다. `bookkeepingDuty`(§2.9)는 원문 자체가 표시값이라 역시 값 그대로다.
+
 ---
 
 ## 1.6 Idempotency-Key
@@ -1898,6 +1900,8 @@ merchant_norm
 
 새로운 `JudgmentRun`은 생성하지 않는다.
 
+3·4단계의 대상은 요청에 적힌 `questionIds`만이 아니다. 같은 Batch·`groupKey`·`factType`에서 `CANCELED`가 아닌 다른 Question도 같은 UserFact로 함께 처리하고 재판정 대상에 넣는다. `PENDING`이면 `ANSWERED`로 바꾸고, 이미 `ANSWERED`이면 `answeredFactId`와 `answeredAt`을 새 UserFact 기준으로 바꾼다. `answeredCount`는 이렇게 함께 처리된 수까지 포함한다.
+
 응답:
 
 ```
@@ -1922,7 +1926,7 @@ merchant_norm
 
 `PENDING` Question은 최초 답변할 수 있고, `ANSWERED` Question은 같은 API로 정정할 수 있다.
 
-정정할 때 기존 UserFact를 수정하지 않는다. 동일한 `(userId, batchId, scopeKey, factType)`에서 `version`을 증가시킨 UserFact를 새로 생성하고 Question의 `answeredFactId`를 새 UserFact로 변경한다.
+정정할 때 기존 UserFact를 수정하지 않는다. 동일한 `(userId, batchId, scopeKey, factType)`에서 `version`을 증가시킨 UserFact를 새로 생성하고, 같은 Batch·`groupKey`·`factType` Question의 `answeredFactId`를 모두 새 UserFact로 변경한다.
 
 `CANCELED` Question에는 응답할 수 없다.
 

@@ -1,6 +1,6 @@
 package com.ktc4.pusan4.judgment.api;
 
-import com.ktc4.pusan4.shared.api.ApiException;
+import com.ktc4.pusan4.shared.api.MockResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,9 +13,16 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/statutes")
 public class StatuteController {
 
+    private final JudgmentMockData mockData;
+
+    public StatuteController(JudgmentMockData mockData) {
+        this.mockData = mockData;
+    }
+
+    @MockResponse
     @Operation(summary = "법령 원문 조회")
     @GetMapping("/{statuteVersionId}")
     public StatuteResponse detail(@PathVariable long statuteVersionId) {
-        throw ApiException.notImplemented();
+        return mockData.statute();
     }
 }

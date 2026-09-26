@@ -1,8 +1,7 @@
 package com.ktc4.pusan4.judgment.api;
 
 import com.ktc4.pusan4.judgment.domain.Verdict;
-import com.ktc4.pusan4.shared.api.ApiException;
-import com.ktc4.pusan4.shared.api.ContractNotes;
+import com.ktc4.pusan4.shared.api.MockResponse;
 import com.ktc4.pusan4.shared.api.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -15,7 +14,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Map;
 import java.util.UUID;
 
 @Tag(name = "judgments", description = "판정 결과 (api.md 3.7, 3.8)")
@@ -23,12 +21,18 @@ import java.util.UUID;
 @RequestMapping("/judgments")
 public class JudgmentController {
 
+    private final JudgmentMockData mockData;
+
+    public JudgmentController(JudgmentMockData mockData) {
+        this.mockData = mockData;
+    }
+
+    @MockResponse
     @Operation(summary = "판정 목록 및 revision 조회",
         description = "batchId·year 는 거래별 현재 Judgment, runId 는 그 Run 이 실제 생성한 Judgment, "
-            + "transactionId + latestOnly=false 는 전체 revision 이력. 정렬: computedAt DESC, id DESC. "
-            + ContractNotes.SHAPE_UNSPECIFIED)
+            + "transactionId + latestOnly=false 는 전체 revision 이력. 정렬: computedAt DESC, id DESC")
     @GetMapping
-    public PageResponse<Map<String, Object>> list(
+    public PageResponse<JudgmentResponse> list(
         @RequestParam(required = false) UUID transactionId,
         @RequestParam(required = false) UUID batchId,
         @RequestParam(required = false) Integer year,
@@ -38,9 +42,10 @@ public class JudgmentController {
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size
     ) {
-        throw ApiException.notImplemented();
+        return mockData.judgments();
     }
 
+    @MockResponse
     @Operation(summary = "판정 결과 요약", description = "batchId, year, runId 중 정확히 하나를 사용한다")
     @GetMapping("/summary")
     public JudgmentSummaryResponse summary(
@@ -48,15 +53,17 @@ public class JudgmentController {
         @RequestParam(required = false) Integer year,
         @RequestParam(required = false) UUID runId
     ) {
-        throw ApiException.notImplemented();
+        return mockData.summary();
     }
 
+    @MockResponse
     @Operation(summary = "판정 상세")
     @GetMapping("/{judgmentId}")
     public JudgmentResponse detail(@PathVariable UUID judgmentId) {
-        throw ApiException.notImplemented();
+        return mockData.judgment();
     }
 
+    @MockResponse
     @Operation(summary = "사용자 판정 수정 (Override)",
         description = "기존 Judgment 는 보존하고 새 revision 을 만든다. 같은 거래의 기존 활성 Override 는 비활성화된다. "
             + "응답은 새 Judgment")
@@ -65,6 +72,6 @@ public class JudgmentController {
         @PathVariable UUID judgmentId,
         @RequestBody OverrideJudgmentRequest request
     ) {
-        throw ApiException.notImplemented();
+        return mockData.override();
     }
 }
