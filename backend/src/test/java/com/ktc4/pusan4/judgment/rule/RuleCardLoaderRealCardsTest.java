@@ -12,6 +12,8 @@ import com.ktc4.pusan4.judgment.domain.UserContext;
 import com.ktc4.pusan4.judgment.domain.UserFact;
 import com.ktc4.pusan4.judgment.domain.Verdict;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -318,27 +320,58 @@ class RuleCardLoaderRealCardsTest {
             .satisfies(question -> assertThat(question.code()).isEqualTo("PG_UNKNOWN_PURPOSE"));
     }
 
-    /** G5 요일 카드는 G2 음식점 카드(940909)가 매칭돼야 도달한다. 그 연결을 본다. */
-    @Test
-    void 주말_음식점에는_플래그가_붙는다() throws IOException {
-        TransactionInput 토요일 = new TransactionInput(
-            UUID.randomUUID(), LocalDate.of(2025, 3, 15), "한식당", "음식점", 25_000);
+    /**
+     * 주말 식대는 개인 식사로 추정해 불가지만, 소명할 수 있게 용도 질문을 남긴다
+     * (세무사 실무 질의응답 2026-09 Q2: 소명이 없으면 개인 식사비로 추정).
+     * 주말 카드가 평일 카드보다 priority 가 높아 이기는지도 함께 본다.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"음식점", "카페", "음식배달"})
+    void 주말_식대는_불가로_추정하되_소명_질문을_남긴다(String 카테고리) throws IOException {
+        Judgment judgment = JudgmentEngine.judge(
+            주말거래(카테고리), 인적용역, List.of(), load());
 
-        Judgment judgment = JudgmentEngine.judge(토요일, 인적용역, List.of(), load());
-
+        assertThat(judgment.verdict()).isEqualTo(Verdict.UNAVAILABLE);
+        assertThat(judgment.questions()).singleElement()
+            .satisfies(question -> assertThat(question.factType()).isEqualTo("용도"));
         assertThat(judgment.attributes()).containsEntry("주말결제", true);
     }
 
-    /**
-     * 로더는 모르는 match 키를 조용히 무시한다. 카드에 weekday 를 weekdays 처럼 오타 내면
-     * 요일 조건이 사라져 모든 요일에 플래그가 붙는데, 그걸 잡는 건 이 테스트뿐이다.
-     */
+    /** 소명한 주말 식대는 평일과 같은 결과여야 한다. 주말이라 더 불리하거나 유리하지 않다. */
     @Test
-    void 평일_음식점에는_주말_플래그가_없다() throws IOException {
-        Judgment judgment = JudgmentEngine.judge(
-            거래("한식당", "음식점", 25_000), 인적용역, List.of(), load());
+    void 주말_업무미팅_소명은_평일과_같은_결과다() throws IOException {
+        TransactionInput 토요일 = 주말거래("음식점");
+        TransactionInput 금요일 = 거래("한식당", "음식점", 25_000);
 
+        Judgment 주말 = JudgmentEngine.judge(토요일, 인적용역, List.of(업무미팅(토요일)), load());
+        Judgment 평일 = JudgmentEngine.judge(금요일, 인적용역, List.of(업무미팅(금요일)), load());
+
+        assertThat(주말.verdict()).isEqualTo(평일.verdict());
+        assertThat(주말.account()).isEqualTo(평일.account());
+        assertThat(주말.attributes()).containsEntry("limit_bucket", 평일.attributes().get("limit_bucket"));
+        assertThat(주말.questions()).isEmpty();
+    }
+
+    /**
+     * 로더는 모르는 match 키를 조용히 무시한다. 주말 카드에 weekday 를 weekdays 처럼 오타 내면
+     * 요일 조건이 사라져 평일 식대까지 전부 불가가 되는데, 그걸 잡는 건 이 테스트뿐이다.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"음식점", "카페", "음식배달"})
+    void 평일_식대는_기존_카드가_판정한다(String 카테고리) throws IOException {
+        Judgment judgment = JudgmentEngine.judge(
+            거래("가맹점", 카테고리, 25_000), 인적용역, List.of(), load());
+
+        assertThat(judgment.verdict()).isEqualTo(Verdict.NEEDS_REVIEW);
         assertThat(judgment.attributes()).doesNotContainKey("주말결제");
+    }
+
+    private static TransactionInput 주말거래(String 카테고리) {
+        return new TransactionInput(UUID.randomUUID(), LocalDate.of(2025, 3, 15), "가맹점", 카테고리, 25_000);
+    }
+
+    private static UserFact 업무미팅(TransactionInput 거래) {
+        return new UserFact("transaction:" + 거래.id(), "용도", Map.of("value", "업무미팅"));
     }
 
     /** 무엇을 샀는지는 여전히 모르므로 가능이어도 계정과목은 비운다. */

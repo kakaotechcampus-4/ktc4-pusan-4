@@ -316,7 +316,61 @@ class RuleCardLoaderTest {
             .hasMessageContaining("토요일");
     }
 
-    // 요일은 소명 신호일 뿐 판정 근거가 아니다(요일로 경비를 막는 조문이 없다).
+    // 요일은 조문이 아니라 추정의 근거다. 요일 카드가 낼 수 있는 판정은 소명으로 풀리는 불가뿐이다.
+    @Test
+    void loads_weekday_unavailable_with_rebuttal_question() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("cards/R-061.yaml"), weekdayCardYaml("[토, 일]", """
+            verdict: 불가
+            citations: [소득세법-33-1-5]
+            question:
+              text: 거래처 미팅이었나요?
+              fact_type: 용도
+              group_by: transaction
+              options:
+                - { value: 업무미팅, verdict: 확인필요 }
+                - { value: 개인, verdict: 불가 }
+            """));
+
+        RuleCard card = new RuleCardLoader().load(root).get(Gate.G5).getFirst();
+
+        assertThat(card.verdict()).isEqualTo(Verdict.UNAVAILABLE);
+    }
+
+    // 소명할 길이 없는 요일 불가는 "주말 = 무조건 불가"다.
+    @Test
+    void rejects_weekday_unavailable_without_question() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("cards/R-061.yaml"), weekdayCardYaml("[토, 일]", """
+            verdict: 불가
+            citations: [소득세법-33-1-5]
+            """));
+
+        assertThatThrownBy(() -> new RuleCardLoader().load(root))
+            .isInstanceOf(RuleCardValidationException.class)
+            .hasMessageContaining("weekday");
+    }
+
+    @Test
+    void rejects_weekday_unavailable_whose_options_cannot_lift_it() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("cards/R-061.yaml"), weekdayCardYaml("[토, 일]", """
+            verdict: 불가
+            citations: [소득세법-33-1-5]
+            question:
+              text: 어떤 용도였나요?
+              fact_type: 용도
+              group_by: transaction
+              options:
+                - { value: 개인, verdict: 불가 }
+                - { value: 모르겠음 }
+            """));
+
+        assertThatThrownBy(() -> new RuleCardLoader().load(root))
+            .isInstanceOf(RuleCardValidationException.class)
+            .hasMessageContaining("weekday");
+    }
+
     @Test
     void rejects_weekday_card_with_verdict() throws IOException {
         Files.createDirectories(root.resolve("cards"));

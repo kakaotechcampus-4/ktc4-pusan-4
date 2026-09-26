@@ -147,13 +147,8 @@ public final class RuleCardLoader {
         if (hasFinalEffectVerdict && citations.isEmpty()) {
             throw new RuleCardValidationException(id + ": effect verdict requires citation");
         }
-        // 요일은 소명 신호일 뿐 판정 근거가 아니다(요일로 경비를 막는 조문이 없다).
-        // 요일 카드가 판정을 내리면 토요일 업무미팅이 되묻기 없이 불가·강등된다.
-        boolean hasEffectVerdict = questions.stream()
-            .flatMap(question -> question.effects().values().stream())
-            .anyMatch(effect -> effect.verdict() != null);
-        if (!ruleMatch.weekdays().isEmpty() && (verdict != null || hasEffectVerdict)) {
-            throw new RuleCardValidationException(id + ": weekday card must not decide a verdict");
+        if (!ruleMatch.weekdays().isEmpty()) {
+            validateWeekdayVerdict(id, verdict, questions);
         }
 
         JsonNode review = root.path("review");
@@ -166,6 +161,29 @@ public final class RuleCardLoader {
             objectMap(root.path("attributes")), questions,
             effectiveFrom, effectiveTo, reviewedBy, reviewedAt
         );
+    }
+
+    // 요일은 조문이 아니라 추정의 근거다(요일로 경비를 막는 조문은 없다). 그래서 요일 카드가
+    // 낼 수 있는 판정은 '소명하면 풀리는 불가' 하나다. 풀 길이 없으면 "주말 = 무조건 불가"가 되어
+    // 토요일 거래처 미팅이 되묻기 없이 제외되고, 확인필요는 이미 확정된 거래를 새 정보 없이 끌어내린다.
+    private static void validateWeekdayVerdict(String id, Verdict verdict, List<QuestionSpec> questions) {
+        if (verdict == null) {
+            boolean hasEffectVerdict = questions.stream()
+                .flatMap(question -> question.effects().values().stream())
+                .anyMatch(effect -> effect.verdict() != null);
+            if (hasEffectVerdict) {
+                throw new RuleCardValidationException(
+                    id + ": weekday card without verdict must not decide one through options");
+            }
+            return;
+        }
+        if (verdict != Verdict.UNAVAILABLE) {
+            throw new RuleCardValidationException(id + ": weekday card may only presume 불가");
+        }
+        if (questions.stream().noneMatch(QuestionSpec::canLiftUnavailable)) {
+            throw new RuleCardValidationException(
+                id + ": weekday 불가 needs a question whose answer can lift it");
+        }
     }
 
     private void validateUniqueIds(List<RuleCard> cards) {

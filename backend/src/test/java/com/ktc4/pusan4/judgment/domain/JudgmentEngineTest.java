@@ -650,6 +650,75 @@ class JudgmentEngineTest {
             .containsExactly(Verdict.UNAVAILABLE, List.of());
     }
 
+    // 기본 불가라도 답으로 풀 수 있으면 확정이 아니다: 소명할 질문을 지우지 않는다.
+    @Test
+    void rebuttable_unavailable_default_keeps_its_question() {
+        TransactionInput transaction = restaurant();
+
+        Judgment result = JudgmentEngine.judge(
+            transaction, new UserContext("940909", false, null), List.of(),
+            new RuleSet(List.of(rebuttableUnavailable()))
+        );
+
+        assertThat(result.verdict()).isEqualTo(Verdict.UNAVAILABLE);
+        assertThat(result.questions()).extracting(QuestionSpec::code).containsExactly("REBUTTAL");
+    }
+
+    @Test
+    void rebuttal_answer_replaces_unavailable_default() {
+        TransactionInput transaction = restaurant();
+        List<UserFact> facts = List.of(
+            new UserFact("transaction:" + transaction.id(), "용도", Map.of("value", "업무미팅"))
+        );
+
+        Judgment result = JudgmentEngine.judge(
+            transaction, new UserContext("940909", false, null), facts,
+            new RuleSet(List.of(rebuttableUnavailable()))
+        );
+
+        assertThat(result)
+            .extracting(Judgment::verdict, Judgment::questions)
+            .containsExactly(Verdict.NEEDS_REVIEW, List.of());
+    }
+
+    // 다른 카드가 불가를 확정했으면 소명해도 풀리지 않으므로 되묻지 않는다.
+    @Test
+    void rebuttal_question_is_dropped_when_another_card_confirms_unavailable() {
+        RuleCard confirmed = new RuleCard(
+            "R-030", 1, Gate.G3, 500, RuleMatch.categories("음식점"),
+            Verdict.UNAVAILABLE, null, List.of(new Citation("근거-확정")), Map.of(), List.of()
+        );
+
+        Judgment result = JudgmentEngine.judge(
+            restaurant(), new UserContext("940909", false, null), List.of(),
+            new RuleSet(List.of(rebuttableUnavailable(), confirmed))
+        );
+
+        assertThat(result)
+            .extracting(Judgment::verdict, Judgment::questions)
+            .containsExactly(Verdict.UNAVAILABLE, List.of());
+    }
+
+    private static TransactionInput restaurant() {
+        return new TransactionInput(UUID.randomUUID(), LocalDate.of(2025, 3, 15), "한식당", "음식점", 25_000);
+    }
+
+    private static RuleCard rebuttableUnavailable() {
+        QuestionSpec rebuttal = new QuestionSpec(
+            "REBUTTAL", "거래처 미팅이었나요?", "용도", "transaction",
+            List.of("업무미팅", "개인"),
+            Map.of(
+                "업무미팅", new QuestionEffect(Verdict.NEEDS_REVIEW, "접대비", Map.of()),
+                "개인", new QuestionEffect(Verdict.UNAVAILABLE, null, Map.of())
+            )
+        );
+        return new RuleCard(
+            "R-311", 1, Gate.G2, 505, RuleMatch.categories("음식점"),
+            Verdict.UNAVAILABLE, null, List.of(new Citation("소득세법-33-1-5")),
+            Map.of(), List.of(rebuttal)
+        );
+    }
+
     @Test
     void g4_forces_asset_question_above_one_million_for_ambiguous_category() {
         Judgment result = JudgmentEngine.judge(

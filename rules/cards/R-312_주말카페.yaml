@@ -1,0 +1,28 @@
+# G2 · 주말 카페 — 개인 음료로 추정해 불가, 소명하면 평일(R-300)과 같게
+#
+# 근거·구조는 R-311 과 같다. 혼자작업은 평일에 verdict 없이 확인필요로 남으므로(R-300),
+# 여기서도 확인필요로 기본 불가를 대체해 평일과 같은 결과를 낸다.
+id: R-312
+version: 1
+gate: G2
+priority: 505
+effective_period: { start: 2024-01-01, end: null }
+match:
+  category: [카페]
+  industry: ["940909"]
+  weekday: [토, 일]
+verdict: 불가
+citations:
+  - { id: 소득세법-33-1-5, verified: true }
+attributes:
+  주말결제: true
+question:
+  code: WEEKEND_CAFE_PURPOSE
+  text: "주말 카페 결제라 개인 용도로 보고 제외했어요. 업무 때문이었다면 알려주세요."
+  fact_type: 용도
+  group_by: transaction
+  options:
+    - { value: 업무미팅, verdict: 확인필요, account: 접대비, limit_bucket: 접대비 }
+    - { value: 개인, verdict: 불가 }
+    - { value: 혼자작업, verdict: 확인필요 }
+review: { by: 미검수, date: 2026-09-26 }
