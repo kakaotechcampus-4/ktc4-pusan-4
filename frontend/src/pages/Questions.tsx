@@ -1,14 +1,27 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowRightIcon, CheckIcon, LayersIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
+import { api, useApi } from '../api';
 import { useSession } from '../contexts/SessionContext';
-import { QUESTION_GROUPS } from '../mock/judgments';
 import { formatNumber, formatWon } from '../utils/format';
 
 export function Questions() {
-  const { answers, answerGroup, counts } = useSession();
+  const groupsQ = useApi(() => api.questions.grouped(), []);
+  const { runId } = useSession();
+  const summaryQ = useApi(() => runId ? api.judgments.summary({ runId }) : Promise.resolve(null), [runId]);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const QUESTION_GROUPS = groupsQ.data?.items ?? [];
+  const counts = { needsReview: summaryQ.data?.byVerdict.NEEDS_REVIEW.count ?? 0 };
+
+  const answerGroup = async (groupKey: string, value: string) => {
+    const group = QUESTION_GROUPS.find((g) => g.groupKey === groupKey);
+    if (!group) return;
+    await api.questions.respond({ questionIds: group.questionIds, answer: { value } });
+    setAnswers((prev) => ({ ...prev, [groupKey]: value }));
+    summaryQ.reload();
+  };
   const remaining = QUESTION_GROUPS.filter(
     (group) => !answers[group.groupKey]
   ).length;
@@ -101,7 +114,7 @@ export function Questions() {
                           <button
                             key={option}
                             type="button"
-                            onClick={() => answerGroup(group.groupKey, option)}
+                            onClick={() => void answerGroup(group.groupKey, option)}
                             className={`rounded-xl border px-3.5 py-2.5 text-left transition-colors duration-150 ease-snap ${
                             active ?
                             'border-accent bg-accent-soft' :

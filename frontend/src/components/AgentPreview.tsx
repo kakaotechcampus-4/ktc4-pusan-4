@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { SHOWCASE_TRACES } from '../mock/trace';
-import { statuteOf } from '../mock/statutes';
 import { formatDate, formatWon } from '../utils/format';
 import { VerdictBadge } from './VerdictBadge';
 
@@ -46,7 +45,7 @@ export function AgentPreview() {
     return () => window.clearTimeout(timer);
   }, [revealed, done, reduceMotion, steps.length]);
 
-  const citation = judgment.citation ? statuteOf(judgment.citation.statuteVersionId) : undefined;
+  const citation = judgment.citation;
 
   return (
     <div

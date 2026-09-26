@@ -5,22 +5,42 @@ import { AppShell } from '../components/AppShell';
 import { JudgmentRow } from '../components/results/JudgmentRow';
 import { JudgmentDetailPanel } from '../components/results/JudgmentDetailPanel';
 import { useSession } from '../contexts/SessionContext';
-import { JUDGMENT_SUMMARY } from '../mock/judgments';
-import type { Verdict } from '../types/domain';
+import { api, useApi } from '../api';
+import type { Judgment, Transaction, Verdict } from '../types/domain';
 import { formatNumber, formatWon } from '../utils/format';
 type Tab = 'ALL' | Verdict;
 export function Results() {
-  const {
-    judgments,
-    transactionOf,
-    counts,
-    overrides,
-    overrideJudgment,
-    pendingQuestionCount,
-    recognizedAmount
-  } = useSession();
+  const { runId } = useSession();
+  const judgmentsQ = useApi(() => runId ? api.judgments.list({ runId }) : Promise.resolve(null), [runId]);
+  const summaryQ = useApi(() => runId ? api.judgments.summary({ runId }) : Promise.resolve(null), [runId]);
+  const transactionsQ = useApi(() => api.transactions.list({ size: 100 }), []);
+  const questionsQ = useApi(() => api.questions.grouped({ status: 'PENDING' }), []);
+
+  const judgments: Judgment[] = judgmentsQ.data?.items ?? [];
+  const transactions = useMemo(
+    () => new Map<string, Transaction>((transactionsQ.data?.items ?? []).map((t) => [t.id, t])),
+    [transactionsQ.data]
+  );
+  const transactionOf = (id: string) => transactions.get(id);
+  const summary = summaryQ.data;
+  const counts = {
+    available: summary?.byVerdict.AVAILABLE.count ?? 0,
+    needsReview: summary?.byVerdict.NEEDS_REVIEW.count ?? 0,
+    unavailable: summary?.byVerdict.UNAVAILABLE.count ?? 0
+  };
+  const recognizedAmount = summary?.byVerdict.AVAILABLE.finalAmount ?? 0;
+  const pendingQuestionCount = questionsQ.data?.page.totalElements ?? 0;
+  const [overridden, setOverridden] = useState<Record<string, true>>({});
+
+  const overrideJudgment = async (judgmentId: string, verdict: Verdict) => {
+    await api.judgments.override(judgmentId, { toVerdict: verdict, reason: '사용자 직접 수정' });
+    setOverridden((prev) => ({ ...prev, [judgmentId]: true }));
+    judgmentsQ.reload();
+    summaryQ.reload();
+  };
+
   const [tab, setTab] = useState<Tab>('ALL');
-  const [selectedId, setSelectedId] = useState(judgments[0]?.id ?? '');
+  const [selectedId, setSelectedId] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const tabs: {
     key: Tab;
@@ -49,7 +69,9 @@ export function Results() {
     tone: 'text-deny'
   }];
   const visible = useMemo(() => tab === 'ALL' ? judgments : judgments.filter((judgment) => judgment.verdict.code === tab), [judgments, tab]);
-  const selected = judgments.find((judgment) => judgment.id === selectedId) ?? judgments[0];
+  const selectedTx = judgments.find((judgment) => judgment.id === selectedId)?.transactionId;
+  const selected =
+  judgments.find((judgment) => judgment.transactionId === selectedTx) ?? judgments[0];
   return <AppShell>
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
@@ -58,7 +80,7 @@ export function Results() {
             판정 결과
           </h1>
           <p className="mt-2 text-[14px] tabular-nums text-muted">
-            2026년 1월 · {formatNumber(JUDGMENT_SUMMARY.totalCount)}건 · 인정 경비{' '}
+            2026년 1월 · {formatNumber(summary?.totalCount ?? 0)}건 · 인정 경비{' '}
             <strong className="font-semibold text-ink">
               {formatWon(recognizedAmount)}
             </strong>
@@ -112,7 +134,7 @@ export function Results() {
 
           <div className="flex items-center justify-between gap-3 border-t border-line px-4 py-3 text-[12px] tabular-nums text-muted">
             <span>
-              1–{visible.length} / {formatNumber(JUDGMENT_SUMMARY.totalCount)}건
+              1–{visible.length} / {formatNumber(summary?.totalCount ?? 0)}건
             </span>
             <div className="flex gap-1">
               <button type="button" disabled className="rounded-lg border border-line px-2.5 py-1 text-muted disabled:opacity-50">
@@ -126,7 +148,7 @@ export function Results() {
         </section>
 
         {selected && <aside className="lg:sticky lg:top-32 lg:self-start">
-            <JudgmentDetailPanel judgment={selected} transaction={transactionOf(selected.transactionId)} overridden={Boolean(overrides[selected.id])} onOverride={(verdict) => overrideJudgment(selected.id, verdict)} />
+            <JudgmentDetailPanel judgment={selected} transaction={transactionOf(selected.transactionId)} overridden={Boolean(overridden[selected.id]) || selected.explanation?.startsWith('사용자 수정') === true} onOverride={(verdict) => void overrideJudgment(selected.id, verdict)} />
           </aside>}
       </div>
     </AppShell>;

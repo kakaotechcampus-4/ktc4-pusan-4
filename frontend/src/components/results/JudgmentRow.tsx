@@ -3,8 +3,18 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronDownIcon } from 'lucide-react';
 import type { Judgment, Transaction } from '../../types/domain';
 import { VerdictBadge } from '../VerdictBadge';
-import { statuteOf } from '../../mock/statutes';
+import { api, useApi } from '../../api';
 import { formatDate, formatWon } from '../../utils/format';
+
+function StatuteChip({ statuteVersionId }: {statuteVersionId: number;}) {
+  const { data } = useApi(() => api.statutes.get(statuteVersionId), [statuteVersionId]);
+  if (!data) return null;
+  return (
+    <li className="rounded-md border border-line bg-surface px-2 py-0.5 text-[12px] text-ink">
+      {data.title}
+    </li>);
+
+}
 
 interface JudgmentRowProps {
   judgment: Judgment;
@@ -111,18 +121,12 @@ export function JudgmentRow({
 
               {judgment.citations.length > 0 ?
             <ul className="flex flex-wrap gap-1.5">
-                  {judgment.citations.map((citation) => {
-                const statute = statuteOf(citation.statuteVersionId);
-                if (!statute) return null;
-                return (
-                  <li
-                    key={citation.statuteVersionId}
-                    className="rounded-md border border-line bg-surface px-2 py-0.5 text-[12px] text-ink">
+                  {judgment.citations.map((citation) =>
+              <StatuteChip
+                key={citation.statuteVersionId}
+                statuteVersionId={citation.statuteVersionId} />
 
-                        {statute.title}
-                      </li>);
-
-              })}
+              )}
                 </ul> :
 
             <p className="inline-flex rounded-md border border-warn-line bg-warn-bg px-2 py-0.5 text-[12px] font-semibold text-warn">
