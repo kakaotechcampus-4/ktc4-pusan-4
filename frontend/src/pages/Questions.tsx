@@ -10,7 +10,7 @@ import { formatNumber, formatWon } from '../utils/format';
 export function Questions() {
   const groupsQ = useApi(() => api.questions.grouped(), []);
   const { runId } = useSession();
-  const summaryQ = useApi(() => runId ? api.judgments.summary(runId) : Promise.resolve(null), [runId]);
+  const summaryQ = useApi(() => runId ? api.judgments.summary({ runId }) : Promise.resolve(null), [runId]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const QUESTION_GROUPS = groupsQ.data?.items ?? [];
   const counts = { needsReview: summaryQ.data?.byVerdict.NEEDS_REVIEW.count ?? 0 };

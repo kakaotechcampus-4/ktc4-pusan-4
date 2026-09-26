@@ -3,15 +3,21 @@ import { ApiRequestError } from '../contract';
 import type {
   BusinessContext,
   BusinessContextRef,
+  ClassificationReview,
+  ClassificationReviewGroup,
+  EffectiveStatus,
   Judgment,
   JudgmentRun,
   Page,
+  Question,
+  QuestionPage,
   Transaction,
-  TransactionStatus,
   UploadBatch,
+  UserInclusion,
   Verdict } from
 '../../types/domain';
 import {
+  CLASSIFICATION_REVIEWS,
   JUDGMENTS,
   JUDGMENT_RUN,
   JUDGMENT_SUMMARY,
@@ -34,10 +40,25 @@ const LABEL: Record<Verdict, string> = {
   UNAVAILABLE: '불가',
   NEEDS_REVIEW: '확인 필요'
 };
-const STATUS_LABEL: Record<TransactionStatus, string> = {
+const STATUS_LABEL: Record<EffectiveStatus, string> = {
   JUDGEABLE: '판정대상',
   CANCELED_OFFSET: '취소상계',
   EXCLUDED: '대상제외'
+};
+
+/** 2.3 sourceStatus + userInclusion → effectiveStatus */
+const effectiveOf = (t: Transaction): EffectiveStatus => {
+  if (t.sourceStatus.code === 'CANCELED_OFFSET') return 'CANCELED_OFFSET';
+  if (t.userInclusion === 'EXCLUDED') return 'EXCLUDED';
+  if (t.userInclusion === 'INCLUDED') return 'JUDGEABLE';
+  return t.sourceStatus.code;
+};
+
+const applyInclusion = (t: Transaction, inclusion: UserInclusion): Transaction => {
+  t.userInclusion = inclusion;
+  const code = effectiveOf(t);
+  t.effectiveStatus = { code, label: STATUS_LABEL[code] };
+  return t;
 };
 
 const LATENCY_MS = 120;
@@ -76,7 +97,8 @@ const store = {
   /** groupKey → 답변 라벨 */
   answers: new Map<string, string>(),
   /** 사용자 수정 이력 (집계 보정용) */
-  overrides: [] as { from: Verdict; to: Verdict; amount: number }[]
+  overrides: [] as { from: Verdict; to: Verdict; amount: number }[],
+  reviews: CLASSIFICATION_REVIEWS.map((r) => ({ ...r })) as ClassificationReview[]
 };
 
 const GROUP_OF_TRANSACTION: Record<string, string> = Object.fromEntries(
@@ -133,6 +155,27 @@ const rejudge = (transactionId: string, groupKey: string, answer: string): Judgm
   return next;
 };
 
+const pendingGroups = (status?: string) => {
+  if (status === 'PENDING') return QUESTION_GROUPS.filter((g) => !store.answers.has(g.groupKey));
+  if (status === 'ANSWERED') return QUESTION_GROUPS.filter((g) => store.answers.has(g.groupKey));
+  return QUESTION_GROUPS;
+};
+
+const filterReviews = (status?: string) =>
+status ? store.reviews.filter((r) => r.status.code === status) : store.reviews;
+
+/** 페이지네이션과 무관한 미해소 집계 (3.9) */
+const withUnresolved = <T,>(page: Page<T>): QuestionPage<T> => {
+  const pending = QUESTION_GROUPS.filter((g) => !store.answers.has(g.groupKey));
+  return {
+    ...page,
+    unresolved: {
+      count: pending.reduce((sum, g) => sum + g.count, 0),
+      amount: pending.reduce((sum, g) => sum + g.totalAmount, 0)
+    }
+  };
+};
+
 const notFound = (code: string, message: string) =>
 Promise.reject(new ApiRequestError(404, code, message));
 
@@ -159,11 +202,13 @@ export const mockApi: Api = {
     create: (body) => {
       const batch: UploadBatch = {
         id: nextId('0199c8f2'),
+        sourceType: body.sourceType,
         cardIssuer: body.cardIssuer,
         periodStart: body.periodStart,
         periodEnd: body.periodEnd,
         transactionCount: body.transactions.length,
         skippedDuplicateCount: 0,
+        classificationPendingCount: store.reviews.filter((r) => r.status.code === 'PENDING').length,
         createdAt: now()
       };
       store.batches.unshift(batch);
@@ -184,7 +229,9 @@ export const mockApi: Api = {
     list: (q) => {
       let items = store.transactions;
       if (q?.batchId) items = items.filter((t) => t.batchId === q.batchId);
-      if (q?.status) items = items.filter((t) => t.status.code === q.status);
+      if (q?.status) items = items.filter((t) => t.effectiveStatus.code === q.status);
+      if (q?.classificationStatus)
+      items = items.filter((t) => t.classificationStatus.code === q.classificationStatus);
       if (q?.year) items = items.filter((t) => t.approvedAt.startsWith(String(q.year)));
       if (q?.month)
       items = items.filter((t) => Number(t.approvedAt.slice(5, 7)) === q.month);
@@ -197,20 +244,28 @@ export const mockApi: Api = {
       const t = transactionOf(id);
       return t ? delay(t) : notFound('TRANSACTION_NOT_FOUND', '요청한 거래를 찾을 수 없습니다.');
     },
-    setStatus: (id, status) => {
+    include: (id) => {
       const t = transactionOf(id);
       if (!t) return notFound('TRANSACTION_NOT_FOUND', '요청한 거래를 찾을 수 없습니다.');
-      // 취소상계는 파서가 판별한다. 사용자는 판정대상 ↔ 대상제외만 오간다 (기능 명세 7.1)
-      if (t.status.code === 'CANCELED_OFFSET' || status === 'CANCELED_OFFSET')
-      return Promise.reject(new ApiRequestError(422, 'INVALID_STATUS_TRANSITION', '취소·상계 상태는 사용자가 변경할 수 없습니다.'));
-      t.status = { code: status, label: STATUS_LABEL[status] };
-      return delay(t);
+      // 2.3 취소상계는 사용자가 포함으로 바꿀 수 없다
+      if (t.sourceStatus.code === 'CANCELED_OFFSET')
+      return Promise.reject(
+        new ApiRequestError(409, 'CANCELED_TRANSACTION_NOT_INCLUDABLE', '취소·상계 거래는 판정 대상으로 포함할 수 없습니다.')
+      );
+      return delay(applyInclusion(t, 'INCLUDED'));
+    },
+    exclude: (id) => {
+      const t = transactionOf(id);
+      if (!t) return notFound('TRANSACTION_NOT_FOUND', '요청한 거래를 찾을 수 없습니다.');
+      return delay(applyInclusion(t, 'EXCLUDED'));
     }
   },
 
   runs: {
     create: ({ batchId }) => {
-      const total = store.transactions.filter((t) => t.batchId === batchId && t.status.code === 'JUDGEABLE').length || JUDGMENT_RUN.totalCount;
+      const total =
+      store.transactions.filter((t) => t.batchId === batchId && t.effectiveStatus.code === 'JUDGEABLE').length ||
+      JUDGMENT_RUN.totalCount;
       const run: JudgmentRun = {
         id: nextId('0199e5b2'),
         status: { code: 'QUEUED', label: '대기' },
@@ -238,11 +293,17 @@ export const mockApi: Api = {
         }
       }
       return delay({ ...run });
+    },
+    failures: (runId, q) => {
+      const run = store.runs.get(runId);
+      if (!run) return notFound('JUDGMENT_RUN_NOT_FOUND', '판정 실행을 찾을 수 없습니다.');
+      // 목업에서는 기술적 실패를 만들지 않는다. NEEDS_REVIEW 는 실패가 아니다
+      return delay(paginate([], q?.page, q?.size));
     }
   },
 
   judgments: {
-    summary: (runId) => {
+    summary: (scope) => {
       // 목업 데이터는 292건 중 24건 샘플이라, 집계는 기준값에 답변·수정으로 생긴 이동만 더한다
       const by: Record<Verdict, { count: number; finalAmount: number }> = {
         AVAILABLE: { ...JUDGMENT_SUMMARY.byVerdict.AVAILABLE },
@@ -267,13 +328,18 @@ export const mockApi: Api = {
         if (o.from === 'AVAILABLE') by.AVAILABLE.finalAmount -= o.amount;
         if (o.to === 'AVAILABLE') by.AVAILABLE.finalAmount += o.amount;
       }
-      return delay({ ...JUDGMENT_SUMMARY, runId, byVerdict: by });
+      const type = scope.batchId ? 'BATCH' : scope.year ? 'YEAR' : 'RUN';
+      const id = String(scope.batchId ?? scope.year ?? scope.runId);
+      return delay({ ...JUDGMENT_SUMMARY, scope: { type, id }, byVerdict: by });
     },
     list: (q) => {
-      let items = q?.latestOnly === false ? [...store.judgments] : latestAll();
-      if (q?.transactionId) items = items.filter((j) => j.transactionId === q.transactionId);
+      // transactionId 지정은 이력 전체, 그 외는 거래별 현재 판정
+      let items = q?.transactionId ?
+      store.judgments.filter((j) => j.transactionId === q.transactionId) :
+      latestAll();
       if (q?.verdict) items = items.filter((j) => j.verdict.code === q.verdict);
-      if (q?.state) items = items.filter((j) => j.state.code === q.state);
+      if (q?.batchId)
+      items = items.filter((j) => transactionOf(j.transactionId)?.batchId === q.batchId);
       items.sort((a, b) => b.computedAt.localeCompare(a.computedAt) || b.id.localeCompare(a.id));
       return delay(paginate(items, q?.page, q?.size ?? 100));
     },
@@ -301,6 +367,12 @@ export const mockApi: Api = {
         amount: next.finalAmount ?? prev.finalAmount ?? 0
       });
       return delay(next);
+    },
+    removeOverride: (overrideId) => {
+      // 목업은 마지막 수정을 되돌린다
+      void overrideId;
+      store.overrides.pop();
+      return delay(undefined);
     }
   },
 
@@ -312,12 +384,25 @@ export const mockApi: Api = {
   },
 
   questions: {
-    grouped: (q) => {
-      let items = QUESTION_GROUPS;
-      if (q?.status === 'PENDING') items = items.filter((g) => !store.answers.has(g.groupKey));
-      if (q?.status === 'ANSWERED') items = items.filter((g) => store.answers.has(g.groupKey));
-      return delay(paginate(items, q?.page, q?.size ?? 100));
+    list: (q) => {
+      const groups = pendingGroups(q?.status);
+      const items: Question[] = groups.flatMap((g) =>
+      g.questionIds.map((id, index) => ({
+        id,
+        transactionId: (QUESTION_TRANSACTIONS[g.groupKey] ?? [])[index] ?? '',
+        factType: g.factType,
+        status: store.answers.has(g.groupKey) ?
+        { code: 'ANSWERED' as const, label: '응답' } :
+        { code: 'PENDING' as const, label: '대기' },
+        questionText: g.questionText,
+        options: [...g.options],
+        createdAt: '2026-09-12T14:05:00+09:00'
+      }))
+      );
+      return delay(withUnresolved(paginate(items, q?.page, q?.size ?? 100)));
     },
+    grouped: (q) =>
+    delay(withUnresolved(paginate(pendingGroups(q?.status), q?.page, q?.size ?? 100))),
     respond: ({ questionIds, answer }) => {
       const group = QUESTION_GROUPS.find((g) => g.questionIds.some((id) => questionIds.includes(id)));
       if (!group) return notFound('QUESTION_NOT_FOUND', '질문을 찾을 수 없습니다.');
@@ -338,6 +423,83 @@ export const mockApi: Api = {
       };
       store.runs.set(run.id, run);
       return delay({ answeredCount: group.count, runId: run.id });
+    },
+    bulkAnswer: ({ factType, answer }) => {
+      // factType 이 같은 PENDING 질문을 한 번에 닫는다. 새 Run 은 만들지 않는다
+      const targets = QUESTION_GROUPS.filter(
+        (g) => g.factType === factType && !store.answers.has(g.groupKey)
+      );
+      const allowed = targets.filter((g) => g.options.includes(answer.value));
+      if (targets.length > 0 && allowed.length !== targets.length)
+      return Promise.reject(
+        new ApiRequestError(422, 'INVALID_ANSWER_VALUE', '모든 대상 질문이 허용하는 값이 아닙니다.')
+      );
+      let answered = 0;
+      allowed.forEach((group) => {
+        store.answers.set(group.groupKey, answer.value);
+        (QUESTION_TRANSACTIONS[group.groupKey] ?? []).forEach((tid) =>
+        rejudge(tid, group.groupKey, answer.value)
+        );
+        answered += group.count;
+      });
+      return delay({
+        answeredCount: answered,
+        skippedCount: 0,
+        factIds: allowed.map((g) => `fact-${g.groupKey}`)
+      });
+    }
+  },
+
+  classificationReviews: {
+    list: (q) => delay(paginate(filterReviews(q?.status), q?.page, q?.size ?? 100)),
+    grouped: (q) => {
+      const byMerchant = new Map<string, ClassificationReview[]>();
+      filterReviews(q?.status).forEach((r) => {
+        const key = `merchant:${r.merchantNorm}`;
+        byMerchant.set(key, [...(byMerchant.get(key) ?? []), r]);
+      });
+      const items: ClassificationReviewGroup[] = [...byMerchant].map(([groupKey, rows]) => ({
+        groupKey,
+        reviewIds: rows.map((r) => r.id),
+        count: rows.length,
+        totalAmount: rows.reduce((sum, r) => sum + (transactionOf(r.transactionId)?.amount ?? 0), 0),
+        merchantRaw: rows[0].merchantRaw,
+        suggestedCategories: rows[0].suggestedCategories
+      }));
+      return delay(paginate(items, q?.page, q?.size ?? 100));
+    },
+    respond: ({ reviewIds, merchantCategory }) => {
+      if (merchantCategory === '미분류')
+      return Promise.reject(
+        new ApiRequestError(422, 'UNCLASSIFIED_CATEGORY_NOT_ALLOWED', '「미분류」는 답변으로 제출할 수 없습니다.')
+      );
+      const rows = store.reviews.filter((r) => reviewIds.includes(r.id));
+      if (rows.length === 0)
+      return notFound('CLASSIFICATION_REVIEW_NOT_FOUND', '분류 확인 항목을 찾을 수 없습니다.');
+      if (new Set(rows.map((r) => r.batchId)).size > 1)
+      return Promise.reject(
+        new ApiRequestError(422, 'REVIEWS_FROM_DIFFERENT_BATCHES', '서로 다른 배치의 항목은 함께 답할 수 없습니다.')
+      );
+      if (rows.some((r) => r.status.code === 'RESOLVED'))
+      return Promise.reject(
+        new ApiRequestError(409, 'CLASSIFICATION_ALREADY_RESOLVED', '이미 해결된 항목입니다.')
+      );
+      rows.forEach((r) => {
+        r.status = { code: 'RESOLVED', label: '해결' };
+        r.resolvedAt = now();
+        const t = transactionOf(r.transactionId);
+        if (t) {
+          t.merchantCategory = merchantCategory;
+          t.classificationStatus = { code: 'CLASSIFIED', label: '분류 완료' };
+        }
+      });
+      // 완료된 Run 이 있으면 해결된 거래만 재판정한다 (origin = CLASSIFICATION_REVIEW)
+      const hasCompletedRun = [...store.runs.values()].some((r) => r.status.code === 'COMPLETED');
+      return delay({
+        resolvedCount: rows.length,
+        merchantCategory,
+        judgedCount: hasCompletedRun ? rows.length : 0
+      });
     }
   }
 };

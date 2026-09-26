@@ -53,7 +53,7 @@ export function Run() {
       setRun(next);
       if (next.status.code === 'COMPLETED' || next.status.code === 'FAILED' || next.status.code === 'PARTIAL_FAILED') {
         if (timer.current) window.clearInterval(timer.current);
-        void api.judgments.summary(runId).then((summary) =>
+        void api.judgments.summary({ runId }).then((summary) =>
         setCounts({
           available: summary.byVerdict.AVAILABLE.count,
           needsReview: summary.byVerdict.NEEDS_REVIEW.count,

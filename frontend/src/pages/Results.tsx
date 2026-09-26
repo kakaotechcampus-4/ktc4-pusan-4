@@ -12,7 +12,7 @@ type Tab = 'ALL' | Verdict;
 export function Results() {
   const { runId } = useSession();
   const judgmentsQ = useApi(() => runId ? api.judgments.list({ runId }) : Promise.resolve(null), [runId]);
-  const summaryQ = useApi(() => runId ? api.judgments.summary(runId) : Promise.resolve(null), [runId]);
+  const summaryQ = useApi(() => runId ? api.judgments.summary({ runId }) : Promise.resolve(null), [runId]);
   const transactionsQ = useApi(() => api.transactions.list({ size: 100 }), []);
   const questionsQ = useApi(() => api.questions.grouped({ status: 'PENDING' }), []);
 
