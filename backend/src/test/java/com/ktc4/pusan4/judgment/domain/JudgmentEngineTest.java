@@ -2,9 +2,11 @@ package com.ktc4.pusan4.judgment.domain;
 
 import org.junit.jupiter.api.Test;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -61,7 +63,7 @@ class JudgmentEngineTest {
         );
         RuleCard specific = new RuleCard(
             "R-091", 1, Gate.G1, 500,
-            new RuleMatch(List.of("카페"), List.of(), List.of("커피"), null, null, List.of()),
+            new RuleMatch(List.of("카페"), List.of(), List.of("커피"), null, null, List.of(), Set.of()),
             Verdict.UNAVAILABLE, null,
             List.of(new Citation("근거-구체")),
             Map.of(), List.of()
@@ -99,7 +101,7 @@ class JudgmentEngineTest {
             "R-027", 1, Gate.G2, 500,
             new RuleMatch(
                 List.of("카페"), List.of(), List.of("스타벅스"),
-                null, 30_000L, List.of()
+                null, 30_000L, List.of(), Set.of()
             ),
             Verdict.AVAILABLE, "소모품비",
             List.of(new Citation("소득세법-27-1")),
@@ -723,6 +725,32 @@ class JudgmentEngineTest {
             .containsExactly(Verdict.NEEDS_REVIEW, Verdict.AVAILABLE, Verdict.AVAILABLE);
     }
 
+    @Test
+    void weekday_card_tags_attribute_without_changing_verdict() {
+        RuleCard weekend = new RuleCard(
+            "R-061", 1, Gate.G5, 500,
+            new RuleMatch(List.of(), List.of(), List.of(), null, null, List.of(),
+                Set.of(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY)),
+            null, null, List.of(), Map.of("주말결제", true), List.of()
+        );
+        RuleSet rules = new RuleSet(List.of(g2Available(), weekend));
+        UserContext context = new UserContext("940909", false, null);
+
+        Judgment saturday = JudgmentEngine.judge(
+            onDate(LocalDate.of(2025, 3, 15)), context, List.of(), rules);
+        Judgment wednesday = JudgmentEngine.judge(
+            onDate(LocalDate.of(2025, 3, 12)), context, List.of(), rules);
+
+        assertThat(saturday.verdict()).isEqualTo(Verdict.AVAILABLE);
+        assertThat(saturday.attributes()).containsEntry("주말결제", true);
+        assertThat(wednesday.verdict()).isEqualTo(Verdict.AVAILABLE);
+        assertThat(wednesday.attributes()).doesNotContainKey("주말결제");
+    }
+
+    private static TransactionInput onDate(LocalDate approvedAt) {
+        return new TransactionInput(UUID.randomUUID(), approvedAt, "가맹점", "음식점", 20_000);
+    }
+
     private static TransactionInput subscription(String category, long amount) {
         return new TransactionInput(
             UUID.randomUUID(), LocalDate.of(2025, 3, 14), "가맹점", category, amount
@@ -732,7 +760,7 @@ class JudgmentEngineTest {
     private static RuleCard g2Available() {
         return new RuleCard(
             "R-020", 1, Gate.G2, 500,
-            new RuleMatch(List.of(), List.of(), List.of(), null, null, List.of()),
+            new RuleMatch(List.of(), List.of(), List.of(), null, null, List.of(), Set.of()),
             Verdict.AVAILABLE, "소모품비",
             List.of(new Citation("소득세법-27-1")),
             Map.of(), List.of()
@@ -755,7 +783,7 @@ class JudgmentEngineTest {
         );
         return new RuleCard(
             "R-051", 1, Gate.G4, 500,
-            new RuleMatch(List.of(), List.of("소모품", "식음료", "카페"), List.of(), 1_000_001L, null, List.of()),
+            new RuleMatch(List.of(), List.of("소모품", "식음료", "카페"), List.of(), 1_000_001L, null, List.of(), Set.of()),
             null, null,
             List.of(new Citation("소득세법시행령-67-4")),
             Map.of(), List.of(assetQuestion)

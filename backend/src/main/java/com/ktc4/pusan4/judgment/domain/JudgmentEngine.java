@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import com.ktc4.pusan4.judgment.domain.AttributeOutcomePolicy;
 
 
 public final class JudgmentEngine {
@@ -147,6 +146,10 @@ public final class JudgmentEngine {
             return false;
         }
         if (match.amountMax() != null && transaction.amount() > match.amountMax()) {
+            return false;
+        }
+        if (!match.weekdays().isEmpty()
+            && !match.weekdays().contains(transaction.approvedAt().getDayOfWeek())) {
             return false;
         }
         return match.industries().isEmpty() || match.industries().contains(context.industryCode());

@@ -318,6 +318,37 @@ class RuleCardLoaderRealCardsTest {
             .satisfies(question -> assertThat(question.code()).isEqualTo("PG_UNKNOWN_PURPOSE"));
     }
 
+    /**
+     * 주말 식사는 불인정 기준이 아니라 소명 신호다(세무사 실무 질의응답 2026-09 Q2).
+     * 플래그만 붙고, 업무미팅 답이 오면 평일과 똑같이 접대비 버킷으로 간다.
+     */
+    @Test
+    void 주말_음식점은_플래그만_붙고_업무미팅_답을_막지_않는다() throws IOException {
+        TransactionInput 토요일 = new TransactionInput(
+            UUID.randomUUID(), LocalDate.of(2025, 3, 15), "한식당", "음식점", 25_000);
+        UserFact 응답 = new UserFact(
+            "transaction:" + 토요일.id(), "용도", Map.of("value", "업무미팅"));
+
+        Judgment 답변전 = JudgmentEngine.judge(토요일, 인적용역, List.of(), load());
+        Judgment 답변후 = JudgmentEngine.judge(토요일, 인적용역, List.of(응답), load());
+
+        assertThat(답변전.attributes()).containsEntry("주말결제", true);
+        assertThat(답변전.questions()).singleElement()
+            .satisfies(question -> assertThat(question.code()).isEqualTo("RESTAURANT_PURPOSE"));
+        assertThat(답변후.verdict()).isNotEqualTo(Verdict.UNAVAILABLE);
+        assertThat(답변후.attributes())
+            .containsEntry("주말결제", true)
+            .containsEntry("limit_bucket", "접대비");
+    }
+
+    @Test
+    void 평일_음식점에는_주말_플래그가_없다() throws IOException {
+        Judgment judgment = JudgmentEngine.judge(
+            거래("한식당", "음식점", 25_000), 인적용역, List.of(), load());
+
+        assertThat(judgment.attributes()).doesNotContainKey("주말결제");
+    }
+
     /** 무엇을 샀는지는 여전히 모르므로 가능이어도 계정과목은 비운다. */
     @Test
     void PG미상_업무용_응답은_가능이되_계정과목을_비운다() throws IOException {

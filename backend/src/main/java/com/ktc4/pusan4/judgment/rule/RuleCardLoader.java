@@ -16,6 +16,7 @@ import com.ktc4.pusan4.judgment.domain.Verdict;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -26,6 +27,12 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 public final class RuleCardLoader {
+
+    private static final Map<String, DayOfWeek> WEEKDAYS = Map.of(
+        "월", DayOfWeek.MONDAY, "화", DayOfWeek.TUESDAY, "수", DayOfWeek.WEDNESDAY,
+        "목", DayOfWeek.THURSDAY, "금", DayOfWeek.FRIDAY, "토", DayOfWeek.SATURDAY,
+        "일", DayOfWeek.SUNDAY
+    );
 
     private static final Comparator<RuleCard> ORDER = Comparator
         .comparingInt(RuleCard::priority).reversed()
@@ -102,7 +109,8 @@ public final class RuleCardLoader {
             strings(match, "keyword"),
             optionalLong(match, "amount_min"),
             optionalLong(match, "amount_max"),
-            strings(match, "industry")
+            strings(match, "industry"),
+            weekdays(id, match)
         );
         validateCategories(id, ruleMatch);
 
@@ -138,6 +146,14 @@ public final class RuleCardLoader {
                 effectVerdict == Verdict.AVAILABLE || effectVerdict == Verdict.UNAVAILABLE);
         if (hasFinalEffectVerdict && citations.isEmpty()) {
             throw new RuleCardValidationException(id + ": effect verdict requires citation");
+        }
+        // 요일은 소명 신호일 뿐 판정 근거가 아니다(요일로 경비를 막는 조문이 없다).
+        // 요일 카드가 판정을 내리면 토요일 업무미팅이 되묻기 없이 불가·강등된다.
+        boolean hasEffectVerdict = questions.stream()
+            .flatMap(question -> question.effects().values().stream())
+            .anyMatch(effect -> effect.verdict() != null);
+        if (!ruleMatch.weekdays().isEmpty() && (verdict != null || hasEffectVerdict)) {
+            throw new RuleCardValidationException(id + ": weekday card must not decide a verdict");
         }
 
         JsonNode review = root.path("review");
@@ -386,6 +402,18 @@ public final class RuleCardLoader {
         List<String> result = new ArrayList<>();
         values.forEach(value -> result.add(value.asText()));
         return List.copyOf(result);
+    }
+
+    private static Set<DayOfWeek> weekdays(String id, JsonNode match) {
+        Set<DayOfWeek> result = new HashSet<>();
+        for (String value : strings(match, "weekday")) {
+            DayOfWeek day = WEEKDAYS.get(value);
+            if (day == null) {
+                throw new RuleCardValidationException(id + ": unknown weekday '" + value + "'");
+            }
+            result.add(day);
+        }
+        return result;
     }
 
     private static <T extends Enum<T>> T enumValue(Class<T> type, String value, String field) {
