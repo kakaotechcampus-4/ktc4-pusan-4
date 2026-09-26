@@ -1,0 +1,31 @@
+name: PR review reminder
+# 리뷰 요청을 받고 24시간 넘게 리뷰하지 않은 리뷰어를 팀 Discord 채널에서 멘션한다.
+# 로직과 설정(secret·variable)은 pr-discord-notify.yml 머리말 참고.
+# 대상: 열린 non-draft PR 중 base 가 main 이 아닌 것 (develop → main 은 운영진 워크플로 담당).
+#
+# ⚠️ schedule 은 기본 브랜치(develop)에 있는 이 파일로만 돈다. 몇 분~수십 분 늦게 돌 수 있다.
+
+on:
+  schedule:
+    - cron: "7 1 * * 1-5"  # 평일 10:07 KST (정각은 GitHub 예약이 몰려 늦게 시작된다)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read  # 리뷰 요청 시각(issue events) 조회
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: tools
+
+      - name: Send Discord reminder
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          TEAM_DISCORD_WEBHOOK: ${{ secrets.TEAM_DISCORD_WEBHOOK }}
+          DISCORD_USER_IDS: ${{ vars.DISCORD_USER_IDS }}
+        run: python3 tools/pr_discord_bot.py remind

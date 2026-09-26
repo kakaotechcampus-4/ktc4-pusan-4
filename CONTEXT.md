@@ -266,6 +266,18 @@ B→A 순서: B 통과, A는 150만만
 
 **대비책: 카테고리마다 조건 없는 기본 카드 1장.** 금액 조건이 붙은 카드가 다 빗나가도 기본 카드가 받는다. `verdict`는 `확인필요`로.
 
+> ⚠️ **둘 다 아직 안 돼 있다(실측).**
+>
+> **구분이 없다.** `JudgmentEngine`이 G2 미매칭에 `RULE_NOT_FOUND` 하나만 쓴다.
+> `CONDITION_MISMATCH`·`PROFILE_MISSING`·`UNCLASSIFIED`는 enum에만 있고 아무도 세팅하지 않는다.
+>
+> **대비책은 11/32다.** 32개 카테고리 전부 카드는 있지만 조건 없는 기본 카드가 있는 건
+> 11개뿐이고, 나머지 21개는 `industry`·`amount_min`이 어긋나면 통째로 빠진다
+> (R-300 카페가 `industry: ["940909"]`라 업종을 늘리면 카페가 전부 미매칭이다).
+>
+> **이 21개가 규칙 후보의 실제 공급원이다.** §9-5가 만드는 초안은 "새 카테고리 카드"가
+> 아니라 "빠지는 조건을 받는 카드"다.
+
 ---
 
 ### G3 · 안분 (속성형)
@@ -1208,6 +1220,7 @@ erDiagram
   LEGAL_CHUNK {
     bigint id PK
     bigint statute_version_id FK
+    string statute_id
     string doc_id
     string doc_type
     string hierarchy
@@ -1216,7 +1229,7 @@ erDiagram
     date effective_to
     boolean is_superseded
     text body
-    string body_hash
+    string source_hash
     vector embedding
   }
   LAW_SYNC_LOG {
@@ -1369,8 +1382,8 @@ WHERE statute_id = :id
 |---|---|
 | `statute_version_id` | 원문 출처 FK |
 | `doc_type` | 위계 순차 탐색 필터 |
-| `section` | **판례 전용:** `원고주장`/`피고주장`/`법원판단`. 검색 시 `법원판단`만 |
-| `body_hash` | 증분 재색인 판단 |
+| `section` | **심판례·해석례 전용.** 심판례 `요지`/`심리판단`/`주장`, 해석례 `질의`/`회답`/`이유`. 법령·행정규칙은 NULL. **검색에서 `주장`을 뺀다** — 기각된 주장이 근거로 올라가면 정반대 결론이 나간다. 판례는 0행이라 아직 없다 |
+| `source_hash` | 증분 재색인 판단. `statute_version.body_hash` 복사본 |
 | **`embedding`** | **vector(1536)** — text-embedding-3-small |
 
 ### 스키마 핵심 세 가지
@@ -1545,39 +1558,82 @@ chunking 전략 변경(**10월에 반드시 겪음**), 임베딩 모델 교체 �
 
 ```
 [1] 집계 (SQL)
-    unmatched_log(reason=규칙없음 중심) + override_log
+    unmatched_log(reason=RULE_NOT_FOUND)
     (merchant_category × industry_code) 단위
-    distinct_users ≥ 2 필터
-    빈도순 상위 N건
+    distinct_users ≥ 2 필터 · 빈도순 상위 N건
+    ⚠️ override_log 는 테이블도 Java 참조도 0건이다 — 오탐 신호를 아직 못 쓴다
+    ⚠️ unmatched_log 에 user_id 가 없어 judgment→transaction→upload_batch 조인이 필요하다
 
-[2] 위계 순차 탐색  ← 에이전트
-    ┌─ 법령 검색                    충분? → [3]
-    ├─ 행정규칙 검색                충분? → [3]
-    ├─ 심판례·해석 검색             충분? → [3]
-    ├─ 판례 검색 (section=법원판단) 있음? → [3]
-    └─ 없음 → 보류 (사유 기록)
+[2] 질의 작성  ← 에이전트 ①
+    SearchPlan(queries[1~3], keywords[1~3])
+    카테고리는 내부 분류 어휘라 조문에 그 단어가 아예 없다. 세법 용어로 바꾼다
 
-[3] 초안 생성 — Pydantic 스키마 강제
+[3] 4개 위계 동시 검색 (코드)
+    법령 · 행정규칙 · 심판례해석 · 판례를 한 번에. 임베딩 1회
+    순차 탐색과 조기 종료는 버렸다 — 아래 "위계를 어디서 지키나"
+
+[4] 근거 선택  ← 에이전트 ②
+    Evidence(sufficient, refs[statute_id+quote], direction, note)
+    quote ∈ 원문, statute_id ∈ 검색결과 를 코드가 검증한다
+    refs 가 비거나 sufficient=false 면 보류
+
+[5] 초안 생성 — Pydantic 스키마 강제  ← 에이전트 ③
     validator: 조문 ID 실재 → 실패 시 재시도
-    validator: 하위 근거만으로 '가능' 초안을 냈는가
+    validator: 확정 결론이 하위 근거만으로 서 있는가 → 보류
 
-[4] rule_candidate INSERT (status: 대기, draft_yaml)
+[6] rule_candidate INSERT (status: 대기 | 보류, draft_yaml)
 ────────── 여기까지 자동 ──────────
-[5] 관리자 페이지 → 세무 검수 승인 → PR 자동 생성 → CI → Kang 머지
+[7] 관리자 페이지 → 세무 검수 승인 → PR 자동 생성 → CI → Kang 머지
 ```
 
-**위계 순서를 코드로 강제할 것.**
-```
-법령 (구속력 있음)
-  ↓ 행정규칙 (국세청 내부 기준)
-  ↓ 심판례·해석 (사안 종속적)
-  ↓ 판례 (사안 종속적, 오독 위험)
-  ↓ 보류
-```
-**⚠️ 하위 근거가 상위를 뒤집는 초안이 나오면 안 된다.**
+**후보당 LLM 호출은 정확히 3회다.** 조기 종료 판정이 없어 가변 구간이 사라졌다.
+**오케스트레이터는 에이전트가 아니라 코드다** — 위 흐름에 분기가 0개라 모델이 낄 자리가 없다.
+
+**위계를 어디서 지키나 — 검색 순서가 아니라 초안 검증이다.**
+
+| | 위계 반영 |
+|---|---|
+| 검색·랭킹 | **안 함.** `doc_type` 가중치 없음. 위계별 RRF 그대로 |
+| 선택 프롬프트 | 후보를 위계별로 **묶어서 보여주기만.** "상위 우선" 지시는 넣지 않는다 |
+| 초안 검증 | **여기서만.** 확정 결론이 하위 근거만으로 서 있으면 `status='보류'` |
+
+**순차 탐색을 버린 이유.** 조기 종료는 LLM의 "이 정도면 됐다" 판단이라 아래
+"자기 확신도 임계값은 권장하지 않는다"와 같은 부류다. 그리고 법령에서 끊으면
+심판례의 반례를 영영 안 본다. 법령 상위 8에 정답이 잘 안 들어오는 것도 실측이라
+(recall@8 = 1/10) 후보를 넓히는 쪽이 재현율에도 유리하다.
+
+**"상위 우선"을 프롬프트로 강요하지 않는 이유.** 과하다. 심판례는 `확인필요`
+결론에는 정당한 근거다. 모델이 유용한 사례를 버리게 만든다.
+
+**⚠️ 하위 근거가 상위를 뒤집는 초안이 나오면 안 된다.** 다만 이유는 법적 서열이
+아니라 **일반화 가능성**이다. 규칙 카드는 일반 규칙인데 심판례는 개별 사실관계에
+대한 판단이다. "온라인 강의 수강료 산입" 심판례로 `category: [교육]` 카드를 만들면
+요가 강습도 '가능'이 된다. 심판례가 상위법을 어긴 게 아니라 **개별 판단을 일반
+규칙으로 승격시킨 것**이 문제다.
+
+행정규칙도 안전하지 않다. `업무용승용차운행기록방법에관한고시`는 같은 이름으로
+소득세법 근거(#2104628)와 법인세법 근거(#52390) 둘이 있어, 개인사업자에게 후자를
+인용하면 조문도 인용문도 실재하는데 결론만 틀린다.
 
 ```python
-class RuleCardDraft(BaseModel):
+class SearchPlan(BaseModel):          # 에이전트 ①
+    queries:  list[str]               # 의미검색용 명사구
+    keywords: list[str]               # LIKE 정확일치용 짧은 법률 용어
+
+
+class StatuteRef(BaseModel):
+    statute_id: str
+    quote: str                        # 원문 그대로. assert quote in body
+
+
+class Evidence(BaseModel):            # 에이전트 ②
+    sufficient: bool
+    refs: list[StatuteRef]
+    direction: Literal["가능","불가","확인필요"]
+    note: str                         # 단서·적용조건. 검수자가 읽는다
+
+
+class RuleCardDraft(BaseModel):       # 에이전트 ③
     gate: Literal["G1","G2","G3","G4","G5","G6"]
     verdict: Literal["가능","확인필요","불가"] | None
     citations: list[StatuteRef]
@@ -1588,16 +1644,32 @@ class RuleCardDraft(BaseModel):
             if not statute_exists(c.id):
                 raise ValueError(f"존재하지 않는 조문: {c.id}")
         return v
+
+
+LOWER = {"심판례해석", "판례"}
+
+def needs_review(ev: Evidence, tier_of: dict[str, str]) -> bool:
+    """확정 결론이 하위 근거만으로 서 있으면 보류 큐로. 거부가 아니다."""
+    if ev.direction == "확인필요":
+        return False
+    return bool(ev.refs) and {tier_of[r.statute_id] for r in ev.refs} <= LOWER
 ```
+
+**빼기로 한 필드들.** `confidence`(자기 확신도는 아래에서 비권장),
+`as_of`(귀속연도는 프롬프트가 아니라 검색 쿼리 인자), `gate_hint`(검색은 `doc_type`으로
+필터하지 `gate`로 안 해서 기여가 0인데 초안만 앵커링된다).
+
+`RuleCardDraft`의 `id`·`version`·`priority`·`effective_period`·`review`·`match`는
+**코드가 박는다.** 모델이 쓰는 건 위 세 필드와 `account`·`question`뿐이다.
 
 **왜 에이전트인가**
 
 | 요건 | 규칙 후보 추출 |
 |---|---|
 | 목표가 주어짐 | "미판정 항목을 규칙으로 만들라" |
-| 스스로 계획 | 어느 카테고리부터 다룰지 빈도로 결정 |
-| 도구 사용 | 4개 섹션 검색, DB 집계 |
-| 다단계·분기 | 충분하면 조기 종료, 없으면 다음 섹션, 끝까지 없으면 보류 |
+| 스스로 계획 | 집계 한 줄을 어떤 법률 용어로 물을지 스스로 정한다 |
+| 도구 사용 | 4개 섹션 검색, 원문 대조, DB 집계 |
+| 다단계·분기 | 질의 → 근거 선택 → 초안. 근거가 없거나 하위뿐이면 보류로 빠진다 |
 | 상태 변화 | 규칙이 늘어 다음 주 판정이 달라짐 |
 
 **절대 자동화하지 않을 것:** 승격은 사람을 거친다. **승인 시점에 `effective_period.start`를 박고 기본값은 "소급 적용 안 함".**
@@ -1647,25 +1719,32 @@ class RuleCardDraft(BaseModel):
 ```sql
 CREATE EXTENSION vector;
 CREATE EXTENSION pg_bigm;
-CREATE INDEX ON legal_chunk USING hnsw (embedding vector_cosine_ops);
 CREATE INDEX ON legal_chunk USING gin (body gin_bigm_ops);
 ```
 
+**⚠️ 벡터 인덱스(HNSW)는 만들지 않는다.** HNSW는 `doc_type` 필터를 걸기 전에 후보를 뽑는데 행정규칙이 전체의 9.7%뿐이라 그 위계의 진짜 1~5위가 안 나온다. 실측으로 `hnsw.max_scan_tuples`를 20만까지 올려도 정답이 상위 8에 안 들어왔고(110ms), 정확 스캔은 같은 질의에서 정답을 1·2위로 물어왔다(115ms). **55,530행 규모에서는 인덱스가 1GB 중 대부분을 먹으면서 결과만 틀리게 만든다.** 코퍼스가 몇 배로 커지면 `doc_type`별 부분 인덱스로 간다. 실물과 근거는 `db/rag.sql`.
+
 ```sql
 WITH vec AS (
-  SELECT id, ROW_NUMBER() OVER (ORDER BY embedding <=> :q_vec) AS rnk
-  FROM legal_chunk
-  WHERE doc_type = :tier AND is_superseded = false
-    AND (effective_to IS NULL OR effective_to > :date)
-  LIMIT 30
+  SELECT id, ROW_NUMBER() OVER (ORDER BY d) AS rnk FROM (
+    SELECT id, embedding <=> :q_vec AS d
+    FROM legal_chunk
+    WHERE doc_type = :tier AND is_superseded = false
+      AND (effective_to IS NULL OR effective_to > :date)
+      AND (section IS NULL OR section <> ALL(:skip))
+    ORDER BY d LIMIT 30) t
 ),
 kw AS (
-  SELECT id, ROW_NUMBER() OVER (ORDER BY bigm_similarity(body, :q_text) DESC) AS rnk
-  FROM legal_chunk
-  WHERE doc_type = :tier AND is_superseded = false AND body =% :q_text
-  LIMIT 30
+  SELECT id, ROW_NUMBER() OVER (ORDER BY s DESC) AS rnk FROM (
+    SELECT id, bigm_similarity(body, :q_text) AS s
+    FROM legal_chunk
+    WHERE doc_type = :tier AND is_superseded = false
+      AND (effective_to IS NULL OR effective_to > :date)
+      AND (section IS NULL OR section <> ALL(:skip))
+      AND body LIKE '%' || :q_text || '%'
+    ORDER BY s DESC LIMIT 30) t
 )
-SELECT c.doc_id, c.body,
+SELECT c.statute_id, c.doc_id, c.body,
        COALESCE(1.0/(60+vec.rnk),0) + COALESCE(1.0/(60+kw.rnk),0) AS score
 FROM legal_chunk c
 LEFT JOIN vec ON c.id = vec.id
@@ -1673,6 +1752,16 @@ LEFT JOIN kw  ON c.id = kw.id
 WHERE vec.id IS NOT NULL OR kw.id IS NOT NULL
 ORDER BY score DESC LIMIT 8;
 ```
+
+**초안에서 세 번 틀렸던 자리다.** 실물은 `ai/pipeline/search.py`.
+
+| | |
+|---|---|
+| `LIMIT`은 서브쿼리 안에서 `ORDER BY`와 붙어야 한다 | CTE 본문에 그냥 걸면 상위 30이 아니라 **임의의 30행**이 뽑힌다 |
+| 키워드 쪽은 `=%`가 아니라 `LIKE`다 | `=%`는 길이가 비슷한 두 문자열의 유사도 검색용이라 짧은 질의와 긴 조문 사이에서 기본 임계값 0.3을 못 넘어 **통째로 죽는다**(실측: `'업무와 관련이 없다고 인정되는 금액'` vs `소득세법-33-1-13` = 0.129). 임계값을 낮추려면 `shared_preload_libraries`가 필요한데 비어 있다. `gin_bigm_ops`는 원래 LIKE 가속용이다 |
+| `section` 필터가 빠지면 안 된다 | 기각된 청구인 주장이 근거로 올라와 **정반대 결론**이 나간다 |
+
+**벡터와 키워드가 원하는 질의 길이가 반대다.** 벡터는 문맥이 붙을수록 잘 찾고 LIKE는 글자가 그대로 본문에 있어야 해서 길어지면 한 건도 안 걸린다. 그래서 에이전트가 `queries`와 `keywords`를 따로 낸다(§9-5).
 
 ### RAG를 쓰는 두 곳 (동일 코퍼스 공유)
 
@@ -1963,7 +2052,7 @@ docker-compose.yml
 
 > **판정 경로는 룰 엔진이 맞습니다. 의도적으로 그렇게 만들었습니다.**
 >
-> 저희 에이전트는 판정하는 게 아니라 **규칙을 만들고, 세무사에게 넘길 문서를 만듭니다.** 매주 판정하지 못한 항목을 모아 쟁점별로 묶고, 법령·행정규칙·심판례·판례를 위계 순으로 탐색해서 — 사용자에게는 세무사 질문 목록을, 우리에게는 다음 주 규칙 초안을 만듭니다. 조문을 못 찾으면 다음 섹션으로 넘어가고, 그래도 없으면 보류합니다.
+> 저희 에이전트는 판정하는 게 아니라 **규칙을 만들고, 세무사에게 넘길 문서를 만듭니다.** 매주 판정하지 못한 항목을 모아 쟁점별로 묶고, 법령·행정규칙·심판례·판례를 한 번에 뒤져 근거를 고르고 — 사용자에게는 세무사 질문 목록을, 우리에게는 다음 주 규칙 초안을 만듭니다. 인용문이 원문에 실제로 있는지, 조문 근거 없이 심판례만으로 결론이 서 있지는 않은지를 코드가 검증하고, 걸리면 보류로 표시해 사람이 먼저 봅니다.
 >
 > **에이전트가 만든 규칙을 룰 엔진이 실행하는 구조**입니다. 판정에 AI를 넣으면 같은 거래에 다른 답이 나오고, 세금에서 그건 오탐입니다.
 

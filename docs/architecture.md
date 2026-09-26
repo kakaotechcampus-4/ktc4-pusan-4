@@ -123,11 +123,13 @@ flowchart TD
     end
 
     subgraph EXTRACT["규칙 후보 추출 (주 1회 배치, 에이전트, 자동)"]
-        AGG["① 집계 (SQL)<br/>unmatched_log(규칙없음) + override_log<br/>merchant_category × industry_code<br/>distinct_users ≥ 2, 빈도순 상위 N"]
-        SEARCH["② 위계 순차 탐색 (에이전트)<br/>법령 → 행정규칙 → 심판례·해석 → 판례(법원판단)<br/>하이브리드 검색: 벡터 + 키워드 (RRF)<br/>충분하면 조기 종료, 끝까지 없으면 보류"]
-        DRAFT["③ 초안 생성 (Pydantic 강제)<br/>validator: 조문 ID 실재, 하위근거로 '가능' 금지"]
-        CAND["④ rule_candidate INSERT<br/>status: 대기, draft_yaml"]
-        AGG --> SEARCH --> DRAFT --> CAND
+        AGG["① 집계 (SQL)<br/>unmatched_log(RULE_NOT_FOUND)<br/>merchant_category × industry_code<br/>distinct_users ≥ 2, 빈도순 상위 N"]
+        PLAN["② 질의 작성 (에이전트 ①)<br/>SearchPlan: 의미질의 + 정확일치 키워드"]
+        SEARCH["③ 4개 위계 동시 검색 (코드)<br/>법령 · 행정규칙 · 심판례해석 · 판례<br/>하이브리드: 벡터 + 키워드 (RRF), 임베딩 1회"]
+        PICK["④ 근거 선택 (에이전트 ②)<br/>Evidence: 인용문 원문 대조, 검색결과 밖 ID 차단"]
+        DRAFT["⑤ 초안 생성 (에이전트 ③, Pydantic 강제)<br/>validator: 조문 ID 실재<br/>확정 결론이 하위 근거뿐이면 보류"]
+        CAND["⑥ rule_candidate INSERT<br/>status: 대기 또는 보류, draft_yaml"]
+        AGG --> PLAN --> SEARCH --> PICK --> DRAFT --> CAND
     end
 
     subgraph HUMAN["사람 검수 후 git 반영 (수동)"]
@@ -141,7 +143,7 @@ flowchart TD
     JUDGE["판정 (룰 엔진)"]
     REPORT["보고서(핸드오프 문서) 생성"]
 
-    JUDGE -->|"unmatched_log · override_log"| AGG
+    JUDGE -->|"unmatched_log"| AGG
     LC -.->|"검색 코퍼스"| SEARCH
     LC -.->|"같은 코퍼스 공유"| REPORT
     CAND --> ADMIN
