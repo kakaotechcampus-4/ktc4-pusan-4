@@ -43,3 +43,12 @@
 - 일반 검증 실패(`VALIDATION_ERROR`) 테스트는 필수 필드가 빠진 문진 요청으로 옮겼다.
 - 스웨거 설명의 "현재 기준: PR #41 의 ce91429" 표기를 지웠다. api.md가 그 뒤로 바뀌어 낡은 표기였다.
 - 목 응답은 입력 검증 에러(422 등)를 내지 않는다. 고정 응답이라 서비스 구현 때 넣기로 하고 PR #55 본문에 적었다.
+
+## 20:38 답변 정정 때 같은 scope 의 ANSWERED 질문도 새 UserFact 로 옮김
+
+- 커밋: 9f2924d
+- PR #55 리뷰(memoryhong) 반영. 앞 기록에서 api.md §3.10에 넣은 형제 질문 문장이 `PENDING`만 대상으로 했다. 정정하면 4단계("Fact의 scope가 영향을 주는 Transaction 조회")에 따라 scope 거래 전체가 새 version으로 재판정되는데, 이미 `ANSWERED`인 형제 질문의 `answeredFactId`는 이전 version에 남았다. 같은 거래에서 Judgment는 새 UserFact를, Question은 옛 UserFact를 가리키게 된다.
+- 형제 질문 대상을 `CANCELED`가 아닌 Question으로 넓혔다. `PENDING`이면 `ANSWERED`로 바꾸고, `ANSWERED`이면 `answeredFactId`와 `answeredAt`을 새 UserFact 기준으로 바꾼다. 정정 문단도 요청한 질문 하나가 아니라 같은 Batch·`groupKey`·`factType` Question을 모두 옮기도록 맞췄다.
+- 옮기는 쪽으로 정한 이유: 정정 문단이 이미 요청한 질문의 `answeredFactId`를 바꾸고 있어서 이 필드는 "현재 답"을 가리킨다. 형제 질문은 처음부터 같은 scope 사실을 공유해서 답해진 것이다. 이전 답은 UserFact 이전 version 행과 Judgment revision의 `trigger_user_fact_id`에 남는다.
+- 삭제한 mock-server `respond()`도 같은 구멍이 있었다. 형제를 `PENDING`만 골랐고 재판정할 거래도 질문에서 뽑아서, 정정 때 형제 거래가 재판정되지 않았다. 서비스 구현 때 `questions.service.test.cjs`를 참고하되 이 부분은 따르지 않는다.
+- 코드 변경은 없다. `POST /question-responses`는 고정 목 응답이고, `answeredFactId`를 읽는 곳도 없다.
