@@ -73,6 +73,8 @@ public class UploadBatchController {
 
     @MockResponse
     @Operation(summary = "배치 상세", description = "목록 items[] 와 같은 형태")
+    @ApiResponse(responseCode = "404", description = "BATCH_NOT_FOUND",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @GetMapping("/{batchId}")
     public UploadBatchResponse detail(@PathVariable UUID batchId) {
         return mockData.uploadBatch();
@@ -82,6 +84,8 @@ public class UploadBatchController {
     @Operation(summary = "배치 및 종속 데이터 삭제",
         description = "Transaction, ClassificationReview, JudgmentRun, Judgment, Question, Batch 범위 UserFact, "
             + "JudgmentOverride 를 함께 삭제한다. StatuteVersion 은 삭제하지 않는다")
+    @ApiResponse(responseCode = "404", description = "BATCH_NOT_FOUND",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @DeleteMapping("/{batchId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable UUID batchId) {

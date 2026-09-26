@@ -45,9 +45,12 @@ public class ClassificationController {
     @MockResponse
     @Operation(summary = "미분류 거래 분류 응답",
         description = "Review → RESOLVED, Transaction.merchantCategory 확정. 분류 응답은 UserFact 로 저장하지 않는다")
+    @ApiResponse(responseCode = "404", description = "CLASSIFICATION_REVIEW_NOT_FOUND",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @ApiResponse(responseCode = "409", description = "CLASSIFICATION_ALREADY_RESOLVED",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
-    @ApiResponse(responseCode = "422", description = "INVALID_MERCHANT_CATEGORY, UNCLASSIFIED_CATEGORY_NOT_ALLOWED",
+    @ApiResponse(responseCode = "422", description = "INVALID_MERCHANT_CATEGORY, UNCLASSIFIED_CATEGORY_NOT_ALLOWED, "
+        + "REVIEWS_FROM_DIFFERENT_BATCHES — reviewIds 가 서로 다른 배치에 걸쳐 있음",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @PostMapping("/classification-responses")
     public ClassificationAnswerResponse answer(@RequestBody ClassificationAnswerRequest request) {

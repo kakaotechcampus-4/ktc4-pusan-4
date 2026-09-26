@@ -1,11 +1,17 @@
 package com.ktc4.pusan4.judgment.api;
 
 import com.ktc4.pusan4.judgment.domain.Verdict;
+import com.ktc4.pusan4.shared.api.ApiException;
+import com.ktc4.pusan4.shared.api.ErrorResponse;
 import com.ktc4.pusan4.shared.api.MockResponse;
 import com.ktc4.pusan4.shared.api.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -14,7 +20,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 @Tag(name = "judgments", description = "판정 결과 (api.md 3.7, 3.8)")
 @RestController
@@ -47,17 +55,27 @@ public class JudgmentController {
 
     @MockResponse
     @Operation(summary = "판정 결과 요약", description = "batchId, year, runId 중 정확히 하나를 사용한다")
+    @ApiResponse(responseCode = "400", description = "INVALID_SUMMARY_SCOPE — batchId, year, runId 가 0개거나 2개 이상",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @GetMapping("/summary")
     public JudgmentSummaryResponse summary(
         @RequestParam(required = false) UUID batchId,
         @RequestParam(required = false) Integer year,
         @RequestParam(required = false) UUID runId
     ) {
+        // 목 응답이어도 스코프 검사는 입력만으로 판단할 수 있어 지금 적용한다
+        long scopes = Stream.of(batchId, year, runId).filter(Objects::nonNull).count();
+        if (scopes != 1) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_SUMMARY_SCOPE",
+                "batchId, year, runId 중 정확히 하나를 지정해야 합니다.");
+        }
         return mockData.summary();
     }
 
     @MockResponse
     @Operation(summary = "판정 상세")
+    @ApiResponse(responseCode = "404", description = "JUDGMENT_NOT_FOUND",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @GetMapping("/{judgmentId}")
     public JudgmentResponse detail(@PathVariable UUID judgmentId) {
         return mockData.judgment();

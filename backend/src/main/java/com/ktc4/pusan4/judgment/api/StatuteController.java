@@ -1,7 +1,11 @@
 package com.ktc4.pusan4.judgment.api;
 
+import com.ktc4.pusan4.shared.api.ErrorResponse;
 import com.ktc4.pusan4.shared.api.MockResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,6 +25,8 @@ public class StatuteController {
 
     @MockResponse
     @Operation(summary = "법령 원문 조회")
+    @ApiResponse(responseCode = "404", description = "STATUTE_NOT_FOUND",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @GetMapping("/{statuteVersionId}")
     public StatuteResponse detail(@PathVariable long statuteVersionId) {
         return mockData.statute();

@@ -46,7 +46,10 @@ public class QuestionController {
     @MockResponse
     @Operation(summary = "확인 질문 응답 및 부분 재판정",
         description = "PENDING 은 최초 답변, ANSWERED 는 정정(UserFact 새 version). 새 JudgmentRun 은 만들지 않는다. "
-            + "처리 순서는 api.md 3.10")
+            + "같은 Batch·groupKey·factType 의 다른 PENDING 질문도 같은 UserFact 로 함께 ANSWERED 처리하고 "
+            + "재판정 대상에 넣는다. answeredCount 는 함께 처리된 수까지 센다. 처리 순서는 api.md 3.10")
+    @ApiResponse(responseCode = "404", description = "QUESTION_NOT_FOUND",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @ApiResponse(responseCode = "409", description = "QUESTION_NOT_ANSWERABLE, QUESTION_GROUP_MISMATCH",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @ApiResponse(responseCode = "422", description = "INVALID_ANSWER_VALUE, QUESTIONS_FROM_DIFFERENT_BATCHES",
