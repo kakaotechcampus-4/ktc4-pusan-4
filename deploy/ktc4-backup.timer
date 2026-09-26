@@ -1,0 +1,9 @@
+[Unit]
+Description=Daily ktc4 PostgreSQL backup
+
+[Timer]
+OnCalendar=*-*-* 18:00:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target
