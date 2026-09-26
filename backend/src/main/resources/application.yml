@@ -19,5 +19,5 @@ springdoc:
     enabled: false
   swagger-ui:
     enabled: false
-  # @RestControllerAdvice 응답을 모든 API 에 자동으로 붙이지 않는다. 501 은 OpenApiConfig 가 붙인다.
+  # @RestControllerAdvice 응답을 모든 API 에 자동으로 붙이지 않는다.
   override-with-generic-response: false

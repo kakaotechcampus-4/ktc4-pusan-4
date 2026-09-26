@@ -270,6 +270,8 @@ size    기본 20, 최대 100
 
 분기는 `code`, 화면 표시는 `label`을 사용한다.
 
+예외: `userInclusion`(§2.3)은 §3.4 응답 예시대로 값을 그대로(`"EXCLUDED"`) 응답한다. `bookkeepingDuty`(§2.9)는 원문 자체가 표시값이라 역시 값 그대로다.
+
 ---
 
 ## 1.6 Idempotency-Key
@@ -1897,6 +1899,8 @@ merchant_norm
 ```
 
 새로운 `JudgmentRun`은 생성하지 않는다.
+
+3·4단계의 대상은 요청에 적힌 `questionIds`만이 아니다. 같은 Batch·`groupKey`·`factType`의 다른 `PENDING` Question도 같은 UserFact로 함께 `ANSWERED` 처리하고 재판정 대상에 넣는다. `answeredCount`는 이렇게 함께 처리된 수까지 포함한다.
 
 응답:
 
