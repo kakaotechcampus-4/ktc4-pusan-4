@@ -41,6 +41,9 @@ postgres_tree=$(git -C "$repo" rev-parse "$sha:docker/postgres")
 export POSTGRES_TAG=${postgres_tree:0:12}
 
 registry=${ECR_REPOSITORY%%/*}
+export DOCKER_CONFIG
+DOCKER_CONFIG=$(mktemp -d)
+trap 'rm -rf "$DOCKER_CONFIG"' EXIT
 aws ecr get-login-password --region ap-northeast-2 \
     | docker login --username AWS --password-stdin "$registry"
 

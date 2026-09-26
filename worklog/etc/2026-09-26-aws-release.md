@@ -29,3 +29,12 @@
 - 격리된 Compose 프로젝트에서 PostgreSQL·Spring·AI의 healthcheck가 모두 통과했다. `db/schema.sql`과 `db/rag.sql` 적용도 확인했다.
 - 첫 기동에서 스키마를 PostgreSQL 초기화 스크립트로 실행하면 Flyway가 비어 있지 않은 스키마를 거부했다. 초기화 시 확장만 만들고, Flyway가 먼저 실행된 뒤 나머지 SQL을 적용하도록 순서를 수정했다.
 - 로컬 Caddy의 `/upload`는 200을, `/api/v1/users/me`는 프록시를 거쳐 현재 구현 상태인 501을 반환했다.
+
+## AWS 준비와 PR
+
+- 팀 계정 `369992801983`의 제공 EC2를 시작하고 EIP `52.78.114.159`를 연결했다. 보안그룹은 80·443만 인바운드로 열었다.
+- 서울 리전에 변경 불가 태그 ECR 저장소와 비공개 S3 백업 버킷을 만들었다. S3 백업은 7일, ECR 이미지는 90일 뒤 정리되도록 설정했다.
+- DuckDNS `ktc4-pusan-4.duckdns.org`가 EIP를 가리키는 것을 확인하고 GitHub Actions 변수 4개를 등록했다.
+- EC2에 Docker와 AWS CLI v2를 설치하고 인스턴스 역할의 ECR 로그인, S3 쓰기·읽기를 확인했다. 운영 환경 파일은 서버에서 비밀번호를 생성해 root 전용으로 만들었다.
+- ECR 로그인 정보가 서버의 기본 Docker 설정에 남지 않도록 배포 스크립트가 임시 Docker 설정 디렉터리를 사용한다.
+- PR #58의 검증 작업은 통과했다. `develop` 반영에는 필수 리뷰가 필요하다.
