@@ -185,7 +185,7 @@ class ApiResponseContractTest {
             .andExpect(jsonPath("$.code").value("IDEMPOTENCY_KEY_REQUIRED"));
     }
 
-    @ParameterizedTest(name = "{0}")
+    @ParameterizedTest(name = "summary{0}")
     @MethodSource("invalidSummaryScopes")
     void summary_without_exactly_one_scope_returns_invalid_summary_scope(String query) throws Exception {
         // when / then: api.md 3.7 — batchId, year, runId 중 정확히 하나

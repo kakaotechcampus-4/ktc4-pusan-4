@@ -25,3 +25,8 @@
 - §1.3 표에 없는 405·415 등은 HTTP 상태 이름(`METHOD_NOT_ALLOWED`)을 code 로 쓴다. api.md 에 넣을지 팀 확인 필요.
 - `401 UNAUTHORIZED` 는 인증이 아직 없어 실제로는 나가지 않는다. 문서에만 있다.
 - `POST /judgments/{id}/override` 는 api.md 에 에러가 없어 손대지 않았다. 없는 판정이면 `JUDGMENT_NOT_FOUND` 가 자연스럽다.
+
+## 16:10 OpenApiConfig 컴파일 오류 수정
+
+- 응답 목록 null 방어에서 `responses` 를 다시 대입해 람다 안에서 effectively final 이 깨졌다(`compileJava` 실패). null 이면 먼저 set 하고 한 번만 읽도록 바꿨다.
+- 앞 push 는 빌드 실패 상태로 올라갔다. 테스트 명령과 push 를 `&&` 로 잇지 않아서다.

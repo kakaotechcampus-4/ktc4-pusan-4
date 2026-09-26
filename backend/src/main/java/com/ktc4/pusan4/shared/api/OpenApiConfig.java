@@ -85,11 +85,10 @@ public class OpenApiConfig {
     @Bean
     OperationCustomizer commonErrorResponses() {
         return (operation, handlerMethod) -> {
-            ApiResponses responses = operation.getResponses();
-            if (responses == null) {
-                responses = new ApiResponses();
-                operation.setResponses(responses);
+            if (operation.getResponses() == null) {
+                operation.setResponses(new ApiResponses());
             }
+            ApiResponses responses = operation.getResponses();
             COMMON_ERRORS.forEach((status, code) -> {
                 ApiResponse existing = responses.get(status);
                 if (existing == null) {
