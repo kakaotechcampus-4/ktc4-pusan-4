@@ -8,10 +8,11 @@
 |---|---|
 | `main` | 멘토님 리뷰 대상. `develop` 에서만 PR 을 받습니다. |
 | `develop` | 기본 브랜치. 팀 작업이 모이는 곳. |
+| `release` | AWS 자동 배포 대상. 검증된 `develop` 커밋을 PR로 승격합니다. |
 | `feature/*` | 기능 작업. `develop` 에서 따고 `develop` 으로 머지. |
 | `refactor/*` | 멘토님 리뷰사항 반영하는 브랜치. |
 
-<!-- TODO: hotfix / release 브랜치를 쓸지, 브랜치 이름 규칙(feature/이슈번호-설명 등)을 정할지 -->
+<!-- TODO: hotfix 브랜치와 기능 브랜치 이름 규칙(feature/이슈번호-설명 등)을 정할지 검토 -->
 
 ## 커밋 메시지
 

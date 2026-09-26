@@ -1,0 +1,8 @@
+[Unit]
+Description=Back up ktc4 PostgreSQL to S3
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash /opt/ktc4/repo/deploy/backup.sh
