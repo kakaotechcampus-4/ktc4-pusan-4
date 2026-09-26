@@ -21,7 +21,10 @@ services:
     build: ./ai
     environment:
       DATABASE_URL: postgresql://${DB_USERNAME:-ktc4}:${DB_PASSWORD:-ktc4-local}@postgres:5432/${DB_NAME:-ktc4}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      AGENT_API_KEY: ${AGENT_API_KEY:-}
+      AGENT_BASE_URL: ${AGENT_BASE_URL:-}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-}
     ports:
       - "${AI_PORT:-8000}:8000"
     depends_on:

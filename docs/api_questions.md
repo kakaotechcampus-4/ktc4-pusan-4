@@ -1,117 +1,15 @@
-# 되묻기 API 명세
+# 되묻기 API 안내
 
-> **이 문서는 되묻기 관련 엔드포인트만 담는다.** 전체 API 명세는 노션이 원본이고,
-> 여기는 PR #21 답글에서 약속한 동작을 명세에 반영하려고 해당 부분만 옮긴 것이다.
-> 나머지 엔드포인트를 옮길 때 이 문서에 합치거나 파일을 나누면 된다.
+되묻기 API의 계약 원본은 [`api.md`](api.md)다. 이 문서는 과거 초안과 전체 API 명세가 다시 갈라지는 것을 막기 위한 안내만 제공한다.
 
-관련: [`architecture.md`](architecture.md) · PR #21 · PR #11(연간 확정 조건)
+- `GET /api/v1/questions`: `api.md` 3.9
+- `POST /api/v1/question-responses`: `api.md` 3.10
+- `POST /api/v1/questions/bulk-answer`: `api.md` 3.11
+- Question 취소 정책: `api.md` 3.12
 
----
+주요 결정:
 
-## 1. GET /api/questions
-
-미해소 되묻기 질문을 **배치 단위**로 내려준다.
-
-### 응답
-
-```json
-{
-  "batch_size": 15,
-  "remaining_in_batch": 12,
-  "total_unresolved": 24,
-  "unresolved_amount": 340000,
-  "questions": [ ... ]
-}
-```
-
-| 필드 | 뜻 |
-|---|---|
-| `batch_size` | 한 번에 보여주는 질문 수. 이만큼 답하면 다음 배치가 나온다 |
-| `remaining_in_batch` | 현재 배치에서 아직 답하지 않은 수 |
-| `total_unresolved` | **전체** 미해소 질문 수. 배치와 무관하다 |
-| `unresolved_amount` | 미해소 질문에 걸린 거래 금액 합계 (원) |
-
-### 왜 `limit` / `remaining` 에서 바꿨는가
-
-이전 명세는 이랬다.
-
-```json
-{ "remaining": 12, "limit": 15 }
-```
-
-`limit` 이 **"총량 절단"** 으로 읽힌다. 실제 동작은 절단이 아니라 배치다 —
-15개를 답하면 다음 15개가 나오고, 질문은 하나도 사라지지 않는다.
-
-그리고 `total_unresolved` 가 없으면 프론트가 **"확인 필요 24건 · 340,000원"**
-을 띄울 수 없다. 그게 PR #21 답글에서 약속한 동작이다.
-
-**질문을 자르면 안 되는 이유:**
-
-- PR #11 의 연간 확정 조건이 "미응답 질문 없음" 이다. 절단하면 확정이
-  영원히 되지 않는다.
-- 미분류 건이 요건 충족 합계에서 빠져 사용자가 경비를 덜 계상한다.
-  거래가 조용히 사라지는 것과 같은 실패다.
-
-`batch_size` 의 목적은 **첫 화면에서 200문항을 보여주지 않는 것**이지
-질문을 없애는 게 아니다.
-
-### `batch_size` 기본값
-
-잠정 **15**. 실측 근거는 PR #21 에 있다 — 제품 경로(카드 파일) 기준으로
-미분류 거래의 80% 를 상위 15개 상호가 덮는다.
-
-표본이 1개월·2명이라 롱테일이 짧다. 1년치 데이터가 들어오면 재측정한다.
-
----
-
-## 2. POST /api/questions/bulk-answer
-
-남은 소액 꼬리를 한 번에 처리한다. **"남은 12건 전부 개인용"** 이 이 엔드포인트다.
-
-되묻기를 끝까지 끌고 가려면(확정 조건이 미응답 0을 요구한다) 마지막 꼬리를
-한 건씩 묻는 대신 일괄로 닫을 수단이 필요하다.
-
-### 요청
-
-```json
-{
-  "scope": "all_unresolved",
-  "fact_type": "용도",
-  "value": "개인"
-}
-```
-
-| 필드 | 뜻 |
-|---|---|
-| `scope` | `all_unresolved`(미해소 전체) 또는 `current_batch`(현재 배치만) |
-| `fact_type` | 답을 채울 사실 유형. 룰카드 `question.fact_type` 과 같은 값 |
-| `value` | 선택지 값. 해당 `fact_type` 의 `options[].value` 중 하나 |
-
-### 응답
-
-```json
-{
-  "answered": 12,
-  "skipped": 3,
-  "total_unresolved": 9,
-  "unresolved_amount": 128000
-}
-```
-
-`skipped` 는 **그 `fact_type` 을 묻지 않는 질문** 이라 건너뛴 수다. 예를 들어
-`용도` 로 일괄 처리하면 `안분비율` 을 묻는 질문은 답이 채워지지 않는다.
-일괄 처리로 전부 닫히지 않을 수 있다는 뜻이고, 응답의 `total_unresolved` 로
-남은 수를 그대로 보여준다.
-
----
-
-## 3. 백엔드 확인 필요
-
-- **`unresolved_amount` 의 정의** — 질문 단위인지 거래 단위인지. 질문은
-  `group_by: merchant_norm` 으로 여러 거래를 묶으므로, 묶인 거래 금액의
-  합계로 보는 것을 제안한다.
-- **일괄 처리의 되돌리기** — 사용자가 "전부 개인용" 을 누른 뒤 개별 건을
-  다시 바꿀 수 있어야 한다. `user_fact` 를 덮어쓰는 방식이면 가능하다.
-- **배치 경계와 `group_by` 의 관계** — 한 질문이 거래 12건을 묶고 있을 때
-  `batch_size` 는 질문 수를 세는가 거래 수를 세는가. 질문 수로 보는 것을
-  제안한다(화면에 뜨는 카드 수와 일치한다).
+- 미해소 집계는 `unresolved: { count, amount }` 형태다.
+- `amount`는 `PENDING` Question이 참조하는 Transaction을 중복 제거한 금액 합계다.
+- 일괄 응답 범위는 요청한 `batchId`와 `factType`으로 제한한다.
+- 일괄 응답 후 개별 정정은 기존 UserFact를 수정하지 않고 새 version을 생성한다.

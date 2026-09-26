@@ -41,6 +41,7 @@ Thumbs.db
 # ── JavaScript / TypeScript ─────────────────────────
 node_modules/
 dist/
+*.tsbuildinfo
 build/
 .next/
 out/
@@ -90,3 +91,10 @@ data/
 /*.jpeg
 /*.png
 /screenshots/
+
+# ── Claude Code ─────────────────────────────────────
+#   settings.json 과 skills/ 는 팀 공용이라 커밋한다.
+.claude/settings.local.json
+.claude/worktrees/
+ai/eval/.queries.json
+ai/eval/.drafts.json

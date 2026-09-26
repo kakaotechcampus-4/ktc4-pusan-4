@@ -1,0 +1,257 @@
+# 검색 골든셋 — 규칙 카드 초안 생성(에이전트)의 근거 검색 정확도를 재는 기준
+#
+# 청크 ID가 아니라 statute_id + must_contain 문구에 고정한다.
+# 청킹 전략을 바꾸면 청크 ID는 전부 바뀌지만 이 둘은 그대로라, A안과 B안을 같은 자로 잴 수 있다.
+#
+# 필드 8개 설명서
+#   id          식별자
+#   consumer    검색을 부르는 쪽. 규칙후보 or 보고서
+#   input       에이전트가 받는 집계 결과 한 줄. 아래 세 필드가 실제 컬럼이다
+#                 merchant_category  unmatched_log.merchant_category varchar(50)
+#                                    값은 docs/categories.md 32종 enum 밖이면 검증기 FAIL
+#                 industry_code      user_context.industry_code varchar(6)
+#                 reason             unmatched_log.reason CHECK 4종
+#   query       고정 질의. 검색만 따로 재기 위한 얼어붙은 입력이다.
+#               input 을 질의로 바꾸는 건 에이전트(pipeline/query.py)의 일인데,
+#               그걸 매번 태우면 0/10 이 나와도 검색 탓인지 프롬프트 탓인지 모른다.
+#               그래서 기본 실행은 이 고정 질의를 쓰고, 청킹·RRF·필터를 바꿀 때
+#               상수 기준으로 잰다. --rewrite 를 주면 에이전트 경로로 잰다.
+#               ⚠️ expect 를 보고 거꾸로 쓰지 말 것. 카테고리의 세무 성격
+#                 (docs/categories.md)만 보고 세무 담당자가 쓸 법한 말로 적는다.
+#   keywords    정확 일치(LIKE)용 짧은 법률 용어. 벡터와 요구가 반대라 따로 둔다 —
+#               긴 문장은 본문에 글자가 그대로 없어 한 건도 안 걸린다(실측 10/10 이 0건).
+#               고르는 법도 query 와 같다. 카테고리 어휘에서 뽑고, 조문에 실재하는지만
+#               DB 로 확인한다. '적격증명서류'는 법령·행정규칙에 0건이라 뺐고
+#               '증명서류'가 실제 조문 용어다. expect 청크의 문구는 쓰지 않는다.
+#   stop_at     인용이 내려가도 되는 가장 아래 위계 (CONTEXT.md 9.5)
+#                 법령 > 행정규칙 > 심판례·해석 > 판례 > 보류
+#               검색은 네 위계를 동시에 본다. 순차 탐색·조기 종료는 버렸다.
+#               이 필드는 하네스가 어디까지 뒤질지를 정하고, 동시에
+#               "하위 근거가 상위를 뒤집는 초안이 나오면 안 된다"를 재는 자다.
+#   expect      정답 조문. statute_id가 상위 k에 있어야 하고 그 청크가 must_contain을 포함해야 한다
+#   must_not    상위 k에 올라오면 실패. 기각된 주장, 다른 세목의 동명 고시 등
+#   note        왜 이 조문인지 나중에 이 항목을 의심할 사람을 위한 것
+#
+# 2026-09-10 기준 코퍼스에서 statute_id 존재와 문구 일치를 전수 확인했다.
+# 카드 47장이 32개 카테고리를 다 덮고 있지만, 조건 없는 기본 카드가 있는 건 11개뿐이라
+# 나머지는 industry·amount 가 어긋나면 RULE_NOT_FOUND 로 떨어진다.
+
+- id: RC-001
+  consumer: 규칙후보
+  input:
+    merchant_category: 음식점
+    industry_code: "940909"
+    reason: RULE_NOT_FOUND
+  query: 거래처 접대 성격 지출과 대표자 개인 식대의 필요경비 산입
+  keywords: ["기업업무추진비", "가사관련경비"]
+  stop_at: 법령
+  expect:
+    - statute_id: 소득세법-35-1
+      must_contain: 접대, 교제, 사례
+    - statute_id: 소득세법시행령-61-1-1
+      must_contain: 사업자가 가사와 관련하여 지출하였음이 확인되는 경비
+  must_not: []
+  note: >-
+    ★ 한 카테고리가 서로 다른 두 법으로 갈리는 유일한 항목. 거래처를 동반했으면
+    기업업무추진비(35조)고 대표자 본인 식대면 가사 관련 경비(시행령 61조1항1호)다
+    (CATEGORY_META "대표자 본인 식대는 불산입"). 어느 쪽 하나만 찾아오면 초안이
+    한쪽 결론으로 굳는다. 검색이 두 갈래를 다 물어와야 조건절이 있는 규칙이 나온다.
+    다만 본인 식대를 가사 경비로 보는 근거는 시행령 61조1항1호의 일반 문언이고
+    이 코퍼스에 직접 판단한 심판례는 못 찾았다 — 초안 단계에서 세무 검수가 필요하다.
+
+- id: RC-002
+  consumer: 규칙후보
+  input:
+    merchant_category: 온라인쇼핑
+    industry_code: "940909"
+    reason: UNCLASSIFIED
+  query: 품목이 불명한 구매 지출의 사업 관련성과 필요경비 산입
+  keywords: ["사업과 직접 관련"]
+  stop_at: 보류
+  expect: []
+  must_not: []
+  note: >-
+    ★ 두 번째 음성 항목. RC-010과 보류 사유가 다르다 — 저쪽은 가맹점 자체가
+    불명이고(PG 차단) 이쪽은 가맹점은 확실한데 품목을 모른다
+    (CATEGORY_META "품목을 모르면 되묻기 대상").
+    쿠팡에서 산 게 키보드인지 생필품인지에 따라 결론이 갈리므로 카테고리 단위로는
+    규칙을 만들 수 없고, 되묻기로 보내고 보류해야 한다.
+    27조 통상성은 관련은 있지만 품목 없이는 적용할 수 없다. 그걸 근거로
+    온라인쇼핑 전체에 규칙을 세우는 게 이 항목의 실패 모습인데, 그 실패는
+    초안 생성[3]에서 일어나므로 검색 평가인 여기서는 must_not에 넣지 않았다.
+    CONTEXT.md 1450줄대로 보류 사유를 기록하는지가 실제 확인 지점이다.
+
+- id: RC-003
+  consumer: 규칙후보
+  input:
+    merchant_category: 수도광열
+    industry_code: "940909"
+    reason: RULE_NOT_FOUND
+  query: 자택 겸용 사업장의 수도광열비 가사 관련 경비 안분
+  keywords: ["가사관련경비", "안분"]
+  stop_at: 법령
+  expect:
+    - statute_id: 소득세법-33-1-5
+      must_contain: 가사(家事)의 경비와 이에 관련되는 경비
+    - statute_id: 소득세법시행령-61-1
+      must_contain: 대통령령으로 정하는 가사(家事)의 경비
+  must_not: []
+  note: >-
+    재택 안분 대상(docs/categories.md). 법률이 "대통령령으로 정하는"이라고만 하고
+    정의를 시행령에 넘긴 구조라 둘 다 나와야 답이 완성된다. 조문 하나만 맞히면 반쪽이다.
+    user_context.home_office_ratio가 안분 비율을 들고 있다.
+
+- id: RC-004
+  consumer: 규칙후보
+  input:
+    merchant_category: 수도광열
+    industry_code: "940909"
+    reason: CONDITION_MISMATCH
+  query: 주거 겸용 사업장의 관리비와 감가상각비를 필요경비로 인정받는 요건
+  keywords: ["가사", "감가상각"]
+  stop_at: 심판례·해석
+  expect:
+    - statute_id: 심판례-115544
+      must_contain: 구분하여 기장하여야
+  must_not:
+    - statute_id: 심판례-115544
+      must_contain: 당연히 필요경비 산입하는 것이므로
+  note: >-
+    ★ 청킹 설계의 핵심 항목. 거주와 사업장을 겸용할 때 안분을 어떻게 인정받는지는
+    법령 조문만으로 안 나온다. 구분기장이라는 요건은 심판례에만 있어서 여기까지
+    내려가는 게 정답이라 stop_at이 심판례·해석이다.
+    같은 문서 안에서 '3. 심리 및 판단'은 정답이고 '2. 가. 청구인 주장'은 기각된
+    주장이다. 주장 부분이 근거로 인용되면 "전액 경비 가능"이라는 정반대 초안이 나간다.
+    CONTEXT.md 1585줄이 근거 오적용을 "기계 검증 불가능, 가장 흔하고 위험"이라 적어둔
+    바로 그 사례고, statute_exists·quoted_text 검증으로는 못 잡는다.
+    섹션 분리가 안 된 청킹 전략은 이 항목에서 반드시 실패한다.
+    CONTEXT.md 1282줄은 section을 '판례 전용'이라 적어놨지만 판례는 0행이고
+    주력이 심판례로 바뀌었으므로 심판례까지 확장해야 한다.
+
+- id: RC-005
+  consumer: 규칙후보
+  input:
+    merchant_category: 사무용품
+    industry_code: "940909"
+    reason: RULE_NOT_FOUND
+  query: 취득가액이 적은 사업용 자산의 필요경비 산입과 감가상각
+  keywords: ["즉시상각", "취득가액", "내용연수"]
+  stop_at: 법령
+  expect:
+    - statute_id: 소득세법시행령-67
+      must_contain: 이를 감가상각한 것으로 보아 상각범위액을 계산한다
+  must_not: []
+  note: >-
+    docs/categories.md가 100만원 초과면 비품(자산)이라고 적어둔 갈림길의 근거.
+    카테고리명(사무용품)과 조문 제목(즉시상각의 의제)이 글자 하나 안 겹친다.
+    키워드 검색이 구조적으로 못 맞히는 항목이라 벡터 도입 효과가 여기서 나와야 한다.
+
+- id: RC-006
+  consumer: 규칙후보
+  input:
+    merchant_category: 카페
+    industry_code: "940909"
+    reason: RULE_NOT_FOUND
+  query: 거래처 미팅 음료 등 접대 성격 지출의 필요경비 불산입
+  keywords: ["기업업무추진비", "가사관련경비"]
+  stop_at: 법령
+  expect:
+    - statute_id: 소득세법-35-1
+      must_contain: 접대, 교제, 사례
+  must_not: []
+  note: >-
+    거래처 미팅이면 기업업무추진비, 혼자 작업이면 불산입으로 갈리는 카테고리다
+    (docs/categories.md). 사용자와 카테고리는 '접대비'라 부르지만 현행 법령 용어는
+    '기업업무추진비'라 라벨과 조문 용어가 어긋난다.
+
+- id: RC-007
+  consumer: 규칙후보
+  input:
+    merchant_category: 해외SaaS
+    industry_code: "940909"
+    reason: RULE_NOT_FOUND
+  query: 사업 관련 지출의 적격증명서류 수취 및 보관 의무
+  keywords: ["증명서류", "신용카드매출전표"]
+  stop_at: 법령
+  expect:
+    - statute_id: 소득세법-160의2-2
+      must_contain: 증명서류를 받아야 한다
+  must_not:
+    - statute_id: 소득세법-33-1-9
+      must_contain: 부가가치세의 매입세액
+  note: >-
+    ★ 페르소나 종속 함정. CATEGORY_META는 이 카테고리에 "부가세 불공제,
+    3만원 초과면 증빙불비 플래그" 두 가지를 걸어놨지만 부가세 쪽은 일반과세
+    사업자 기준이다. 940909 인적용역은 면세라 부가세 포함 전액이 경비고
+    매입세액 불산입 조항이 적용되지 않는다(CONTEXT.md 402줄).
+    그래서 33조1항 9호는 이 페르소나에서 근거 오적용이라 must_not에 있다.
+    조문은 실재하고 인용문도 원문 그대로인데 이 사업자에겐 안 맞는다는 점에서
+    RC-009(법인세법 고시)와 같은 유형이다.
+    2차 페르소나(일반과세)가 켜지면 9호는 그쪽에서 expect가 된다 — 이 항목을
+    고치는 게 아니라 industry_code가 다른 항목을 새로 추가한다.
+
+- id: RC-008
+  consumer: 규칙후보
+  input:
+    merchant_category: 게임
+    industry_code: "940909"
+    reason: RULE_NOT_FOUND
+  query: 사업과 직접 관련이 없는 지출의 필요경비 불산입
+  keywords: ["사업과 직접 관련", "업무와 관련이 없"]
+  stop_at: 법령
+  expect:
+    - statute_id: 소득세법-33-1-13
+      must_contain: 직접 그 업무와 관련이 없다고 인정되는 금액
+  must_not: []
+  note: >-
+    사업 무관 후보(docs/categories.md). 13호는 전액 차단이 아니라 조건부라
+    G2로 간다(CONTEXT.md §G1 표). 업종이 개발업이면 게임이 업무 관련일 수도 있어
+    industry_code에 따라 결론이 갈리는데, 940909(인적용역)에서는 무관 쪽이다.
+
+- id: RC-009
+  consumer: 규칙후보
+  input:
+    merchant_category: 차량
+    industry_code: "940909"
+    reason: RULE_NOT_FOUND
+  query: 업무용승용차 운행기록부 작성과 업무사용비율 입증
+  keywords: ["업무용승용차", "운행기록", "업무사용비율"]
+  stop_at: 행정규칙
+  expect:
+    - statute_id: 업무용승용차운행기록방법에관한고시#2104628-3
+      must_contain: 해당 개인사업자는 과세관청의 요청시
+  must_not:
+    - statute_id: 업무용승용차운행기록방법에관한고시#52390-1
+      must_contain: 「법인세법」제27조의2제2항
+    - statute_id: 업무용승용차운행기록방법에관한고시#52390-3
+      must_contain: 법인은 과세관청의 요청시
+  note: >-
+    ★ 동명이고시 함정. 같은 이름의 고시 둘이 동시에 현행인데 #2104628은 소득세법
+    근거(개인사업자), #52390은 법인세법 근거다. 개인사업자에게 법인세법 고시를
+    인용하면 조문은 실재하고 인용문도 원문 그대로인데 결론만 틀린 근거 오적용이 된다.
+    업무용 사용비율 안분 자체는 법령에 있지만 운행기록 방법과 소명 요건은 고시에만
+    있어서 행정규칙까지 내려가는 게 정답이다.
+
+    must_not 이 둘인 이유. 두 고시를 절 단위로 대조했더니 제1조(목적)만 근거 법령이
+    다르고 제3조(소명)는 주어가 "해당 개인사업자" 대 "법인"으로 갈린다. 개인사업자에게
+    #52390-3 을 인용하면 주어부터 틀린다. 제2조(운행기록 방법)는 두 고시가 바이트
+    단위로 같아서(md5 1ed3b827) 임베딩도 키워드도 구분이 안 된다 — 만족 불가능한
+    조건이라 일부러 넣지 않았다. 제4조는 재검토 기한 보일러플레이트다.
+
+- id: RC-010
+  consumer: 규칙후보
+  input:
+    merchant_category: PG_미상
+    industry_code: "940909"
+    reason: UNCLASSIFIED
+  query: 가맹점이 불명한 결제대행 지출의 사업 관련성
+  keywords: ["결제대행", "사업과 직접 관련"]
+  stop_at: 보류
+  expect: []
+  must_not: []
+  note: >-
+    ★ 음성 항목. 실제 가맹점이 불명이라 근거를 찾을 수 없는 게 정상이고,
+    CONTEXT.md 1450줄대로 보류하고 사유를 기록해야 한다.
+    expect가 비어 있다는 건 "아무 조문도 자신 있게 올라오면 안 된다"는 뜻이다.
+    없는 근거를 지어내지 않는지 보는 항목이라, 이게 없으면 골든셋이 재현율만 재고
+    환각은 못 잰다. docs/categories.md도 이 카테고리는 사전 등록 금지라고 못박았다.

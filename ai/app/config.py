@@ -8,7 +8,10 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=ROOT / ".env", extra="ignore")
 
     database_url: str = "postgresql://ktc4:ktc4-local@localhost:15432/ktc4"
-    openai_api_key: str | None = None
+    agent_api_key: str | None = None
+    agent_base_url: str | None = None
+    embedding_api_key: str | None = None
+    embedding_base_url: str | None = None
     law_api_oc: str = "test"
 
 settings = Settings()

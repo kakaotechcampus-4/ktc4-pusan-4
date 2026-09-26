@@ -1,5 +1,7 @@
 backend/gradlew text eol=lf
 backend/gradlew.bat text eol=crlf
+.githooks/* text eol=lf
+.claude/hooks/* text eol=lf
 
 # ── 운영 추가(2026-09-21): .github/ 줄바꿈 LF 고정 ──
 # CRLF 로 재작성되면 내용이 같아도 PR 이 승인 대기에 걸립니다.

@@ -11,3 +11,13 @@ management:
     web:
       exposure:
         include: health
+
+# 스웨거는 기본으로 닫는다. 로컬(application-local.yml)에서만 연다.
+# 프로필을 빠뜨려도 운영에 노출되지 않는 쪽으로 떨어지게 하기 위해서다.
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+  # @RestControllerAdvice 응답을 모든 API 에 자동으로 붙이지 않는다. 501 은 OpenApiConfig 가 붙인다.
+  override-with-generic-response: false

@@ -6,6 +6,7 @@
 |---|---|---|
 | **백엔드 Flyway** | `statute_version` 등 판정 코어 | `backend/src/main/resources/db/migration/V*.sql` |
 | **이 디렉터리** | `law_sync_log` | `db/schema.sql` |
+| **이 디렉터리** | `legal_chunk` (RAG 색인) | `db/rag.sql` |
 
 `statute_version`이 `judgment_citation.statute_version_id`의 FK 대상이라 저쪽이 만든다.
 양쪽이 같이 만들면 initdb가 먼저 돌아 Flyway가 "이미 존재한다"로 실패하고 앱이 안 뜬다.
@@ -17,7 +18,11 @@
 ```bash
 docker compose up -d postgres          # 1) 확장 + law_sync.sql
 ./gradlew :backend:bootRun             # 2) Flyway 마이그레이션 (또는 아래 수동 적용)
+docker compose exec -T postgres psql -U ktc4 -d ktc4 < db/rag.sql   # 3) legal_chunk
 ```
+
+`rag.sql`은 **initdb에 마운트하지 않는다.** `statute_version`을 FK로 걸어서, Flyway보다
+먼저 도는 initdb 단계에서는 참조 대상이 없어 `CREATE TABLE`이 실패하고 컨테이너가 죽는다.
 
 백엔드를 띄우지 않고 AI 쪽만 작업할 때는 V1을 직접 넣는다.
 
@@ -72,8 +77,10 @@ CREATE EXTENSION IF NOT EXISTS pg_bigm;
 |---|---|
 | `statute_version` | 법령·행정규칙·심판례해석·판례 원문. **append-only**. *Flyway 소유* |
 | `law_sync_log` | 동기화 실행 기록. 변경이 없어도 한 줄 남긴다 |
+| `legal_chunk` | 재색인 산출물. 규칙 후보 초안·보고서 생성 전용이고 **판정 경로는 쓰지 않는다** |
 
-`legal_chunk`(임베딩 산출물)는 아직 없다. 청킹·색인 작업 때 추가한다.
+`legal_chunk`는 `statute_version`에서 파생된다. 원본이 아니므로 통째로 지우고 다시 만들어도 된다.
+증분 재색인은 `source_hash`(= `statute_version.body_hash` 복사본) 비교로 판단한다.
 
 `statute_version`을 다룰 때 알아야 할 것:
 
