@@ -28,8 +28,8 @@ from psycopg.types.json import Json
 
 from app.config import settings
 from pipeline.draft import draft, missing_statutes, render
-from pipeline.query import category_meta, context, rewrite
-from pipeline.search import TIERS, Hit, expand, search_tiers
+from pipeline.query import NOT_APPLICABLE, category_meta, context, rewrite
+from pipeline.search import TIERS, Hit, retrieve
 from pipeline.select import Evidence, needs_review, select
 
 REASON = "RULE_NOT_FOUND"
@@ -72,14 +72,17 @@ def aggregate(conn: psycopg.Connection, min_users: int, limit: int) -> list[dict
 
 
 def top_tier(ev: Evidence, by_tier: dict[str, list[Hit]]) -> str | None:
-    """인용이 나온 가장 위 위계. rule_candidate.searched_tier 가 위계 준수를 보는 값이다."""
-    tier_of = {h.statute_id: t for t, hits in by_tier.items() for h in hits}
+    """인용이 나온 가장 위 위계. rule_candidate.searched_tier 가 위계 준수를 보는 값이다.
+
+    딕트 키가 아니라 doc_type 으로 본다. '기본' 은 위계가 아니라 기본 조문 묶음이다.
+    """
+    tier_of = {h.statute_id: h.doc_type for hits in by_tier.values() for h in hits}
     used = {tier_of[r.statute_id] for r in ev.refs if r.statute_id in tier_of}
     return next((t for t in TIERS if t in used), None)
 
 
 def docs(ev: Evidence, by_tier: dict[str, list[Hit]]) -> list[dict]:
-    tier_of = {h.statute_id: t for t, hits in by_tier.items() for h in hits}
+    tier_of = {h.statute_id: h.doc_type for hits in by_tier.values() for h in hits}
     return [
         {"statute_id": r.statute_id, "quote": r.quote, "tier": tier_of.get(r.statute_id)}
         for r in ev.refs
@@ -104,9 +107,8 @@ def propose(
     }
     try:
         plan = rewrite(cat, ind, REASON, meta)
-        by_tier = search_tiers(conn, plan.queries, plan.keywords, as_of)
-        flat = [h for hs in by_tier.values() for h in hs]
-        ev = select(block, by_tier, bodies=expand(conn, flat))
+        by_tier = retrieve(conn, plan.queries, plan.keywords, as_of, NOT_APPLICABLE.get(ind, ()))
+        ev = select(block, by_tier)
         card = draft(block, ev)
     except (ValueError, RuntimeError) as e:
         return out, f"에이전트 실패 — {e}"

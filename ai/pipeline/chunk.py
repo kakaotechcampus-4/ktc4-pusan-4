@@ -21,6 +21,16 @@ _CLAIM = re.compile(r"[0-9]+\.\s*청구인\s*주장")
 # 개행은 parse.py 가 API 필드를 "\n".join 한 자리라 그대로 필드 경계다.
 _CASE_SECTIONS = {"심판례": ("요지", "주문", "이유"), "해석례": ("질의", "회답", "이유")}
 
+# 개정 이력과 한자 병기. 형제 호가 같은 개정일 목록을 달고 있어 임베딩이 그걸로 채워지고
+# (시행령-55-1 은 466자 중 316자), `가사(家事)의` 같은 병기는 LIKE '가사의 경비' 를 막는다.
+_NOISE = re.compile(
+    r"<(?:개정|신설|조항조정|삭제|전문개정)[^<>]*>|<[\d.,\s]+>|\([\u4e00-\u9fff\uf900-\ufaff]+\)"
+)
+
+
+def clean(text: str) -> str:
+    return _NOISE.sub("", text)
+
 
 @dataclass(frozen=True)
 class Chunk:
@@ -98,7 +108,7 @@ def chunk_statutes(rows: Iterable[dict[str, Any]]) -> list[Chunk]:
         c
         for sid, row in by_id.items()
         if sid not in parents
-        for c in _emit(row, _lead(sid, by_id) + row["body"], None)
+        for c in _emit(row, clean(_lead(sid, by_id) + row["body"]), None)
     ]
 
 

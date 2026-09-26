@@ -34,6 +34,11 @@ def test_하위만_인용하면_그_위계다():
     assert top_tier(ev("심판례-1"), BY_TIER) == "심판례해석"
 
 
+def test_기본_조문만_인용해도_법령이다():
+    by_tier = {"기본": [hit("소득세법-33-1-1", "법령")], **BY_TIER}
+    assert top_tier(ev("소득세법-33-1-1"), by_tier) == "법령"
+
+
 def test_인용이_없으면_없다():
     assert top_tier(ev(), BY_TIER) is None
 

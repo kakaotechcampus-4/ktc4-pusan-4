@@ -1,6 +1,6 @@
 """초안 골든셋 하네스. 규칙 카드가 정답지다.
 
-사용: python -m eval.run_draft [--limit 10] [--gate G2] [--category 카페] [--show]
+사용: python -m eval.run_draft [--limit 10] [--gate G2] [--category 카페] [--show] [--search-only]
 
 run_search 가 검색 한 층을 잰다면 이쪽은 그 뒤 두 층을 잰다.
 
@@ -32,10 +32,11 @@ from pathlib import Path
 
 import yaml
 
+from eval.run_search import cached_plan
 from pipeline.draft import draft
-from pipeline.query import category_meta, context, rewrite
-from pipeline.search import connect, expand, search_tiers
-from pipeline.select import needs_review, select
+from pipeline.query import NOT_APPLICABLE, category_meta, context
+from pipeline.search import FRAME, connect, retrieve
+from pipeline.select import _candidates, needs_review, select
 
 with contextlib.suppress(Exception):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -43,6 +44,9 @@ with contextlib.suppress(Exception):
 ROOT = Path(__file__).resolve().parents[2]
 CARDS = ROOT / "rules" / "cards"
 CACHE = Path(__file__).parent / ".drafts.json"
+# 질의 계획을 고정해 검색 쪽 지표를 결정적으로 만든다. 다시 쓰려면 이 파일을 지운다.
+# run_search 의 .queries.json 과 나눈 건 거기 --fresh 가 파일을 통째로 덮기 때문이다.
+PLANS = Path(__file__).parent / ".plans.json"
 
 AS_OF = date(2026, 1, 1)
 REASON = "RULE_NOT_FOUND"
@@ -103,24 +107,25 @@ def grade_verdict(got: str | None, want: set[str]) -> str:
     return "반대"
 
 
-def produce(conn, cat: str, industry: str, meta: dict) -> dict:
+def produce(conn, cat: str, industry: str, meta: dict, plans: dict, search_only: bool = False) -> dict:
     """파이프라인 한 바퀴. 실패는 값으로 돌려준다 — 한 건에 하네스가 죽으면 안 된다."""
     block = context(cat, industry, REASON, meta)
+    # 후보 전체를 남긴다. 이게 없으면 근거를 못 맞춘 게 검색 탓인지 선택 탓인지
+    # 구분이 안 된다 - 원인 귀속이 하네스를 둘로 나눈 이유다. 선택이 실패해도 남긴다.
+    out = {"error": None, "refs": [], "pool": [], "chars": 0, "gate": None, "verdict": None, "hold": True}
     try:
-        plan = rewrite(cat, industry, REASON, meta)
-        by_tier = search_tiers(conn, plan.queries, plan.keywords, AS_OF)
-        flat = [h for hs in by_tier.values() for h in hs]
-        ev = select(block, by_tier, bodies=expand(conn, flat))
+        plan = cached_plan(cat, industry, REASON, meta, plans, PLANS)
+        by_tier = retrieve(conn, plan.queries, plan.keywords, AS_OF, NOT_APPLICABLE.get(industry, ()))
+        out["pool"] = sorted({h.statute_id for hs in by_tier.values() for h in hs})
+        out["chars"] = len(_candidates(by_tier))
+        if search_only:
+            return out
+        ev = select(block, by_tier)
         card = draft(block, ev)
     except (ValueError, RuntimeError) as e:
-        return {"error": str(e)[:90], "refs": [], "pool": [], "gate": None,
-                "verdict": None, "hold": True}
-    return {
-        "error": None,
+        return out | {"error": str(e)[:90]}
+    return out | {
         "refs": [r.statute_id for r in ev.refs],
-        # 후보 전체를 남긴다. 이게 없으면 근거를 못 맞춘 게 검색 탓인지 선택 탓인지
-        # 구분이 안 된다 - 원인 귀속이 하네스를 둘로 나눈 이유다.
-        "pool": sorted({h.statute_id for hits in by_tier.values() for h in hits}),
         "gate": card.gate,
         "verdict": card.verdict,
         "hold": needs_review(ev, by_tier) or not ev.sufficient,
@@ -148,13 +153,33 @@ def score(got: dict, want: dict) -> dict:
     }
 
 
+def missing(got: dict, want: dict) -> list[str]:
+    return [c for c in sorted(want["cites"]) if not any(_same(p, c) for p in got["pool"])]
+
+
+def recall(rows: list) -> str:
+    """후보에 정답 인용이 들어왔나. 틀(27·33조)은 검색 대상이 아니라 따로 센다."""
+    seen = []
+    for r in rows:
+        miss = missing(r[2], r[1])
+        seen += [(any(_same(c, f) for f in FRAME), c not in miss) for c in r[1]["cites"]]
+    part ={fr: [ok for f, ok in seen if f is fr] for fr in (True, False)}
+    chars = sum(r[2].get("chars", 0) for r in rows) / max(len(rows), 1) / 1000
+    return (
+        f"후보 재현율 {sum(ok for _, ok in seen)}/{len(seen)}"
+        f" (틀 {sum(part[True])}/{len(part[True])} · 틀 밖 {sum(part[False])}/{len(part[False])})"
+        f" · 후보 평균 {chars:.1f}k자"
+    )
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="초안 골든셋 채점")
     ap.add_argument("--limit", type=int, help="앞에서 N건만")
     ap.add_argument("--category", help="한 카테고리만")
     ap.add_argument("--gate", help="기대 게이트로 거른다 (예: G2)")
     ap.add_argument("--show", action="store_true", help="인용을 전부 찍는다")
-    ap.add_argument("--fresh", action="store_true", help="캐시를 버리고 다시 부른다")
+    ap.add_argument("--fresh", action="store_true", help="초안 캐시를 버리고 다시 부른다. 질의 계획은 남는다")
+    ap.add_argument("--search-only", action="store_true", help="질의·검색만 돌려 후보 재현율을 잰다")
     args = ap.parse_args()
 
     keys = wanted()
@@ -165,16 +190,28 @@ def main() -> int:
     items = list(keys.items())[: args.limit]
 
     meta = category_meta()
+    plans = json.loads(PLANS.read_text("utf-8")) if PLANS.exists() else {}
     cache = {} if args.fresh or not CACHE.exists() else json.loads(CACHE.read_text("utf-8"))
 
     rows = []
     with connect() as conn:
         for (cat, industry), want in items:
+            if args.search_only:
+                rows.append(((cat, industry), want, produce(conn, cat, industry, meta, plans, True)))
+                continue
             ck = f"{cat}|{industry}"
             if ck not in cache:
-                cache[ck] = produce(conn, cat, industry, meta)
+                cache[ck] = produce(conn, cat, industry, meta, plans)
                 CACHE.write_text(json.dumps(cache, ensure_ascii=False, indent=2), "utf-8")
             rows.append(((cat, industry), want, cache[ck], score(cache[ck], want)))
+
+    if args.search_only:
+        for (cat, _), want, got in rows:
+            miss = missing(got, want)
+            note = got["error"] or " ".join(miss)
+            print(f"{cat:<14} 후보 {len(want['cites']) - len(miss)}/{len(want['cites'])}  {note}")
+        print(f"\n{recall(rows)}")
+        return 0
 
     print(f"{'카테고리':<14} {'게이트':<12} {'근거':<7} {'결론':<8} 비고")
     for (cat, _), want, got, s in rows:
@@ -210,6 +247,7 @@ def main() -> int:
 
     print(f"\n게이트 {gate_ok}/{n}   근거 적중 {hit}/{need} (검색누락 {unfound} · 선택누락 {unpicked})   오적용 {stray}건")
     print("결론  " + "  ".join(f"{k} {v}" for k, v in sorted(grades.items())))
+    print(recall(rows))
 
     # 반대 결론이 제일 나쁘다. 카드가 가능이라는데 초안이 불가면 경비를 잃는다.
     return 1 if grades["반대"] else 0

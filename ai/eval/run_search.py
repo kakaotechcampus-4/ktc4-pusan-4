@@ -11,8 +11,9 @@
 0/10 이 나와도 검색이 깨진 건지 프롬프트가 나쁜 건지 구분할 수 없다.
 청킹·RRF·필터를 건드릴 때는 기본으로 재고, 프롬프트를 손볼 때만 --rewrite 를 쓴다.
 
-채점은 랭킹된 청크 본문으로 한다. 조 전문으로 넓힌 본문으로 채점하면 9호와
-13호가 같은 조에 있어 RC-007 의 must_not 이 구조적으로 깨진다.
+채점은 모델에게 보여주는 후보로 한다. 법령은 조 단위로 뽑혀 형제 잎이 점수 0 으로
+딸려 온다. expect 는 보여준 잎 전부로 인정하고 must_not 은 순위에 든(점수 > 0) 것만
+센다 — 9호(RC-007 must_not)와 13호(RC-008 expect)가 같은 조라 형제까지 세면 구조적으로 깨진다.
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ from pathlib import Path
 
 import yaml
 
+from pipeline.chunk import clean
 from pipeline.embed import embed
 from pipeline.query import SearchPlan, category_meta, rewrite
 from pipeline.search import SKIP_SECTIONS, TIERS, Hit, connect, search_tiers
@@ -45,22 +47,25 @@ _TIER_OF = {"법령": "법령", "행정규칙": "행정규칙", "심판례·해�
 CACHE = Path(__file__).parent / ".queries.json"
 
 
-def plan_of(case: dict, meta: dict, cache: dict, use_llm: bool) -> SearchPlan:
-    """고정 질의를 쓰거나, 에이전트에게 검색 계획을 받아온다.
+def cached_plan(cat: str, industry: str, reason: str, meta: dict, cache: dict, path: Path) -> SearchPlan:
+    """에이전트에게 검색 계획을 한 번 받아 path 에 캐시한다. run_draft 도 쓴다.
 
-    에이전트 경로는 한 번 부르고 캐시한다. 검색 자체가 결정론이라 질의만
-    고정하면 하네스도 재현된다.
+    검색 자체가 결정론이라 질의만 고정하면 하네스도 재현된다. dict 가 아닌 값은
+    SearchPlan 이전의 옛 캐시라 다시 받는다.
     """
+    key = f"{cat}|{industry}|{reason}"
+    if not isinstance(cache.get(key), dict):
+        cache[key] = rewrite(cat, industry, reason, meta).model_dump()
+        path.write_text(json.dumps(cache, ensure_ascii=False, indent=2), encoding="utf-8")
+    return SearchPlan(**cache[key])
+
+
+def plan_of(case: dict, meta: dict, cache: dict, use_llm: bool) -> SearchPlan:
+    """고정 질의를 쓰거나, 에이전트에게 검색 계획을 받아온다."""
     if not use_llm:
         return SearchPlan(queries=[case["query"]], keywords=case.get("keywords") or [])
-
     i = case["input"]
-    key = f"{i['merchant_category']}|{i['industry_code']}|{i['reason']}"
-    if key not in cache:
-        plan = rewrite(i["merchant_category"], i["industry_code"], i["reason"], meta)
-        cache[key] = plan.model_dump()
-        CACHE.write_text(json.dumps(cache, ensure_ascii=False, indent=2), encoding="utf-8")
-    return SearchPlan(**cache[key])
+    return cached_plan(i["merchant_category"], i["industry_code"], i["reason"], meta, cache, CACHE)
 
 
 def _key(want: dict) -> tuple[str, str]:
@@ -71,12 +76,12 @@ def _matches(hits: list[Hit], want: dict) -> bool:
     """기대 조문은 조·항·호가 섞여 있고 색인은 맨 아래 조항만 한다.
 
     시행령 제67조를 기대해도 색인에는 그 아래 18개 청크만 있으므로 하위까지
-    인정한다. must_contain 이 엉뚱한 하위 조항을 걸러주는 자물쇠다.
+    인정한다. must_contain 이 엉뚱한 하위 조항을 걸러주는 자물쇠다. 골든셋은 원문
+    문구 그대로 두고, 청크와 같은 정리(clean)를 걸어 대조한다.
     """
-    sid = want["statute_id"]
+    sid, mc = want["statute_id"], clean(want["must_contain"])
     return any(
-        (h.statute_id == sid or h.statute_id.startswith(f"{sid}-"))
-        and want["must_contain"] in h.body
+        (h.statute_id == sid or h.statute_id.startswith(f"{sid}-")) and mc in h.body
         for h in hits
     )
 
@@ -111,7 +116,7 @@ def rank_of(conn, vectors: list[list[float]], tiers: list[str], want: dict) -> i
                     "skip": SKIP_SECTIONS,
                     "sid": want["statute_id"],
                     "pre": want["statute_id"] + "-%",
-                    "mc": want["must_contain"],
+                    "mc": clean(want["must_contain"]),
                 },
             ).fetchone()
         )
@@ -139,14 +144,14 @@ def run(case: dict, k: int, meta: dict, cache: dict, use_llm: bool) -> dict:
         "ranks": ranks,
         "found": [w for w in case["expect"] if _matches(hits, w)],
         "missed": [w for w in case["expect"] if not _matches(hits, w)],
-        "violated": [w for w in case["must_not"] if _matches(hits, w)],
+        "violated": [w for w in case["must_not"] if _matches([h for h in hits if h.score > 0], w)],
         "hits": hits,
     }
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="검색 골든셋 채점")
-    ap.add_argument("--k", type=int, default=8, help="위계별 상위 k")
+    ap.add_argument("--k", type=int, default=8, help="위계별 상위 k (법령은 조 k 개)")
     ap.add_argument("--case", help="한 건만 (예: RC-004)")
     ap.add_argument("--show", action="store_true", help="실패 케이스의 상위 k 를 찍는다")
     ap.add_argument("--rewrite", action="store_true", help="고정 질의 대신 에이전트가 질의를 쓴다")

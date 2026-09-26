@@ -17,7 +17,7 @@ pg_bigm 의 gin_bigm_ops 인덱스는 원래 LIKE 를 가속하라고 있는 것
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from datetime import date
 
@@ -34,9 +34,18 @@ TIERS = ["법령", "행정규칙", "심판례해석", "판례"]
 # 기각된 청구인 주장이 근거로 인용되면 정반대 결론이 나간다.
 SKIP_SECTIONS = ["주장"]
 
+# 검색 대상이 아니라 전제다. G1 은 33조1항 열거 호, G2 는 27조1항 통상성이라 카드 인용의
+# 대부분이 여기서 나오는데, 주제 질의로는 수백 위로 밀린다(docs/rag-eval.md).
+FRAME = ("소득세법-27", "소득세법-33")
+
 TOP_K = 8
-CANDIDATES = 30
+CANDIDATES = 200
 RRF_K = 60
+
+# 법령은 형제 호가 같은 머리말을 달아 한 조가 상위를 다 먹는다. 조 단위로 k 개를 고르고
+# 그 조의 잎을 보여준다. 잎 합계(머리말 포함)가 이보다 길면 순위에 든 잎만 LONG_LEAVES 개.
+LEAF_CHARS = 4500
+LONG_LEAVES = 3
 
 _FILTER = """
     doc_type = %(tier)s
@@ -45,27 +54,37 @@ _FILTER = """
     AND (section IS NULL OR section <> ALL(%(skip)s))
 """
 
+# 벡터 r위와 키워드 r위는 점수가 같고 두 목록이 거의 안 겹쳐 top-k 경계가 동점으로 갈린다.
+# 재색인해도 안 바뀌는 (statute_id, section, seq) 로 깬다. id 는 재색인마다 바뀐다.
 _SQL = f"""
 WITH vec AS (
-    SELECT id, ROW_NUMBER() OVER (ORDER BY d) AS rnk FROM (
-        SELECT id, embedding <=> %(q_vec)s::vector AS d
+    SELECT id, ROW_NUMBER() OVER (ORDER BY d, statute_id, section, seq) AS rnk FROM (
+        SELECT id, statute_id, section, seq, embedding <=> %(q_vec)s::vector AS d
           FROM legal_chunk WHERE {_FILTER}
-         ORDER BY d LIMIT %(cand)s) t
+         ORDER BY d, statute_id, section, seq LIMIT %(cand)s) t
 ), kw AS (
-    SELECT id, ROW_NUMBER() OVER (ORDER BY n DESC, s DESC) AS rnk FROM (
-        SELECT c.id, count(DISTINCT k) AS n, max(bigm_similarity(c.body, k)) AS s
+    SELECT id, ROW_NUMBER() OVER (ORDER BY n DESC, s DESC, statute_id, section, seq) AS rnk FROM (
+        SELECT c.id, c.statute_id, c.section, c.seq,
+               count(DISTINCT k) AS n, max(bigm_similarity(c.body, k)) AS s
           FROM legal_chunk c, unnest(%(kws)s::text[]) AS k
          WHERE {_FILTER} AND c.body LIKE '%%' || k || '%%'
-         GROUP BY c.id ORDER BY n DESC, s DESC LIMIT %(cand)s) t
+         GROUP BY c.id ORDER BY n DESC, s DESC, c.statute_id, c.section, c.seq LIMIT %(cand)s) t
 )
 SELECT c.id, c.statute_id, c.doc_id, c.doc_type, c.hierarchy, c.section, c.body,
-       COALESCE(1.0 / (%(rrf)s + vec.rnk), 0)
-     + COALESCE(1.0 / (%(rrf)s + kw.rnk), 0) AS score
+       (COALESCE(1.0 / (%(rrf)s + vec.rnk), 0)
+      + COALESCE(1.0 / (%(rrf)s + kw.rnk), 0))::float8 AS score
   FROM legal_chunk c
   LEFT JOIN vec ON c.id = vec.id
   LEFT JOIN kw  ON c.id = kw.id
  WHERE vec.id IS NOT NULL OR kw.id IS NOT NULL
- ORDER BY score DESC LIMIT %(k)s
+ ORDER BY score DESC, c.statute_id, c.section, c.seq LIMIT %(k)s
+"""
+
+_LEAVES = f"""
+SELECT id, statute_id, doc_id, doc_type, hierarchy, section, body, 0::float8 AS score
+  FROM legal_chunk
+ WHERE {_FILTER} AND (statute_id = ANY(%(arts)s) OR statute_id LIKE ANY(%(pre)s))
+ ORDER BY id
 """
 
 
@@ -115,6 +134,25 @@ def search(
     return [Hit(**r) for r in rows]
 
 
+def _article(statute_id: str) -> str:
+    return "-".join(statute_id.split("-")[:2])
+
+
+def pick(arts: Sequence[str], ranked: list[Hit], leaves: list[Hit]) -> list[Hit]:
+    """조마다 잎을 전부(조문 순서) 보여준다. 조가 길면 순위에 든 잎 상위 LONG_LEAVES 개만.
+
+    순위에 든 잎은 점수를 단 채로 돌려준다. 점수 0 은 형제로 딸려 온 잎이다.
+    """
+    scored = {h.id: h for h in ranked}
+    out = []
+    for a in arts:
+        mine = [scored.get(h.id, h) for h in leaves if _article(h.statute_id) == a]
+        if sum(len(h.body) for h in mine) > LEAF_CHARS:
+            mine = [h for h in ranked if _article(h.statute_id) == a][:LONG_LEAVES]
+        out += mine
+    return out
+
+
 def search_tier(
     conn: psycopg.Connection,
     queries: Sequence[str],
@@ -123,19 +161,27 @@ def search_tier(
     on: date,
     k: int = TOP_K,
     vecs: Sequence[list[float]] | None = None,
+    skip: Collection[str] = (),
 ) -> list[Hit]:
     """질의 여러 개를 각각 돌려 합친다. 같은 청크가 겹치면 높은 점수를 남긴다.
 
     질의별 RRF 점수는 같은 식에서 나와 서로 비교 가능하다. 합산하지 않는 이유는
     질의를 많이 쓴 청크가 유리해져서 — 한 갈래만 맞는 조문이 밀린다.
+
+    법령은 조 단위로 k 개를 고른다. skip 은 뽑지 않을 조다 — 기본 조문은 retrieve 가
+    따로 붙이므로 검색 칸을 먹으면 안 된다. 심판례는 두 토막이 문서 전체라 묶지 않는다.
     """
     vecs = embed(list(queries)) if vecs is None else vecs
     best: dict[int, Hit] = {}
     for q, v in zip(queries, vecs, strict=True):
-        for h in search(conn, q, tier, on, k, q_vec=v, keywords=keywords):
+        for h in search(conn, q, tier, on, CANDIDATES, q_vec=v, keywords=keywords):
             if h.id not in best or h.score > best[h.id].score:
                 best[h.id] = h
-    return sorted(best.values(), key=lambda h: -h.score)[:k]
+    ranked = [h for h in sorted(best.values(), key=lambda h: -h.score) if _article(h.statute_id) not in skip]
+    if tier != "법령":
+        return ranked[:k]
+    arts = list(dict.fromkeys(_article(h.statute_id) for h in ranked))[:k]
+    return pick(arts, ranked, _leaves(conn, arts, tier, on))
 
 
 def search_tiers(
@@ -145,29 +191,36 @@ def search_tiers(
     on: date,
     k: int = TOP_K,
     tiers: Sequence[str] = TIERS,
+    skip: Collection[str] = (),
 ) -> dict[str, list[Hit]]:
     """네 위계를 한 번에 본다. 임베딩은 질의당 한 번뿐이다."""
     vecs = embed(list(queries))
-    return {t: search_tier(conn, queries, keywords, t, on, k, vecs) for t in tiers}
+    return {t: search_tier(conn, queries, keywords, t, on, k, vecs, skip) for t in tiers}
 
 
-def expand(conn: psycopg.Connection, hits: list[Hit]) -> dict[str, str]:
-    """법령 청크를 소속 조 전문으로 바꿔 돌려준다.
-
-    항의 88%가 다른 조문을 참조해서 호 하나만 떼면 "제2항에도 불구하고"의
-    제2항을 못 본다. 랭킹은 청크 단위로 유지하고 에이전트에게 넘길 때만 넓힌다.
-    조 전문은 statute_version 에 이미 별도 행으로 있어 조인 한 번이면 된다.
-    """
-    wanted = {h.statute_id: "-".join(h.statute_id.split("-")[:2]) for h in hits if h.doc_type == "법령"}
-    if not wanted:
-        return {}
+def _leaves(conn: psycopg.Connection, arts: Sequence[str], tier: str, on: date) -> list[Hit]:
+    """조 ID 들의 잎 청크. 배열 인자는 list 로 넘긴다 — 튜플은 record 로 간다."""
     rows = conn.execute(
-        "SELECT statute_id, body FROM statute_version"
-        " WHERE statute_id = ANY(%s) AND effective_to IS NULL",
-        (list(set(wanted.values())),),
+        _LEAVES,
+        {"arts": list(arts), "pre": [f"{a}-%" for a in arts], "tier": tier, "on": on, "skip": SKIP_SECTIONS},
     ).fetchall()
-    bodies = {r["statute_id"]: r["body"] for r in rows}
-    return {sid: bodies[jo] for sid, jo in wanted.items() if jo in bodies}
+    return [Hit(**r) for r in rows]
+
+
+def retrieve(
+    conn: psycopg.Connection,
+    queries: Sequence[str],
+    keywords: Sequence[str],
+    on: date,
+    drop: Collection[str] = (),
+) -> dict[str, list[Hit]]:
+    """검색 결과 앞에 기본 조문(FRAME)을 '기본' 위계로 붙인다. 검색은 FRAME 조를 건너뛴다.
+
+    drop 은 이 사업자에게 적용되지 않는 statute_id 다(query.NOT_APPLICABLE).
+    """
+    base = [h for h in _leaves(conn, FRAME, "법령", on) if h.statute_id not in drop]
+    found = search_tiers(conn, queries, keywords, on, skip=FRAME)
+    return {"기본": base} | {t: [h for h in hs if h.statute_id not in drop] for t, hs in found.items()}
 
 
 def connect() -> psycopg.Connection:

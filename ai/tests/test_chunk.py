@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import date
 from pathlib import Path
 
@@ -47,7 +48,14 @@ def test_lead_completes_the_sentence(chunks):
     body = chunks["소득세법-33-1-5"].body
     assert body.startswith("제33조(필요경비 불산입)")
     assert "다음 각 호에 해당하는 것은" in body
-    assert body.endswith("가사(家事)의 경비와 이에 관련되는 경비")
+    assert body.endswith("가사의 경비와 이에 관련되는 경비")
+
+
+def test_revision_notes_and_hanja_are_stripped(chunks):
+    # 형제 호가 같은 개정일 목록을 달고 있어 임베딩이 그걸로 채워진다. 호환 한자 병기도 섞여 있다
+    bodies = [c.body for c in chunks.values()]
+    assert not any("<개정" in b or "<신설" in b for b in bodies)
+    assert not any(re.search(r"\([\u4e00-\u9fff\uf900-\ufaff]+\)", b) for b in bodies)
 
 
 def test_lead_skips_hang_that_starts_with_a_ho(chunks):

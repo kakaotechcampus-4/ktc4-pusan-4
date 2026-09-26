@@ -3,9 +3,9 @@
 검색은 위계를 안 가린다. 네 위계의 상위 k 가 한꺼번에 올라오고, 무엇이 실제
 근거인지는 여기서 정한다. 순차 탐색과 조기 종료를 버린 자리가 이 함수다.
 
-랭킹은 잎 청크로 하고 보여줄 때만 조 전문으로 넓힌다(search.expand). 호 하나만
+법령은 조 단위로 뽑혀 형제 잎이 각자 라벨을 달고 온다(search.pick). 호 하나만
 떼어 보여주면 형제 호와 뒤따르는 항을 못 본다 — 소득세법 33조 제2항의 적용
-순서 규칙이 그 예다.
+순서 규칙이 그 예다. 인용은 라벨마다 제 본문으로만 검증한다.
 
 모델이 낸 것을 코드가 두 가지 검증한다.
   statute_id 가 후보 안에 있는가    실재하는 딴 조문을 지어내는 걸 막는다
@@ -19,6 +19,7 @@
 
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from typing import Literal
 
@@ -41,20 +42,17 @@ LOWER = {"훈령", "심판례", "해석례", "판례"}
 # 인용할 수 있으니 quote 검증은 잘라내기 전 원문으로 해도 그대로 통과한다.
 BODY_CHARS = 1200
 
-# 조 전문이 이보다 길면 안 넓힌다. 상한에 잘리면 정작 걸린 호가 날아가서 넓히기
-# 전보다 나빠진다. 기존 룰카드가 인용하는 조 8개를 전부 덮는 값이다 — 긴 쪽이
-# 소득세법시행령-55(4,452자)와 -78의3(4,189자)이라 3,000 에서는 둘 다 빠진다.
-# 후보 8건이 전부 서로 다른 긴 조면 법령 쪽 프롬프트가 36,000자까지 간다.
-ARTICLE_CHARS = 4500
-
-ARTICLE_NOTE = "[조 전문] 위 조문이 속한 조의 전체. 맥락용이고 그 자체가 후보는 아니다"
-
 RETRIES = 3
 
 # 이보다 짧으면 공백을 지운 부분일치가 아무 데나 걸려 검증이 무의미해진다.
 MIN_QUOTE = 10
 
+# 모델이 호 번호 '2.' 를 '②' 로 바꿔 적는다(실측: 33-1-2 를 세 번 재시도해도 같았다).
+# 번호는 구조지 인용 내용이 아니라 앞에서 떼고 대조한다.
+_LEAD_NO = re.compile(r"^\s*(?:[①-⑳]|\d+(?:의\d+)*\.|[가-하]\.)\s*")
+
 _TIER_NOTE = {
+    "기본": "모든 지출에 항상 붙는다. 검색 결과가 아니다. 이 지출에 해당하는 조항만 인용해라",
     "법령": "법률·시행령·시행규칙. 구속력 있다",
     "행정규칙": "국세청 내부 해석기준. 법적 구속력은 없다",
     "심판례해석": "개별 사안에 대한 판단. 일반 규범이 아니다",
@@ -68,9 +66,8 @@ SYSTEM = """너는 세무 규칙 카드 초안에 쓸 근거를 후보 중에서
 - 우리가 판정하는 건 종합소득세 필요경비다. 다른 세목(부가가치세 등) 조문은
   소득세법이 그것을 끌어다 쓸 때만 근거가 된다.
 - 같은 이름의 문서가 둘 이상이면 어느 법 소관인지 본문에서 확인해라.
-- [조 전문] 은 맥락이다. 거기서 인용해도 되지만 statute_id 는 위에 라벨로
-  적힌 것 중에서만 골라라. 라벨에 없는 조문은 후보가 아니다.
-- quote 는 후보 본문에서 그대로 복사해라. 한 글자도 바꾸지 마라.
+- statute_id 는 라벨로 적힌 것 중에서만 골라라. 라벨에 없는 조문은 후보가 아니다.
+- quote 는 그 라벨 바로 아래 본문에서 그대로 복사해라. 한 글자도 바꾸지 마라.
   짧아도 된다. 한 문장이면 충분하다. 요약하거나 여러 줄을 이어 붙이지 마라.
 - refs 에는 이 지출에 적용되는 것을 전부 넣어라. sufficient 와 상관없다.
 - sufficient 는 그 근거들로 규칙 카드를 쓸 수 있느냐다. 모자라도 refs 는 채워라.
@@ -97,35 +94,29 @@ class Evidence(BaseModel):
     note: str
 
 
-def _article(h: Hit, bodies: dict[str, str] | None) -> str | None:
-    """넓혀서 보여줄 조 전문. 상한을 넘으면 안 넓힌다 — 잘리면 정작 걸린 호가 날아간다."""
-    full = (bodies or {}).get(h.statute_id)
-    return full if full and len(full) <= ARTICLE_CHARS else None
-
-
-def _candidates(by_tier: dict[str, list[Hit]], bodies: dict[str, str] | None = None) -> str:
-    """ID 한 줄에 본문 한 덩이. 조 전문은 그 아래 맥락으로 붙이되 조마다 한 번만.
+def _candidates(by_tier: dict[str, list[Hit]]) -> str:
+    """ID 한 줄에 본문 한 덩이. 앞 잎과 겹치는 머리말 줄은 다시 찍지 않는다.
 
     ID 여럿을 한 줄에 묶고 본문을 한 덩이만 두면 모델이 어느 문장이 어느 호
     소속인지 못 맞춘다(실측: 시행령 문구를 법률 ID 로 인용해 검증 실패 2건).
-    조마다 한 번만 붙이는 건 반복 때문이다 — 시행령 78의3 은 다섯 호가 같이
-    걸려서, 안 막으면 4,189자가 다섯 번 실린다.
+    머리말을 잎마다 되풀이하면 "…산입하지 아니한다" 가 호마다 붙어 모든 호가 해당하는
+    것처럼 보인다(실측: 33조 잎 17개를 통째로 인용). 검증은 생략 전 본문(_pool)으로 한다.
     """
     out = []
     for tier, hits in by_tier.items():
         if not hits:
             continue
         out.append(f"[{tier}] {_TIER_NOTE.get(tier, '')}")
-        seen: set[str] = set()
+        prev: list[str] = []
         for h in hits:
             sec = f" ({h.section})" if h.section else ""
+            lines = h.body[:BODY_CHARS].strip().split("\n")
+            same = 0
+            while same < min(len(prev), len(lines) - 1) and prev[same] == lines[same]:
+                same += 1
             out.append(f"  {h.statute_id}{sec}")
-            out.append(f"    {h.body[:BODY_CHARS].strip()}")
-            art = _article(h, bodies)
-            if art and art not in seen:
-                seen.add(art)
-                out.append(f"  {ARTICLE_NOTE}")
-                out.append(f"    {art.strip()}")
+            out += [f"    {line}" for line in lines[same:]]
+            prev = lines
         out.append("")
     return "\n".join(out)
 
@@ -142,20 +133,16 @@ def _norm(s: str) -> str:
     return "".join(s.split())
 
 
-def _pool(by_tier: dict[str, list[Hit]], bodies: dict[str, str] | None = None) -> dict[str, list[str]]:
-    """statute_id 하나에 본문이 여럿일 수 있다.
+def _pool(by_tier: dict[str, list[Hit]]) -> dict[str, list[str]]:
+    """statute_id 하나에 본문이 여럿일 수 있다(심판례는 요지·심리판단이 같은 id).
 
-    심판례는 요지·심리판단이 같은 id 고, 법령은 조 전문으로 넓히면 잎 청크와
-    전문 둘 다 인용처가 된다. 보여준 것만 넣는다 — 안 보여준 전문까지 인정하면
-    형제 호 본문을 엉뚱한 호 ID 로 인용해도 통과한다.
+    라벨마다 제 본문만 넣는다 — 조 전문까지 인용처로 두면 형제 호 본문을 엉뚱한
+    호 ID 로 인용해도 통과한다.
     """
     out = defaultdict(list)
     for hits in by_tier.values():
         for h in hits:
             out[h.statute_id].append(h.body)
-            art = _article(h, bodies)
-            if art:
-                out[h.statute_id].append(art)
     return out
 
 
@@ -166,11 +153,12 @@ def _check(ev: Evidence, pool: dict[str, list[str]]) -> list[str]:
         bad.append("sufficient 가 true 인데 refs 가 비었다.")
     for r in ev.refs:
         chunks = pool.get(r.statute_id) or []
-        if len(_norm(r.quote)) < MIN_QUOTE:
+        quote = _norm(_LEAD_NO.sub("", r.quote))
+        if len(quote) < MIN_QUOTE:
             bad.append(f"{r.statute_id} 의 인용문이 너무 짧다. 한 문장을 통째로 복사해라.")
         elif not chunks:
-            bad.append(f"{r.statute_id} 는 후보에 없다. 후보에 있는 것만 골라라.")
-        elif not any(_norm(r.quote) in _norm(b) for b in chunks):
+            bad.append(f"{r.statute_id} 는 후보에 없다. 후보 밖 조문은 근거가 될 수 없으니 빼고 결론을 다시 세워라.")
+        elif not any(quote in _norm(b) for b in chunks):
             bad.append(
                 f"{r.statute_id} 의 인용문 \"{r.quote[:40]}...\" 가 본문에 없다."
                 " 요약하지 말고 한 문장을 그대로 복사해라."
@@ -178,18 +166,10 @@ def _check(ev: Evidence, pool: dict[str, list[str]]) -> list[str]:
     return bad
 
 
-def select(
-    row: str,
-    by_tier: dict[str, list[Hit]],
-    api: OpenAI | None = None,
-    bodies: dict[str, str] | None = None,
-) -> Evidence:
-    """row 는 pipeline.query.context() 가 만든 집계 블록.
-
-    bodies 는 search.expand() 가 준 조 전문. 없으면 잎 청크만 보여준다.
-    """
-    pool = _pool(by_tier, bodies)
-    user = f"{row}\n\n후보\n{_candidates(by_tier, bodies)}"
+def select(row: str, by_tier: dict[str, list[Hit]], api: OpenAI | None = None) -> Evidence:
+    """row 는 pipeline.query.context() 가 만든 집계 블록."""
+    pool = _pool(by_tier)
+    user = f"{row}\n\n후보\n{_candidates(by_tier)}"
     for _ in range(RETRIES):
         ev = structured(SYSTEM, user, Evidence, api)
         bad = _check(ev, pool)

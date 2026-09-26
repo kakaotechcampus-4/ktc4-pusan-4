@@ -98,3 +98,4 @@ data/
 .claude/worktrees/
 ai/eval/.queries.json
 ai/eval/.drafts.json
+ai/eval/.plans.json

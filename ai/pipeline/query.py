@@ -19,6 +19,10 @@ from pipeline.llm import structured
 ROOT = Path(__file__).resolve().parents[2]
 CATEGORIES = ROOT / "docs" / "categories.md"
 
+# 업종에 적용되지 않는 조문. 940909 인적용역은 부가세 면세라 33조1항9호(매입세액) 단서로
+# 빠지는데, 면세라고 알려줘도 모델이 단서를 적용하지 못한다(실측: 해외SaaS 3회 모두 인용).
+NOT_APPLICABLE = {"940909": {"소득세법-33-1-9"}}
+
 
 class SearchPlan(BaseModel):
     """집계 한 줄을 검색 입력으로 바꾼 것.

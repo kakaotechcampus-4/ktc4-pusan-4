@@ -117,19 +117,22 @@ flowchart LR
 flowchart TD
     subgraph CORPUS["법령 코퍼스 구축 (별도 배치, 일 1회)"]
         LAW["국가법령정보 OPEN API<br/>법령 · 행정규칙 · 심판례 · 판례"]
-        SV["statute_version (원문, append-only)"]
-        LC["legal_chunk<br/>벡터 임베딩(1536) + pg_bigm 인덱스"]
-        LAW -->|"동기화"| SV -->|"변경 시 재색인"| LC
+        SV["statute_version (원문, append-only)<br/>조 / 항 / 호 / 문서 전부"]
+        LC["legal_chunk (맨 아래 잎만)<br/>벡터 임베딩(1536) + pg_bigm 인덱스"]
+        LAW -->|"law_sync.py"| SV -->|"reindex.py · chunk + embed"| LC
     end
 
-    subgraph EXTRACT["규칙 후보 추출 (주 1회 배치, 에이전트, 자동)"]
-        AGG["① 집계 (SQL)<br/>unmatched_log(RULE_NOT_FOUND)<br/>merchant_category × industry_code<br/>distinct_users ≥ 2, 빈도순 상위 N"]
+    subgraph EXTRACT["규칙 후보 추출 · candidates.py (주 1회 배치, 자동, 후보당 LLM 3회)"]
+        AGG["① 집계 (SQL)<br/>unmatched_log(RULE_NOT_FOUND)<br/>merchant_category × industry_code<br/>distinct_users ≥ 2 로 자르고, 빈도는 상위 N 정렬에만 쓴다<br/>이미 후보 행이 있는 조합은 건너뛴다"]
         PLAN["② 질의 작성 (에이전트 ①)<br/>SearchPlan: 의미질의 + 정확일치 키워드"]
-        SEARCH["③ 4개 위계 동시 검색 (코드)<br/>법령 · 행정규칙 · 심판례해석 · 판례<br/>하이브리드: 벡터 + 키워드 (RRF), 임베딩 1회"]
-        PICK["④ 근거 선택 (에이전트 ②)<br/>Evidence: 인용문 원문 대조, 검색결과 밖 ID 차단"]
-        DRAFT["⑤ 초안 생성 (에이전트 ③, Pydantic 강제)<br/>validator: 조문 ID 실재<br/>확정 결론이 하위 근거뿐이면 보류"]
-        CAND["⑥ rule_candidate INSERT<br/>status: 대기 또는 보류, draft_yaml"]
-        AGG --> PLAN --> SEARCH --> PICK --> DRAFT --> CAND
+        SEARCH["③ 4개 위계 동시 검색 (코드)<br/>법령 · 행정규칙 · 심판례해석 · 판례 각 top-k<br/>하이브리드: 벡터 + LIKE(pg_bigm) → RRF<br/>법령은 조 단위로 뽑아 형제 잎까지 라벨을 붙여 넘긴다<br/>임베딩 호출은 여기 한 번뿐"]
+        FRAME["기본 조문 · search.retrieve() (코드)<br/>소득세법 27조 · 33조 잎을 검색 없이 항상 붙인다<br/>업종에 안 맞는 조문은 뺀다 (940909 → 33-1-9)"]
+        PICK["④ 근거 선택 (에이전트 ②)<br/>Evidence: 인용문 원문 대조, 검색결과 밖 ID 차단<br/>검증 실패 시 사유를 붙여 최대 3회 재시도"]
+        DRAFT["⑤ 초안 생성 (에이전트 ③, Pydantic 강제)<br/>모델이 정하는 건 gate · verdict · account 셋뿐<br/>인용 · 매칭 · 우선순위는 코드가 박는다"]
+        HOLD["⑥ 보류 판정 (코드)<br/>근거 부족 · 하위 근거만으로 확정 · 폐지된 조문<br/>하나라도 걸리면 보류"]
+        CAND["⑦ rule_candidate INSERT<br/>status: 대기 또는 보류, draft_yaml"]
+        AGG --> PLAN --> SEARCH --> PICK --> DRAFT --> HOLD --> CAND
+        FRAME -->|"'기본' 위계"| PICK
     end
 
     subgraph HUMAN["사람 검수 후 git 반영 (수동)"]
@@ -145,6 +148,7 @@ flowchart TD
 
     JUDGE -->|"unmatched_log"| AGG
     LC -.->|"검색 코퍼스"| SEARCH
+    LC -.->|"27·33조 잎 lookup · 검색 아님"| FRAME
     LC -.->|"같은 코퍼스 공유"| REPORT
     CAND --> ADMIN
     CARDS -.->|"다음 판정에 반영"| JUDGE
@@ -154,8 +158,12 @@ flowchart TD
 ```
 
 - **후보는 DB에, 확정된 카드는 git에 둔다.** 에이전트가 초안(`draft_yaml`)까지 자동으로 만들고, 그다음부터는 사람이 맡는다. 세무 검수자가 관리자 페이지에서 승인하면 PR이 자동으로 생성되고, CI 회귀를 통과해야 머지된다. 규칙 승격에는 항상 사람이 개입하며, 승인 시점에 효력기간 시작일을 지정해 **소급 적용하지 않는다.**
-- **RAG는 판정 경로에 쓰지 않는다.** 위계 순차 탐색(벡터와 키워드를 RRF로 융합한 하이브리드 검색)은 **규칙 카드 초안 생성**과 **보고서 생성** 두 곳에서만 쓰고, 두 기능은 같은 `legal_chunk` 코퍼스를 공유한다. 판정 화면의 근거는 규칙 카드에 하드코딩된 조문 ID로 DB에서 직접 조회한다. LLM이 조문 문자열을 지어내지 않는다.
-- **위계는 코드로 강제한다.** 법령 → 행정규칙 → 심판례·해석 → 판례 순으로 탐색하고, 하위 근거가 상위를 뒤집는 초안(예: 판례만으로 '가능')이나 실재하지 않는 조문 ID는 Pydantic validator가 막는다. 자세한 내용은 `CONTEXT.md`의 §9.5(규칙 후보 추출)와 §10(RAG)에 있다.
+- **오케스트레이터는 에이전트가 아니라 코드다.** `candidates.py`가 집계부터 적재까지 순서대로 호출하며, 그 흐름에 분기가 없어 모델이 낄 자리가 없다. 후보당 LLM 호출은 정확히 3회다.
+- **RAG는 판정 경로에 쓰지 않는다.** 하이브리드 검색(벡터와 키워드를 RRF로 융합)은 **규칙 카드 초안 생성**과 **보고서 생성** 두 곳에서만 쓰고, 두 기능은 같은 `legal_chunk` 코퍼스를 공유한다. 판정 화면의 근거는 규칙 카드에 하드코딩된 조문 ID로 DB에서 직접 조회한다. LLM이 조문 문자열을 지어내지 않는다.
+- **위계는 검색 순서가 아니라 초안 검증에서 지킨다.** 검색은 네 위계를 동시에 뒤지고 `doc_type` 가중치도 조기 종료도 없다. 순차 탐색을 버린 이유는 조기 종료가 결국 LLM의 "이 정도면 됐다" 판단이 되고, 법령에서 끊으면 심판례의 반례를 영영 못 보기 때문이다. 대신 확정 결론이 하위 근거(훈령·심판례·해석례·판례)만으로 서 있으면 `needs_review`가 `status='보류'`로 빼 사람이 먼저 보게 한다. **거부가 아니라 우선순위 표시다.** 실재하지 않는 조문 ID와 원문에 없는 인용문은 그와 별개로 코드가 막는다. 자세한 내용은 `CONTEXT.md`의 §9.5(규칙 후보 추출)와 §10(RAG)에 있다.
+- **원문과 검색 사본을 나눈 이유.** `statute_version`은 버전 이력을 그대로 쌓는 원문이고 임베딩이 없다. `legal_chunk`는 검색용 사본이라 임베딩과 pg_bigm 인덱스를 달고, 심판례의 기각된 '주장' 섹션을 빼고, 임베딩 상한을 넘으면 쪼갠다. **랭킹은 잎 청크(호 단위)로 해야 정확한데, 항의 88%가 다른 조문을 참조해서 호 하나만 모델에 넘기면 "제2항에도 불구하고"의 제2항을 못 본다.** 그래서 법령은 조 단위로 상위 k개를 고르고 그 조의 잎을 각자 라벨을 붙여 넘긴다(`search.pick`). 잎 합계가 4,500자를 넘는 긴 조는 순위에 든 잎 3개만 넘기고, 같은 조의 반복 머리말은 한 번만 찍는다. 인용은 라벨마다 제 본문으로만 검증하므로 형제 호 문구를 엉뚱한 호 ID로 붙이면 걸린다. 조 전문까지 `legal_chunk`에 넣으면 조와 그 안의 호가 둘 다 검색 후보가 돼 같은 내용이 중복으로 랭킹된다.
+- **27·33조는 검색 대상이 아니라 전제다.** G1은 33조1항의 열거 호, G2는 27조1항 통상성이라 카드 인용의 대부분(키별 51건 중 44건)이 두 조에서 나오는데, 주제 질의로는 수백 위로 밀린다. 그래서 `retrieve()`가 검색 없이 모든 후보 추출에 '기본' 블록으로 붙이고, 어느 호를 인용할지만 모델이 고른다. 검색은 두 조를 건너뛰어 칸을 먹지 않는다. 수치는 `docs/rag-eval.md` §9.
+- **아직 없는 것.** 배치 트리거(주 1회 cron)가 `.github/workflows/`에 없다 — GH Actions와 EC2 cron 중 미정이고, Actions는 러너 IP가 매번 바뀌어 RDS 화이트리스트를 못 쓴다는 제약이 있다(`CONTEXT.md` §9.1). 관리자 승인 화면과 PR 자동 생성도 미구현이라, **현재 자동으로 도는 구간은 `rule_candidate` 적재까지다.**
 
 ---
 
