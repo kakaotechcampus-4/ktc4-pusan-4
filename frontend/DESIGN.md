@@ -67,6 +67,8 @@
 - 라운드: 카드·패널 `rounded-2xl`, 버튼 md/lg·입력 `rounded-xl`, 버튼 sm `rounded-lg`, 칩 `rounded-md`, 배지 `rounded-full`.
 - 그림자는 `shadow-card`(거의 없음)와 `shadow-panel`(떠 있는 패널) 둘뿐. 카드는 테두리로 구분하고 그림자를 쓰지 않는다.
 - 전환: `transition-colors duration-150 ease-snap`. 등장 애니메이션은 `animate-rise` 하나.
+- **기울임·광원은 랜딩 히어로에서만** (`HeroStage`). 앱 화면은 차분하게 둔다 — 세금 판정 화면에서 화려한 연출은 신뢰를 깎는다.
+- 한 요소에 `animate-rise`(translate)와 기울임(rotate)을 같이 걸지 않는다. 뒤에 오는 `transform` 이 앞을 덮어쓴다. 바깥 요소에 등장, 안쪽 요소에 기울임.
 
 ## 부품
 
