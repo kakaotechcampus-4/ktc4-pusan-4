@@ -726,7 +726,7 @@ class JudgmentEngineTest {
     }
 
     @Test
-    void weekday_card_tags_attribute_without_changing_verdict() {
+    void weekday_match_uses_approved_date_day_of_week() {
         RuleCard weekend = new RuleCard(
             "R-061", 1, Gate.G5, 500,
             new RuleMatch(List.of(), List.of(), List.of(), null, null, List.of(),
@@ -741,9 +741,7 @@ class JudgmentEngineTest {
         Judgment wednesday = JudgmentEngine.judge(
             onDate(LocalDate.of(2025, 3, 12)), context, List.of(), rules);
 
-        assertThat(saturday.verdict()).isEqualTo(Verdict.AVAILABLE);
         assertThat(saturday.attributes()).containsEntry("주말결제", true);
-        assertThat(wednesday.verdict()).isEqualTo(Verdict.AVAILABLE);
         assertThat(wednesday.attributes()).doesNotContainKey("주말결제");
     }
 

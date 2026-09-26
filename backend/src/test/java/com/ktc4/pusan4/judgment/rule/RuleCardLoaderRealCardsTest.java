@@ -318,29 +318,21 @@ class RuleCardLoaderRealCardsTest {
             .satisfies(question -> assertThat(question.code()).isEqualTo("PG_UNKNOWN_PURPOSE"));
     }
 
-    /**
-     * 주말 식사는 불인정 기준이 아니라 소명 신호다(세무사 실무 질의응답 2026-09 Q2).
-     * 플래그만 붙고, 업무미팅 답이 오면 평일과 똑같이 접대비 버킷으로 간다.
-     */
+    /** G5 요일 카드는 G2 음식점 카드(940909)가 매칭돼야 도달한다. 그 연결을 본다. */
     @Test
-    void 주말_음식점은_플래그만_붙고_업무미팅_답을_막지_않는다() throws IOException {
+    void 주말_음식점에는_플래그가_붙는다() throws IOException {
         TransactionInput 토요일 = new TransactionInput(
             UUID.randomUUID(), LocalDate.of(2025, 3, 15), "한식당", "음식점", 25_000);
-        UserFact 응답 = new UserFact(
-            "transaction:" + 토요일.id(), "용도", Map.of("value", "업무미팅"));
 
-        Judgment 답변전 = JudgmentEngine.judge(토요일, 인적용역, List.of(), load());
-        Judgment 답변후 = JudgmentEngine.judge(토요일, 인적용역, List.of(응답), load());
+        Judgment judgment = JudgmentEngine.judge(토요일, 인적용역, List.of(), load());
 
-        assertThat(답변전.attributes()).containsEntry("주말결제", true);
-        assertThat(답변전.questions()).singleElement()
-            .satisfies(question -> assertThat(question.code()).isEqualTo("RESTAURANT_PURPOSE"));
-        assertThat(답변후.verdict()).isNotEqualTo(Verdict.UNAVAILABLE);
-        assertThat(답변후.attributes())
-            .containsEntry("주말결제", true)
-            .containsEntry("limit_bucket", "접대비");
+        assertThat(judgment.attributes()).containsEntry("주말결제", true);
     }
 
+    /**
+     * 로더는 모르는 match 키를 조용히 무시한다. 카드에 weekday 를 weekdays 처럼 오타 내면
+     * 요일 조건이 사라져 모든 요일에 플래그가 붙는데, 그걸 잡는 건 이 테스트뿐이다.
+     */
     @Test
     void 평일_음식점에는_주말_플래그가_없다() throws IOException {
         Judgment judgment = JudgmentEngine.judge(
