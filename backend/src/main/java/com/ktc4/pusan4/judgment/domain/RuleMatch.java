@@ -8,7 +8,8 @@ public record RuleMatch(
     List<String> keywords,
     Long amountMin,
     Long amountMax,
-    List<String> industries
+    List<String> industries,
+    boolean holiday
 ) {
     public RuleMatch {
         categories = copy(categories);
@@ -18,11 +19,11 @@ public record RuleMatch(
     }
 
     public static RuleMatch categories(String... categories) {
-        return new RuleMatch(List.of(categories), List.of(), List.of(), null, null, List.of());
+        return new RuleMatch(List.of(categories), List.of(), List.of(), null, null, List.of(), false);
     }
 
     public static RuleMatch any() {
-        return new RuleMatch(List.of(), List.of(), List.of(), null, null, List.of());
+        return new RuleMatch(List.of(), List.of(), List.of(), null, null, List.of(), false);
     }
 
     // 같은 priority에서 더 구체적인 match가 이긴다: 조건별 가중치의 합.

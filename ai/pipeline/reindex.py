@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import hashlib
 import sys
 from typing import Any
 
@@ -48,35 +49,58 @@ VALUES (
 
 _STALE = """
 SELECT sv.id FROM statute_version sv
- WHERE NOT EXISTS (
+ WHERE sv.doc_type = %s AND sv.effective_to IS NULL
+   AND NOT EXISTS (
      SELECT 1 FROM legal_chunk lc
       WHERE lc.statute_version_id = sv.id AND lc.source_hash = sv.body_hash)
 """
 
+# law_sync 가 옛 행을 닫아도 body_hash 는 그대로라 청크가 현행으로 남는다
+_SYNC = """
+UPDATE legal_chunk lc SET effective_to = sv.effective_to, is_superseded = sv.is_superseded
+  FROM statute_version sv
+ WHERE lc.statute_version_id = sv.id
+   AND (lc.effective_to, lc.is_superseded) IS DISTINCT FROM (sv.effective_to, sv.is_superseded)
+"""
 
-def _fetch(conn: psycopg.Connection, doc_type: str | None) -> list[dict[str, Any]]:
-    sql = f"SELECT {COLS} FROM statute_version"
-    params: tuple = ()
-    if doc_type:
-        sql += " WHERE doc_type = %s"
-        params = (doc_type,)
-    return conn.execute(sql, params).fetchall()
+_STORED = """
+SELECT lc.statute_version_id, lc.section, lc.seq, md5(lc.body) AS md5
+  FROM legal_chunk lc JOIN statute_version sv ON sv.id = lc.statute_version_id
+ WHERE lc.doc_type = %s AND sv.effective_to IS NULL
+"""
+
+
+def _fetch(conn: psycopg.Connection, doc_type: str, ids: set[int] | None = None) -> list[dict]:
+    sql = f"SELECT {COLS} FROM statute_version WHERE doc_type = %s AND effective_to IS NULL"
+    if ids is None:
+        return conn.execute(sql, (doc_type,)).fetchall()
+    return conn.execute(sql + " AND id = ANY(%s)", (doc_type, list(ids))).fetchall()
+
+
+def stale(made: list[Chunk], stored: list[dict]) -> set[int]:
+    """청크 본문이 하나라도 달라진 원문 행. 부모 문구만 바뀐 호, 잎에서 빠진 조도 잡힌다."""
+    new: dict[int, dict] = {}
+    old: dict[int, dict] = {}
+    for c in made:
+        new.setdefault(c.statute_version_id, {})[c.section, c.seq] = (
+            hashlib.md5(c.body.encode()).hexdigest()
+        )
+    for r in stored:
+        old.setdefault(r["statute_version_id"], {})[r["section"], r["seq"]] = r["md5"]
+    return {i for i in new.keys() | old.keys() if new.get(i) != old.get(i)}
 
 
 def _row(c: Chunk, vector: list[float]) -> dict[str, Any]:
     return {**c.__dict__, "embedding": str(vector)}
 
 
-def write(conn: psycopg.Connection, chunks: list[Chunk], batch: int = 100) -> int:
-    """임베딩을 받아 적재한다. 같은 원문의 옛 청크는 지우고 새로 넣는다."""
+def write(conn: psycopg.Connection, chunks: list[Chunk], ids: set[int], batch: int = 100) -> int:
+    """ids 의 옛 청크를 지우고 chunks 를 임베딩해 넣는다."""
+    conn.execute("DELETE FROM legal_chunk WHERE statute_version_id = ANY(%s)", (list(ids),))
     if not chunks:
         return 0
     api = client()
     done = 0
-    conn.execute(
-        "DELETE FROM legal_chunk WHERE statute_version_id = ANY(%s)",
-        ([c.statute_version_id for c in chunks],),
-    )
     for i in range(0, len(chunks), batch):
         part = chunks[i : i + batch]
         vectors = embed([c.body for c in part], api)
@@ -87,19 +111,28 @@ def write(conn: psycopg.Connection, chunks: list[Chunk], batch: int = 100) -> in
     return done
 
 
-def collect(conn: psycopg.Connection, doc_type: str | None, incremental: bool) -> list[Chunk]:
-    stale = {r["id"] for r in conn.execute(_STALE).fetchall()} if incremental else None
-
+def collect(
+    conn: psycopg.Connection, doc_type: str | None, incremental: bool
+) -> tuple[list[Chunk], set[int]]:
+    """다시 넣을 청크와, 옛 청크를 지울 원문 행 id."""
     chunks: list[Chunk] = []
+    ids: set[int] = set()
     for kind in [doc_type] if doc_type else DOC_TYPES:
-        rows = _fetch(conn, kind)
-        if incremental and kind not in NEEDS_SIBLINGS:
-            rows = [r for r in rows if r["id"] in stale]
-        if not rows:
-            continue
-        made = chunk(rows)
-        chunks += [c for c in made if stale is None or c.statute_version_id in stale]
-    return chunks
+        if not incremental:
+            made = chunk(_fetch(conn, kind))
+            ids |= {c.statute_version_id for c in made}
+        elif kind in NEEDS_SIBLINGS:
+            made = chunk(_fetch(conn, kind))
+            changed = stale(made, conn.execute(_STORED, (kind,)).fetchall())
+            made = [c for c in made if c.statute_version_id in changed]
+            ids |= changed
+        else:
+            # 심판례는 162MB 라 전량을 읽지 않는다. 불변 문서라 새 행만 보면 된다
+            new = {r["id"] for r in conn.execute(_STALE, (kind,)).fetchall()}
+            made = chunk(_fetch(conn, kind, new)) if new else []
+            ids |= new
+        chunks += made
+    return chunks, ids
 
 
 def main() -> int:
@@ -120,18 +153,22 @@ def main() -> int:
                 sql += " WHERE doc_type = %s"
                 params = (args.doc_type,)
             conn.execute(sql, params)
+        else:
+            n = conn.execute(_SYNC).rowcount
+            print(f"닫힌 원문 반영 {n:,}청크")
 
-        chunks = collect(conn, args.doc_type, args.incremental)
+        chunks, ids = collect(conn, args.doc_type, args.incremental)
         if args.limit:
             chunks = chunks[: args.limit]
+            ids = {c.statute_version_id for c in chunks}
 
         total = sum(len(c.body) for c in chunks)
-        print(f"청크 {len(chunks):,}개 · 본문 {total:,}자")
+        print(f"원문 {len(ids):,}행 · 청크 {len(chunks):,}개 · 본문 {total:,}자")
         if args.dry_run:
             conn.rollback()
             return 0
 
-        write(conn, chunks)
+        write(conn, chunks, ids)
         if args.incremental:
             conn.execute("UPDATE law_sync_log SET reindexed = true WHERE changed AND NOT reindexed")
         conn.commit()

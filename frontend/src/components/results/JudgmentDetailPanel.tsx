@@ -1,9 +1,17 @@
 import React from 'react';
 import { TriangleAlertIcon } from 'lucide-react';
-import type { Judgment, Transaction, Verdict } from '../../types/domain';
+import type { Judgment, JudgmentOriginType, Transaction, Verdict } from '../../types/domain';
 import { VerdictBadge } from '../VerdictBadge';
 import { StatuteCitation } from '../StatuteCitation';
 import { formatFullDate, formatWon } from '../../utils/format';
+
+/** 2.8 이 revision 이 생긴 직접 원인 */
+const ORIGIN_LABEL: Record<JudgmentOriginType, string> = {
+  RUN: '자동 판정',
+  USER_FACT: '답변 반영',
+  CLASSIFICATION_REVIEW: '분류 확인 반영',
+  OVERRIDE: '사용자 수정'
+};
 
 interface JudgmentDetailPanelProps {
   judgment: Judgment;
@@ -27,8 +35,13 @@ export function JudgmentDetailPanel({
       <header className="border-b border-line px-5 py-4">
         <div className="flex flex-wrap items-center gap-2">
           <VerdictBadge verdict={judgment.verdict} size="md" />
+          {judgment.outOfScope &&
+          <span className="rounded-md border border-warn-line bg-warn-bg px-1.5 py-0.5 text-[11px] font-semibold text-warn">
+              판정 범위 밖
+            </span>
+          }
           <span className="rounded-md border border-line px-1.5 py-0.5 text-[11px] text-muted">
-            {judgment.state.label}
+            {ORIGIN_LABEL[judgment.origin.type]}
           </span>
           <span className="text-[11px] tabular-nums text-muted">
             rev.{judgment.revision}
@@ -113,6 +126,29 @@ export function JudgmentDetailPanel({
               <dd className="text-ink2">{String(value)}</dd>
             </div>
           )}
+          {judgment.ruleCardId &&
+          <div className="flex justify-between gap-2">
+              <dt>규칙 카드</dt>
+              <dd className="text-ink2">
+                {judgment.ruleCardId}
+                {judgment.ruleCardVersion !== null && ` v${judgment.ruleCardVersion}`}
+                {judgment.appliedRuleIds.length > 1 &&
+                ` 외 ${judgment.appliedRuleIds.length - 1}장`}
+              </dd>
+            </div>
+          }
+          {judgment.rulesCommitSha &&
+          <div className="flex justify-between gap-2">
+              <dt>규칙 커밋</dt>
+              <dd className="text-ink2">{judgment.rulesCommitSha.slice(0, 8)}</dd>
+            </div>
+          }
+          {judgment.userContextVersion !== null &&
+          <div className="flex justify-between gap-2">
+              <dt>문진 버전</dt>
+              <dd className="text-ink2">v{judgment.userContextVersion}</dd>
+            </div>
+          }
           <div className="flex justify-between gap-2">
             <dt>판정 시각</dt>
             <dd className="text-ink2">{judgment.computedAt.slice(0, 16).replace('T', ' ')}</dd>

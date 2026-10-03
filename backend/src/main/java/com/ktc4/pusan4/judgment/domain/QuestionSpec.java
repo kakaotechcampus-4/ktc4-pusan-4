@@ -32,4 +32,10 @@ public record QuestionSpec(
         }
         return effects.getOrDefault(selectedValue, QuestionEffect.none());
     }
+
+    // 답에 따라 불가가 풀리는 선택지가 있다. 한 카드의 판정은 그 카드 질문의 답이 대체한다.
+    public boolean canLiftUnavailable() {
+        return effects.values().stream()
+            .anyMatch(effect -> effect.verdict() != null && effect.verdict() != Verdict.UNAVAILABLE);
+    }
 }

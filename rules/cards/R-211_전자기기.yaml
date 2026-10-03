@@ -6,8 +6,11 @@
 # 같은 거래에 동시에 걸리지 않는다. 선택지 값은 평가셋 어휘('개인')를 따른다.
 #
 # industry 를 걸지 않는다 — 프로파일에 '전자기기' 칸이 없다.
+#
+# 근거는 답마다 다르다: 가능 선택지는 §27① 을 선택지에 싣고, 카드 citations 에는 불가 근거만 둔다
+# (선택지 citations 가 카드 것을 대신한다, PR #68). 카드에 둘 다 두면 개인 답에도 §27① 이 붙는다.
 id: R-211
-version: 1
+version: 2
 gate: G2
 priority: 500
 effective_period: { start: 2024-01-01, end: null }
@@ -15,7 +18,6 @@ match:
   category: [전자기기]
 verdict: 확인필요
 citations:
-  - { id: 소득세법-27-1, verified: true }
   - { id: 소득세법-33-1-5, verified: true }
 question:
   code: DEVICE_PURPOSE
@@ -23,7 +25,7 @@ question:
   fact_type: 용도
   group_by: transaction
   options:
-    - { value: 업무용, verdict: 가능, account: 소모품비 }
+    - { value: 업무용, verdict: 가능, citations: [{ id: 소득세법-27-1, verified: true }], account: 소모품비 }
     - { value: 개인, verdict: 불가 }
     - { value: 업무·개인 혼재 }
 review: { by: 미검수, date: 2026-09-15 }

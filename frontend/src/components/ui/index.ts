@@ -7,5 +7,6 @@ export { SectionHeading } from './SectionHeading';
 export { Container } from './Container';
 export { Input, Select, Field } from './Input';
 export { ChoiceGroup } from './ChoiceGroup';
+export { Empty } from './Empty';
 export type { ChoiceOption } from './ChoiceGroup';
 export { cn } from './cn';

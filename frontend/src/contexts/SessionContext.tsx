@@ -5,17 +5,9 @@ import React, {
   useMemo,
   useState } from
 'react';
-import type { BusinessContext, Judgment, Transaction, Verdict } from '../types/domain';
-import {
-  JUDGMENTS,
-  JUDGMENT_SUMMARY,
-  QUESTION_ANSWER_VERDICT,
-  QUESTION_GROUPS,
-  QUESTION_TRANSACTIONS,
-  TRANSACTIONS } from
-'../mock/judgments';
+import type { BusinessContext, BusinessContextRef } from '../types/domain';
 import type { ParsedBatch } from '../mock/sampleFiles';
-import { VERDICT_LABEL } from '../utils/verdict';
+import { seedSession } from '../api';
 
 /** 업종은 IT(62010) 고정 */
 export const DEFAULT_CONTEXT: BusinessContext = {
@@ -27,59 +19,40 @@ export const DEFAULT_CONTEXT: BusinessContext = {
   homeOfficeRatio: 20
 };
 
-/** 목업 화면의 진행 단계. API의 RunStatus와 다르다. */
-export type DemoRunStatus = 'IDLE' | 'RUNNING' | 'DONE';
-
-interface VerdictCounts {
-  available: number;
-  needsReview: number;
-  unavailable: number;
-}
-
+/**
+ * 클라이언트 세션. 로그인 상태와 "지금 어느 배치·문진·실행을 보고 있는지"만 든다.
+ * 판정·질문 같은 서버 상태는 여기 두지 않고 api.* 로 읽는다.
+ */
 interface SessionValue {
   isAuthenticated: boolean;
   email: string | null;
   signIn: (email: string) => void;
   signOut: () => void;
+  /** 브라우저 파싱 결과 (업로드 화면 → 확인 화면) */
   batch: ParsedBatch | null;
   setBatch: (batch: ParsedBatch | null) => void;
+  /** 서버에 저장된 배치 id */
+  batchId: string | null;
+  setBatchId: (id: string | null) => void;
+  /** 문진 입력값과 서버 참조 */
   context: BusinessContext | null;
   setContext: (context: BusinessContext) => void;
-  runStatus: DemoRunStatus;
-  setRunStatus: (status: DemoRunStatus) => void;
-  /** 그룹 키 → 선택한 답변 라벨 */
-  answers: Record<string, string>;
-  answerGroup: (groupKey: string, value: string) => void;
-  overrides: Record<string, Verdict>;
-  overrideJudgment: (judgmentId: string, verdict: Verdict) => void;
-  judgments: Judgment[];
-  transactionOf: (transactionId: string) => Transaction | undefined;
-  counts: VerdictCounts;
-  pendingQuestionCount: number;
-  recognizedAmount: number;
+  contextRef: BusinessContextRef | null;
+  setContextRef: (ref: BusinessContextRef | null) => void;
+  /** 현재 판정 실행 */
+  runId: string | null;
+  setRunId: (id: string | null) => void;
 }
 
 const SessionContext = createContext<SessionValue | null>(null);
 
-const ratioOf = (answer: string): number | null =>
-/^\d+%$/.test(answer) ? Number(answer.replace('%', '')) : null;
-
-const coded = (code: Verdict) => ({ code, label: VERDICT_LABEL[code] });
-
-/** 거래 → 소속 질문 그룹. 목업 전용 역매핑 */
-const GROUP_OF_TRANSACTION: Record<string, string> = Object.fromEntries(
-  Object.entries(QUESTION_TRANSACTIONS).flatMap(([groupKey, ids]) =>
-  ids.map((id) => [id, groupKey])
-  )
-);
-
 export function SessionProvider({ children }: {children: React.ReactNode;}) {
   const [email, setEmail] = useState<string | null>(null);
   const [batch, setBatch] = useState<ParsedBatch | null>(null);
+  const [batchId, setBatchId] = useState<string | null>(seedSession?.batchId ?? null);
   const [context, setContext] = useState<BusinessContext | null>(null);
-  const [runStatus, setRunStatus] = useState<DemoRunStatus>('IDLE');
-  const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [overrides, setOverrides] = useState<Record<string, Verdict>>({});
+  const [contextRef, setContextRef] = useState<BusinessContextRef | null>(seedSession?.contextRef ?? null);
+  const [runId, setRunId] = useState<string | null>(seedSession?.runId ?? null);
 
   const signIn = useCallback((nextEmail: string) => {
     setEmail(nextEmail);
@@ -88,127 +61,11 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
   const signOut = useCallback(() => {
     setEmail(null);
     setBatch(null);
+    setBatchId(seedSession?.batchId ?? null);
     setContext(null);
-    setRunStatus('IDLE');
-    setAnswers({});
-    setOverrides({});
+    setContextRef(seedSession?.contextRef ?? null);
+    setRunId(seedSession?.runId ?? null);
   }, []);
-
-  const answerGroup = useCallback((groupKey: string, value: string) => {
-    setAnswers((prev) => ({ ...prev, [groupKey]: value }));
-  }, []);
-
-  const overrideJudgment = useCallback(
-    (judgmentId: string, verdict: Verdict) => {
-      setOverrides((prev) => ({ ...prev, [judgmentId]: verdict }));
-    },
-    []
-  );
-
-  const transactionOf = useCallback(
-    (transactionId: string) =>
-    TRANSACTIONS.find((transaction) => transaction.id === transactionId),
-    []
-  );
-
-  /** 응답 → 재판정 → 새 Revision 을 클라이언트에서 흉내 낸다. 서버에서는 룰엔진이 한다. */
-  const judgments = useMemo<Judgment[]>(
-    () =>
-    JUDGMENTS.map((judgment) => {
-      const groupKey = GROUP_OF_TRANSACTION[judgment.transactionId];
-      const answer = groupKey ? answers[groupKey] : undefined;
-      let next = judgment;
-
-      if (groupKey && answer) {
-        const verdict = QUESTION_ANSWER_VERDICT[groupKey]?.[answer] ?? 'NEEDS_REVIEW';
-        const ratio = ratioOf(answer);
-        const amount = transactionOf(judgment.transactionId)?.amount ?? 0;
-        next = {
-          ...judgment,
-          revision: judgment.revision + 1,
-          verdict: coded(verdict),
-          blockedAtGate: verdict === 'NEEDS_REVIEW' ? judgment.blockedAtGate : null,
-          isInference: false,
-          unmatchedReason: null,
-          attributes: ratio !== null ? { 안분율: ratio } : judgment.attributes,
-          finalAmount:
-          verdict !== 'AVAILABLE' ?
-          null :
-          ratio !== null ?
-          Math.floor(amount * ratio / 100) :
-          amount,
-          explanation:
-          verdict === 'AVAILABLE' ?
-          ratio !== null ?
-          `사용자 응답으로 업무 사용 비율 ${ratio}%를 적용해 구분되는 금액만 산입합니다.` :
-          '사용자 응답으로 용도가 업무로 확인되어 통상성 게이트를 통과했습니다.' :
-          verdict === 'UNAVAILABLE' ?
-          '사용자 응답에 따라 개인 목적 지출로 확정되어 필요경비에 산입하지 않습니다.' :
-          judgment.explanation,
-          computedAt: new Date().toISOString()
-        };
-      }
-
-      const override = overrides[judgment.id];
-      if (override) {
-        next = {
-          ...next,
-          revision: next.revision + 1,
-          verdict: coded(override),
-          finalAmount:
-          override === 'AVAILABLE' ?
-          next.finalAmount ?? transactionOf(judgment.transactionId)?.amount ?? null :
-          null
-        };
-      }
-
-      return next;
-    }),
-    [answers, overrides, transactionOf]
-  );
-
-  const counts = useMemo<VerdictCounts>(() => {
-    let { available, needsReview, unavailable } = {
-      available: JUDGMENT_SUMMARY.byVerdict.AVAILABLE.count,
-      needsReview: JUDGMENT_SUMMARY.byVerdict.NEEDS_REVIEW.count,
-      unavailable: JUDGMENT_SUMMARY.byVerdict.UNAVAILABLE.count
-    };
-    QUESTION_GROUPS.forEach((group) => {
-      const answer = answers[group.groupKey];
-      if (!answer) return;
-      const verdict = QUESTION_ANSWER_VERDICT[group.groupKey]?.[answer];
-      if (!verdict || verdict === 'NEEDS_REVIEW') return;
-      needsReview -= group.count;
-      if (verdict === 'AVAILABLE') available += group.count;else
-      unavailable += group.count;
-    });
-    return { available, needsReview, unavailable };
-  }, [answers]);
-
-  const pendingQuestionCount = useMemo(
-    () =>
-    QUESTION_GROUPS.filter((group) => {
-      const answer = answers[group.groupKey];
-      if (!answer) return true;
-      return QUESTION_ANSWER_VERDICT[group.groupKey]?.[answer] === 'NEEDS_REVIEW';
-    }).length,
-    [answers]
-  );
-
-  const recognizedAmount = useMemo(() => {
-    const extra = QUESTION_GROUPS.reduce((sum, group) => {
-      const answer = answers[group.groupKey];
-      if (!answer) return sum;
-      const ratio = ratioOf(answer);
-      if (ratio !== null) {
-        return sum + Math.floor(group.totalAmount * ratio / 100);
-      }
-      return QUESTION_ANSWER_VERDICT[group.groupKey]?.[answer] === 'AVAILABLE' ?
-      sum + group.totalAmount :
-      sum;
-    }, 0);
-    return JUDGMENT_SUMMARY.byVerdict.AVAILABLE.finalAmount + extra;
-  }, [answers]);
 
   const value = useMemo<SessionValue>(
     () => ({
@@ -218,37 +75,16 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
       signOut,
       batch,
       setBatch,
+      batchId,
+      setBatchId,
       context,
       setContext,
-      runStatus,
-      setRunStatus,
-      answers,
-      answerGroup,
-      overrides,
-      overrideJudgment,
-      judgments,
-      transactionOf,
-      counts,
-      pendingQuestionCount,
-      recognizedAmount
+      contextRef,
+      setContextRef,
+      runId,
+      setRunId
     }),
-    [
-    email,
-    signIn,
-    signOut,
-    batch,
-    context,
-    runStatus,
-    answers,
-    answerGroup,
-    overrides,
-    overrideJudgment,
-    judgments,
-    transactionOf,
-    counts,
-    pendingQuestionCount,
-    recognizedAmount]
-
+    [email, signIn, signOut, batch, batchId, context, contextRef, runId]
   );
 
   return (

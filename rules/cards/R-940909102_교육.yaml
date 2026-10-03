@@ -1,0 +1,25 @@
+# 생성 파일이다. 직접 고치지 않는다.
+# 원본: rules/templates/R-102_교육.yaml + profiles/940909.yaml
+# 다시 만들기: ./backend/gradlew -p backend generateRuleCards
+id: R-940909102
+version: 102
+gate: G2
+priority: 500
+effective_period:
+  start: 2024-01-01
+  end: null
+match:
+  category:
+  - 교육
+  industry:
+  - "940909"
+verdict: 가능
+account: 교육훈련비
+citations:
+- id: 소득세법-27-1
+  verified: true
+- id: 소득세법시행령-55-1-28
+  verified: true
+review:
+  by: 미검수
+  date: 2026-09-14

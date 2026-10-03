@@ -40,6 +40,17 @@ export const DEV_EXPENSES = [
 
 
 
+/** 히어로 뒤 카드에 겹쳐 보여주는 결과 요약 (데모 수치) */
+export const HERO_SUMMARY = {
+  total: 292,
+  availableAmount: 21_483_000,
+  distribution: [
+  { label: '가능', count: 168, bar: 'bg-ok' },
+  { label: '확인 필요', count: 71, bar: 'bg-warn' },
+  { label: '불가', count: 53, bar: 'bg-deny' }]
+
+};
+
 export const STATS = [
 { value: '40+', label: '검수를 마친 규칙 카드' },
 { value: '60건', label: '적재된 조문·해석 버전' },

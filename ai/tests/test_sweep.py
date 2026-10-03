@@ -1,6 +1,6 @@
 import pytest
 
-from pipeline.law_sync import _stale
+from pipeline.law_sync import _stale, complete
 
 CURRENT = {f"소득세법-{i}" for i in range(200)}
 
@@ -26,3 +26,20 @@ def test_small_deletion_is_allowed():
 def test_aborts_on_mass_disappearance():
     with pytest.raises(SystemExit):
         _stale(CURRENT, {"소득세법-0"})
+
+
+def test_complete_listing():
+    # 9/29 국세청 실측: 100 + 100 + 1 = 201
+    assert complete([("201", 100), ("201", 100), ("201", 1)])
+
+
+def test_empty_page_midway_is_incomplete():
+    assert not complete([("201", 100), ("201", 0)])
+
+
+def test_missing_total_is_incomplete():
+    assert not complete([(None, 0)])
+
+
+def test_total_changed_between_pages_is_incomplete():
+    assert not complete([("201", 100), ("202", 100), ("202", 2)])

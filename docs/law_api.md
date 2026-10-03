@@ -281,12 +281,13 @@ curl "https://www.law.go.kr/DRF/lawSearch.do?OC=test&target=admrul&type=JSON&mod
 ## 8. 파이프라인에서의 사용 (CONTEXT.md §11 연계)
 
 ```
-[일 1회 03:00 KST]
+[주 1회 일 04:00 KST — deploy/ktc4-corpus.timer]
   법령·행정규칙   → target=law / admrul
-                    전량 목록 조회 → 공포번호 + 조문 해시 비교 (수백 건)
-                    admrul은 modYd 기간검색으로 증분 축소 가능
+                    전량 조회 → 조문 해시 비교, 안 나온 조문은 sweep 으로 닫음
+                    admrul sweep 은 목록 totalCnt 와 받은 건수가 맞을 때만
+                    admrul은 modYd 기간검색으로 증분 축소 가능(미사용)
   판례·심판례·해석 → target=prec / ttSpecialDecc / expc
-                    신규 생산분만 증분 (prncYd / 의결일자 / explYd 기준)
+                    키워드 본문검색 → 적재 안 된 문서만 본문 조회(--resume)
   국세청 법령해석   → target=ntsCgmExpc — 목록(메타)만. 본문 없음 (§9)
   변경 감지 → statute_version 새 행 (append-only) → 조건부 재색인
 ```

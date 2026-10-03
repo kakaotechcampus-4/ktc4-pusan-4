@@ -8,3 +8,5 @@
 - `compose.yaml`: 로컬 개발용 PostgreSQL
 
 백엔드 개발 환경과 실행 방법은 [`backend/README.md`](backend/README.md)를 참고하세요.
+
+AWS 단일 서버 배포 절차는 [`docs/deployment.md`](docs/deployment.md)를 참고하세요.

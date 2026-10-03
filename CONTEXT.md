@@ -1571,10 +1571,12 @@ chunking 전략 변경(**10월에 반드시 겪음**), 임베딩 모델 교체 �
 [3] 4개 위계 동시 검색 (코드)
     법령 · 행정규칙 · 심판례해석 · 판례를 한 번에. 임베딩 1회
     순차 탐색과 조기 종료는 버렸다 — 아래 "위계를 어디서 지키나"
+    기본 조문(소득세법 27·33조 잎)은 검색 없이 항상 후보에 붙는다. 법령은 조 단위로 뽑는다
+    (docs/architecture.md, 수치는 docs/rag-eval.md §9)
 
 [4] 근거 선택  ← 에이전트 ②
     Evidence(sufficient, refs[statute_id+quote], direction, note)
-    quote ∈ 원문, statute_id ∈ 검색결과 를 코드가 검증한다
+    quote ∈ 원문, statute_id ∈ 후보(검색결과 + 기본 조문) 를 코드가 검증한다
     refs 가 비거나 sufficient=false 면 보류
 
 [5] 초안 생성 — Pydantic 스키마 강제  ← 에이전트 ③

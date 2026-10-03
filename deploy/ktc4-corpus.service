@@ -1,0 +1,8 @@
+[Unit]
+Description=Sync ktc4 legal corpus from law.go.kr
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash /opt/ktc4/repo/deploy/corpus-sync.sh

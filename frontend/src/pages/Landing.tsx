@@ -2,7 +2,7 @@ import { ArrowRightIcon } from 'lucide-react';
 import { MarketingHeader } from '../components/MarketingHeader';
 import { MarketingFooter } from '../components/MarketingFooter';
 import { StatuteCitation } from '../components/StatuteCitation';
-import { AgentPreview } from '../components/AgentPreview';
+import { HeroStage } from '../components/HeroStage';
 import {
   Badge,
   Button,
@@ -60,7 +60,7 @@ export function Landing() {
       <main className="flex-1">
         {/* 히어로 */}
         <Container as="section" className="pb-16 pt-20 sm:pt-28">
-          <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_420px]">
             <div>
               <SectionHeading
                 as="h1"
@@ -91,8 +91,8 @@ export function Landing() {
             </div>
 
             <figure className="justify-self-center lg:justify-self-end">
-              <AgentPreview />
-              <figcaption className="mt-3 text-center text-small text-muted">
+              <HeroStage />
+              <figcaption className="mt-4 text-center text-small text-muted">
                 실제 규칙 카드 순서 그대로 · 샘플 3건 순환
               </figcaption>
             </figure>

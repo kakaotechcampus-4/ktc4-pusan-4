@@ -2,6 +2,7 @@
 
 from datetime import date
 
+import pytest
 import yaml
 
 from pipeline.draft import PRIORITY, RuleCardDraft, render
@@ -90,6 +91,21 @@ def test_G1인데_33조를_안_물면_반려():
 def test_G1이_33조를_물면_통과():
     from pipeline.draft import _check
     refs = [StatuteRef(statute_id="소득세법-33-1-2", quote="벌금ㆍ과료와 과태료")]
+    assert _check(card(gate="G1", verdict="불가"), ev(refs=refs)) == []
+
+
+# 13호는 1호와 앞자리가 같아 호 경계를 안 보면 통과해 버린다
+@pytest.mark.parametrize("sid", ["소득세법-33-1-5", "소득세법-33-1-13"])
+def test_G1이_조건부_호만_물면_반려(sid):
+    from pipeline.draft import _check
+    refs = [StatuteRef(statute_id=sid, quote="대통령령으로 정하는 가사의 경비")]
+    bad = _check(card(gate="G1", verdict="불가"), ev(refs=refs))
+    assert len(bad) == 1 and "33조" in bad[0]
+
+
+def test_G1이_두_자리_전액차단_호를_물면_통과():
+    from pipeline.draft import _check
+    refs = [StatuteRef(statute_id="소득세법-33-1-10", quote="건설자금에 충당한 차입금의 이자")]
     assert _check(card(gate="G1", verdict="불가"), ev(refs=refs)) == []
 
 

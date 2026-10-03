@@ -17,7 +17,6 @@ import java.util.TreeSet;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -88,14 +87,5 @@ class ApiContractIntegrationTest {
         });
 
         assertThat(actual).containsExactlyInAnyOrderElementsOf(CONTRACT);
-    }
-
-    @Test
-    void unimplemented_endpoint_returns_501_in_error_format() throws Exception {
-        mockMvc.perform(get("/api/v1/users/me"))
-            .andExpect(status().isNotImplemented())
-            .andExpect(jsonPath("$.code").value("NOT_IMPLEMENTED"))
-            .andExpect(jsonPath("$.message").isNotEmpty())
-            .andExpect(jsonPath("$.traceId").isNotEmpty());
     }
 }

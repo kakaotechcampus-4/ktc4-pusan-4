@@ -223,7 +223,9 @@ ID      "0199c8f2-1a2b-7c3d-8e4f-5a6b7c8d9e0f"
 | 400 | VALIDATION_ERROR | 필수 필드 누락·타입 불일치 등 문서화되지 않은 요청 검증 실패 |
 | 401 | UNAUTHORIZED | `Authorization` 헤더 누락 |
 | 404 | NOT_FOUND | 전용 `*_NOT_FOUND`가 없는 경로의 리소스 없음 |
+| 405 | METHOD_NOT_ALLOWED | 경로는 있으나 지원하지 않는 HTTP 메서드 |
 | 409 | CONFLICT | 전용 코드가 없는 상태 충돌 |
+| 415 | UNSUPPORTED_MEDIA_TYPE | 지원하지 않는 `Content-Type` |
 | 422 | UNPROCESSABLE_ENTITY | 전용 코드가 없는 처리 불가 |
 | 500 | INTERNAL_ERROR | 그 외 서버 오류 |
 
@@ -269,6 +271,8 @@ size    기본 20, 최대 100
 ```
 
 분기는 `code`, 화면 표시는 `label`을 사용한다.
+
+예외: `userInclusion`(§2.3)은 §3.4 응답 예시대로 값을 그대로(`"EXCLUDED"`) 응답한다. `bookkeepingDuty`(§2.9)는 원문 자체가 표시값이라 역시 값 그대로다.
 
 ---
 
@@ -991,6 +995,12 @@ approvedAt DESC, id DESC
 }
 ```
 
+에러:
+
+```
+404 TRANSACTION_NOT_FOUND
+```
+
 ---
 
 ## `POST /api/v1/transactions/{transactionId}/exclude`
@@ -1017,6 +1027,12 @@ userInclusion = EXCLUDED
 기존 Judgment는 이력 보존을 위해 삭제하지 않는다.
 
 단, `batchId`, `year`를 이용한 현재 결과 및 summary에서는 해당 Transaction을 제외한다.
+
+에러:
+
+```
+404 TRANSACTION_NOT_FOUND
+```
 
 ---
 
@@ -1054,6 +1070,7 @@ sourceStatus = CANCELED_OFFSET
 에러:
 
 ```
+404 TRANSACTION_NOT_FOUND
 409 CANCELED_TRANSACTION_NOT_INCLUDABLE
 ```
 
@@ -1898,6 +1915,8 @@ merchant_norm
 
 새로운 `JudgmentRun`은 생성하지 않는다.
 
+3·4단계의 대상은 요청에 적힌 `questionIds`만이 아니다. 같은 Batch·`groupKey`·`factType`에서 `CANCELED`가 아닌 다른 Question도 같은 UserFact로 함께 처리하고 재판정 대상에 넣는다. `PENDING`이면 `ANSWERED`로 바꾸고, 이미 `ANSWERED`이면 `answeredFactId`와 `answeredAt`을 새 UserFact 기준으로 바꾼다. `answeredCount`는 이렇게 함께 처리된 수까지 포함한다.
+
 응답:
 
 ```
@@ -1922,7 +1941,7 @@ merchant_norm
 
 `PENDING` Question은 최초 답변할 수 있고, `ANSWERED` Question은 같은 API로 정정할 수 있다.
 
-정정할 때 기존 UserFact를 수정하지 않는다. 동일한 `(userId, batchId, scopeKey, factType)`에서 `version`을 증가시킨 UserFact를 새로 생성하고 Question의 `answeredFactId`를 새 UserFact로 변경한다.
+정정할 때 기존 UserFact를 수정하지 않는다. 동일한 `(userId, batchId, scopeKey, factType)`에서 `version`을 증가시킨 UserFact를 새로 생성하고, 같은 Batch·`groupKey`·`factType` Question의 `answeredFactId`를 모두 새 UserFact로 변경한다.
 
 `CANCELED` Question에는 응답할 수 없다.
 

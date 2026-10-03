@@ -147,22 +147,25 @@ def _stale(current: set[str], seen: set[str]) -> set[str]:
     return gone
 
 
-def sweep(conn: psycopg.Connection, doc_ids: list[str], seen: set[str], on: date) -> int:
+def sweep(
+    conn: psycopg.Connection, doc_type: str, doc_ids: list[str] | None, seen: set[str], on: date
+) -> int:
     """삭제·이동·폐지된 조문의 effective_to를 닫는다.
 
-    법령은 매 런마다 전문을 통째로 다시 받으므로, 이번 런에 안 나온 조문은 없어진 것이다.
+    법령·행정규칙은 매 런마다 전문을 통째로 다시 받으므로, 이번 런에 안 나온 조문은 없어진 것이다.
     삭제 시점은 본문에서만 캐낼 수 있고 표기가 제각각이라 확인 시점으로 근사한다.
+    doc_ids 가 None 이면 doc_type 의 현행 전체가 대상이다.
     """
-    current = {
-        r[0]
-        for r in conn.execute(
-            "SELECT statute_id FROM statute_version"
-            " WHERE doc_type = '법령' AND doc_id = ANY(%s)"
-            # effective_from >= on 인 시행예정 조문을 닫으면 CHECK 제약에 걸린다
-            "   AND effective_to IS NULL AND effective_from < %s",
-            (doc_ids, on),
-        ).fetchall()
-    }
+    # effective_from >= on 인 시행예정 조문을 닫으면 CHECK 제약에 걸린다
+    sql = (
+        "SELECT statute_id FROM statute_version"
+        " WHERE doc_type = %s AND effective_to IS NULL AND effective_from < %s"
+    )
+    params: tuple = (doc_type, on)
+    if doc_ids is not None:
+        sql += " AND doc_id = ANY(%s)"
+        params += (doc_ids,)
+    current = {r[0] for r in conn.execute(sql, params).fetchall()}
     gone = _stale(current, seen)
     if gone:
         conn.execute(
@@ -173,13 +176,28 @@ def sweep(conn: psycopg.Connection, doc_ids: list[str], seen: set[str], on: date
     return len(gone)
 
 
-def _rows(oc: str, target: str, key: str, limit: int | None, **params) -> Iterator[dict]:
+def complete(pages: list[tuple[str | None, int]]) -> bool:
+    """페이지별 (totalCnt, 받은 건수)로 목록을 끝까지 받았는지 본다.
+
+    중간 페이지가 비어 오면 _rows 는 거기서 끝난 줄 안다. 그걸로 sweep 하면 멀쩡한 규칙이 닫힌다.
+    """
+    totals = {t for t, _ in pages}
+    if len(totals) != 1 or None in totals:
+        return False
+    return sum(n for _, n in pages) == int(totals.pop())
+
+
+def _rows(
+    oc: str, target: str, key: str, limit: int | None, pages: list | None = None, **params
+) -> Iterator[dict]:
     """목록을 페이징한다. display 상한이 100이라 totalCnt 기준으로 돈다."""
     page = sent = 0
     while True:
         page += 1
         result = search(oc, target, display=100, page=page, **params)
         rows = as_list(result.get(key))
+        if pages is not None:
+            pages.append((result.get("totalCnt"), len(rows)))
         if not rows:
             return
         for row in rows:
@@ -211,8 +229,24 @@ def _keyword_rows(
                 return
 
 
+def _case_body(oc: str, target: str, doc_id: str) -> dict | None:
+    """사례 본문. 한 문서가 계속 응답하지 않으면(판례 104905) 건너뛴다.
+
+    불변 문서라 --resume 이 다음 런에 다시 시도한다. 법령·행정규칙은 건너뛰면
+    sweep 이 그 조문을 폐지로 닫으므로 여기를 쓰지 않는다.
+    """
+    try:
+        return service(oc, target, ID=doc_id)
+    except NotApproved:
+        raise
+    except RuntimeError as exc:
+        print(f"{target:<8} ⚠️ {doc_id} 건너뜀 — {str(exc).splitlines()[0]}", flush=True)
+        return None
+
+
 def collect(
-    oc: str, target: str, limit: int | None, laws: list[str], known: set[str]
+    oc: str, target: str, limit: int | None, laws: list[str], known: set[str],
+    pages: list | None = None,
 ) -> Iterator[Unit]:
     if target == "law":
         for law_id in laws:
@@ -220,7 +254,7 @@ def collect(
 
     elif target == "admrul":
         for org in ADMRUL_ORGS:
-            for row in _rows(oc, "admrul", "admrul", limit, org=org):
+            for row in _rows(oc, "admrul", "admrul", limit, pages, org=org):
                 # 공고는 덤핑방지관세 부과 결정 같은 일회성 문서다. 제목이 겹쳐
                 # statute_id 가 충돌하고, 필요경비 판정과도 무관하다.
                 if row.get("행정규칙종류") == "공고":
@@ -229,13 +263,14 @@ def collect(
 
     elif target == "expc":
         for row in _keyword_rows(oc, "expc", "expc", "법령해석례일련번호", limit, known):
-            body = service(oc, "expc", ID=row["법령해석례일련번호"])
-            yield from parse_expc(body, row)
+            if body := _case_body(oc, "expc", row["법령해석례일련번호"]):
+                yield from parse_expc(body, row)
 
     elif target == "decc":
         field = "특별행정심판재결례일련번호"
         for row in _keyword_rows(oc, "ttSpecialDecc", "decc", field, limit, known):
-            yield from parse_decc(service(oc, "ttSpecialDecc", ID=row[field]), row)
+            if body := _case_body(oc, "ttSpecialDecc", row[field]):
+                yield from parse_decc(body, row)
 
     elif target == "prec":
         rows = _keyword_rows(oc, "prec", "prec", "판례일련번호", limit, known, datSrcNm="대법원")
@@ -243,7 +278,8 @@ def collect(
             # 본문 조회 전에 거른다. 민사·형사가 절반이 넘는다.
             if row.get("사건종류명") not in PREC_CASE_TYPES:
                 continue
-            yield from parse_prec(service(oc, "prec", ID=row["판례일련번호"]), row)
+            if body := _case_body(oc, "prec", row["판례일련번호"]):
+                yield from parse_prec(body, row)
 
 
 def main() -> int:
@@ -270,6 +306,7 @@ def main() -> int:
             hashes: dict[str, str] = {}
             clashes: list[str] = []
             known: set[str] = set()
+            pages: list = []
             if args.resume and target in ("expc", "decc", "prec"):
                 known = {
                     r[0]
@@ -282,7 +319,7 @@ def main() -> int:
 
             try:
                 for unit in collect(
-                    settings.law_api_oc, target, args.limit, args.law or LAWS, known
+                    settings.law_api_oc, target, args.limit, args.law or LAWS, known, pages
                 ):
                     # 같은 statute_id가 다른 내용으로 두 번 나오면 하나가 조용히 사라진다
                     if hashes.setdefault(unit.statute_id, unit.body_hash) != unit.body_hash:
@@ -302,10 +339,18 @@ def main() -> int:
                 print(f"{target:<8} 건너뜀 — OC에 미신청된 API. open.law.go.kr 에서 신청 필요")
                 continue
             # 일부만 받아온 런은 "사라졌다"와 "안 받았다"를 구분할 수 없다
+            today = datetime.now(KST).date()
+            n_gone = 0
             if target == "law" and not args.limit:
-                n_gone = sweep(conn, args.law or LAWS, set(hashes), datetime.now(KST).date())
-                if n_gone:
-                    print(f"{target:<8} 사라진 조문 {n_gone:6d}건 닫음")
+                n_gone = sweep(conn, "법령", args.law or LAWS, set(hashes), today)
+            elif target == "admrul" and not args.limit:
+                # ponytail: ADMRUL_ORGS 가 둘 이상이면 totalCnt 가 섞여 늘 건너뛴다. 기관별로 판정할 것
+                if complete(pages):
+                    n_gone = sweep(conn, "행정규칙", None, set(hashes), today)
+                else:
+                    print(f"{target:<8} sweep 건너뜀 — 목록을 끝까지 못 받음 {pages}")
+            if n_gone:
+                print(f"{target:<8} 사라진 조문 {n_gone:6d}건 닫음")
 
             total += n_changed
             print(f"{target:<8} {len(hashes):6d}행  변경 {n_changed:6d}")

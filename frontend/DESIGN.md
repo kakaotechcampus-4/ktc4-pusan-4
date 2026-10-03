@@ -10,9 +10,10 @@
 | 층 | 어디에 | 무엇 |
 |---|---|---|
 | 토큰 | `tailwind.config.js` | 색·타이포·폭·그림자·이징. 화면에서는 이름으로만 쓴다 |
-| 부품 | `src/components/ui/` | Button, Card, Badge, SectionHeading, Container, Input/Select/Field, ChoiceGroup |
+| 부품 | `src/components/ui/` | Button, Card, Badge, SectionHeading, Container, Input/Select/Field, ChoiceGroup, Empty |
 | 도메인 부품 | `src/components/` | VerdictBadge, StatuteCitation, AgentPreview — ui 부품 위에 도메인 의미를 얹은 것 |
 | 타입 | `src/types/domain.ts` | API 명세와 1:1. 화면 편의 필드를 여기 추가하지 않는다 |
+| 데이터 | `src/api/` | 화면은 `api.*`만 호출. 서버 상태를 화면·Context에 두지 않는다 |
 | 규칙 | 이 문서 | 코드로 강제 못 하는 것 |
 
 ## 토큰
@@ -34,7 +35,7 @@
 **상태색 규칙**
 - `ok·warn·deny`는 `bg + line + text` 세 개를 항상 세트로 쓴다. 글자만 빨갛게 하지 않는다.
 - 색만으로 상태를 말하지 않는다. 판정 배지에는 기호(✓ ? ✕)가 반드시 붙는다 → `VerdictBadge` 사용.
-- 상태색은 판정 결과에만 쓴다. "성공했습니다" 토스트에 `ok`를 쓰지 않는다.
+- 상태색은 **판정 결과(verdict)와 분류 상태(classificationStatus)** 에만 쓴다. 둘 다 계약이 `NEEDS_REVIEW` 로 부르는 "사람 확인이 필요하다"는 같은 뜻이다. "성공했습니다" 토스트에 `ok` 를 쓰지 않는다.
 
 ### 타이포
 
@@ -66,6 +67,8 @@
 - 라운드: 카드·패널 `rounded-2xl`, 버튼 md/lg·입력 `rounded-xl`, 버튼 sm `rounded-lg`, 칩 `rounded-md`, 배지 `rounded-full`.
 - 그림자는 `shadow-card`(거의 없음)와 `shadow-panel`(떠 있는 패널) 둘뿐. 카드는 테두리로 구분하고 그림자를 쓰지 않는다.
 - 전환: `transition-colors duration-150 ease-snap`. 등장 애니메이션은 `animate-rise` 하나.
+- **기울임·광원은 랜딩 히어로에서만** (`HeroStage`). 앱 화면은 차분하게 둔다 — 세금 판정 화면에서 화려한 연출은 신뢰를 깎는다.
+- 한 요소에 `animate-rise`(translate)와 기울임(rotate)을 같이 걸지 않는다. 뒤에 오는 `transform` 이 앞을 덮어쓴다. 바깥 요소에 등장, 안쪽 요소에 기울임.
 
 ## 부품
 
@@ -104,6 +107,10 @@
 - **있지만 아직 동작하지 않는 선택지는 `disabled: true`** — 흐리게 보이고 눌리지 않으며 '준비 중'이 붙는다. 다른 직종처럼 "보여는 주되 IT만 동작"할 때 쓴다.
 - 눌리는데 아무 일도 일어나지 않는 버튼은 만들지 않는다. 사용자는 그걸 고장으로 읽는다.
 
+### Empty
+- 목록이 비었을 때. **"없음"이 아니라 "왜 없는지"** 를 말하고, 다음에 할 행동이 있으면 `action` 에 버튼 하나만 둔다.
+- `tone="ok"` 는 비어 있는 것이 좋은 결과일 때만 (확인할 항목을 다 처리한 경우).
+
 ### Field · Input · Select
 - 라벨 `body-lg semibold`, 힌트 `small muted`, 오류 `small deny` + `role="alert"`.
 - 입력은 기본 `w-full`. 폭을 줄이려면 `className`이 아니라 감싸는 div에 폭을 준다 (클래스 충돌 회피).
@@ -124,5 +131,5 @@
 
 ## 아직 없는 것 (앱 화면 명세 뒤 추가 예정)
 
-Table, Tabs, Toast/알림, Modal, 진행 표시(Stepper·Progress), 빈 상태(Empty), 파일 드롭존, FilterBar, Drawer, StatTile, Timeline.
+Table, Tabs, Toast/알림, Modal, 진행 표시(Stepper·Progress), 파일 드롭존, FilterBar, Drawer, StatTile, Timeline.
 지금 앱 페이지(`Upload`, `Interview`, `Results` 등)는 아직 옛 클래스 그대로이며, 명세 확정 후 치오님과 나눠 교체한다.

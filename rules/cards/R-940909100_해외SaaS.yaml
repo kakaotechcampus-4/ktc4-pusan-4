@@ -1,0 +1,24 @@
+# 생성 파일이다. 직접 고치지 않는다.
+# 원본: rules/templates/R-100_해외SaaS.yaml + profiles/940909.yaml
+# 다시 만들기: ./backend/gradlew -p backend generateRuleCards
+id: R-940909100
+version: 102
+gate: G2
+priority: 500
+effective_period:
+  start: 2024-01-01
+  end: null
+match:
+  category:
+  - 해외SaaS
+  amount_max: 100000
+  industry:
+  - "940909"
+verdict: 가능
+account: 지급수수료
+citations:
+- id: 소득세법-27-1
+  verified: true
+review:
+  by: 미검수
+  date: 2026-09-14

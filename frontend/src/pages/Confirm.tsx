@@ -3,16 +3,22 @@ import { Link, useNavigate } from 'react-router-dom';
 import { CheckIcon, PlayIcon, ShieldCheckIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { DEFAULT_CONTEXT, useSession } from '../contexts/SessionContext';
+import { api } from '../api';
 import { formatFullDate, formatNumber, formatPeriod } from '../utils/format';
 
 export function Confirm() {
   const navigate = useNavigate();
-  const { batch, context, setRunStatus } = useSession();
+  const { batch, batchId, context, contextRef, setRunId } = useSession();
   const [agreed, setAgreed] = useState(false);
+  const [starting, setStarting] = useState(false);
   const resolved = context ?? DEFAULT_CONTEXT;
 
-  const start = () => {
-    setRunStatus('RUNNING');
+  /** POST /judgment-runs — batchId·contextId 둘 다 필요하다 */
+  const start = async () => {
+    setStarting(true);
+    if (!batchId || !contextRef) return;
+    const created = await api.runs.create({ batchId, contextId: contextRef.id });
+    setRunId(created.id);
     navigate('/run');
   };
 
@@ -159,8 +165,8 @@ export function Confirm() {
 
           <button
             type="button"
-            disabled={!agreed}
-            onClick={start}
+            disabled={!agreed || starting}
+            onClick={() => void start()}
             className="mt-4 inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-3 text-[15px] font-semibold text-white transition-colors duration-150 ease-snap hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line disabled:text-muted">
             
             <PlayIcon className="h-4 w-4" aria-hidden="true" />

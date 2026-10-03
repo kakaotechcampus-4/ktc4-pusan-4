@@ -92,6 +92,23 @@ def test_admrul_id_includes_doc_id():
     assert all("#37081-" in u.statute_id for u in units)
 
 
+def test_admrul_skips_deleted_articles():
+    payload, _ = _fx("admrul")
+    payload = {
+        **payload,
+        "조문내용": [
+            *payload["조문내용"],
+            "제90조 <삭제>",
+            "제91조<삭제, 2024.1.1.>",
+            "제92조(삭제된 문서의 처리) 보존기간이 지난 문서는 파기한다.",
+        ],
+    }
+    ids = {u.statute_id.rsplit("-", 1)[1] for u in parse_admrul(payload)}
+    assert "90" not in ids
+    assert "91" not in ids
+    assert "92" in ids
+
+
 def test_admrul_strips_img_tags():
     units = {u.statute_id: u for u in parse_admrul(_fx("admrul")[0])}
     assert "<img" not in units["2025년귀속경비율고시#37081-3"].body

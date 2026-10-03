@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowRightIcon, InfoIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { DEFAULT_CONTEXT, useSession } from '../contexts/SessionContext';
+import { api } from '../api';
 import type { BookkeepingDuty, BusinessContext } from '../types/domain';
 import { ChoiceGroup, type ChoiceOption } from '../components/ui';
 import { formatNumber } from '../utils/format';
@@ -32,7 +33,7 @@ const hintClass = 'mt-1 text-[13px] leading-6 text-muted';
 
 export function Interview() {
   const navigate = useNavigate();
-  const { setContext } = useSession();
+  const { setContext, setContextRef } = useSession();
   const [form, setForm] = useState<BusinessContext>(DEFAULT_CONTEXT);
 
   const update = <K extends keyof BusinessContext,>(
@@ -53,16 +54,18 @@ export function Interview() {
   '자택 작업 비율이 없어 통신비·관리비 안분 판정을 하지 않습니다.'];
 
 
-  const submit = (event: React.FormEvent) => {
+  const submit = async (event: React.FormEvent) => {
     event.preventDefault();
+    const ref = await api.contexts.create(form);
     setContext(form);
+    setContextRef(ref);
     navigate('/confirm');
   };
 
   return (
     <AppShell>
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <form onSubmit={submit}>
+        <form onSubmit={(event) => void submit(event)}>
           <header>
             <p className="text-[13px] font-semibold text-accent">1단계 · 인식</p>
             <h1 className="mt-1.5 text-[28px] font-bold tracking-tight text-ink">

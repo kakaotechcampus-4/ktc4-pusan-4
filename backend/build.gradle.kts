@@ -63,7 +63,7 @@ tasks.test {
     // 레포 루트의 평가셋·규칙카드를 입력으로 추적한다. 없으면 YAML만 고쳐도 테스트가 UP-TO-DATE로 건너뛴다.
     val evalRulesDir = providers.environmentVariable("EVAL_RULES_DIR").orElse("../rules")
     inputs.property("evalRulesDir", evalRulesDir)
-    inputs.files(fileTree("../eval"), fileTree(evalRulesDir))
+    inputs.files(fileTree("../eval"), fileTree(evalRulesDir), fileTree("../profiles"))
 }
 
 val integrationTestTask = tasks.register<Test>("integrationTest") {
@@ -137,4 +137,12 @@ tasks.register("codeHealthReports") {
     description = "Generates coverage, PMD, and CPD reports for the quality bot."
     group = LifecycleBasePlugin.VERIFICATION_GROUP
     dependsOn(jacocoCombinedReport, tasks.named("pmdMain"), cpdMain)
+}
+
+tasks.register<JavaExec>("generateRuleCards") {
+    description = "Generates industry cards from rules/templates and profiles into rules/cards."
+    group = "rules"
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("com.ktc4.pusan4.judgment.rule.ProfileCardGenerator")
+    args(file("../rules").absolutePath, file("../profiles").absolutePath)
 }

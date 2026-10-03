@@ -1,5 +1,5 @@
 import { ExternalLinkIcon } from 'lucide-react';
-import { statuteOf } from '../mock/statutes';
+import { api, useApi } from '../api';
 
 interface StatuteCitationProps {
   statuteVersionId: number;
@@ -12,7 +12,10 @@ export function StatuteCitation({
   statuteVersionId,
   showBody = true
 }: StatuteCitationProps) {
-  const statute = statuteOf(statuteVersionId);
+  const { data: statute } = useApi(
+    () => api.statutes.get(statuteVersionId),
+    [statuteVersionId]
+  );
   if (!statute) return null;
 
   return (

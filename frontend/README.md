@@ -21,14 +21,30 @@ npm run dev        # http://localhost:5173
 
 ```
 src/
-  components/ui/   공용 부품 (Button, Card, Badge, SectionHeading, Container, Field·Input·Select)
+  api/             API 레이어 — contract.ts(명세 3.1~3.7 함수 시그니처), hooks.ts(useApi), mock/(목업 구현·데이터)
+  components/ui/   공용 부품 (Button, Card, Badge, SectionHeading, Container, Field·Input·Select, ChoiceGroup)
   components/      도메인 부품 (VerdictBadge, StatuteCitation, AgentPreview, AppShell …)
   pages/           라우트별 화면 (Landing, Login, Upload, Interview, …, Styleguide)
-  mock/            목업 데이터 (판정 샘플, 조문, 마케팅 카피)
-  contexts/        세션 상태
-  types/           도메인 타입
+  mock/            화면 전용 목업 (마케팅 카피, 히어로 트레이스, 업로드 샘플 파일)
+  contexts/        세션 상태 (로그인, 현재 batch·context·run id)
+  types/           도메인 타입 (API 명세와 1:1)
   utils/           포맷·판정 메타
 ```
+
+## 데이터 흐름
+
+화면은 `api.*` 만 호출한다. `src/api/index.ts` 가 지금은 `mock` 구현을 내보내고, 백엔드가 준비되면 여기서 http 구현으로 바꾼다. 화면 코드는 그대로.
+
+```tsx
+import { api, useApi } from '../api';
+
+const { data, loading, error, reload } = useApi(() => api.judgments.list({ runId }), [runId]);
+await api.questions.respond({ questionIds, answer: { value } });
+```
+
+- 서버 상태(판정·질문·집계)는 화면이나 Context에 두지 않는다. 항상 `api.*` 로 읽고, 바꾼 뒤엔 `reload()`.
+- 목업 구현은 재판정·Revision·집계를 인메모리로 흉내 낸다. 새로고침하면 초기화된다.
+- 진행률은 `api.runs.get` 1초 폴링. SSE 토큰 방식이 정해지면 교체한다.
 
 ## 디자인 시스템
 
@@ -41,5 +57,6 @@ src/
 ## 현재 상태
 
 - 랜딩 페이지는 디자인 시스템 부품으로 구성됨
-- 앱 화면(업로드·문진·판정·결과 등)은 기능·API 명세 확정 전 초안. 목업 데이터로 동작하며, 명세 확정 후 부품으로 교체 예정
+- 앱 화면은 `api` 목업으로 동작. 업로드 → 분류 확인 → 문진 → 판정 → 결과 → 되묻기 순
+- `/preview` `/uploads` `/transactions` `/account` 는 라우트만 있는 빈 화면
 - 백엔드 연동 없음

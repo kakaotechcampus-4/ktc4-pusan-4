@@ -3,25 +3,36 @@ name: PR Discord notify
 #   - opened / reopened / ready_for_review : 2분 기다린 뒤 새 PR 알림 + 그때의 리뷰어 멘션
 #   - review_requested                      : 그 뒤에 지정된 리뷰어만 따로 멘션
 #     (열자마자 리뷰어를 지정하는 경우 메시지가 리뷰어 수만큼 쪼개지지 않게 하려는 것)
+#   - 리뷰 · PR 코멘트                       : 작성자를 멘션. 작성자 본인 글은 태그한 팀원이 있을 때만 그 팀원을 멘션
+#     (리뷰는 pr-review-reminder.yml 의 relay run 이 끝나면 workflow_run 으로 받는다. fork PR 도 secret 을 쓰려는 것)
 # 로직은 tools/pr_discord_bot.py (pr-review-reminder.yml 과 공유).
 #
 # 설정 (Settings → Secrets and variables → Actions)
 #   - secret   TEAM_DISCORD_WEBHOOK : 팀 채널 웹후크 URL
 #   - variable DISCORD_USER_IDS     : {"<GitHub login>": "<Discord user ID>", ...}
 #                                     없는 login 은 멘션 대신 @login 텍스트로 나간다.
+#                                     리뷰·코멘트 알림은 여기 있는 사람만 팀원으로 본다.
 #
 # ⚠️ develop → main 은 운영진 notify-discord.yml 이 멘토 채널로 알린다 → branches-ignore: [main]
+#   issue_comment · workflow_run 은 브랜치 필터가 없어서 스크립트가 거른다.
 # ⚠️ secret 이름을 DISCORD_WEBHOOK 으로 바꾸지 말 것. 운영진 워크플로가 쓰는 이름이다.
 # ⚠️ concurrency 를 넣지 말 것. 연속으로 열린 PR 알림이 조용히 취소된다.
 # ⚠️ pull_request_target 인 이유: fork 에서 온 PR(#52)은 pull_request 이벤트에 secret·variable 이
 #   넘어오지 않아 알림이 실패했다. pull_request_target 은 base 브랜치(develop)의 워크플로·코드로
 #   돌아서 secret 을 쓸 수 있다. 대신 PR head 코드를 checkout·실행하면 안 된다 — 지금은 develop 의
-#   tools/ 만 실행하고 PR 은 API 로 제목·번호만 읽는다. 이 워크플로 수정은 develop 에 머지돼야 반영된다.
+#   tools/ 만 실행하고 PR·리뷰·코멘트는 API 와 이벤트 JSON 으로 읽기만 한다. issue_comment · workflow_run 도
+#   develop 의 워크플로·코드로 돌고 secret 을 쓰니 같은 제약이다. 이 워크플로 수정은 develop 에 머지돼야 반영된다.
+# ⚠️ 이벤트가 섞여 있어 job 조건마다 github.event_name 을 확인한다. 조건식은 null == false 를 참으로 계산한다.
 
 on:
   pull_request_target:
     types: [opened, reopened, ready_for_review, review_requested]
     branches-ignore: [main]
+  issue_comment:
+    types: [created]
+  workflow_run:
+    workflows: [PR review reminder]
+    types: [completed]
 
 permissions:
   contents: read
@@ -31,7 +42,7 @@ permissions:
 jobs:
   notify:
     runs-on: ubuntu-latest
-    if: github.event.pull_request.draft == false
+    if: github.event_name == 'pull_request_target' && github.event.pull_request.draft == false
     steps:
       - uses: actions/checkout@v4
         with:
@@ -43,3 +54,20 @@ jobs:
           TEAM_DISCORD_WEBHOOK: ${{ secrets.TEAM_DISCORD_WEBHOOK }}
           DISCORD_USER_IDS: ${{ vars.DISCORD_USER_IDS }}
         run: python3 tools/pr_discord_bot.py notify
+
+  review:
+    runs-on: ubuntu-latest
+    if: >-
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request) ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request_review')
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: tools
+
+      - name: Send Discord message
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          TEAM_DISCORD_WEBHOOK: ${{ secrets.TEAM_DISCORD_WEBHOOK }}
+          DISCORD_USER_IDS: ${{ vars.DISCORD_USER_IDS }}
+        run: python3 tools/pr_discord_bot.py review

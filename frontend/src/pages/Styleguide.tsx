@@ -8,6 +8,7 @@ import {
   Card,
   ChoiceGroup,
   Container,
+  Empty,
   Field,
   Input,
   SectionHeading,
@@ -224,6 +225,21 @@ export function Styleguide() {
               { value: '85699', label: '온라인 강사', disabled: true },
               { value: 'ETC', label: '그 외', disabled: true, disabledLabel: '문의' }]
               } />
+            
+          </div>
+        </Block>
+
+        <Block title="Empty" note="「없음」이 아니라 「왜 없는지」를 말한다. 비어 있는 게 좋은 결과면 tone=ok.">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Empty
+              title="아직 올린 파일이 없습니다"
+              description="국민·기업카드 이용내역을 올리면 여기에 쌓입니다."
+              action={<Button size="sm" variant="secondary">카드내역 올리기</Button>} />
+            
+            <Empty
+              tone="ok"
+              title="확인할 가맹점이 없습니다"
+              description="모든 거래에 업종이 붙었습니다." />
             
           </div>
         </Block>
