@@ -216,7 +216,7 @@ class Report:
 # 구현은 tools/normalize.py 한 곳뿐이다. 여기서 다시 만들면 사전의 norm_key 와
 # 엔진 결과가 조용히 갈라진다.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from normalize import Normalizer  # noqa: E402
+from normalize import Normalizer, inject_brands  # noqa: E402
 
 
 def load_yaml(path: Path):
@@ -240,6 +240,7 @@ def check_normalize_spec(rep: Report, spec):
         rep.info("SKIP - 파일 없음 (T1 미완)")
         return None
     try:
+        inject_brands(spec)   # resolve_brand 단계가 런타임과 같은 사전(rules/brands.yaml)을 보게 한다
         norm = Normalizer(spec)
     except Exception as e:  # noqa: BLE001
         rep.error("normalize.yaml 로드 실패: %s" % e)
@@ -541,6 +542,7 @@ def main() -> int:
     if args.normalize:
         if nspec is None:
             sys.exit("normalize.yaml 이 아직 없다")
+        inject_brands(nspec)
         print(Normalizer(nspec).string_key(args.normalize))
         return 0
 

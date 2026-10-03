@@ -45,10 +45,18 @@ java -Dfile.encoding=UTF-8 -cp out kr.taxmate.preprocess.t1.T1Cli \
 # MiniYaml 파싱 결과를 정규 JSON 으로 (yaml.safe_load 와 대조용)
 java -Dfile.encoding=UTF-8 -cp out kr.taxmate.preprocess.t1.T1Cli \
      --dump-spec <레포>/rules/normalize.yaml
+
+# 브랜드 fixture — 파이썬 `normalize.py --fixture` 와 같은 파일, 같은 기대값
+java -Dfile.encoding=UTF-8 -cp out kr.taxmate.preprocess.t1.T1Cli \
+     --fixture <레포>/rules/normalize.yaml <레포>/tools/fixtures/brand_layer1.yaml
 ```
 
 `normalize.yaml` 사본을 이 폴더에 두지 않는다. 사본을 두는 순간 두 파일이 갈라진다.
 레포 체크아웃 경로를 인자로 넘긴다.
+
+브랜드 사전(T4 1겹)도 사본을 두지 않는다. `normalize.yaml` 의 `resolve_brand` 단계가
+가리키는 `rules/brands.yaml` 을 러너가 읽어 그 단계에 넣는다. 파이썬 `load()` 의
+`inject_brands` 와 같은 방식이다.
 
 ## 두 테스트의 역할 — 섞지 말 것
 
@@ -105,12 +113,11 @@ java -Dfile.encoding=UTF-8 -cp out kr.taxmate.preprocess.t1.T1Cli \
 | 항목 | 상태 |
 |---|---|
 | `strip_branch.trim_trailing` | 파이썬만 읽는다. 자바가 모르면 `GS25-역삼점` 결과가 갈린다 |
-| `branch` / `branch_raw` | 파이썬만 반환한다 (`T1Result` 에 필드 없음) |
-| `key_strategy` | 양쪽 다 읽지 않는다. 파이썬은 `normalize()` 에 하드코딩 (이슈 #22) |
+| `key_strategy` | 양쪽 다 읽지 않는다. 두 구현 모두 `normalize()` 에 같은 로직(키 = 문자열, #22 A안)을 하드코딩한다 |
 | `test_cases` 의 `expect` 블록 | 미도입. `norm_key`·`track`·`is_truncated`·`branch_blocked` 를 단언하도록 확장 예정 |
 | `split_delimiters.pg_hints` | **성격이 다르다 — 아래 참고.** 양쪽 다 읽지만 값 출처가 다르다. 파이썬은 실행 시 `rules/pg_blocklist.yaml`(15개)로 덮어쓰고, 자바는 `normalize.yaml` 에 박힌 목록(10개)을 쓴다 |
 
-위 네 항목은 **한쪽에 없거나 아무도 안 읽는** 키다. `pg_hints` 는 다르다 —
+위 세 항목은 **한쪽에 없거나 아무도 안 읽는** 키다. `pg_hints` 는 다르다 —
 **양쪽 다 읽는데 값이 다르다.** 읽히지 않는 키는 동작을 바꾸지 않지만, 값이
 다른 키는 조용히 다른 결과를 낸다. 위의 구글플레이 건이 그것이다.
 

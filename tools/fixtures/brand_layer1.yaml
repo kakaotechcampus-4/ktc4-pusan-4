@@ -1,0 +1,61 @@
+# T4 1겹 fixture — docs/labeling_guide.md 1층 표의 합성 예시.
+#
+# Python 과 Java 가 같은 파일로 같은 기대값을 검사한다. 두 구현의 동일 출력 테스트다.
+#   python tools/normalize.py --fixture tools/fixtures/brand_layer1.yaml
+#   java ... T1Cli --fixture rules/normalize.yaml tools/fixtures/brand_layer1.yaml
+#
+# brands 는 rules/brands.yaml 대신 쓰는 합성 사전이다. 실제 상호는 넣지 않는다.
+# 각 case 는 적은 필드만 비교한다. 이름은 Python Result 필드명(snake_case)이다.
+
+brands:
+  - brand_key: 가나다커피
+    aliases: ["가나다커피"]
+  - brand_key: 가나다마트
+    aliases: ["가나다마트"]
+  # 하위 업태는 사전에 별도 브랜드로 둔다(1층 7행). 긴 표기가 먼저 걸린다.
+  # 20바이트 미만으로 둔다 — 정확히 20바이트면 절단 규칙(8행)이 먼저 걸린다.
+  - brand_key: 가나다마트프레시
+    aliases: ["가나다마트프레시"]
+  # 19바이트 절단 확정 경로용 — 이름보다 긴 브랜드여야 '중간에서 끝남' 이 생긴다
+  - brand_key: ABC가나다라마바사아자차
+    aliases: ["ABC가나다라마바사아자차"]
+
+cases:
+  # 1층 · 지점명(한글) — 사전에 있는 브랜드만 그 뒤를 지점으로 뗀다
+  - { in: "가나다커피해운대점", norm_key: "가나다커피", brand_key: "가나다커피", branch: "해운대점", is_truncated: false }
+  # 사전에 없으면 원문 유지
+  - { in: "라마바커피해운대점", norm_key: "라마바커피해운대점", brand_key: "", branch: "" }
+
+  # 1층 · 현재 구현 유지 행 (사전 미적중 -> 기존 전처리)
+  - { in: "ABC마트 서면점", norm_key: "ABC마트", brand_key: "", branch: "서면점" }
+  - { in: "(주)가나다커피", norm_key: "가나다커피", brand_key: "가나다커피" }
+  - { in: "가나다(GANADA)", norm_key: "가나다GANADA", brand_key: "" }
+  - { in: "가나다123", norm_key: "가나다", brand_key: "", branch: "123" }
+  - { in: "가나다 - 커피", norm_key: "가나다-커피", brand_key: "" }
+
+  # 1층 · 하위 업태 — 사전에 등록된 하위 업태는 별도 브랜드다 (가나다마트프레시 != 가나다마트)
+  - { in: "가나다마트프레시", norm_key: "가나다마트프레시", brand_key: "가나다마트프레시", is_truncated: false }
+  - { in: "가나다마트프레시해운대점", norm_key: "가나다마트프레시", brand_key: "가나다마트프레시", branch: "해운대점" }
+  # 사전에 없는 하위 업태: 뒤가 지점 모양이 아니면 떼지 않는다
+  - { in: "가나다마트익스", norm_key: "가나다마트익스", brand_key: "" }
+  # 확정 사항 — 사전에 없는 하위 업태는 뒤에 지점이 붙으면 부모 브랜드에 붙는다.
+  # 하위 업태는 사전에 별도 등록해야 한다.
+  - { in: "가나다마트익스해운대점", norm_key: "가나다마트", brand_key: "가나다마트", branch: "익스해운대점" }
+
+  # 1층 · 절단 — 20B·괄호 미닫힘은 사전 앞부분 대조로 복원
+  - { in: "가나다커피해운대라마", norm_key: "가나다커피", brand_key: "가나다커피", is_truncated: true, brand_restored: true, branch_raw: "해운대라마" }
+  - { in: "가나다커피(해운", norm_key: "가나다커피", brand_key: "가나다커피", is_truncated: true, brand_restored: true }
+  # 표에 적힌 예시 '가나다커피해운' 은 14바이트라 절단이 아니다 -> 뒤가 지점 모양이 아니어서 떼지 않는다
+  - { in: "가나다커피해운", norm_key: "가나다커피해운", brand_key: "", is_truncated: false }
+  # 19B 는 의심 — 이름이 사전 브랜드 중간에서 끝날 때(브랜드 앞부분만 일치)만 절단 확정
+  - { in: "ABC가나다라마바사아", norm_key: "ABC가나다라마바사아자차", brand_key: "ABC가나다라마바사아자차", is_truncated: true, brand_restored: true }
+  # 브랜드 전체가 들어 있으면 절단이 아니다. 뒤가 지점 모양이면 일반 지점으로 뗀다
+  - { in: "가나다커피A해운대점", norm_key: "가나다커피", brand_key: "가나다커피", branch: "A해운대점", is_truncated: false }
+  # 브랜드 전체가 들어 있고 뒤가 지점 모양이 아니면 떼지 않는다(의심으로 남는다)
+  - { in: "가나다커피해운대라A", norm_key: "가나다커피해운대라A", brand_key: "", is_truncated: false }
+  # 사전에 없으면 그대로
+  - { in: "라마바사아자차카타A", norm_key: "라마바사아자차카타A", brand_key: "", is_truncated: false }
+
+  # #22 A안 — 사업자번호가 있어도 키는 문자열. 사업자번호는 biz_no 로 남는다
+  - { in: "가나다커피해운대점", biz: "123-45-67890", norm_key: "가나다커피", biz_no: "123-45-67890", track: "string" }
+  - { in: "가나다커피해운대점", norm_key: "가나다커피", biz_no: "", track: "string" }

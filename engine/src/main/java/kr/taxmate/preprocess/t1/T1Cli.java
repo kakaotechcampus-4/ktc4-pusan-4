@@ -16,7 +16,11 @@ import java.util.TreeMap;
  *   java -cp out kr.taxmate.preprocess.t1.T1Cli --dump-spec rules/normalize.yaml
  *   java -cp out kr.taxmate.preprocess.t1.T1Cli --batch     rules/normalize.yaml cases.tsv
  *   java -cp out kr.taxmate.preprocess.t1.T1Cli --text      rules/normalize.yaml "스타벅스코리아 강남대로점"
+ *   java -cp out kr.taxmate.preprocess.t1.T1Cli --fixture   rules/normalize.yaml tools/fixtures/brand_layer1.yaml
  * </pre>
+ *
+ * <p>브랜드 사전은 normalize.yaml 의 resolve_brand 단계가 가리키는 파일(rules/brands.yaml)을
+ * 읽어 그 단계에 넣는다. 파이썬 load() 의 inject_brands 와 같은 방식이다.
  */
 public final class T1Cli {
 
@@ -25,7 +29,12 @@ public final class T1Cli {
         if (args.length < 2) { out.println("usage: --selftest|--dump-spec|--batch|--text <normalize.yaml> [arg]"); return; }
 
         String mode = args[0];
-        Map<String, Object> spec = MiniYaml.load(Path.of(args[1]));
+        Path specPath = Path.of(args[1]);
+        Map<String, Object> spec = MiniYaml.load(specPath);
+        if ("--fixture".equals(mode)) {
+            System.exit(fixture(spec, Path.of(args[2]), out));
+        }
+        injectBrands(spec, specPath, null);
         T1Normalizer norm = new T1Normalizer(spec);
 
         switch (mode) {
@@ -41,6 +50,65 @@ public final class T1Cli {
             }
             default -> out.println("알 수 없는 모드: " + mode);
         }
+    }
+
+    /** resolve_brand 단계에 브랜드 목록을 넣는다. brands 가 null 이면 단계의 dict 파일을 읽는다. */
+    @SuppressWarnings("unchecked")
+    static void injectBrands(Map<String, Object> spec, Path specPath, List<Object> brands) throws Exception {
+        for (Map<String, Object> step : (List<Map<String, Object>>) spec.getOrDefault("steps", List.of())) {
+            if (!"resolve_brand".equals(String.valueOf(step.get("id")))) continue;
+            List<Object> b = brands;
+            if (b == null) {
+                Object dict = step.getOrDefault("dict", "brands.yaml");
+                Path dictPath = specPath.toAbsolutePath().getParent().resolve(String.valueOf(dict));
+                b = (List<Object>) MiniYaml.load(dictPath).getOrDefault("brands", List.of());
+            }
+            step.put("brands", b);
+        }
+    }
+
+    /** fixture 의 brands 로 사전을 바꿔 끼우고 cases 의 기대 필드를 검사한다. 파이썬 --fixture 와 같은 파일. */
+    @SuppressWarnings("unchecked")
+    private static int fixture(Map<String, Object> spec, Path fixturePath, PrintStream out) throws Exception {
+        Map<String, Object> fx = MiniYaml.load(fixturePath);
+        injectBrands(spec, null, (List<Object>) fx.getOrDefault("brands", List.of()));
+        T1Normalizer norm = new T1Normalizer(spec);
+        List<Map<String, Object>> cases = (List<Map<String, Object>>) fx.getOrDefault("cases", List.of());
+        int bad = 0;
+        for (Map<String, Object> c : cases) {
+            Object biz = c.get("biz");
+            T1Result r = norm.normalize(String.valueOf(c.get("in")), biz == null ? "" : String.valueOf(biz));
+            StringBuilder diff = new StringBuilder();
+            for (Map.Entry<String, Object> e : c.entrySet()) {
+                if (e.getKey().equals("in") || e.getKey().equals("biz")) continue;
+                Object got = field(r, e.getKey());
+                if (!String.valueOf(got).equals(String.valueOf(e.getValue()))) {
+                    diff.append(String.format("  %s=%s(기대 %s)", e.getKey(), got, e.getValue()));
+                }
+            }
+            if (diff.length() > 0) {
+                bad++;
+                out.printf("  FAIL  %-24s%s%n", c.get("in"), diff);
+            }
+        }
+        out.printf("%n  %d/%d 통과%n", cases.size() - bad, cases.size());
+        return bad == 0 ? 0 : 1;
+    }
+
+    /** fixture 필드명은 파이썬 Result 이름(snake_case)이다. */
+    private static Object field(T1Result r, String name) {
+        return switch (name) {
+            case "norm_key" -> r.normKey();
+            case "track" -> r.track();
+            case "string_norm" -> r.stringNorm();
+            case "is_truncated" -> r.truncated();
+            case "biz_no" -> r.bizNo();
+            case "brand_key" -> r.brandKey();
+            case "brand_restored" -> r.brandRestored();
+            case "branch" -> r.branch();
+            case "branch_raw" -> r.branchRaw();
+            default -> throw new IllegalArgumentException("fixture: 모르는 필드 " + name);
+        };
     }
 
     @SuppressWarnings("unchecked")
@@ -72,7 +140,9 @@ public final class T1Cli {
                 String.join(",", r.protectedTokens()),
                 r.pgHint() == null ? "" : r.pgHint(),
                 String.valueOf(r.condSplit()), String.valueOf(r.condKept()),
-                String.valueOf(r.collapsed()));
+                String.valueOf(r.collapsed()),
+                r.bizNo(), r.brandKey(), String.valueOf(r.brandRestored()),
+                r.branch(), r.branchRaw());
     }
 
     // ---------------------------------------------------------------- 정규 JSON

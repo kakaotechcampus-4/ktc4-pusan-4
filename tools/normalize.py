@@ -106,6 +106,13 @@ class Normalizer:
         # 20을 넘는 문자열은 애초에 안 온다. >= 로 두면 20바이트가 넘는 정상
         # 입력(테스트 케이스 등)까지 절단으로 오판한다.
         ctx["is_truncated"] = ctx["enc_bytes"] == max_bytes
+        # 닫히지 않은 괄호는 바이트와 무관하게 절단 확정이다(T5 1층 8행).
+        if self.trunc.get("unclosed_bracket") and unclosed_bracket(s):
+            ctx["is_truncated"] = True
+        # 19바이트는 의심만 남긴다. resolve_brand 가 사전과 맞을 때만 확정한다.
+        suspect = self.trunc.get("suspect_bytes")
+        ctx["truncation_suspect"] = (suspect is not None and not ctx["is_truncated"]
+                                     and ctx["enc_bytes"] == int(suspect))
         return s
 
     def step_strip_corp(self, s, ctx, step):
@@ -183,7 +190,43 @@ class Normalizer:
     def step_upper_ascii(self, s, ctx, step):
         return "".join(c.upper() if c.isascii() else c for c in s)
 
+    def step_resolve_brand(self, s, ctx, step):
+        """브랜드 사전 앞부분 대조(T4 1겹). 규칙은 normalize.yaml 의 resolve_brand 주석."""
+        compact = s.replace(" ", "")
+        for alias, brand in brand_aliases(step):
+            if not compact.startswith(alias):
+                continue
+            rest = compact[len(alias):]
+            # 'CU' 뒤에 'TE' 가 오면 CUTE 라는 다른 단어다. 숫자 뒤 숫자는 지점 패턴이 가른다.
+            if rest and _ascii_alpha(alias[-1]) and _ascii_alpha(rest[0]):
+                continue
+            if ctx.get("is_truncated"):
+                # 20B·괄호 미닫힘. 뒤가 잘려 지점 모양인지 알 수 없다. 사전 앞부분이 맞으면 복원한다.
+                ctx["brand_key"] = brand
+                ctx["brand_restored"] = bool(rest)
+                ctx["branch_raw"] = rest
+                return brand
+            if not rest or any(re.search(p, rest) for p in step.get("branch") or []):
+                ctx["brand_key"] = brand
+                ctx["branch"] = rest
+                return brand
+            # 뒤가 지점이 아니다(하위 업태 등). 별도 브랜드로 보고 떼지 않는다.
+            return s
+        # 19B 의심: 이름이 사전 브랜드 중간에서 끝날 때(브랜드 앞부분만 일치)만 절단 확정.
+        # 브랜드 전체가 이름에 들어 있으면 위에서 일반 매칭으로 끝나고 의심으로 남는다.
+        if ctx.get("truncation_suspect"):
+            for alias, brand in brand_aliases(step):
+                if len(compact) < len(alias) and alias.startswith(compact):
+                    ctx["is_truncated"] = True
+                    ctx["brand_key"] = brand
+                    ctx["brand_restored"] = True
+                    ctx["branch_raw"] = ""
+                    return brand
+        return s
+
     def step_strip_branch(self, s, ctx, step):
+        if ctx.get("brand_key"):
+            return s   # resolve_brand 가 이미 지점을 뗐다
         if step.get("skip_if_truncated") and ctx.get("is_truncated"):
             # 절단된 상호는 지점 표기 자체가 잘려나갔다. 억지로 파싱하지 않고
             # 손대지 못한 문자열을 branch_raw 로만 남긴다.
@@ -240,22 +283,19 @@ class Normalizer:
         return ascii_ratio >= float(self.overseas.get("ascii_letter_ratio_min", 0.5))
 
     def normalize(self, raw: str, biz_no: str = "") -> Result:
-        """3트랙 키 전략을 적용해 norm_key 를 결정한다."""
+        """norm_key 는 항상 문자열이다(#22 A안). 사업자번호는 biz_no 로만 남긴다."""
         s, ctx = self.run_pipeline(raw)
         biz_no = (biz_no or "").strip()
         overseas = self.is_overseas(raw, biz_no, ctx)
-
-        if biz_no:
-            track, key = "bizno", biz_no
-        elif overseas:
-            track, key = "overseas", s
-        else:
-            track, key = "string", s
+        track = "overseas" if overseas else "string"
 
         return Result(
             raw=str(raw),
-            norm_key=key,
+            norm_key=s,
             track=track,
+            biz_no=biz_no,
+            brand_key=ctx.get("brand_key", ""),
+            brand_restored=bool(ctx.get("brand_restored")),
             string_norm=s,
             overseas_norm=s if overseas else "",
             tokens=ctx.get("tokens") or [],
@@ -297,7 +337,45 @@ def load() -> Normalizer:
             for step in spec.get("steps") or []:
                 if step.get("id") == "split_delimiters":
                     step["pg_hints"] = pats
+    inject_brands(spec)
     return Normalizer(spec)
+
+
+def inject_brands(spec: dict, brands: list | None = None) -> None:
+    """resolve_brand 단계에 브랜드 목록을 넣는다. 원본은 단계의 dict(rules/brands.yaml).
+
+    PG 힌트와 같은 방식이다 — 규칙 파일은 하나만 두고 로더가 단계에 주입한다.
+    Java(T1Cli)도 같은 방식으로 같은 파일을 읽는다.
+    """
+    for step in spec.get("steps") or []:
+        if step.get("id") != "resolve_brand":
+            continue
+        if brands is None:
+            path = NORMALIZE_YAML.parent / str(step.get("dict", "brands.yaml"))
+            with path.open(encoding="utf-8") as f:
+                brands = (yaml.safe_load(f) or {}).get("brands") or []
+        step["brands"] = brands
+
+
+def brand_aliases(step: dict) -> list:
+    """(대조용 표기, 브랜드 키) 를 긴 표기부터. 표기는 공백 제거 + ASCII 대문자."""
+    pairs = []
+    for b in step.get("brands") or []:
+        for a in b.get("aliases") or []:
+            pairs.append((_ascii_upper(str(a).replace(" ", "")), str(b["brand_key"])))
+    return sorted(pairs, key=lambda x: (-len(x[0]), x[0]))
+
+
+def _ascii_upper(s: str) -> str:
+    return "".join(c.upper() if c.isascii() else c for c in s)
+
+
+def _ascii_alpha(c: str) -> bool:
+    return c.isascii() and c.isalpha()
+
+
+def unclosed_bracket(s: str) -> bool:
+    return s.count("(") > s.count(")") or s.count("[") > s.count("]")
 
 
 # ------------------------------------------------------------------ 자체 테스트
@@ -310,6 +388,30 @@ def selftest(norm: Normalizer) -> int:
         bad += 0 if ok else 1
         print("  %s  %-26r -> %-22r %s" % (
             "ok  " if ok else "FAIL", c["in"], got, "" if ok else "(기대 %r)" % c["out"]))
+    print("\n  %d/%d 통과" % (len(cases) - bad, len(cases)))
+    return 1 if bad else 0
+
+
+def run_fixture(path) -> int:
+    """fixture 파일의 brands 로 사전을 바꿔 끼우고 cases 의 기대 필드를 검사한다.
+
+    Java(T1Cli --fixture)가 같은 파일을 읽어 같은 기대값을 검사한다 — 두 구현이
+    같은 출력을 내는지는 이 파일 하나로 확인된다.
+    """
+    with NORMALIZE_YAML.open(encoding="utf-8") as f:
+        spec = yaml.safe_load(f)
+    with open(path, encoding="utf-8") as f:
+        fx = yaml.safe_load(f)
+    inject_brands(spec, fx.get("brands") or [])
+    norm = Normalizer(spec)
+    bad = 0
+    cases = fx.get("cases") or []
+    for c in cases:
+        r = norm.normalize(c["in"], c.get("biz", "") or "")
+        diff = {k: (r[k], v) for k, v in c.items() if k not in ("in", "biz") and r[k] != v}
+        bad += 1 if diff else 0
+        print("  %s  %-24r %s" % ("ok  " if not diff else "FAIL", c["in"],
+                                  "" if not diff else "  ".join("%s=%r(기대 %r)" % (k, a, b) for k, (a, b) in diff.items())))
     print("\n  %d/%d 통과" % (len(cases) - bad, len(cases)))
     return 1 if bad else 0
 
@@ -842,6 +944,7 @@ def main() -> int:
     ap.add_argument("--text", help="문자열 하나를 정규화한다")
     ap.add_argument("--biz-no", default="", help="--text 와 함께 쓸 사업자번호")
     ap.add_argument("--selftest", action="store_true", help="normalize.yaml 의 test_cases 실행")
+    ap.add_argument("--fixture", help="브랜드 fixture 실행 (Java T1Cli --fixture 와 같은 파일)")
     ap.add_argument("--report", action="store_true", help="docs/normalize_report.md 생성")
     args = ap.parse_args()
 
@@ -854,6 +957,9 @@ def main() -> int:
                   "is_truncated", "is_overseas", "enc_bytes", "branch_skipped", "protected"):
             print("  %-14s %s" % (k, r[k]))
         return 0
+
+    if args.fixture:
+        return run_fixture(args.fixture)
 
     if args.selftest:
         return selftest(norm)

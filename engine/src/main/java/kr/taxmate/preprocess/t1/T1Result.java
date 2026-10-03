@@ -9,8 +9,8 @@ import java.util.List;
  * 되묻기 화면과 리포트가 뒤쪽 필드를 쓴다.
  *
  * @param raw            원문 상호
- * @param normKey        트랙이 고른 키. 사업자번호이거나 정규화된 문자열이다
- * @param track          bizno · overseas · string
+ * @param normKey        키. 항상 정규화된 문자열이다(#22 A안). 브랜드 사전에 걸리면 브랜드 키다
+ * @param track          overseas · string. 키가 아니라 라벨이다
  * @param stringNorm     문자열 트랙 결과. 트랙과 무관하게 항상 채워진다
  * @param overseasNorm   해외로 판정됐을 때만 stringNorm 과 같은 값, 아니면 빈 문자열
  * @param tokens         구분자로 분해된 토큰. 분해되지 않았으면 비어 있다
@@ -24,6 +24,11 @@ import java.util.List;
  * @param condSplit      조건부 구분자('-')를 실제로 잘랐는지
  * @param condKept       조건부 구분자를 자르지 않고 원문을 유지했는지
  * @param collapsed      반복 토큰을 접었는지
+ * @param bizNo          사업자번호. 키로 쓰지 않고 남겨만 둔다(T4 2단계 점포 테이블용)
+ * @param brandKey       브랜드 사전(rules/brands.yaml)에 걸린 브랜드 키. 안 걸리면 빈 문자열
+ * @param brandRestored  절단된 이름을 사전 앞부분으로 복원했는지
+ * @param branch         떼어낸 지점명
+ * @param branchRaw      절단이라 지점으로 확정하지 못하고 남긴 문자열
  */
 public record T1Result(
         String raw,
@@ -41,7 +46,12 @@ public record T1Result(
         String pgHint,
         boolean condSplit,
         boolean condKept,
-        boolean collapsed
+        boolean collapsed,
+        String bizNo,
+        String brandKey,
+        boolean brandRestored,
+        String branch,
+        String branchRaw
 ) {
     /** 사전·룰 조회에 쓸 단위. 분해되지 않았으면 키 하나짜리 목록이다. */
     public List<String> lookupUnits() {

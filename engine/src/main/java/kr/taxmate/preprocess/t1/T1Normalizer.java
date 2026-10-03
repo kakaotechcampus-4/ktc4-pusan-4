@@ -77,7 +77,7 @@ public final class T1Normalizer {
      *   <li>런타임에는 캐시가 읽기 전용이 되어 스레드 간 경쟁이 생기지 않는다.</li>
      * </ul>
      *
-     * <p>정규식을 담는 키는 {@code patterns}·{@code preserve}·{@code pg_hints}·{@code chars} 넷뿐이다.
+     * <p>정규식을 담는 키는 {@code patterns}·{@code preserve}·{@code pg_hints}·{@code chars}·{@code branch} 다섯이다.
      * 새 단계가 다른 키로 정규식을 받게 되면 여기에도 추가한다. 빠뜨려도 동작은 한다 —
      * 캐시가 {@link ConcurrentHashMap} 이라 지연 컴파일로 안전하게 되돌아갈 뿐이다.
      */
@@ -86,6 +86,7 @@ public final class T1Normalizer {
             for (String p : stringList(step.get("patterns"))) pattern(p);   // strip_corp, strip_branch
             for (String p : stringList(step.get("preserve"))) pattern(p);   // split_delimiters
             for (String h : stringList(step.get("pg_hints"))) patternCi(h); // split_delimiters
+            for (String b : stringList(step.get("branch"))) pattern(b);     // resolve_brand
             Object chars = step.get("chars");                              // strip_special
             pattern(chars == null ? STRIP_SPECIAL_DEFAULT : String.valueOf(chars));
         }
@@ -95,23 +96,19 @@ public final class T1Normalizer {
 
     // ---------------------------------------------------------------- 공개 API
 
-    /** 3트랙 키 전략까지 적용해 norm_key 를 정한다. */
+    /** norm_key 는 항상 문자열이다(#22 A안). 사업자번호는 bizNo 로만 남긴다. */
     public T1Result normalize(String raw, String bizNo) {
         Ctx ctx = new Ctx(bare(raw));
         String s = runPipeline(raw, ctx);
         String biz = bizNo == null ? "" : bizNo.trim();
         boolean isOverseas = isOverseas(raw, biz);
+        String track = isOverseas ? "overseas" : "string";
 
-        String track;
-        String key;
-        if (!biz.isEmpty())      { track = "bizno";    key = biz; }
-        else if (isOverseas)     { track = "overseas"; key = s; }
-        else                     { track = "string";   key = s; }
-
-        return new T1Result(raw, key, track, s, isOverseas ? s : "",
+        return new T1Result(raw, s, track, s, isOverseas ? s : "",
                 List.copyOf(ctx.tokens), ctx.isTruncated, isOverseas, ctx.encBytes,
                 ctx.branchSkipped, List.copyOf(ctx.branchBlocked), List.copyOf(ctx.protectedTokens),
-                ctx.pgHint, ctx.condSplit, ctx.condKept, ctx.collapsed);
+                ctx.pgHint, ctx.condSplit, ctx.condKept, ctx.collapsed,
+                biz, ctx.brandKey, ctx.brandRestored, ctx.branch, ctx.branchRaw);
     }
 
     public T1Result normalize(String raw) { return normalize(raw, ""); }
@@ -140,6 +137,7 @@ public final class T1Normalizer {
             case "split_delimiters":       return splitDelimiters(s, ctx, step);
             case "strip_special":          return stripSpecial(s, step);
             case "upper_ascii":            return upperAscii(s);
+            case "resolve_brand":          return resolveBrand(s, ctx, step);
             case "strip_branch":           return stripBranch(s, ctx, step);
             case "protect_exceptions":     return protectExceptions(s, ctx);
             case "drop_space":             return s.replace(" ", "");
@@ -154,7 +152,24 @@ public final class T1Normalizer {
         // '이상' 이 아니라 '정확히 한계값' 이다. 카드사가 20에서 자르므로 그보다 긴 문자열은
         // 애초에 오지 않는다. >= 로 두면 20을 넘는 정상 입력까지 절단으로 오판한다.
         ctx.isTruncated = ctx.encBytes == maxBytes;
+        // 닫히지 않은 괄호는 바이트와 무관하게 절단 확정이다(T5 1층 8행).
+        if (Boolean.TRUE.equals(truncation.get("unclosed_bracket")) && unclosedBracket(s)) {
+            ctx.isTruncated = true;
+        }
+        // 19바이트는 의심만 남긴다. resolve_brand 가 사전과 맞을 때만 확정한다.
+        Object suspect = truncation.get("suspect_bytes");
+        ctx.truncationSuspect = suspect instanceof Number n && !ctx.isTruncated && ctx.encBytes == n.intValue();
         return s;
+    }
+
+    private static boolean unclosedBracket(String s) {
+        return countChar(s, '(') > countChar(s, ')') || countChar(s, '[') > countChar(s, ']');
+    }
+
+    private static int countChar(String s, char c) {
+        int n = 0;
+        for (int i = 0; i < s.length(); i++) if (s.charAt(i) == c) n++;
+        return n;
     }
 
     private int encodedLength(String s) {
@@ -241,16 +256,92 @@ public final class T1Normalizer {
         return sb.toString();
     }
 
+    /** 브랜드 사전 앞부분 대조(T4 1겹). 규칙은 normalize.yaml 의 resolve_brand 주석. */
+    private String resolveBrand(String s, Ctx ctx, Map<String, Object> step) {
+        String compact = s.replace(" ", "");
+        for (String[] pair : brandAliases(step)) {
+            String alias = pair[0];
+            String brand = pair[1];
+            if (!compact.startsWith(alias)) continue;
+            String rest = compact.substring(alias.length());
+            // 'CU' 뒤에 'TE' 가 오면 CUTE 라는 다른 단어다. 숫자 뒤 숫자는 지점 패턴이 가른다.
+            if (!rest.isEmpty() && asciiAlpha(alias.charAt(alias.length() - 1)) && asciiAlpha(rest.charAt(0))) continue;
+            if (ctx.isTruncated) {
+                // 20B·괄호 미닫힘. 뒤가 잘려 지점 모양인지 알 수 없다. 사전 앞부분이 맞으면 복원한다.
+                ctx.brandKey = brand;
+                ctx.brandRestored = !rest.isEmpty();
+                ctx.branchRaw = rest;
+                return brand;
+            }
+            boolean branchLike = rest.isEmpty();
+            for (String p : stringList(step.get("branch"))) {
+                if (branchLike) break;
+                branchLike = pattern(p).matcher(rest).find();
+            }
+            if (branchLike) {
+                ctx.brandKey = brand;
+                ctx.branch = rest;
+                return brand;
+            }
+            return s;   // 뒤가 지점이 아니다(하위 업태 등). 별도 브랜드로 보고 떼지 않는다.
+        }
+        // 19B 의심: 이름이 사전 브랜드 중간에서 끝날 때(브랜드 앞부분만 일치)만 절단 확정.
+        // 브랜드 전체가 이름에 들어 있으면 위에서 일반 매칭으로 끝나고 의심으로 남는다.
+        if (ctx.truncationSuspect) {
+            for (String[] pair : brandAliases(step)) {
+                if (compact.length() < pair[0].length() && pair[0].startsWith(compact)) {
+                    ctx.isTruncated = true;
+                    ctx.brandKey = pair[1];
+                    ctx.brandRestored = true;
+                    ctx.branchRaw = "";
+                    return pair[1];
+                }
+            }
+        }
+        return s;
+    }
+
+    /** (대조용 표기, 브랜드 키) 를 긴 표기부터. 표기는 공백 제거 + ASCII 대문자. */
+    @SuppressWarnings("unchecked")
+    private static List<String[]> brandAliases(Map<String, Object> step) {
+        List<String[]> pairs = new ArrayList<>();
+        Object brands = step.get("brands");
+        if (brands instanceof List<?> list) {
+            for (Object o : list) {
+                if (!(o instanceof Map<?, ?> m)) continue;
+                String key = String.valueOf(((Map<String, Object>) m).get("brand_key"));
+                for (String a : stringList(((Map<String, Object>) m).get("aliases"))) {
+                    pairs.add(new String[] { upperAscii(a.replace(" ", "")), key });
+                }
+            }
+        }
+        pairs.sort((x, y) -> x[0].length() != y[0].length()
+                ? Integer.compare(y[0].length(), x[0].length()) : x[0].compareTo(y[0]));
+        return pairs;
+    }
+
+    private static boolean asciiAlpha(char c) {
+        return c < 128 && Character.isLetter(c);
+    }
+
     private String stripBranch(String s, Ctx ctx, Map<String, Object> step) {
+        if (!ctx.brandKey.isEmpty()) return s;   // resolve_brand 가 이미 지점을 뗐다
         if (Boolean.TRUE.equals(step.get("skip_if_truncated")) && ctx.isTruncated) {
             ctx.branchSkipped = true;
+            ctx.branchRaw = s;
             return s;   // 뒤가 이미 잘려 있어 지점명 규칙이 엉뚱한 글자를 먹는다
         }
         int minKeep = intOf(step.get("min_keep"), 2);
         for (String pat : stringList(step.get("patterns"))) {
             String cand = pattern(pat).matcher(s).replaceAll("").strip();
             if (cand.equals(s)) continue;
-            if (cand.codePointCount(0, cand.length()) >= minKeep) return cand;
+            if (cand.codePointCount(0, cand.length()) >= minKeep) {
+                // 떼어낸 부분이 지점명이다. 버리지 않고 보존한다(파이썬 branch 와 같은 값).
+                ctx.branch = s.startsWith(cand)
+                        ? s.substring(cand.length()).strip()
+                        : s.replaceFirst(Pattern.quote(cand), "").strip();
+                return cand;
+            }
             ctx.branchBlocked.add(pat);   // 통째로 사라질 뻔했다 — 기록만 하고 다음 패턴으로
         }
         return s;
@@ -348,8 +439,10 @@ public final class T1Normalizer {
         final List<String> branchBlocked = new ArrayList<>();
         final List<String> protectedTokens = new ArrayList<>();
         boolean isTruncated, branchSkipped, condSplit, condKept, collapsed;
+        boolean truncationSuspect, brandRestored;
         int encBytes;
         String pgHint;
+        String brandKey = "", branch = "", branchRaw = "";
 
         Ctx(String bareInput) { this.bareInput = bareInput; }
     }
