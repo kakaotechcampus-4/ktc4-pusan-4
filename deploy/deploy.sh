@@ -53,9 +53,9 @@ compose=(docker compose --env-file "$config" -f "$repo/deploy/compose.yaml")
 
 # Flyway must initialize the empty application schema before these SQL files run.
 "${compose[@]}" exec -T postgres \
-    psql -v ON_ERROR_STOP=1 -U "$DB_USERNAME" -d "$DB_NAME" < "$repo/db/schema.sql"
+    psql -1 -v ON_ERROR_STOP=1 -U "$DB_USERNAME" -d "$DB_NAME" < "$repo/db/schema.sql"
 "${compose[@]}" exec -T postgres \
-    psql -v ON_ERROR_STOP=1 -U "$DB_USERNAME" -d "$DB_NAME" < "$repo/db/rag.sql"
+    psql -1 -v ON_ERROR_STOP=1 -U "$DB_USERNAME" -d "$DB_NAME" < "$repo/db/rag.sql"
 
 printf '%s\n' "$sha" > /opt/ktc4/current-sha
 docker image prune -af --filter until=168h

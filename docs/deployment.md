@@ -61,6 +61,22 @@ curl -I "https://<도메인>/"
 
 `docker compose ps`에서 PostgreSQL·백엔드·AI가 healthy이고 웹 컨테이너가 running이어야 한다. 브라우저에서 `/`, `/upload`를 새로고침해 SPA 라우팅을 확인한다. 백엔드 `/actuator/health`와 AI `/health/db`는 컨테이너 내부 검사로 확인하며 외부에 공개하지 않는다. `docker stats`와 `df -h`로 4GB 메모리·50GB 디스크 사용량을 확인한다.
 
+Compose는 기존 백엔드를 내린 뒤 새 백엔드를 띄우고, 새 백엔드가 부팅하면서 Flyway를 실행한다. 마이그레이션이 실패하면 그 시점부터 서비스가 멈추므로 5절의 롤백 명령으로 이전 SHA를 다시 배포한다. 마이그레이션 작성 규칙은 `db/README.md`를 따른다.
+
+### PostgreSQL이 다시 시작되는 변경
+
+DB는 평소 배포에서 그대로 유지된다. 아래 변경이 포함된 배포에서만 postgres 컨테이너가 다시 만들어지며, 재시작하는 동안 백엔드와 AI가 DB에 접속하지 못한다. 데이터는 `postgres-data` 볼륨에 남는다. 이런 PR은 본문에 DB 재시작을 적고 리뷰한다.
+
+- `docker/postgres/` 아래 파일. 디렉터리 트리 해시가 이미지 태그라 태그가 바뀐다.
+- `deploy/compose.yaml`의 `postgres` 서비스 정의(이미지, 환경 변수, 볼륨, `mem_limit`, healthcheck).
+- `/etc/ktc4/production.env`의 `DB_NAME`·`DB_USERNAME`·`DB_PASSWORD`.
+
+다음은 재시작만으로 해결되지 않는다.
+
+- PostgreSQL 메이저 버전(`pgvector/pgvector:pg17`의 `17`)을 올리면 기존 데이터 디렉터리를 읽지 못해 DB가 뜨지 않는다. 덤프·복원을 포함한 별도 업그레이드 작업으로 진행한다.
+- `POSTGRES_*` 환경 변수와 `docker/postgres/init.sql`은 볼륨이 비어 있을 때 한 번만 적용된다. `DB_PASSWORD`를 바꾸려면 DB에서 `ALTER ROLE`로 먼저 바꾼 뒤 환경 파일을 맞추고, 확장을 추가하려면 운영 DB에 `CREATE EXTENSION`을 직접 실행한다.
+- 운영에서 `docker compose down -v`를 실행하지 않는다. `postgres-data` 볼륨이 삭제된다. `db/README.md`의 볼륨 삭제 안내는 로컬 전용이다.
+
 ## 5. 백업과 복구
 
 첫 배포에 성공한 뒤 타이머를 설치한다. 매일 03:00 KST에 `pg_dump -Fc`를 S3로 스트리밍하므로 서버 디스크에 별도 덤프를 쌓지 않는다.
