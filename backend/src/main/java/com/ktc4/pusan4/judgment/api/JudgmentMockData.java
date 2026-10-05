@@ -4,6 +4,8 @@ import com.ktc4.pusan4.judgment.api.JudgmentSummaryResponse.AccountSummary;
 import com.ktc4.pusan4.judgment.api.JudgmentSummaryResponse.Scope;
 import com.ktc4.pusan4.judgment.api.JudgmentSummaryResponse.VerdictSummary;
 import com.ktc4.pusan4.judgment.domain.Gate;
+import com.ktc4.pusan4.judgment.domain.JudgmentOrigin;
+import com.ktc4.pusan4.judgment.domain.JudgmentOriginType;
 import com.ktc4.pusan4.judgment.domain.Verdict;
 import com.ktc4.pusan4.shared.api.Coded;
 import com.ktc4.pusan4.shared.api.PageResponse;

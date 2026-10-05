@@ -27,4 +27,15 @@ interface QuestionQueueRepository extends Repository<QuestionQueueEntity, UUID> 
         @Param("questionId") UUID questionId,
         @Param("userId") UUID userId
     );
+
+    @Query("""
+        select transaction.batchId
+        from QuestionQueueEntity question,
+             JudgmentEntity judgment,
+             TransactionRecordEntity transaction
+        where question.id = :questionId
+          and question.judgmentId = judgment.id
+          and judgment.transactionId = transaction.id
+        """)
+    UUID findBatchId(@Param("questionId") UUID questionId);
 }

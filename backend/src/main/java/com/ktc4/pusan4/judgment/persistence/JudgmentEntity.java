@@ -1,6 +1,7 @@
 package com.ktc4.pusan4.judgment.persistence;
 
 import com.ktc4.pusan4.judgment.domain.Judgment;
+import com.ktc4.pusan4.judgment.domain.JudgmentOrigin;
 import com.ktc4.pusan4.judgment.domain.UserFact;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -70,6 +71,19 @@ class JudgmentEntity {
     @Column(name = "input_facts", nullable = false, columnDefinition = "jsonb")
     private List<UserFact> inputFacts;
 
+    // origin 은 FK 4개 중 정확히 하나만 채운다 (api.md §4, judgment_has_one_origin).
+    @Column(name = "run_id")
+    private UUID runId;
+
+    @Column(name = "trigger_user_fact_id")
+    private UUID triggerUserFactId;
+
+    @Column(name = "classification_review_id")
+    private UUID classificationReviewId;
+
+    @Column(name = "judgment_override_id")
+    private UUID judgmentOverrideId;
+
     protected JudgmentEntity() {
     }
 
@@ -96,6 +110,13 @@ class JudgmentEntity {
         this.attributes = judgment.attributes();
         this.appliedRuleIds = judgment.appliedRuleIds();
         this.inputFacts = command.inputFacts();
+        JudgmentOrigin origin = command.origin();
+        switch (origin.type()) {
+            case RUN -> this.runId = origin.id();
+            case USER_FACT -> this.triggerUserFactId = origin.id();
+            case CLASSIFICATION_REVIEW -> this.classificationReviewId = origin.id();
+            case OVERRIDE -> this.judgmentOverrideId = origin.id();
+        }
     }
 
     private static String first(List<String> values) {

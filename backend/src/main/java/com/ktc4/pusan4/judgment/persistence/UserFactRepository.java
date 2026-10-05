@@ -12,35 +12,39 @@ interface UserFactRepository extends Repository<UserFactEntity, UUID> {
 
     UserFactEntity save(UserFactEntity fact);
 
-    Optional<UserFactEntity> findFirstByUserIdAndScopeKeyAndFactTypeOrderByVersionDesc(
-        UUID userId, String scopeKey, String factType
+    Optional<UserFactEntity> findFirstByUserIdAndBatchIdAndScopeKeyAndFactTypeOrderByVersionDesc(
+        UUID userId, UUID batchId, String scopeKey, String factType
     );
 
     @Query("""
         select fact
         from UserFactEntity fact
         where fact.userId = :userId
+          and fact.batchId = :batchId
           and not exists (
             select newer.id
             from UserFactEntity newer
             where newer.userId = fact.userId
+              and newer.batchId = fact.batchId
               and newer.scopeKey = fact.scopeKey
               and newer.factType = fact.factType
               and newer.version > fact.version
           )
         order by fact.scopeKey, fact.factType
         """)
-    List<UserFactEntity> findAllLatest(@Param("userId") UUID userId);
+    List<UserFactEntity> findAllLatest(@Param("userId") UUID userId, @Param("batchId") UUID batchId);
 
     @Query("""
         select coalesce(max(fact.version), 0) + 1
         from UserFactEntity fact
         where fact.userId = :userId
+          and fact.batchId = :batchId
           and fact.scopeKey = :scopeKey
           and fact.factType = :factType
         """)
     int findNextVersion(
         @Param("userId") UUID userId,
+        @Param("batchId") UUID batchId,
         @Param("scopeKey") String scopeKey,
         @Param("factType") String factType
     );
