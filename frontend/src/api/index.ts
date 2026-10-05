@@ -1,5 +1,5 @@
 import type { Api } from './contract';
-import { mockApi, mockSeedSession } from './mock';
+import { mockApi, mockControls, mockSeedSession } from './mock';
 
 export type { Api, PageQuery, TransactionQuery, JudgmentQuery, QuestionQuery } from './contract';
 export { ApiRequestError } from './contract';
@@ -17,3 +17,6 @@ export const seedSession: {
   runId: string;
 } | null = mockSeedSession;
 export { useApi } from './hooks';
+
+/** 개발용. http 구현으로 바꾸면 사라진다 */
+export { mockControls };

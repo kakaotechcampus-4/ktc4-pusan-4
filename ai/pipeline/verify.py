@@ -48,7 +48,7 @@ CHECKS = [
         # 정상적으로 그런 문구로 시작할 수 있다.
         "삭제 조문 잔존",
         r"""SELECT statute_id FROM statute_version
-            WHERE unit_level <> '문서'
+            WHERE unit_level <> '문서' AND effective_to IS NULL
               AND body ~ '^제\d+조(의\d+)?\s*[(<]?\s*삭제'""",
     ),
     (

@@ -1,8 +1,8 @@
 package com.ktc4.pusan4.transaction.api;
 
 import com.ktc4.pusan4.judgment.domain.Verdict;
-import com.ktc4.pusan4.shared.api.ApiException;
 import com.ktc4.pusan4.shared.api.ErrorResponse;
+import com.ktc4.pusan4.shared.api.MockResponse;
 import com.ktc4.pusan4.shared.api.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -24,6 +24,13 @@ import java.util.UUID;
 @RequestMapping("/transactions")
 public class TransactionController {
 
+    private final TransactionMockData mockData;
+
+    public TransactionController(TransactionMockData mockData) {
+        this.mockData = mockData;
+    }
+
+    @MockResponse
     @Operation(summary = "거래 목록", description = "정렬: approvedAt DESC, id DESC")
     @GetMapping
     public PageResponse<TransactionResponse> list(
@@ -36,28 +43,37 @@ public class TransactionController {
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size
     ) {
-        throw ApiException.notImplemented();
+        return mockData.transactions();
     }
 
+    @MockResponse
     @Operation(summary = "거래 상세")
+    @ApiResponse(responseCode = "404", description = "TRANSACTION_NOT_FOUND",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @GetMapping("/{transactionId}")
     public TransactionResponse detail(@PathVariable UUID transactionId) {
-        throw ApiException.notImplemented();
+        return mockData.transaction();
     }
 
+    @MockResponse
     @Operation(summary = "판정 대상에서 제외",
         description = "userInclusion = EXCLUDED. 새 Judgment revision 을 만들지 않는다")
+    @ApiResponse(responseCode = "404", description = "TRANSACTION_NOT_FOUND",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @PostMapping("/{transactionId}/exclude")
     public TransactionInclusionResponse exclude(@PathVariable UUID transactionId) {
-        throw ApiException.notImplemented();
+        return mockData.exclude();
     }
 
+    @MockResponse
     @Operation(summary = "판정 대상에 포함",
         description = "userInclusion = INCLUDED. 새 Judgment revision 을 만들지 않는다")
+    @ApiResponse(responseCode = "404", description = "TRANSACTION_NOT_FOUND",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @ApiResponse(responseCode = "409", description = "CANCELED_TRANSACTION_NOT_INCLUDABLE",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @PostMapping("/{transactionId}/include")
     public TransactionInclusionResponse include(@PathVariable UUID transactionId) {
-        throw ApiException.notImplemented();
+        return mockData.include();
     }
 }

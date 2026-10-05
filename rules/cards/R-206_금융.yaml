@@ -6,8 +6,11 @@
 #
 # ⚠️ fact_type '지출성격'은 이 카드에서 처음 쓴다. 되묻기 어휘 단일 원본이
 #    아직 없어 평가셋·되묻기 API(#23)와 어긋날 수 있다.
+#
+# 근거는 답마다 다르다: 가능 선택지는 §27① 을 선택지에 싣고, 카드 citations 에는 불가 근거만 둔다
+# (선택지 citations 가 카드 것을 대신한다, PR #68). 카드에 둘 다 두면 개인 답에도 §27① 이 붙는다.
 id: R-206
-version: 1
+version: 2
 gate: G2
 priority: 500
 effective_period: { start: 2024-01-01, end: null }
@@ -16,7 +19,6 @@ match:
   industry: ["940909"]
 verdict: 확인필요
 citations:
-  - { id: 소득세법-27-1, verified: true }
   - { id: 소득세법-33-1-5, verified: true }
 question:
   code: FINANCE_KIND
@@ -24,8 +26,8 @@ question:
   fact_type: 지출성격
   group_by: merchant_norm
   options:
-    - { value: 은행 수수료, verdict: 가능, account: 지급수수료 }
-    - { value: 카드 연회비, verdict: 가능, account: 지급수수료 }
+    - { value: 은행 수수료, verdict: 가능, citations: [{ id: 소득세법-27-1, verified: true }], account: 지급수수료 }
+    - { value: 카드 연회비, verdict: 가능, citations: [{ id: 소득세법-27-1, verified: true }], account: 지급수수료 }
     - { value: 사업용 대출이자 }
     - { value: 개인 금융, verdict: 불가 }
 review: { by: 미검수, date: 2026-09-15 }

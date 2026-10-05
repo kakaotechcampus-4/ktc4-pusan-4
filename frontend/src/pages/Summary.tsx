@@ -1,4 +1,3 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRightIcon, CopyIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
@@ -201,7 +200,7 @@ export function Summary() {
           판정하지 않고 남긴 건을 상담용 문장으로 정리했습니다.
         </p>
         <blockquote className="mt-4 rounded-xl bg-canvas p-4 text-[13px] leading-6 text-ink2">
-          2026년 1월 사업용카드 292건 중 {formatNumber(counts.needsReview)}건은 근거를
+          2026년 1월 사업용카드 {formatNumber(total)}건 중 {formatNumber(counts.needsReview)}건은 근거를
           확정하지 못했습니다. 주요 항목은 단독 카페 이용{' '}
           {pendingQuestionCount > 0 ? '(용도 확인 필요)' : '(사용자 응답 반영)'},
           통신비·자택 관리비 안분율, 연간 구독의 서비스 기간입니다. 자택 작업공간

@@ -223,7 +223,9 @@ ID      "0199c8f2-1a2b-7c3d-8e4f-5a6b7c8d9e0f"
 | 400 | VALIDATION_ERROR | 필수 필드 누락·타입 불일치 등 문서화되지 않은 요청 검증 실패 |
 | 401 | UNAUTHORIZED | `Authorization` 헤더 누락 |
 | 404 | NOT_FOUND | 전용 `*_NOT_FOUND`가 없는 경로의 리소스 없음 |
+| 405 | METHOD_NOT_ALLOWED | 경로는 있으나 지원하지 않는 HTTP 메서드 |
 | 409 | CONFLICT | 전용 코드가 없는 상태 충돌 |
+| 415 | UNSUPPORTED_MEDIA_TYPE | 지원하지 않는 `Content-Type` |
 | 422 | UNPROCESSABLE_ENTITY | 전용 코드가 없는 처리 불가 |
 | 500 | INTERNAL_ERROR | 그 외 서버 오류 |
 
@@ -269,6 +271,8 @@ size    기본 20, 최대 100
 ```
 
 분기는 `code`, 화면 표시는 `label`을 사용한다.
+
+예외: `userInclusion`(§2.3)은 §3.4 응답 예시대로 값을 그대로(`"EXCLUDED"`) 응답한다. `bookkeepingDuty`(§2.9)는 원문 자체가 표시값이라 역시 값 그대로다.
 
 ---
 
@@ -991,6 +995,12 @@ approvedAt DESC, id DESC
 }
 ```
 
+에러:
+
+```
+404 TRANSACTION_NOT_FOUND
+```
+
 ---
 
 ## `POST /api/v1/transactions/{transactionId}/exclude`
@@ -1017,6 +1027,12 @@ userInclusion = EXCLUDED
 기존 Judgment는 이력 보존을 위해 삭제하지 않는다.
 
 단, `batchId`, `year`를 이용한 현재 결과 및 summary에서는 해당 Transaction을 제외한다.
+
+에러:
+
+```
+404 TRANSACTION_NOT_FOUND
+```
 
 ---
 
@@ -1054,6 +1070,7 @@ sourceStatus = CANCELED_OFFSET
 에러:
 
 ```
+404 TRANSACTION_NOT_FOUND
 409 CANCELED_TRANSACTION_NOT_INCLUDABLE
 ```
 
@@ -1087,7 +1104,7 @@ createdAt ASC, id ASC
 
 ### grouped=false (기본)
 
-Review 개별 항목을 반환한다.
+Review 개별 항목을 반환한다. `unresolved` 집계는 grouped 여부와 무관하게 항상 최상위에 포함한다(아래 "미해소 집계" 참고).
 
 ```
 {
@@ -1111,6 +1128,10 @@ Review 개별 항목을 반환한다.
       "resolvedAt": null
     }
   ],
+  "unresolved": {
+    "count": 5,
+    "amount": 230000
+  },
   "page": {}
 }
 ```
@@ -1124,6 +1145,7 @@ Review 개별 항목을 반환한다.
   "items": [
     {
       "groupKey": "merchant:XYZ PAYMENTS",
+      "merchantNorm": "XYZ PAYMENTS",
       "reviewIds": [
         "0199c1...",
         "0199c2...",
@@ -1136,14 +1158,75 @@ Review 개별 항목을 반환한다.
         "해외SaaS",
         "온라인쇼핑",
         "기타"
+      ],
+      "transactions": [
+        {
+          "reviewId": "0199c1...",
+          "transactionId": "0199f1...",
+          "approvedAt": "2026-01-03",
+          "merchantRaw": "XYZ PAYMENTS",
+          "amount": 47000,
+          "installmentMonths": 0
+        },
+        {
+          "reviewId": "0199c2...",
+          "transactionId": "0199f2...",
+          "approvedAt": "2026-01-17",
+          "merchantRaw": "XYZ PAYMENTS",
+          "amount": 50000,
+          "installmentMonths": 0
+        },
+        {
+          "reviewId": "0199c3...",
+          "transactionId": "0199f3...",
+          "approvedAt": "2026-02-03",
+          "merchantRaw": "XYZPAY*KR",
+          "amount": 50000,
+          "installmentMonths": 0
+        }
       ]
     }
   ],
+  "unresolved": {
+    "count": 5,
+    "amount": 230000
+  },
   "page": {}
 }
 ```
 
-`count`는 `reviewIds.length`와 항상 같아야 한다.
+`count`는 `reviewIds.length`, `transactions.length`와 항상 같아야 한다.
+
+`totalAmount`는 `transactions[].amount`의 합이다.
+
+`merchantNorm`은 그룹 안 Review들이 공유하는 정규화 이름이다. 화면에서 그룹 제목은 이 값을 쓴다.
+
+`groupKey`는 그룹을 구분하는 식별 문자열이다. 형식을 보장하지 않으므로 파싱하지 않는다. 같은 `merchantNorm`이라도 분류 키(카드사 트랙 등)가 다르면 별도 그룹이 될 수 있다.
+
+`merchantRaw`는 그룹 대표 표기로, `transactions`의 첫 거래 표기다. 한 그룹에 표기가 여러 개면 `transactions[].merchantRaw`로 각 표기를 본다.
+
+`transactions`는 그룹에 묶인 Review마다 거래 요약을 하나씩 담는다. 잘라내지 않고 전부 포함한다. 필드 이름과 뜻은 `GET /transactions`와 같다.
+
+`transactions` 정렬:
+
+```
+approvedAt ASC, transactionId ASC
+```
+
+`page`, `size`는 그룹 단위로 적용한다.
+
+### 미해소 집계
+
+`items`, `page`와 별도로 응답 최상위에 미해소 집계를 포함한다.
+
+| 필드 | 뜻 |
+| --- | --- |
+| `count` | 페이지네이션 전 `PENDING` Review 수 |
+| `amount` | `PENDING` Review가 참조하는 Transaction 금액 합계(원) |
+
+집계에는 `batchId` 필터를 적용하지만 `status`, `grouped`, `page`, `size`는 적용하지 않는다. 따라서 `page.totalElements`와 `unresolved.count`는 다를 수 있다.
+
+프론트가 "확인 필요 5건 · 230,000원"을 표시하기 위한 값이다. 현재 페이지 항목의 `count`, `totalAmount`를 더하면 페이지 밖 그룹이 빠진다.
 
 ---
 
@@ -1898,6 +1981,8 @@ merchant_norm
 
 새로운 `JudgmentRun`은 생성하지 않는다.
 
+3·4단계의 대상은 요청에 적힌 `questionIds`만이 아니다. 같은 Batch·`groupKey`·`factType`에서 `CANCELED`가 아닌 다른 Question도 같은 UserFact로 함께 처리하고 재판정 대상에 넣는다. `PENDING`이면 `ANSWERED`로 바꾸고, 이미 `ANSWERED`이면 `answeredFactId`와 `answeredAt`을 새 UserFact 기준으로 바꾼다. `answeredCount`는 이렇게 함께 처리된 수까지 포함한다.
+
 응답:
 
 ```
@@ -1922,7 +2007,7 @@ merchant_norm
 
 `PENDING` Question은 최초 답변할 수 있고, `ANSWERED` Question은 같은 API로 정정할 수 있다.
 
-정정할 때 기존 UserFact를 수정하지 않는다. 동일한 `(userId, batchId, scopeKey, factType)`에서 `version`을 증가시킨 UserFact를 새로 생성하고 Question의 `answeredFactId`를 새 UserFact로 변경한다.
+정정할 때 기존 UserFact를 수정하지 않는다. 동일한 `(userId, batchId, scopeKey, factType)`에서 `version`을 증가시킨 UserFact를 새로 생성하고, 같은 Batch·`groupKey`·`factType` Question의 `answeredFactId`를 모두 새 UserFact로 변경한다.
 
 `CANCELED` Question에는 응답할 수 없다.
 

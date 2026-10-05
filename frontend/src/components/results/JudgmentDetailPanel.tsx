@@ -1,4 +1,3 @@
-import React from 'react';
 import { TriangleAlertIcon } from 'lucide-react';
 import type { Judgment, JudgmentOriginType, Transaction, Verdict } from '../../types/domain';
 import { VerdictBadge } from '../VerdictBadge';

@@ -1,0 +1,32 @@
+# G2 · 주말·공휴일 여비교통 — 개인 이동으로 추정해 불가, 업무출장 소명이면 가능
+#
+# 회의 결정(2026-09): 주말·공휴일 카페·음식점·여비교통은 기본 불가, 소명하면 가능.
+# 근거·구조는 R-311 과 같다. 이전 기록(worklog be 2026-09-26)은 "주말 강의 출장이 흔하다"며
+# 여비교통을 뺐는데, 그 우려는 소명 질문으로 푼다(업무출장이라 답하면 평일과 같은 가능).
+#
+# 업무출장 답은 §27① 통상 경비로 가능이다. 평일 R-208 은 §27①·§33①5 를 카드에 같이 싣지만,
+# 여기서는 §27① 을 선택지에만 싣고 카드에는 불가 근거(§33①5)만 둔다.
+#
+# fact_type·값(용도: 업무출장·개인)은 R-208·평가셋 E-033 과 같은 어휘다.
+# priority 505: 휴일에 R-208(500)을 이긴다(R-311 주석 참고).
+id: R-314
+version: 1
+gate: G2
+priority: 505
+effective_period: { start: 2024-01-01, end: null }
+match:
+  category: [여비교통]
+  industry: ["940909"]
+  holiday: true
+verdict: 불가
+citations:
+  - { id: 소득세법-33-1-5, verified: true }
+question:
+  code: HOLIDAY_TRAVEL_PURPOSE
+  text: "주말·공휴일 이동이라 개인 용도로 보고 제외했어요. 업무 출장이었다면 알려주세요."
+  fact_type: 용도
+  group_by: transaction
+  options:
+    - { value: 업무출장, verdict: 가능, citations: [{ id: 소득세법-27-1, verified: true }], account: 여비교통비 }
+    - { value: 개인, verdict: 불가 }
+review: { by: 미검수, date: 2026-09-30 }

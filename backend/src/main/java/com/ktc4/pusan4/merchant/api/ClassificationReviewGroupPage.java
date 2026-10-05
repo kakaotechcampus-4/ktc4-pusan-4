@@ -7,5 +7,6 @@ import java.util.List;
 /**
  * 문서용 타입. {@link ClassificationReviewPage} 참고.
  */
-public record ClassificationReviewGroupPage(List<ClassificationReviewGroupResponse> items, PageMeta page) {
+public record ClassificationReviewGroupPage(List<ClassificationReviewGroupResponse> items,
+    ClassificationUnresolved unresolved, PageMeta page) {
 }

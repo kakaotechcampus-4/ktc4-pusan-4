@@ -66,6 +66,18 @@ bash ./backend/gradlew -p backend bootRun --args='--spring.profiles.active=local
 
 `integrationTest`와 `check`를 실행하기 전에는 Docker가 실행 중이어야 합니다. CI는 `test` 다음 `integrationTest`를 실행하며, 특정 클래스를 지정하지 않으므로 이후 추가되는 `*IntegrationTest`도 자동으로 포함합니다. 현재는 도메인 단위 테스트가 없어 `test`가 `NO-SOURCE`로 완료됩니다.
 
+## 목 응답
+
+서비스 레이어가 구현되기 전의 API는 기능별 `*MockData` Bean(`UserMockData`, `TransactionMockData`, `ClassificationMockData`, `JudgmentMockData`)이 만든 고정 응답을 반환합니다. 입력과 id에 상관없이 같은 값이고, 상태를 저장하지 않습니다. 이런 API에는 `@MockResponse`가 붙어 있고 스웨거 설명이 `[목 응답]`으로 시작합니다.
+
+서비스를 구현하면 엔드포인트 단위로 다음을 바꿉니다.
+
+1. 컨트롤러가 주입받는 `*MockData`를 서비스로 바꾸고 호출부를 서비스 호출로 바꿉니다.
+2. 해당 메서드의 `@MockResponse`를 지웁니다.
+3. `*MockData`의 메서드가 더 이상 쓰이지 않으면 지웁니다. 모든 API가 바뀌면 `MockFixtures`, `MockResponse`까지 지웁니다.
+
+`ApiResponseContractTest`는 각 API의 상태 코드와 응답 필드 이름만 확인하고 값은 확인하지 않습니다. 그래서 서비스로 바꿔도 계약이 그대로면 통과해야 합니다.
+
 ## 코드 건강도 리포트
 
 PR에서는 `.github/workflows/backend-code-health.yml`이 JaCoCo, PMD/CPD, Codelens 결과를 하나의 댓글로 갱신합니다. 모든 지표는 정보 제공용이며 품질 저하나 분석 도구 오류로 merge를 막지 않습니다. 변화량은 `develop` 또는 `main`의 최신 push에서 저장한 스냅샷과 비교하고, 첫 실행처럼 스냅샷이 없으면 기준값을 `N/A`로 표시합니다.

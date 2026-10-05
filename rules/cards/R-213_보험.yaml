@@ -8,8 +8,11 @@
 # '금융'으로 먼저 보낸다. 여기로 오면 R-106·R-200 의 근거가 닿지 않는다.
 #
 # industry 를 걸지 않는다 — 프로파일에 '보험' 칸이 없다.
+#
+# 근거는 답마다 다르다: 가능 선택지는 §27① 을 선택지에 싣고, 카드 citations 에는 불가 근거만 둔다
+# (선택지 citations 가 카드 것을 대신한다, PR #68). 카드에 둘 다 두면 개인 답에도 §27① 이 붙는다.
 id: R-213
-version: 1
+version: 2
 gate: G2
 priority: 500
 effective_period: { start: 2024-01-01, end: null }
@@ -17,7 +20,6 @@ match:
   category: [보험]
 verdict: 확인필요
 citations:
-  - { id: 소득세법-27-1, verified: true }
   - { id: 소득세법-33-1-5, verified: true }
 question:
   code: INSURANCE_KIND
@@ -25,7 +27,7 @@ question:
   fact_type: 보험종류
   group_by: merchant_norm
   options:
-    - { value: 사업장 재산·배상책임, verdict: 가능, account: 보험료 }
+    - { value: 사업장 재산·배상책임, verdict: 가능, citations: [{ id: 소득세법-27-1, verified: true }], account: 보험료 }
     - { value: 본인 보장성, verdict: 불가 }
     - { value: 모르겠음 }
 review: { by: 미검수, date: 2026-09-15 }

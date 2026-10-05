@@ -1,8 +1,10 @@
 # G2 · 생활용품 — 프로파일 940909 통상성[생활용품] = 비통상
 #
-# ⚠️ 프로파일이 '비통상'인데 불가로 확정하지 않는다. 다이소 한 건에 사무용품과
-#    가사용품이 같이 담기고, 카드 내역에는 품목이 없다. 불가로 확정하면
-#    실제 사무용품 구입이 조용히 부인된다. 되묻기로 사용자에게 가른다.
+# 프로파일이 '비통상'(개인 소비로 추정)이라 기본 판정은 불가다. 다만 다이소 한 건에 사무용품과
+# 가사용품이 같이 담기고 카드 내역에는 품목이 없어서, 업무용이라고 답하면 풀리는 불가로 둔다
+# (휴일 카드 R-311 과 같은 '추정 + 소명' 구조). 엔진은 답으로 풀 수 있는 불가의 질문을 지우지
+# 않으므로(PR #68) 사무용품 구입이 조용히 부인되지 않는다.
+# 혼재는 불가를 유지할 근거도 가능으로 풀 근거도 없어 확인필요로 둔다.
 #    (keyword_rules 가 다이소를 사무용품이 아니라 생활용품으로 보내는 것도 같은 판단이다)
 #
 # fact_type '용도'/transaction 은 R-104(온라인쇼핑)와 같지만, 거래 하나는
@@ -11,17 +13,19 @@
 # ⚠️ 선택지 값은 평가셋(PR #25) 어휘를 따른다 — 개인용이 아니라 '개인'이다.
 #    E-027·E-040·E-050 이 모두 '개인'으로 답한다. R-104 는 '개인용'을 쓰고 있어
 #    같은 fact_type 에서 어휘가 갈린다. PR #27 리뷰로 올린다.
+#
+# 근거는 답마다 다르다: 가능 선택지는 §27① 을 선택지에 싣고, 카드 citations 에는 불가 근거만 둔다
+# (선택지 citations 가 카드 것을 대신한다, PR #68). 카드에 둘 다 두면 개인 답에도 §27① 이 붙는다.
 id: R-207
-version: 1
+version: 3
 gate: G2
 priority: 500
 effective_period: { start: 2024-01-01, end: null }
 match:
   category: [생활용품]
   industry: ["940909"]
-verdict: 확인필요
+verdict: 불가
 citations:
-  - { id: 소득세법-27-1, verified: true }
   - { id: 소득세법-33-1-5, verified: true }
 question:
   code: HOUSEHOLD_ITEM_PURPOSE
@@ -29,7 +33,7 @@ question:
   fact_type: 용도
   group_by: transaction
   options:
-    - { value: 업무용, verdict: 가능, account: 소모품비 }
+    - { value: 업무용, verdict: 가능, citations: [{ id: 소득세법-27-1, verified: true }], account: 소모품비 }
     - { value: 개인, verdict: 불가 }
-    - { value: 업무·개인 혼재 }
+    - { value: 업무·개인 혼재, verdict: 확인필요 }
 review: { by: 미검수, date: 2026-09-15 }

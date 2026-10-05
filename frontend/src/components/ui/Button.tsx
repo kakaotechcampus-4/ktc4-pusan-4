@@ -2,14 +2,16 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { cn } from './cn';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'soft' | 'ghost';
+export type ButtonVariant = 'primary' | 'secondary' | 'soft' | 'ghost' | 'danger';
 export type ButtonSize = 'sm' | 'md' | 'lg' | 'inline';
 
 const VARIANT: Record<ButtonVariant, string> = {
   primary: 'bg-accent text-white hover:bg-accent-hover',
   secondary: 'border border-line bg-surface text-ink hover:bg-canvas',
   soft: 'bg-accent-soft text-accent hover:bg-accent-line',
-  ghost: 'text-ink hover:text-accent'
+  ghost: 'text-ink hover:text-accent',
+  /** 되돌릴 수 없는 동작에만. 한 화면에 하나 */
+  danger: 'bg-deny text-white hover:brightness-95'
 };
 
 /** sm은 헤더·표 안, md는 폼, lg는 랜딩 CTA, inline은 문장 속 텍스트 링크(ghost 전용) */

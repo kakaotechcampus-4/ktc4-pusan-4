@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { CheckIcon, PlayIcon, ShieldCheckIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { DEFAULT_CONTEXT, useSession } from '../contexts/SessionContext';
-import { api } from '../api';
+import { api, ApiRequestError } from '../api';
 import { formatFullDate, formatNumber, formatPeriod } from '../utils/format';
 
 export function Confirm() {
@@ -11,31 +11,46 @@ export function Confirm() {
   const { batch, batchId, context, contextRef, setRunId } = useSession();
   const [agreed, setAgreed] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const resolved = context ?? DEFAULT_CONTEXT;
 
-  /** POST /judgment-runs — batchId·contextId 둘 다 필요하다 */
+  /** POST /judgment-runs — batchId·contextId 둘 다 있어야 실행할 수 있다 */
+  const missing = !batchId ?
+  '올린 카드내역이 없습니다. 파일을 먼저 올려 주세요.' :
+  !contextRef ?
+  '사업자 문진을 먼저 마쳐 주세요.' :
+  null;
+
   const start = async () => {
-    setStarting(true);
     if (!batchId || !contextRef) return;
-    const created = await api.runs.create({ batchId, contextId: contextRef.id });
-    setRunId(created.id);
-    navigate('/run');
+    setStarting(true);
+    setError(null);
+    try {
+      const created = await api.runs.create({ batchId, contextId: contextRef.id });
+      setRunId(created.id);
+      navigate('/run');
+    } catch (caught) {
+      setError(
+        caught instanceof ApiRequestError ?
+        caught.message :
+        '판정을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.'
+      );
+    } finally {
+      setStarting(false);
+    }
   };
 
-  const batchRows = [
-  { term: '파일', value: batch?.fileName ?? '사업용신용카드_승인내역_202601.xlsx' },
-  { term: '카드사 어댑터', value: batch?.issuer ?? '홈택스 사업용카드' },
+  // 올린 내역이 없으면 비워 둔다. 없는 파일 이름과 건수를 지어내지 않는다
+  const batchRows = batch ?
+  [
+  { term: '파일', value: batch.fileName },
+  { term: '카드사 어댑터', value: batch.issuer },
   {
     term: '판정 대상',
-    value: `${formatNumber(batch?.rowCount ?? 292)}건 (취소 상계·중복 제외 후)`
+    value: `${formatNumber(batch.rowCount)}건 (취소 상계·중복 제외 후)`
   },
-  {
-    term: '기간',
-    value: formatPeriod(
-      batch?.periodStart ?? '2026-01-01',
-      batch?.periodEnd ?? '2026-01-31'
-    )
-  }];
+  { term: '기간', value: formatPeriod(batch.periodStart, batch.periodEnd) }] :
+  [];
 
 
   const contextRows = [
@@ -60,34 +75,39 @@ export function Confirm() {
     <AppShell>
       <div className="mx-auto max-w-3xl">
         <header>
-          <p className="text-[13px] font-semibold text-accent">사람 게이트 ①</p>
-          <h1 className="mt-1.5 text-[28px] font-bold tracking-tight text-ink">
+          <p className="text-small font-semibold text-accent">사람 게이트 ①</p>
+          <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
             이 입력으로 판정합니다
           </h1>
-          <p className="mt-2 text-[14px] leading-6 text-ink2">
+          <p className="mt-2 text-body leading-6 text-ink2">
             판정은 입력을 바꾸지 않으면 항상 같은 결과를 냅니다. 시작 전에 두 입력이
             맞는지만 확인해 주세요.
           </p>
         </header>
 
         <section className="mt-6 overflow-hidden rounded-2xl border border-line bg-surface">
-          <h2 className="border-b border-line px-5 py-3.5 text-sm font-semibold text-ink">
+          <h2 className="border-b border-line px-5 py-3.5 text-body font-semibold text-ink">
             카드내역
           </h2>
           <dl className="divide-y divide-line2">
+            {batchRows.length === 0 &&
+            <div className="px-5 py-3">
+                <p className="text-small text-muted">아직 올린 카드내역이 없습니다.</p>
+              </div>
+            }
             {batchRows.map((row) =>
             <div key={row.term} className="flex gap-4 px-5 py-3">
-                <dt className="w-36 shrink-0 text-[13px] text-muted">
+                <dt className="w-36 shrink-0 text-small text-muted">
                   {row.term}
                 </dt>
-                <dd className="text-[13px] font-medium text-ink">{row.value}</dd>
+                <dd className="text-small font-medium text-ink">{row.value}</dd>
               </div>
             )}
           </dl>
           <div className="border-t border-line bg-canvas px-5 py-3">
             <Link
               to="/upload"
-              className="text-[13px] font-semibold text-accent transition-colors duration-150 hover:text-accent-hover">
+              className="text-small font-semibold text-accent transition-colors duration-150 hover:text-accent-hover">
               
               카드내역 다시 올리기
             </Link>
@@ -95,16 +115,16 @@ export function Confirm() {
         </section>
 
         <section className="mt-4 overflow-hidden rounded-2xl border border-line bg-surface">
-          <h2 className="border-b border-line px-5 py-3.5 text-sm font-semibold text-ink">
+          <h2 className="border-b border-line px-5 py-3.5 text-body font-semibold text-ink">
             사업자 문진 · 버전 4
           </h2>
           <dl className="divide-y divide-line2">
             {contextRows.map((row) =>
             <div key={row.term} className="flex gap-4 px-5 py-3">
-                <dt className="w-36 shrink-0 text-[13px] text-muted">
+                <dt className="w-36 shrink-0 text-small text-muted">
                   {row.term}
                 </dt>
-                <dd className="text-[13px] font-medium tabular-nums text-ink">
+                <dd className="text-small font-medium tabular-nums text-ink">
                   {row.value}
                 </dd>
               </div>
@@ -113,7 +133,7 @@ export function Confirm() {
           <div className="border-t border-line bg-canvas px-5 py-3">
             <Link
               to="/interview"
-              className="text-[13px] font-semibold text-accent transition-colors duration-150 hover:text-accent-hover">
+              className="text-small font-semibold text-accent transition-colors duration-150 hover:text-accent-hover">
               
               문진 수정하기
             </Link>
@@ -127,10 +147,10 @@ export function Confirm() {
               aria-hidden="true" />
             
             <div>
-              <h2 className="text-sm font-semibold text-ink">
+              <h2 className="text-body font-semibold text-ink">
                 되돌릴 수 없는 동작은 없습니다
               </h2>
-              <p className="mt-1.5 text-[13px] leading-6 text-muted">
+              <p className="mt-1.5 text-small leading-6 text-muted">
                 판정은 신고·제출·발송·금전 이동을 만들지 않습니다. 결과는 언제든 다시
                 계산할 수 있고, 답변을 고치면 새 판정 이력이 쌓입니다.
               </p>
@@ -157,20 +177,44 @@ export function Confirm() {
               onChange={(event) => setAgreed(event.target.checked)}
               className="sr-only" />
             
-            <span className="text-[13px] leading-6 text-ink2">
+            <span className="text-small leading-6 text-ink2">
               이 결과가 세무 신고를 확정하는 것이 아니며, 최종 판단에는 세무대리인의
               확인이 필요하다는 점을 이해했습니다.
             </span>
           </label>
 
+          {missing &&
+          <p
+            role="alert"
+            className="mt-4 rounded-xl border border-warn-line bg-warn-bg px-4 py-3 text-small leading-6 text-warn">
+            
+              {missing}{' '}
+              <Link
+                to={!batchId ? '/upload' : '/interview'}
+                className="font-semibold underline">
+
+                {!batchId ? '카드내역 올리기' : '문진 하러 가기'}
+              </Link>
+            </p>
+          }
+
+          {error &&
+          <p
+            role="alert"
+            className="mt-4 rounded-xl border border-deny-line bg-deny-bg px-4 py-3 text-small leading-6 text-deny">
+
+              {error}
+            </p>
+          }
+
           <button
             type="button"
-            disabled={!agreed || starting}
+            disabled={!agreed || starting || missing !== null}
             onClick={() => void start()}
-            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-3 text-[15px] font-semibold text-white transition-colors duration-150 ease-snap hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line disabled:text-muted">
+            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-3 text-body-lg font-semibold text-white transition-colors duration-150 ease-snap hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line disabled:text-muted">
             
             <PlayIcon className="h-4 w-4" aria-hidden="true" />
-            판정 시작
+            {starting ? '판정을 시작하는 중…' : '판정 시작'}
           </button>
         </section>
       </div>

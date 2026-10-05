@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowRightIcon, CheckIcon, LayersIcon } from 'lucide-react';
@@ -36,7 +36,7 @@ export function Questions() {
               확인이 필요한 것만 물어봅니다
             </h1>
             <p className="mt-2 max-w-xl text-[14px] leading-6 text-ink2">
-              292건을 한 건씩 묻지 않습니다. 같은 사유·같은 가맹점끼리 묶어{' '}
+              한 건씩 묻지 않습니다. 같은 사유·같은 가맹점끼리 묶어{' '}
               {QUESTION_GROUPS.length}개 질문으로 줄였습니다.
             </p>
           </div>

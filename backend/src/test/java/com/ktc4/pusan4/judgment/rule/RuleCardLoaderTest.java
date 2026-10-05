@@ -1,5 +1,6 @@
 package com.ktc4.pusan4.judgment.rule;
 
+import com.ktc4.pusan4.judgment.domain.Citation;
 import com.ktc4.pusan4.judgment.domain.QuestionEffect;
 import com.ktc4.pusan4.judgment.domain.Gate;
 import com.ktc4.pusan4.judgment.domain.RuleCard;
@@ -89,6 +90,93 @@ class RuleCardLoaderTest {
                 Map.of("limit_bucket", "접대비")
             )
         );
+    }
+
+    @Test
+    void loads_option_citations_as_citations_not_attributes() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("cards/R-027.yaml"), """
+            id: R-027
+            version: 1
+            gate: G3
+            priority: 401
+            effective_period: { start: 2025-01-01, end: null }
+            match:
+              category: [카페]
+            question:
+              code: PURPOSE
+              text: 이 결제는 어떤 용도였나요?
+              fact_type: 용도
+              group_by: transaction
+              options:
+                - { value: 업무미팅, verdict: 가능, citations: [{ id: 소득세법-35-1, verified: true }] }
+                - { value: 개인, verdict: 불가 }
+            citations: [소득세법-33-1-5]
+            review: { by: 외부자문, date: 2026-09-05 }
+            """);
+
+        RuleCard card = new RuleCardLoader().load(root).get(Gate.G3).getFirst();
+
+        assertThat(card.questions().getFirst().effects()).containsEntry(
+            "업무미팅",
+            new QuestionEffect(Verdict.AVAILABLE, null, Map.of(), List.of(new Citation("소득세법-35-1")))
+        );
+    }
+
+    // 카드 근거가 없어도 확정 답마다 자기 근거가 있으면 된다. 근거 없는 확정 답이 하나라도 있으면 거부한다.
+    @Test
+    void rejects_final_option_verdict_without_card_or_option_citation() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("cards/R-027.yaml"), """
+            id: R-027
+            version: 1
+            gate: G3
+            priority: 401
+            effective_period: { start: 2025-01-01, end: null }
+            match:
+              category: [카페]
+            question:
+              code: PURPOSE
+              text: 이 결제는 어떤 용도였나요?
+              fact_type: 용도
+              group_by: transaction
+              options:
+                - { value: 업무미팅, verdict: 가능, citations: [소득세법-35-1] }
+                - { value: 개인, verdict: 불가 }
+            review: { by: 외부자문, date: 2026-09-05 }
+            """);
+
+        assertThatThrownBy(() -> new RuleCardLoader().load(root))
+            .isInstanceOf(RuleCardValidationException.class)
+            .hasMessageContaining("R-027")
+            .hasMessageContaining("effect verdict requires citation");
+    }
+
+    @Test
+    void accepts_final_option_verdicts_that_each_carry_their_own_citation() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("cards/R-027.yaml"), """
+            id: R-027
+            version: 1
+            gate: G3
+            priority: 401
+            effective_period: { start: 2025-01-01, end: null }
+            match:
+              category: [카페]
+            question:
+              code: PURPOSE
+              text: 이 결제는 어떤 용도였나요?
+              fact_type: 용도
+              group_by: transaction
+              options:
+                - { value: 업무미팅, verdict: 가능, citations: [소득세법-35-1] }
+                - { value: 개인, verdict: 불가, citations: [소득세법-33-1-5] }
+            review: { by: 외부자문, date: 2026-09-05 }
+            """);
+
+        RuleCard card = new RuleCardLoader().load(root).get(Gate.G3).getFirst();
+
+        assertThat(card.citations()).isEmpty();
     }
 
     @Test
@@ -292,6 +380,140 @@ class RuleCardLoaderTest {
         List<RuleCard> cards = new RuleCardLoader().load(root).get(Gate.G4);
 
         assertThat(cards).extracting(RuleCard::id).containsExactly("R-051");
+    }
+
+    @Test
+    void loads_holiday_match_flag() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("cards/R-061.yaml"), holidayCardYaml("true", ""));
+
+        RuleCard card = new RuleCardLoader().load(root).get(Gate.G5).getFirst();
+
+        assertThat(card.match().holiday()).isTrue();
+    }
+
+    // 휴일은 조문이 아니라 추정의 근거다. 휴일 카드가 낼 수 있는 판정은 소명으로 풀리는 불가뿐이다.
+    @Test
+    void loads_holiday_unavailable_with_rebuttal_question() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("cards/R-061.yaml"), holidayCardYaml("true", """
+            verdict: 불가
+            citations: [소득세법-33-1-5]
+            question:
+              text: 거래처 미팅이었나요?
+              fact_type: 용도
+              group_by: transaction
+              options:
+                - { value: 업무미팅, verdict: 확인필요 }
+                - { value: 개인, verdict: 불가 }
+            """));
+
+        RuleCard card = new RuleCardLoader().load(root).get(Gate.G5).getFirst();
+
+        assertThat(card.verdict()).isEqualTo(Verdict.UNAVAILABLE);
+    }
+
+    // 소명할 길이 없는 휴일 불가는 "주말 = 무조건 불가"다.
+    @Test
+    void rejects_holiday_unavailable_without_question() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("cards/R-061.yaml"), holidayCardYaml("true", """
+            verdict: 불가
+            citations: [소득세법-33-1-5]
+            """));
+
+        assertThatThrownBy(() -> new RuleCardLoader().load(root))
+            .isInstanceOf(RuleCardValidationException.class)
+            .hasMessageContaining("holiday");
+    }
+
+    @Test
+    void rejects_holiday_unavailable_whose_options_cannot_lift_it() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("cards/R-061.yaml"), holidayCardYaml("true", """
+            verdict: 불가
+            citations: [소득세법-33-1-5]
+            question:
+              text: 어떤 용도였나요?
+              fact_type: 용도
+              group_by: transaction
+              options:
+                - { value: 개인, verdict: 불가 }
+                - { value: 모르겠음 }
+            """));
+
+        assertThatThrownBy(() -> new RuleCardLoader().load(root))
+            .isInstanceOf(RuleCardValidationException.class)
+            .hasMessageContaining("holiday");
+    }
+
+    @Test
+    void rejects_holiday_card_with_verdict() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("cards/R-061.yaml"), holidayCardYaml("true", """
+            verdict: 확인필요
+            """));
+
+        assertThatThrownBy(() -> new RuleCardLoader().load(root))
+            .isInstanceOf(RuleCardValidationException.class)
+            .hasMessageContaining("holiday");
+    }
+
+    @Test
+    void rejects_holiday_card_with_option_verdict() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("cards/R-061.yaml"), holidayCardYaml("true", """
+            citations: [소득세법-33-1-5]
+            question:
+              text: 주말 결제입니다. 어떤 용도였나요?
+              fact_type: 용도
+              group_by: transaction
+              options:
+                - { value: 개인, verdict: 불가 }
+            """));
+
+        assertThatThrownBy(() -> new RuleCardLoader().load(root))
+            .isInstanceOf(RuleCardValidationException.class)
+            .hasMessageContaining("holiday");
+    }
+
+    // 문자열 "true" 가 조용히 false 로 떨어지면 휴일 조건이 사라져 모든 날에 카드가 붙는다.
+    @Test
+    void rejects_non_boolean_holiday() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("cards/R-061.yaml"), holidayCardYaml("\"true\"", ""));
+
+        assertThatThrownBy(() -> new RuleCardLoader().load(root))
+            .isInstanceOf(RuleCardValidationException.class)
+            .hasMessageContaining("R-061")
+            .hasMessageContaining("holiday must be a boolean");
+    }
+
+    // weekday 는 holiday 로 대체됐다. 남아 있으면 조용히 무시되어 요일 조건이 사라진다.
+    @Test
+    void rejects_removed_weekday_match_key() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("cards/R-061.yaml"),
+            holidayCardYaml("true", "").replace("  holiday: true\n", "  weekday: [토, 일]\n"));
+
+        assertThatThrownBy(() -> new RuleCardLoader().load(root))
+            .isInstanceOf(RuleCardValidationException.class)
+            .hasMessageContaining("R-061")
+            .hasMessageContaining("weekday");
+    }
+
+    private static String holidayCardYaml(String holiday, String extra) {
+        return """
+            id: R-061
+            version: 1
+            gate: G5
+            priority: 500
+            effective_period: { start: 2025-01-01, end: null }
+            match:
+              category: [음식점]
+              holiday: %s
+            review: { by: 외부자문, date: 2026-09-26 }
+            """.formatted(holiday) + extra;
     }
 
     private static String cardYaml(String id, int priority) {

@@ -1,4 +1,3 @@
-import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronDownIcon } from 'lucide-react';
 import type { Judgment, Transaction } from '../../types/domain';

@@ -1,5 +1,7 @@
 package com.ktc4.pusan4.judgment.domain;
 
+import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -7,7 +9,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import com.ktc4.pusan4.judgment.domain.AttributeOutcomePolicy;
 
 
 public final class JudgmentEngine {
@@ -21,9 +22,20 @@ public final class JudgmentEngine {
         List<UserFact> facts,
         RuleSet rules
     ) {
+        return judge(transaction, context, facts, rules, Set.of());
+    }
+
+    // publicHolidays: 평일 공휴일(대체·임시공휴일 포함). 토·일은 요일로 판단하므로 넣지 않아도 된다.
+    public static Judgment judge(
+        TransactionInput transaction,
+        UserContext context,
+        List<UserFact> facts,
+        RuleSet rules,
+        Set<LocalDate> publicHolidays
+    ) {
         Judgment blocked = rules.get(Gate.G1).stream()
             .filter(rule -> rule.isEffectiveOn(transaction.approvedAt()))
-            .filter(rule -> matches(rule.match(), transaction, context))
+            .filter(rule -> matches(rule.match(), transaction, context, publicHolidays))
             .findFirst()
             .map(rule -> new Judgment(
                 Verdict.UNAVAILABLE,
@@ -45,7 +57,7 @@ public final class JudgmentEngine {
 
         RuleCard winner = rules.get(Gate.G2).stream()
             .filter(rule -> rule.isEffectiveOn(transaction.approvedAt()))
-            .filter(rule -> matches(rule.match(), transaction, context))
+            .filter(rule -> matches(rule.match(), transaction, context, publicHolidays))
             .findFirst()
             .orElse(null);
         if (winner == null) {
@@ -64,6 +76,7 @@ public final class JudgmentEngine {
         String defaultAccount = null;
         String answeredAccount = null;
         boolean answeredAccountConflict = false;
+        boolean confirmedUnavailable = false;
 
         // 승자(G2)와 속성 관문(G3~G6) 카드를 한 파이프라인으로 동일하게 처리한다.
         // 되묻기는 어느 관문에 있든 user_fact로 해소된다.
@@ -72,7 +85,7 @@ public final class JudgmentEngine {
         for (Gate gate : List.of(Gate.G3, Gate.G4, Gate.G5, Gate.G6)) {
             rules.get(gate).stream()
                 .filter(rule -> rule.isEffectiveOn(transaction.approvedAt()))
-                .filter(rule -> matches(rule.match(), transaction, context))
+                .filter(rule -> matches(rule.match(), transaction, context, publicHolidays))
                 .forEach(pipeline::add);
         }
 
@@ -81,6 +94,8 @@ public final class JudgmentEngine {
             outOfScope |= rule.outOfScope();
             // 카드의 기본 판정을, 그 카드의 되묻기 응답(effect)이 있으면 대체한다.
             Verdict cardVerdict = rule.verdict();
+            boolean rebuttable = false;
+            List<Citation> answeredCitations = new ArrayList<>();
             if (defaultAccount == null && rule.account() != null) {
                 defaultAccount = rule.account();
             }
@@ -88,12 +103,14 @@ public final class JudgmentEngine {
                 QuestionEffect effect = resolvedEffect(question, transaction, facts);
                 if (effect == null) {
                     questions.add(resolveGroupKey(question, transaction));
+                    rebuttable |= question.canLiftUnavailable();
                     continue;
                 }
                 mergeAttributes(attributes, effect.attributes(), rule.id() + ":" + question.code());
                 if (effect.verdict() != null) {
                     cardVerdict = effect.verdict();
                 }
+                answeredCitations.addAll(effect.citations());
                 if (effect.account() != null) {
                     if (answeredAccount == null) {
                         answeredAccount = effect.account();
@@ -103,15 +120,19 @@ public final class JudgmentEngine {
                     }
                 }
             }
+            // 기본 불가라도 미응답 질문의 답으로 풀릴 수 있으면(소명 대기) 확정이 아니다.
+            confirmedUnavailable |= cardVerdict == Verdict.UNAVAILABLE && !rebuttable;
             // 관문 간에는 더 제한적인 판정이 이긴다(뒤 관문이 앞 판정을 완화하지 못함).
             resolvedVerdict = moreRestrictive(resolvedVerdict, cardVerdict);
             appliedRuleIds.add(rule.id());
             appliedRuleVersions.add(rule.version());
-            citations.addAll(rule.citations());
+            // 답에 근거가 따로 있으면 카드 근거 대신 싣는다(업무미팅 §35① / 개인 §33①5 처럼 답마다 근거가 다름).
+            citations.addAll(answeredCitations.isEmpty() ? rule.citations() : answeredCitations);
         }
 
         // 이미 불가로 확정된 거래는 되묻지 않는다: 미해소 질문을 버려 되묻기 예산 낭비를 막는다.
-        if (resolvedVerdict == Verdict.UNAVAILABLE) {
+        // 불가가 전부 소명 대기(예: 주말 식대 추정)면 질문을 남겨 사용자가 풀 수 있게 한다.
+        if (confirmedUnavailable) {
             questions.clear();
         }
         // 미해소 질문이 결과를 바꿀 수 있을 때만 검토로 전환한다. 가산세 플래그만 세우는
@@ -131,7 +152,12 @@ public final class JudgmentEngine {
         );
     }
 
-    static boolean matches(RuleMatch match, TransactionInput transaction, UserContext context) {
+    static boolean matches(
+        RuleMatch match,
+        TransactionInput transaction,
+        UserContext context,
+        Set<LocalDate> publicHolidays
+    ) {
         if (!match.categories().isEmpty()
             && !match.categories().contains(transaction.merchantCategory())) {
             return false;
@@ -149,7 +175,15 @@ public final class JudgmentEngine {
         if (match.amountMax() != null && transaction.amount() > match.amountMax()) {
             return false;
         }
+        if (match.holiday() && !isHoliday(transaction.approvedAt(), publicHolidays)) {
+            return false;
+        }
         return match.industries().isEmpty() || match.industries().contains(context.industryCode());
+    }
+
+    private static boolean isHoliday(LocalDate date, Set<LocalDate> publicHolidays) {
+        DayOfWeek day = date.getDayOfWeek();
+        return day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY || publicHolidays.contains(date);
     }
 
     private static void mergeAttributes(

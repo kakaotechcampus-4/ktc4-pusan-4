@@ -34,12 +34,17 @@ PRIORITY = 410
 # 판정을 막는 관문. 로더가 verdict 를 요구한다(docs/rule-card-fields.md).
 BLOCKING = ("G1", "G2")
 
+# CONTEXT.md §G1 표의 전액 차단 호. 5·13호는 조건부(G2·G3), 6·9·14호는 금액 조정(G4)이다.
+# 기본 조문이 늘 후보에 있어 "33조 아무 호"로 두면 G1 을 못 막는다.
+G1_ITEMS = [f"소득세법-33-1-{n}" for n in (1, 2, 3, 4, 8, 10, 11, 12, 15)]
+
 RETRIES = 3
 
 SYSTEM = """너는 세무 규칙 카드의 초안을 쓴다. 근거는 이미 골라져 있다. 셋만 정해라.
 
 gate — 어느 관문이 이 지출을 판정하나. 가맹점 카테고리 단위 카드는 거의 G1 아니면 G2 다.
   G1  소득세법 33조가 이름을 대고 막은 것. 소득세·벌금·과태료처럼 열거돼 있다
+      가사경비(5호)·업무무관(13호)은 사실관계로 갈려 G1 이 아니다
   G2  경비로 인정할지를 사업 관련성으로 가리는 것. 대부분 여기다
   G3  이미 인정된 건의 업무/가사 비율을 나누는 것.
       인정 여부 자체를 다투는 중이면 G3 가 아니라 G2 다
@@ -83,10 +88,12 @@ def missing_statutes(conn: psycopg.Connection, ids: list[str]) -> list[str]:
 def _check(card: RuleCardDraft, ev: Evidence) -> list[str]:
     """카드가 스스로 모순인 경우만. 게이트가 옳은지는 기계가 못 본다."""
     bad = []
-    if card.gate == "G1" and not any(r.statute_id.startswith("소득세법-33-") for r in ev.refs):
+    if card.gate == "G1" and not any(
+        r.statute_id == i or r.statute_id.startswith(f"{i}-") for r in ev.refs for i in G1_ITEMS
+    ):
         bad.append(
-            "G1 은 소득세법 33조가 이름을 대고 막은 것뿐이다."
-            " 고른 근거에 33조가 없으면 G1 이 아니다."
+            "G1 은 소득세법 33조1항의 전액 차단 호(1·2·3·4·8·10·11·12·15호)가 막은 것뿐이다."
+            " 고른 근거에 그 호가 없으면 G1 이 아니다."
         )
     if card.gate in BLOCKING and card.verdict is None:
         bad.append(f"{card.gate} 는 차단형이라 verdict 가 있어야 한다.")

@@ -17,6 +17,11 @@ const STEPS = [
 { path: '/run', label: '판정' },
 { path: '/results', label: '결과' }];
 
+/** 흐름의 단계가 아니라 언제든 들러보는 자료 화면 */
+const REFS = [
+{ path: '/transactions', label: '거래' },
+{ path: '/uploads', label: '업로드 이력' }];
+
 /** 단계 표시에 포함되지 않지만 특정 단계에 속하는 화면 */
 const STEP_ALIAS: Record<string, number> = {
   '/confirm': 2,
@@ -54,7 +59,7 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
               <span className="block h-[18px] w-[4px] rounded-sm bg-ink" />
               <span className="block h-[18px] w-[4px] rounded-sm bg-accent" />
             </span>
-            <span className="text-[15px] font-bold tracking-tight text-ink">
+            <span className="text-h4 font-bold tracking-tight text-ink">
               경비판정
             </span>
           </Link>
@@ -75,7 +80,7 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
                     }
                       <span
                       aria-current={active ? 'step' : undefined}
-                      className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[13px] ${
+                      className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-small ${
                       active ?
                       'bg-accent-soft font-semibold text-accent' :
                       done ?
@@ -89,7 +94,7 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
                         aria-hidden="true" /> :
 
 
-                      <span className="tabular-nums text-[11px] text-muted">
+                      <span className="tabular-nums text-caption text-muted">
                             {index + 1}
                           </span>
                       }
@@ -102,7 +107,25 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
             </nav>
           }
 
-          <div className="flex items-center gap-3 text-[13px] text-muted">
+          <div className="flex items-center gap-3 text-small text-muted">
+            <nav aria-label="자료" className="flex items-center gap-0.5">
+              {REFS.map((ref) => {
+                const active = pathname.startsWith(ref.path);
+                return (
+                  <Link
+                    key={ref.path}
+                    to={ref.path}
+                    aria-current={active ? 'page' : undefined}
+                    className={`rounded-lg px-2.5 py-1.5 font-semibold transition-colors duration-150 ease-snap ${
+                    active ? 'bg-canvas text-ink' : 'text-ink2 hover:bg-canvas'}`
+                    }>
+
+                    {ref.label}
+                  </Link>);
+
+              })}
+            </nav>
+            <span className="hidden h-4 w-px bg-line sm:inline" />
             <span className="hidden tabular-nums sm:inline">
               귀속 2026년
             </span>
@@ -116,7 +139,7 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
                 signOut();
                 navigate('/');
               }}
-              className="rounded-lg border border-line px-2.5 py-1.5 text-[12px] font-semibold text-ink transition-colors duration-150 ease-snap hover:bg-canvas">
+              className="rounded-lg border border-line px-2.5 py-1.5 text-caption font-semibold text-ink transition-colors duration-150 ease-snap hover:bg-canvas">
               
               로그아웃
             </button>
@@ -131,7 +154,7 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
       </main>
 
       <footer className="border-t border-line bg-surface">
-        <div className="mx-auto flex max-w-[1240px] flex-col gap-1 px-6 py-5 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
+        <div className="mx-auto flex max-w-[1240px] flex-col gap-1 px-6 py-5 text-caption text-muted sm:flex-row sm:items-center sm:justify-between">
           <p>
             카드내역 원본은 서버에 저장하지 않습니다. 카드번호·계좌번호는 브라우저
             파싱 단계에서 폐기됩니다.

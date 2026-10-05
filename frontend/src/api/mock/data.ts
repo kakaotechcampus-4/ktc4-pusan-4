@@ -2,7 +2,6 @@ import type {
   ClassificationReview,
   Judgment,
   JudgmentRun,
-  JudgmentSummary,
   QuestionGroup,
   Transaction,
   UploadBatch,
@@ -17,67 +16,29 @@ export const UPLOAD_BATCH: UploadBatch = {
   cardIssuer: '국민',
   periodStart: '2026-01-01',
   periodEnd: '2026-01-31',
-  transactionCount: 292,
+  // transactionCount·classificationPendingCount 는 mock/index.ts 가 실제 배열에서
+  // 다시 계산한다. 여기 적은 값과 시드가 어긋나 화면끼리 숫자가 달라졌던 적이 있다.
+  transactionCount: 0,
   skippedDuplicateCount: 0,
-  classificationPendingCount: 6,
+  classificationPendingCount: 0,
   createdAt: '2026-09-12T13:58:00+09:00'
 };
 
 export const JUDGMENT_RUN: JudgmentRun = {
   id: '0199e5b2-0000-7000-8000-000000000001',
+  batchId: '0199c8f2-0000-7000-8000-000000000001',
+  contextId: '0199d3a1-0000-7000-8000-000000000001',
+  contextVersion: 4,
   status: {
     code: 'COMPLETED',
     label: '완료'
   },
-  totalCount: 292,
-  processedCount: 292,
+  // 판정 대상(JUDGEABLE + 분류 완료) 수와 같게 둔다. 292 는 시드에 없는 숫자였다
+  totalCount: 23,
+  processedCount: 23,
   failedCount: 0,
   startedAt: '2026-09-12T14:01:00+09:00',
   completedAt: '2026-09-12T14:05:00+09:00'
-};
-
-export const JUDGMENT_SUMMARY: JudgmentSummary = {
-  scope: {
-    type: 'RUN',
-    id: '0199e5b2-0000-7000-8000-000000000001'
-  },
-  totalCount: 292,
-  byVerdict: {
-    AVAILABLE: {
-      count: 168,
-      finalAmount: 21_483_000
-    },
-    UNAVAILABLE: {
-      count: 53,
-      finalAmount: 0
-    },
-    NEEDS_REVIEW: {
-      count: 71,
-      finalAmount: 0
-    }
-  },
-  byAccount: [
-    {
-      account: '지급수수료',
-      count: 61,
-      finalAmount: 9_120_000
-    },
-    {
-      account: '소모품비',
-      count: 42,
-      finalAmount: 1_820_000
-    },
-    {
-      account: '여비교통비',
-      count: 38,
-      finalAmount: 640_000
-    },
-    {
-      account: '도서인쇄비',
-      count: 27,
-      finalAmount: 903_000
-    }
-  ]
 };
 
 export const TRANSACTIONS: Transaction[] = [
@@ -588,6 +549,52 @@ export const TRANSACTIONS: Transaction[] = [
     }
   },
   {
+    id: '0199c8f2-0000-7000-8000-00000000001030',
+    batchId: '0199c8f2-0000-7000-8000-000000000001',
+    approvedAt: '2026-01-21',
+    merchantRaw: 'COUPANG PAY',
+    merchantNorm: '쿠팡',
+    merchantCategory: '온라인쇼핑',
+    classificationStatus: {
+      code: 'CLASSIFIED',
+      label: '분류 완료'
+    },
+    amount: 89_000,
+    installmentMonths: 0,
+    sourceStatus: {
+      code: 'CANCELED_OFFSET',
+      label: '취소상계'
+    },
+    userInclusion: 'AUTO',
+    effectiveStatus: {
+      code: 'CANCELED_OFFSET',
+      label: '취소상계'
+    }
+  },
+  {
+    id: '0199c8f2-0000-7000-8000-00000000001031',
+    batchId: '0199c8f2-0000-7000-8000-000000000001',
+    approvedAt: '2026-01-22',
+    merchantRaw: 'COUPANG PAY 취소',
+    merchantNorm: '쿠팡',
+    merchantCategory: '온라인쇼핑',
+    classificationStatus: {
+      code: 'CLASSIFIED',
+      label: '분류 완료'
+    },
+    amount: -89_000,
+    installmentMonths: 0,
+    sourceStatus: {
+      code: 'CANCELED_OFFSET',
+      label: '취소상계'
+    },
+    userInclusion: 'AUTO',
+    effectiveStatus: {
+      code: 'CANCELED_OFFSET',
+      label: '취소상계'
+    }
+  },
+  {
     id: '0199c8f2-0000-7000-8000-00000000001023',
     batchId: '0199c8f2-0000-7000-8000-000000000001',
     approvedAt: '2026-01-31',
@@ -622,6 +629,121 @@ export const TRANSACTIONS: Transaction[] = [
       label: '분류 완료'
     },
     amount: 70_000,
+    installmentMonths: 0,
+    sourceStatus: {
+      code: 'JUDGEABLE',
+      label: '판정대상'
+    },
+    userInclusion: 'AUTO',
+    effectiveStatus: {
+      code: 'JUDGEABLE',
+      label: '판정대상'
+    }
+  },
+  {
+    id: '0199c8f2-0000-7000-8000-0000000001101',
+    batchId: '0199c8f2-0000-7000-8000-000000000001',
+    approvedAt: '2026-01-19',
+    merchantRaw: 'XYZ PAYMENTS',
+    merchantNorm: 'XYZ PAYMENTS',
+    merchantCategory: '미분류',
+    classificationStatus: {
+      code: 'NEEDS_REVIEW',
+      label: '분류 확인 필요'
+    },
+    amount: 47_000,
+    installmentMonths: 0,
+    sourceStatus: {
+      code: 'JUDGEABLE',
+      label: '판정대상'
+    },
+    userInclusion: 'AUTO',
+    effectiveStatus: {
+      code: 'JUDGEABLE',
+      label: '판정대상'
+    }
+  },
+  {
+    id: '0199c8f2-0000-7000-8000-0000000001102',
+    batchId: '0199c8f2-0000-7000-8000-000000000001',
+    approvedAt: '2026-01-22',
+    merchantRaw: '(주)케이지이니시스',
+    merchantNorm: 'KG이니시스',
+    merchantCategory: '미분류',
+    classificationStatus: {
+      code: 'NEEDS_REVIEW',
+      label: '분류 확인 필요'
+    },
+    amount: 132_000,
+    installmentMonths: 0,
+    sourceStatus: {
+      code: 'JUDGEABLE',
+      label: '판정대상'
+    },
+    userInclusion: 'AUTO',
+    effectiveStatus: {
+      code: 'JUDGEABLE',
+      label: '판정대상'
+    }
+  },
+  {
+    id: '0199c8f2-0000-7000-8000-0000000001103',
+    batchId: '0199c8f2-0000-7000-8000-000000000001',
+    approvedAt: '2026-01-24',
+    merchantRaw: 'PADDLE.NET* CURSOR AI',
+    merchantNorm: 'Paddle',
+    merchantCategory: '미분류',
+    classificationStatus: {
+      code: 'NEEDS_REVIEW',
+      label: '분류 확인 필요'
+    },
+    amount: 28_800,
+    installmentMonths: 0,
+    sourceStatus: {
+      code: 'JUDGEABLE',
+      label: '판정대상'
+    },
+    userInclusion: 'AUTO',
+    effectiveStatus: {
+      code: 'JUDGEABLE',
+      label: '판정대상'
+    }
+  },
+  {
+    id: '0199c8f2-0000-7000-8000-0000000001104',
+    batchId: '0199c8f2-0000-7000-8000-000000000001',
+    approvedAt: '2026-01-08',
+    merchantRaw: 'PADDLE.NET* RAYCAST',
+    merchantNorm: 'Paddle',
+    merchantCategory: '미분류',
+    classificationStatus: {
+      code: 'NEEDS_REVIEW',
+      label: '분류 확인 필요'
+    },
+    amount: 38_400,
+    installmentMonths: 0,
+    sourceStatus: {
+      code: 'JUDGEABLE',
+      label: '판정대상'
+    },
+    userInclusion: 'AUTO',
+    effectiveStatus: {
+      code: 'JUDGEABLE',
+      label: '판정대상'
+    }
+  },
+  {
+    id: '0199c8f2-0000-7000-8000-0000000001105',
+    batchId: '0199c8f2-0000-7000-8000-000000000001',
+    approvedAt: '2026-01-16',
+    merchantRaw: 'PADDLE.NET* TABLEPLUS',
+    merchantNorm: 'Paddle',
+    merchantCategory: '미분류',
+    classificationStatus: {
+      code: 'NEEDS_REVIEW',
+      label: '분류 확인 필요'
+    },
+    amount: 110_000,
     installmentMonths: 0,
     sourceStatus: {
       code: 'JUDGEABLE',
@@ -1455,36 +1577,6 @@ export const JUDGMENTS: Judgment[] = [
     ]
   },
   {
-    id: '0199f1c3-0000-7000-8000-00000000001023',
-    transactionId: '0199c8f2-0000-7000-8000-00000000001023',
-    revision: 1,
-    origin: {
-      type: 'RUN',
-      id: '0199e5b2-0000-7000-8000-000000000001'
-    },
-    verdict: {
-      code: 'NEEDS_REVIEW',
-      label: '확인 필요'
-    },
-    outOfScope: false,
-    blockedAtGate: 'G2',
-    account: '소모품비',
-    finalAmount: null,
-    isInference: true,
-    unmatchedReason: 'MERCHANT_UNRESOLVED',
-    attributes: {
-
-    },
-    ruleCardId: null,
-    ruleCardVersion: null,
-    appliedRuleIds: [],
-    rulesCommitSha: '139f8189',
-    userContextVersion: 4,
-    explanation: null,
-    computedAt: '2026-09-12T14:05:00+09:00',
-    citations: []
-  },
-  {
     id: '0199f1c3-0000-7000-8000-00000000001024',
     transactionId: '0199c8f2-0000-7000-8000-00000000001024',
     revision: 1,
@@ -1655,9 +1747,20 @@ export const QUESTION_ANSWER_VERDICT: Record<string, Record<string, Verdict>> = 
 /** 미분류로 남아 분류 확인이 필요한 거래. GET /classification-reviews */
 export const CLASSIFICATION_REVIEWS: ClassificationReview[] = [
 {
+  id: '0199c100-0000-7000-8000-000000000006',
+  batchId: '0199c8f2-0000-7000-8000-000000000001',
+  transactionId: '0199c8f2-0000-7000-8000-00000000001023',
+  merchantRaw: 'ELEVENLABS IO',
+  merchantNorm: '미확인 가맹점',
+  status: { code: 'PENDING', label: '대기' },
+  suggestedCategories: ['해외SaaS', '구독서비스', '기타'],
+  createdAt: '2026-09-12T13:58:09+09:00',
+  resolvedAt: null
+},
+{
   id: '0199c100-0000-7000-8000-000000000001',
   batchId: '0199c8f2-0000-7000-8000-000000000001',
-  transactionId: '0199c8f2-0000-7000-8000-0000000001022',
+  transactionId: '0199c8f2-0000-7000-8000-0000000001101',
   merchantRaw: 'XYZ PAYMENTS',
   merchantNorm: 'XYZ PAYMENTS',
   status: { code: 'PENDING', label: '대기' },
@@ -1668,7 +1771,7 @@ export const CLASSIFICATION_REVIEWS: ClassificationReview[] = [
 {
   id: '0199c100-0000-7000-8000-000000000002',
   batchId: '0199c8f2-0000-7000-8000-000000000001',
-  transactionId: '0199c8f2-0000-7000-8000-0000000001023',
+  transactionId: '0199c8f2-0000-7000-8000-0000000001102',
   merchantRaw: '(주)케이지이니시스',
   merchantNorm: 'KG이니시스',
   status: { code: 'PENDING', label: '대기' },
@@ -1679,11 +1782,33 @@ export const CLASSIFICATION_REVIEWS: ClassificationReview[] = [
 {
   id: '0199c100-0000-7000-8000-000000000003',
   batchId: '0199c8f2-0000-7000-8000-000000000001',
-  transactionId: '0199c8f2-0000-7000-8000-0000000001024',
-  merchantRaw: 'PADDLE.NET* CURSOR',
+  transactionId: '0199c8f2-0000-7000-8000-0000000001103',
+  merchantRaw: 'PADDLE.NET* CURSOR AI',
   merchantNorm: 'Paddle',
   status: { code: 'PENDING', label: '대기' },
   suggestedCategories: ['해외SaaS', '국내SW', '기타'],
   createdAt: '2026-09-12T13:58:12+09:00',
+  resolvedAt: null
+},
+{
+  id: '0199c100-0000-7000-8000-000000000004',
+  batchId: '0199c8f2-0000-7000-8000-000000000001',
+  transactionId: '0199c8f2-0000-7000-8000-0000000001104',
+  merchantRaw: 'PADDLE.NET* RAYCAST',
+  merchantNorm: 'Paddle',
+  status: { code: 'PENDING', label: '대기' },
+  suggestedCategories: ['해외SaaS', '국내SW', '기타'],
+  createdAt: '2026-09-12T13:58:14+09:00',
+  resolvedAt: null
+},
+{
+  id: '0199c100-0000-7000-8000-000000000005',
+  batchId: '0199c8f2-0000-7000-8000-000000000001',
+  transactionId: '0199c8f2-0000-7000-8000-0000000001105',
+  merchantRaw: 'PADDLE.NET* TABLEPLUS',
+  merchantNorm: 'Paddle',
+  status: { code: 'PENDING', label: '대기' },
+  suggestedCategories: ['해외SaaS', '국내SW', '기타'],
+  createdAt: '2026-09-12T13:58:15+09:00',
   resolvedAt: null
 }];

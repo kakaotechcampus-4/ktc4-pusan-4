@@ -1,0 +1,9 @@
+[Unit]
+Description=Weekly ktc4 legal corpus sync (Sun 04:00 KST)
+
+[Timer]
+OnCalendar=Sat *-*-* 19:00:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target

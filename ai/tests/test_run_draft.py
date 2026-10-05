@@ -66,3 +66,10 @@ def test_정답지는_카드에서_나온다():
     # 한 카테고리에 카드가 여럿이면 묶어서 본다
     쇼핑 = keys[("온라인쇼핑", "940909")]
     assert len(쇼핑["cards"]) > 1 and 쇼핑["gates"] == {"G2", "G4"}
+
+
+def test_휴일_카드는_정답지에서_뺀다():
+    # 하네스 입력에 날짜가 없어 휴일 카드(match.holiday)는 재현할 수 없다.
+    # 섞이면 카페 정답 판정이 {확인필요, 불가} 가 된다.
+    cards = {card for w in wanted().values() for card in w["cards"]}
+    assert not cards & {"R-311", "R-312", "R-313", "R-314"}

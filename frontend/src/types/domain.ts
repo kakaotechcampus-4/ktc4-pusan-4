@@ -43,6 +43,21 @@ export type CardIssuer = '국민' | '기업';
 export type SourceType = '승인내역' | '청구내역' | '판별불가';
 export type GateId = 'G0' | 'G1' | 'G2' | 'G3' | 'G4' | 'G5' | 'G6';
 
+/**
+ * 2.12 가맹점 카테고리. 단일 원본은 rules/categories.yaml (32종).
+ * 분류 실패 거래에는 별도 센티넬 `미분류`가 붙고, 사용자 답변으로는 제출할 수 없다.
+ */
+export const MERCHANT_CATEGORIES = [
+'카페', '음식점', '편의점', '온라인쇼핑', '음식배달', '해외SaaS', '국내SW', '통신',
+'수도광열', '여비교통', '차량', '도서', '교육', '광고', '사무용품', '의료', '금융',
+'지자체_과태료', '경찰청_범칙금', '조세', 'PG_미상', '기타',
+// T3 추가
+'게임', '구독서비스', '여가', '미용', '생활용품',
+// T4 추가 (PM 승인 2026-09-15). 담당 A 룰카드 전제
+'임차료', '전자기기', '전문가수수료', '보험', '수리비'] as const;
+
+export const UNCLASSIFIED = '미분류';
+
 // ── 1. 공통 ─────────────────────────────────────────
 
 export interface ApiError {
@@ -194,12 +209,17 @@ export interface ClassificationResponseResult {
 /** POST /judgment-runs 응답 (202) */
 export interface JudgmentRunCreated {
   id: string;
+  batchId: string;
+  contextId: string;
+  contextVersion: number;
   status: Coded<RunStatus>;
+  /** 미분류·취소상계·대상제외 거래는 포함하지 않는다 */
   totalCount: number;
 }
 
 /** GET /judgment-runs/{runId} 응답 */
 export interface JudgmentRun extends JudgmentRunCreated {
+  /** 성공적으로 처리가 끝난 수. NEEDS_REVIEW 도 성공으로 센다 */
   processedCount: number;
   failedCount: number;
   startedAt: string | null;
@@ -329,7 +349,8 @@ export interface QuestionResponseRequest {
 
 export interface QuestionResponseResult {
   answeredCount: number;
-  runId: string;
+  factId: string;
+  rejudgedTransactionCount: number;
 }
 
 export interface BulkAnswerRequest {
@@ -342,4 +363,6 @@ export interface BulkAnswerResult {
   answeredCount: number;
   skippedCount: number;
   factIds: string[];
+  rejudgedTransactionCount: number;
+  unresolved: UnresolvedSummary;
 }
