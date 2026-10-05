@@ -8,6 +8,8 @@ from datetime import datetime, timedelta, timezone
 
 # pr-review-reminder.yml 의 environment(review-reminder) wait timer 와 같아야 한다.
 REVIEW_WAIT_THRESHOLD = timedelta(hours=24)
+# 첫 리마인드 뒤 반복 간격. environment(review-reminder-followup) wait timer 와 같아야 한다.
+REMIND_INTERVAL = timedelta(hours=12)
 # 새 PR 알림은 이만큼 기다렸다가 리뷰어를 조회하고, 그 사이 들어온 리뷰 요청은 따로 알리지 않는다.
 REVIEWER_SETTLE_WINDOW = timedelta(minutes=2)
 REVIEW_STATE_LABELS = {
@@ -85,10 +87,20 @@ def last_ready_time(events: list[dict]) -> datetime | None:
     )
 
 
+def reminder_wait(nth: int) -> timedelta:
+    return REVIEW_WAIT_THRESHOLD + REMIND_INTERVAL * nth
+
+
 def due_reviewers(
-    pr: dict, events: list[dict], action: str, login: str | None, now: datetime
+    pr: dict,
+    events: list[dict],
+    action: str,
+    login: str | None,
+    now: datetime,
+    nth: int = 0,
 ) -> list[str]:
-    # 24시간을 기다린 run 이 멘션할 리뷰어. 그 사이 재요청이나 ready 가 있었으면 그때 뜬 run 이 맡는다.
+    # reminder_wait(nth) 를 기다린 run 이 멘션할 리뷰어. 그 사이 재요청이나 ready 가 있었으면 그때 뜬 run 이 맡는다.
+    wait = reminder_wait(nth)
     if pr["state"] != "open" or pr["draft"]:
         return []
     request_times = latest_request_times(events)
@@ -105,8 +117,8 @@ def due_reviewers(
         # PR 과 함께 지정된 리뷰어는 opened·ready run 이 묶어서 멘션한다.
         if not is_late_review_request(pr, requested_at, last_ready):
             return []
-        return [login] if now - requested_at >= REVIEW_WAIT_THRESHOLD else []
-    if now - opened_time(pr, last_ready) < REVIEW_WAIT_THRESHOLD:
+        return [login] if now - requested_at >= wait else []
+    if now - opened_time(pr, last_ready) < wait:
         return []
     return [
         reviewer
@@ -115,10 +127,13 @@ def due_reviewers(
     ]
 
 
-def build_reminder_message(pr: dict, logins: list[str], user_ids: dict[str, str]) -> str:
+def build_reminder_message(
+    pr: dict, logins: list[str], user_ids: dict[str, str], nth: int = 0
+) -> str:
     reviewers = ", ".join(mention(login, user_ids) for login in logins)
+    bangs = "!" * 2 * (nth + 1)
     return (
-        f"리뷰 요청 후 {REVIEW_WAIT_THRESHOLD // timedelta(hours=1)}시간이 지났습니다.\n"
+        f"{bangs}리뷰 요청 후 {reminder_wait(nth) // timedelta(hours=1)}시간이 지났습니다.{bangs}\n"
         f"{pr['user']['login']}님의 PR {_pr_link(pr)}: {reviewers}"
     )
 
@@ -159,9 +174,12 @@ def build_review_notification(
     )
 
 
-def _github_request(url: str, token: str) -> urllib.request.Request:
+def _github_request(
+    url: str, token: str, payload: dict | None = None
+) -> urllib.request.Request:
     return urllib.request.Request(
         url,
+        data=json.dumps(payload).encode("utf-8") if payload else None,
         headers={
             "Authorization": f"Bearer {token}",
             "Accept": "application/vnd.github+json",
@@ -236,13 +254,35 @@ def collect_notification(
 
 def collect_reminder(
     event: dict, repo: str, token: str, user_ids: dict[str, str], now: datetime
-) -> str | None:
+) -> tuple[str | None, dict | None]:
     api = f"https://api.github.com/repos/{repo}"
-    pr = github_get(f"{api}/pulls/{event['pull_request']['number']}", token)
-    events = github_get_all(f"{api}/issues/{pr['number']}/events?per_page=100", token)
-    login = event.get("requested_reviewer", {}).get("login")
-    logins = due_reviewers(pr, events, event["action"], login, now)
-    return build_reminder_message(pr, logins, user_ids) if logins else None
+    if "inputs" in event:  # 후속 run (workflow_dispatch)
+        inputs = event["inputs"]
+        number, action, nth = int(inputs["pr"]), inputs["action"], int(inputs["nth"])
+        login = inputs.get("reviewer") or None
+    else:
+        number, action, nth = event["pull_request"]["number"], event["action"], 0
+        login = event.get("requested_reviewer", {}).get("login")
+    pr = github_get(f"{api}/pulls/{number}", token)
+    events = github_get_all(f"{api}/issues/{number}/events?per_page=100", token)
+    logins = due_reviewers(pr, events, action, login, now, nth)
+    if not logins:
+        return None, None
+    # 보낸 run 만 다음 run 을 띄운다. 보내지 않으면 반복이 여기서 끝난다.
+    next_inputs = {
+        "pr": str(number),
+        "action": action,
+        "reviewer": login or "",
+        "nth": str(nth + 1),
+    }
+    return build_reminder_message(pr, logins, user_ids, nth), next_inputs
+
+
+def dispatch_reminder(repo: str, token: str, ref: str, inputs: dict) -> None:
+    url = f"https://api.github.com/repos/{repo}/actions/workflows/pr-review-reminder.yml/dispatches"
+    urllib.request.urlopen(
+        _github_request(url, token, {"ref": ref, "inputs": inputs}), timeout=30
+    ).close()
 
 
 def collect_review_notification(
@@ -285,13 +325,14 @@ def main() -> None:
     now = datetime.now(timezone.utc)
     with open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8") as event_file:
         event = json.load(event_file)
+    next_reminder = None
     if args.command == "notify":
         settle_seconds = 0 if args.dry_run else REVIEWER_SETTLE_WINDOW.total_seconds()
         content = collect_notification(
             event, repo, token, user_ids, now, settle_seconds
         )
     elif args.command == "remind":
-        content = collect_reminder(event, repo, token, user_ids, now)
+        content, next_reminder = collect_reminder(event, repo, token, user_ids, now)
     else:
         content = collect_review_notification(event, repo, token, user_ids)
 
@@ -301,6 +342,9 @@ def main() -> None:
         print(content)
     else:
         post_discord(os.environ["TEAM_DISCORD_WEBHOOK"], content)
+        if next_reminder:
+            ref = event["repository"]["default_branch"]
+            dispatch_reminder(repo, token, ref, next_reminder)
 
 
 if __name__ == "__main__":

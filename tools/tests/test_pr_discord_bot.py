@@ -7,6 +7,7 @@ from tools.pr_discord_bot import (
     build_reminder_message,
     build_review_notification,
     build_review_request_message,
+    collect_reminder,
     due_reviewers,
     is_late_review_request,
     latest_request_times,
@@ -179,9 +180,87 @@ def test_reminder_message_mentions_waiting_reviewers_on_authors_pr():
     message = build_reminder_message(make_pr(), ["cho104", "Jaeseong22"], {"cho104": "222"})
 
     assert message == (
-        "리뷰 요청 후 24시간이 지났습니다.\n"
+        "!!리뷰 요청 후 24시간이 지났습니다.!!\n"
         "yuyeol3님의 PR #45 [RAG 파이프라인](https://github.com/o/r/pull/45): <@222>, @Jaeseong22"
     )
+
+
+@pytest.mark.parametrize(
+    ("nth", "first_line"),
+    [
+        (1, "!!!!리뷰 요청 후 36시간이 지났습니다.!!!!"),
+        (2, "!!!!!!리뷰 요청 후 48시간이 지났습니다.!!!!!!"),
+    ],
+)
+def test_follow_up_reminder_adds_twelve_hours_and_two_bangs_each_side(nth, first_line):
+    message = build_reminder_message(make_pr(), ["cho104"], {}, nth)
+
+    assert message.split("\n")[0] == first_line
+
+
+HALF_DAY = timedelta(hours=12)
+
+
+@pytest.mark.parametrize(
+    ("events", "now", "expected"),
+    [
+        (ONE_LATE, LATE + DAY + HALF_DAY, ["Jaeseong22"]),
+        (RE_REQUESTED, LATE + DAY + HALF_DAY, []),
+        (ONE_LATE, LATE + DAY, []),
+    ],
+    ids=["still-waiting", "re-requested-since", "woke-early"],
+)
+def test_follow_up_due_after_twelve_more_hours(events, now, expected):
+    assert (
+        due_reviewers(make_pr(), events, "review_requested", "Jaeseong22", now, 1)
+        == expected
+    )
+
+
+@pytest.mark.parametrize(
+    ("event", "now", "next_nth"),
+    [
+        (
+            {
+                "action": "review_requested",
+                "pull_request": {"number": 45},
+                "requested_reviewer": {"login": "Jaeseong22"},
+            },
+            LATE + DAY,
+            "1",
+        ),
+        (
+            {
+                "inputs": {
+                    "pr": "45",
+                    "action": "review_requested",
+                    "reviewer": "Jaeseong22",
+                    "nth": "1",
+                }
+            },
+            LATE + DAY + HALF_DAY,
+            "2",
+        ),
+    ],
+    ids=["first-run", "follow-up-run"],
+)
+def test_collect_reminder_hands_next_nth_to_follow_up_run(
+    monkeypatch, event, now, next_nth
+):
+    monkeypatch.setattr("tools.pr_discord_bot.github_get", lambda url, token: make_pr())
+    monkeypatch.setattr(
+        "tools.pr_discord_bot.github_get_all", lambda url, token: ONE_LATE
+    )
+
+    content, next_inputs = collect_reminder(event, "o/r", "token", {}, now)
+
+    assert content is not None
+    assert next_inputs == {
+        "pr": "45",
+        "action": "review_requested",
+        "reviewer": "Jaeseong22",
+        "nth": next_nth,
+    }
 
 
 TEAM = {"yuyeol3": "111", "cho104": "222", "Jaeseong22": "333"}
