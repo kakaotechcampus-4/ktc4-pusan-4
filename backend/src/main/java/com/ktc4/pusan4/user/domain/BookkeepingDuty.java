@@ -1,4 +1,4 @@
-package com.ktc4.pusan4.user.api;
+package com.ktc4.pusan4.user.domain;
 
 /**
  * 기장의무 (api.md 2.9). 원문 자체가 표시값이라 {code, label} 형태를 쓰지 않는다.
