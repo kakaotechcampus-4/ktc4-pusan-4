@@ -90,3 +90,42 @@
 
 - `test`·`integrationTest` 전부 통과(204개).
 - 일부러 깨 봤다. origin `run_id` 를 다시 CASCADE 로 바꾸면 교차 참조 테스트가 실패한다.
+
+## 01:20 판정 origin 저장과 UserFact batch 범위 (A1b, feature/judgment-origin)
+
+- 브랜치: feature/judgment-origin (base: feature/judgment-schema)
+- 커밋: a2e4160 (1개)
+- 주요파일: SaveJudgmentCommand.java, JudgmentEntity.java, UserFactPersistenceService.java, V8__require_judgment_origin_and_fact_batch.sql
+
+### 한 일
+
+- `JudgmentOrigin`·`JudgmentOriginType` 을 `judgment.api` 에서 `judgment.domain` 으로 옮겼다.
+- `SaveJudgmentCommand` 가 `origin` 을 필수로 받는다. 두 번째 필드이고, null 이면 생성자가 거부한다.
+- `JudgmentEntity` 가 FK 컬럼 4개를 매핑한다. origin type 에 맞는 컬럼 하나만 채운다.
+- UserFact 를 batch 범위로 바꿨다.
+  - `save`, `findLatest`, `findAllLatest`, 채번이 batchId 를 받는다.
+  - `answerQuestion` 은 질문 → 판정 → 거래에서 batch 를 찾아 쓴다(`QuestionQueueRepository.findBatchId`).
+- V8
+  - `judgment_has_one_origin` CHECK 를 걸었다.
+  - `user_fact.batch_id` 를 NOT NULL 로 바꿨다.
+  - UNIQUE 를 `(user_id, batch_id, scope_key, fact_type, version)` 으로 교체했다.
+  - `idx_user_fact_latest` 를 지웠다. 같은 열 순서인 UNIQUE 인덱스가 대신한다.
+- 테스트
+  - 헬퍼가 run origin 을 갖게 했다. `insertRun` 이 batch 소유자의 새 Context 버전으로 run 을 만든다.
+  - 추가: origin 0개·2개 거부, USER_FACT origin 이 `trigger_user_fact_id` 에만 저장되는지, 다른 batch 의 fact 는 읽지 않고 버전도 따로 매기는지, 답변 fact 가 질문의 batch 에 저장되는지.
+
+### 왜 이렇게 했나
+
+- origin 타입을 domain 으로 옮긴 건 저장(persistence)과 API 응답이 같은 타입을 쓰게 하려는 것이다. persistence 가 api 패키지에 기대지 않는다. B1b 가 `BookkeepingDuty` 를 옮긴 것과 같은 방식이다.
+- V8 은 기존 행을 채우지 않고 실패하게 뒀다. 기존 판정이나 fact 에 붙일 origin·batch 를 지어낼 근거가 없다. 운영 코드는 아직 두 테이블에 쓰지 않으므로 행이 없을 것으로 본다.
+- `user_fact` 의 `(batch_id, user_id)` 가 같은 사용자인지는 DB 가 보장하지 않는다. B2 의 `upload_batch(id, user_id)` UNIQUE 가 아직 develop 에 없어서 복합 FK 를 걸 수 없다. 지금은 호출하는 쪽(A4b)이 batch 소유를 확인해야 한다.
+
+### 확인한 것
+
+- `test`·`integrationTest` 전부 통과(204개).
+- 일부러 깨 봤다. CHECK 를 `>= 0` 으로 바꾸면 `judgment_requires_exactly_one_origin` 이 실패한다.
+
+### 남은 것 · 아는 문제
+
+- 배포 전에 운영 DB 의 `judgment`·`user_fact` 행이 0 인지 확인해야 한다.
+- B2 가 merge 되면 `user_fact (batch_id, user_id)` 를 `upload_batch(id, user_id)` 에 복합 FK 로 묶는 것을 검토한다.
