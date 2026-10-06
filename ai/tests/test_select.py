@@ -156,6 +156,36 @@ def test_형제_호_문구를_엉뚱한_호_ID로_인용하면_걸린다():
     assert len(bad) == 1 and "본문에 없다" in bad[0]
 
 
+머리 = "제33조(필요경비 불산입)\n① 다음 각 호에 해당하는 것은 필요경비에 산입하지 아니한다."
+HO1 = hit("소득세법-33-1-1", "법령", f"{머리}\n1. 소득세와 개인지방소득세")
+HO5 = hit("소득세법-33-1-5", "법령", f"{머리}\n5. 대통령령으로 정하는 가사의 경비")
+
+
+def test_머리말은_첫_라벨_위에_싣는다():
+    # 첫 라벨 아래 두면 "…산입하지 아니한다" 를 1호 문장으로 인용한다
+    lines = _candidates({"법령": [HO1, HO5]}).splitlines()
+    assert lines.index("  제33조(필요경비 불산입)") < lines.index("  소득세법-33-1-1")
+    assert lines[lines.index("  소득세법-33-1-1") + 1] == "    1. 소득세와 개인지방소득세"
+
+
+def test_머리말만_인용하면_걸린다():
+    refs = [StatuteRef(statute_id="소득세법-33-1-1", quote="필요경비에 산입하지 아니한다")]
+    bad = _check(ev(refs), _pool({"법령": [HO1, HO5]}))
+    assert len(bad) == 1 and "머리말" in bad[0]
+
+
+@pytest.mark.parametrize(("quote", "ok"), [("14. 선급비용", True), ("선급", False)])
+def test_호_문장_전체가_짧으면_그_전체만_통과(quote, ok):
+    pool = _pool({"법령": [HO1, hit("소득세법-33-1-14", "법령", f"{머리}\n14. 선급비용")]})
+    bad = _check(ev([StatuteRef(statute_id="소득세법-33-1-14", quote=quote)]), pool)
+    assert (bad == []) is ok
+
+
+def test_머리말에_호_문장을_이어_적으면_통과():
+    quote = "필요경비에 산입하지 아니한다. 5. 대통령령으로 정하는 가사의 경비"
+    assert _check(ev([StatuteRef(statute_id="소득세법-33-1-5", quote=quote)]), _pool({"법령": [HO1, HO5]})) == []
+
+
 # 같은 doc_type 인데 위계로 갈린다 — 위임 고시는 대외적 구속력이 있고 훈령은 없다
 고시 = hit("업무용승용차운행기록방법에관한고시#2104628-3", "행정규칙",
           "운행기록등을 작성ㆍ비치하여야 한다", hier="고시")

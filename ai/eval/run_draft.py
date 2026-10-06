@@ -31,6 +31,7 @@ from datetime import date
 from pathlib import Path
 
 import yaml
+from langfuse import observe
 
 from eval.run_search import cached_plan
 from pipeline.draft import draft
@@ -111,6 +112,7 @@ def grade_verdict(got: str | None, want: set[str]) -> str:
     return "반대"
 
 
+@observe()
 def produce(conn, cat: str, industry: str, meta: dict, plans: dict, search_only: bool = False) -> dict:
     """파이프라인 한 바퀴. 실패는 값으로 돌려준다 — 한 건에 하네스가 죽으면 안 된다."""
     block = context(cat, industry, REASON, meta)
@@ -130,6 +132,7 @@ def produce(conn, cat: str, industry: str, meta: dict, plans: dict, search_only:
         return out | {"error": str(e)[:90]}
     return out | {
         "refs": [r.statute_id for r in ev.refs],
+        "evidence": ev.model_dump(),
         "gate": card.gate,
         "verdict": card.verdict,
         "hold": needs_review(ev, by_tier) or not ev.sufficient,

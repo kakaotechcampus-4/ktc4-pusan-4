@@ -924,7 +924,11 @@ review: { by: 외부자문, date: 2026-09-05 }
 ```
 
 - **법률·시행령·시행규칙** → "근거"
-- **기본통칙·고시·예규** → "참고 해석기준" (법령이 아니라 국세청 내부 해석기준, 법적 구속력 없음)
+- **기본통칙·고시·예규** → "참고 해석기준"
+  - 기본통칙·예규: 법령이 아니라 국세청 내부 해석기준. 법적 구속력 없음
+  - 고시: 법령의 위임을 받은 고시는 법령을 보충해 대외적 구속력이 있다(예: R-070 의 `업무용승용차운행기록방법에관한고시`).
+    그래서 화면에서 고시에는 "구속력 없음"을 붙이지 않고, 규칙 후보는 고시만으로 확정 결론을 세울 수 있다(`ai/pipeline/select.py` 의 `LOWER`).
+    `hierarchy` 에 위임 여부가 없어 고시끼리는 가르지 않는다
 - **심판례·판례** → "참고 사례"
 
 **안 나누면 사용자가 전부 같은 무게로 읽는다.**
@@ -1415,7 +1419,7 @@ WHERE statute_id = :id
 
 | 이름 | 성격 | 트리거 | 담당 |
 |---|---|---|---|
-| **법령 동기화 → 재색인** | 배치 (2단계) | GH Actions cron 일 1회 | Kang |
+| **법령 동기화 → 재색인** | 배치 (2단계 + 알림) | EC2 systemd timer 주 1회 (일 04:00 KST) | Kang |
 | **참조데이터 적재** | 1회성 + 연 1회 | 수동 | Kang |
 | **카드내역 정규화** | 온디맨드 | 사용자 업로드 | 프론트+백엔드 |
 | **평가 회귀 하네스** | CI | PR마다 | Kang |
@@ -1423,28 +1427,23 @@ WHERE statute_id = :id
 
 ### 1. 법령 동기화 → 재색인
 
-**1단계 · 수집** (매일 03:00 KST = UTC 18:00)
+매주 일요일 04:00 KST(토 19:00 UTC)에 EC2 `ktc4-corpus.timer`가 `deploy/corpus-sync.sh`로 세 단계를 차례로 돌린다. 운영 절차는 [`docs/deployment.md`](docs/deployment.md) §6.
+
+**1단계 · 수집**
 ```
 [E] 국가법령정보 OPEN API (OC 발급 완료)
-      target=law / admrul / expc / prec / ttSpecialDecc  (본문+목록)
-      target=ntsCgmExpc                              (목록만 · 본문 미제공)
+      target=law / admrul / expc / ttSpecialDecc(decc)  (본문+목록)
+      판례(prec)는 넣지 않는다 (당사자 주장 혼입). ntsCgmExpc는 본문이 없어 받지 않는다
       lawSearch.do (목록), lawService.do (본문)
-[T] 법령·행정규칙 → 공포번호 + 조문 해시 전량 비교 (수백 건)
-    판례·심판례    → 신규 생산분만 증분 (수만 건)
-[L] 변경 없음 → law_sync_log 한 줄
-    변경 있음 → statute_version 새 행 (append-only)
-              → grep으로 영향받는 규칙 카드 탐색
-              → GitHub Issue + Discord 알림 → changed=true
+[T] 법령·행정규칙 → 조문 해시 전량 비교. 이번 런에 안 나온 조문은 sweep으로 닫는다
+    해석례·심판례  → 새 문서만 증분 (--resume)
+[L] 대상마다 law_sync_log 한 줄 (changed 참/거짓)
+    바뀐 조문 → statute_version 새 행 (append-only) + 옛 행 effective_to 닫기
 ```
 
-**2단계 · 재색인 (조건부)**
-```yaml
-- id: sync
-  run: python -m pipeline.law_sync
-- name: 재색인
-  if: steps.sync.outputs.changed == 'true'
-  run: python -m pipeline.reindex --incremental
-```
+**2단계 · 재색인** — `reindex --incremental`을 동기화 결과와 관계없이 매번 돈다. 앞 대상이 실패해도 이미 적재된 개정분은 검색에 보여야 한다.
+
+**3단계 · 알림** — `sync_report`가 이번 런의 변경 요약과 영향받는 규칙 카드를 디스코드 PR 알림 채널로 보낸다. 영향 카드는 인용 조문 자신이나 그 하위가 바뀌거나 닫힌 카드다. 변경이 없거나 실패해도 보낸다. **카드를 고치는 건 사람이다.** 알림을 보고 PR로 고친다.
 
 **단계를 나눈 이유는 실행 주기가 아니라 실패 격리.** 임베딩 API가 죽어도 원문은 저장돼 있고 재색인만 다시 돌리면 된다.
 
@@ -1466,7 +1465,7 @@ chunking 전략 변경(**10월에 반드시 겪음**), 임베딩 모델 교체 �
 
 **판례·심판례에 결론 태그(`outcome: 인정/부인/일부인정`)를 붙이면 초안 방향이 안정된다.**
 
-**⚠️ 러너 IP 문제:** GH Actions는 IP가 매번 바뀌어 RDS 화이트리스트를 못 쓴다. **Actions는 앱 엔드포인트를 호출만 하고 DB 쓰기는 서버가.**
+**⚠️ 트리거는 GH Actions cron이 아니라 EC2 systemd timer다.** GH cron은 5시간 지연 전례가 있고, DB가 SSM 너머라 러너가 닿지 않는다. 03:00 KST 백업 1시간 뒤에 돌아서 백업이 복구 지점이 된다.
 
 ### 2. 참조데이터 적재
 
@@ -1888,7 +1887,7 @@ id: E-021
 | **LLM** | **OpenAI API** |
 | **임베딩** | **text-embedding-3-small (1536차원)** |
 | 배포 | **AWS EC2 1대 + docker compose + RDS** |
-| CI·스케줄 | GitHub Actions |
+| CI·스케줄 | GitHub Actions (CI·배포) · EC2 systemd timer (코퍼스 동기화) |
 | 관측 | Langfuse (LLM 호출 추적) |
 
 ### RDS 확장 지원 (확인 완료)
@@ -2038,6 +2037,7 @@ docker-compose.yml
   실질 판례 코퍼스는 대법원 1,500~2,000건 수준이고, **주력 근거는 판례가 아니라 심판례(9,546건)다**
 - 🔴 **팀 OC(`kakaotech4pusan4`)에 판례 API가 미신청 상태다.** `law`/`admrul`/`expc`/`ttSpecialDecc`는 정상.
   open.law.go.kr → OPEN API 신청 → 등록된 API에서 **판례** 체크가 필요하다
+  → 이후 승인됐다(9/29 확인). 다만 주간 동기화에서는 판례를 뺐다(§9-1)
 - 🟠 **행정규칙명은 유일하지 않다.** `업무용승용차 운행기록 방법에 관한 고시`가 소득세법 근거·법인세법 근거 둘 다 현행이다.
   `statute_id`에 `행정규칙ID`를 넣어야 서로 덮어쓰지 않는다 (`발령번호`는 개정마다 바뀌어 버전 체인이 끊긴다)
 - 🟠 **경비율 고시 본문은 조문 4개뿐이고 수치표는 `<img>` 38개다.** 아래 §9-2 참조

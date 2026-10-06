@@ -8,7 +8,8 @@ name: PR Discord notify
 # 로직은 tools/pr_discord_bot.py (pr-review-reminder.yml 과 공유).
 #
 # 설정 (Settings → Secrets and variables → Actions)
-#   - secret   TEAM_DISCORD_WEBHOOK : 팀 채널 웹후크 URL
+#   - secret   TEAM_DISCORD_WEBHOOK : 팀 채널 웹후크 URL. 스레드로 보내려면 끝에 ?thread_id=<스레드 ID>
+#                                     (코퍼스 동기화 알림은 같은 웹후크에 다른 스레드 ID 를 붙여 서버 env 에 둔다)
 #   - variable DISCORD_USER_IDS     : {"<GitHub login>": "<Discord user ID>", ...}
 #                                     없는 login 은 멘션 대신 @login 텍스트로 나간다.
 #                                     리뷰·코멘트 알림은 여기 있는 사람만 팀원으로 본다.

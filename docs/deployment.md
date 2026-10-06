@@ -99,12 +99,15 @@ sudo bash /opt/ktc4/repo/deploy/deploy.sh <이전-40자리-SHA> --rollback
 
 ## 6. 법령 코퍼스 주간 동기화
 
-매주 일요일 04:00 KST(백업 1시간 뒤)에 `deploy/corpus-sync.sh`가 `ai` 이미지로 두 단계를 차례로 돌린다. 배포와 같은 락을 잡으므로 배포 중이면 끝날 때까지 기다린다.
+매주 일요일 04:00 KST(백업 1시간 뒤)에 `deploy/corpus-sync.sh`가 `ai` 이미지로 세 단계를 차례로 돌린다. 배포와 같은 락을 잡으므로 배포 중이면 끝날 때까지 기다린다.
 
 1. `pipeline.law_sync --target <law|admrul|expc|decc> --resume`: 법령 12개와 국세청 행정규칙을 전량 받아 조문 해시를 비교한다. 바뀐 조문만 새 행으로 넣고, 사라진 조문은 닫는다. 해석례·심판례는 새 문서만 받고, 응답하지 않는 문서는 건너뛰었다가 다음 주에 다시 시도한다. 판례(`prec`)는 코퍼스에 넣지 않았으므로 돌리지 않는다. 대상마다 `law_sync_log`에 한 줄을 남긴다.
-2. `pipeline.reindex --incremental`: 닫힌 원문의 청크에 종료일을 반영하고, 청크 본문이 달라진 원문만 다시 임베딩한다. 앞 단계가 실패해도 돌리고, 스크립트는 실패 코드로 끝난다.
+2. `pipeline.reindex --incremental`: 닫힌 원문의 청크에 종료일을 반영하고, 청크 본문이 달라진 원문만 다시 임베딩한다. 앞 단계가 실패해도 돌린다.
+3. `pipeline.sync_report --since <런 시작 시각>`: 이번 런의 변경 요약과 영향 카드를 팀 디스코드의 코퍼스 알림 스레드로 보낸다. 변경이 없거나 앞 단계가 실패해도 보내므로, 일요일 아침에 알림이 없으면 타이머나 스크립트가 멈춘 것이다. 실패한 단계는 머리 줄에 이름이 붙고, 스크립트는 실패 코드로 끝난다.
 
-`/etc/ktc4/production.env`의 `LAW_API_OC`에는 발급받은 키를 넣는다. `test`는 공개 시험용이다. 미신청 API는 건너뛰고 로그에 남는다. 첫 배포에 성공한 뒤 타이머를 설치한다.
+영향 카드는 `rules/cards/*.yaml`의 카드 인용과 선택지 인용(`question.options[].citations`) 중, 인용한 조문 자신이나 그 하위 항·호가 바뀌거나 닫힌 것이다. 상위 조는 하위 하나만 바뀌어도 새 행이 생기므로 보지 않는다. 그래서 항 머리말처럼 부모 문구만 바뀐 경우는 호를 인용한 카드에 잡히지 않는다. 카드 파일은 서버 repo의 `rules/`를 컨테이너 `/rules`에 읽기 전용으로 붙여 읽는다. 카드를 고치는 로직은 없다. 알림을 보고 사람이 카드를 검토해 PR로 고친다.
+
+`/etc/ktc4/production.env`의 `LAW_API_OC`에는 발급받은 키를 넣는다. `test`는 공개 시험용이다. 미신청 API는 건너뛰고 로그에 남는다. `TEAM_DISCORD_WEBHOOK`에는 PR 알림과 같은 채널의 웹훅 URL 끝에 코퍼스 스레드 ID를 붙여 넣는다(`https://discord.com/api/webhooks/<ID>/<토큰>?thread_id=<스레드 ID>`). PR 알림은 같은 웹훅에 다른 스레드 ID를 붙인 값을 GitHub secret `TEAM_DISCORD_WEBHOOK`로 쓴다. secret 값은 다시 볼 수 없으니 URL은 디스코드 채널 설정 → 연동 → 웹후크에서 복사하고, 스레드 ID는 개발자 모드에서 스레드를 우클릭해 복사한다. 비워 두면 요약을 `journalctl`에만 남긴다. 첫 배포에 성공한 뒤 타이머를 설치한다.
 
 ```bash
 sudo cp /opt/ktc4/repo/deploy/ktc4-corpus.* /etc/systemd/system/
@@ -115,4 +118,4 @@ journalctl -u ktc4-corpus.service -n 50
 systemctl list-timers ktc4-corpus.timer
 ```
 
-실패하면 서비스가 failed로 남고 `journalctl`에 원인이 있다. 두 단계 모두 멱등이라 원인을 고친 뒤 `systemctl start ktc4-corpus.service`로 다시 돌리면 된다. 운영 postgres는 메모리 1GB라 결과는 행 수 수준의 가벼운 쿼리로만 확인한다.
+실패하면 서비스가 failed로 남고 `journalctl`에 원인이 있다. 세 단계 모두 멱등이라 원인을 고친 뒤 `systemctl start ktc4-corpus.service`로 다시 돌리면 된다. 운영 postgres는 메모리 1GB라 결과는 행 수 수준의 가벼운 쿼리로만 확인한다.

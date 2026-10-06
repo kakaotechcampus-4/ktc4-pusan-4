@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     agent_base_url: str | None = None
     embedding_api_key: str | None = None
     embedding_base_url: str | None = None
+    langfuse_public_key: str | None = None
+    langfuse_secret_key: str | None = None
+    langfuse_base_url: str = "https://jp.cloud.langfuse.com"
     law_api_oc: str = "test"
+    team_discord_webhook: str | None = None
 
 settings = Settings()
