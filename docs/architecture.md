@@ -46,6 +46,7 @@ flowchart TD
         G1 -->|"매칭"| UNAV
         G1 -->|"통과"| G2
         G2 -->|"매칭 실패"| REVIEW
+        G2 -->|"승자가 불가 확정"| UNAV
         G2 -->|"승자 매칭"| G36 --> QCHK
         QCHK -->|"예"| SAFE
     end

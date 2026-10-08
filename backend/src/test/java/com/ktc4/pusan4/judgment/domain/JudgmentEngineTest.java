@@ -698,6 +698,63 @@ class JudgmentEngineTest {
             .containsExactly(Verdict.UNAVAILABLE, List.of());
     }
 
+    // G2 는 차단형이다: 불가가 확정되면 속성 관문의 카드·근거·속성을 싣지 않는다.
+    @Test
+    void confirmed_g2_unavailable_blocks_before_attribute_gates() {
+        RuleCard g2 = new RuleCard(
+            "R-304", 1, Gate.G2, 500, RuleMatch.categories("음식점"),
+            Verdict.UNAVAILABLE, null, List.of(new Citation("소득세법-33-1-5")), Map.of(), List.of()
+        );
+
+        Judgment result = JudgmentEngine.judge(
+            restaurant(), new UserContext("940909", false, null), List.of(),
+            new RuleSet(List.of(g2, g5Receipt()))
+        );
+
+        assertThat(result)
+            .extracting(Judgment::verdict, Judgment::blockedAtGate, Judgment::appliedRuleIds,
+                Judgment::citations, Judgment::attributes, Judgment::questions)
+            .containsExactly(Verdict.UNAVAILABLE, Gate.G2, List.of("R-304"),
+                List.of(new Citation("소득세법-33-1-5")), Map.of(), List.of());
+    }
+
+    @Test
+    void g2_answer_confirming_unavailable_blocks_before_attribute_gates() {
+        TransactionInput transaction = restaurant();
+        List<UserFact> facts = List.of(
+            new UserFact("transaction:" + transaction.id(), "용도", Map.of("value", "개인"))
+        );
+
+        Judgment result = JudgmentEngine.judge(
+            transaction, new UserContext("940909", false, null), facts,
+            new RuleSet(List.of(optionCited(), g5Receipt()))
+        );
+
+        assertThat(result)
+            .extracting(Judgment::verdict, Judgment::blockedAtGate, Judgment::appliedRuleIds)
+            .containsExactly(Verdict.UNAVAILABLE, Gate.G2, List.of("R-301"));
+    }
+
+    // 소명으로 풀릴 수 있는 불가는 확정이 아니라 차단하지 않는다.
+    @Test
+    void rebuttable_g2_unavailable_continues_to_attribute_gates() {
+        Judgment result = JudgmentEngine.judge(
+            restaurant(), new UserContext("940909", false, null), List.of(),
+            new RuleSet(List.of(rebuttableUnavailable(), g5Receipt()))
+        );
+
+        assertThat(result)
+            .extracting(Judgment::verdict, Judgment::blockedAtGate, Judgment::appliedRuleIds)
+            .containsExactly(Verdict.UNAVAILABLE, null, List.of("R-311", "R-060"));
+    }
+
+    private static RuleCard g5Receipt() {
+        return new RuleCard(
+            "R-060", 1, Gate.G5, 500, RuleMatch.categories("음식점"),
+            null, null, List.of(new Citation("소득세법-160의2-2")), Map.of("증빙필요", true), List.of()
+        );
+    }
+
     // 카드 근거는 모든 답에 붙으므로, 답마다 근거가 다르면 선택지 근거가 카드 근거를 대신한다.
     // 업무미팅 가능에 §33①5(가사경비)가, 개인 불가에 §35①(접대비)이 붙으면 안 된다(E-027).
     @Test
