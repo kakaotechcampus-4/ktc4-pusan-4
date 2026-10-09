@@ -19,5 +19,10 @@ ALTER TABLE user_fact
     ADD CONSTRAINT user_fact_user_id_batch_id_scope_key_fact_type_version_key
         UNIQUE (user_id, batch_id, scope_key, fact_type, version);
 
+-- fact 와 batch 의 소유자가 어긋날 수 없게 한다. transaction 의 V8 복합 FK 와 같은 방식이다.
+ALTER TABLE user_fact
+    ADD CONSTRAINT user_fact_batch_user_fkey
+    FOREIGN KEY (batch_id, user_id) REFERENCES upload_batch(id, user_id) ON DELETE CASCADE;
+
 -- 최신값 조회 인덱스는 위 UNIQUE 의 인덱스가 같은 열 순서로 대신한다.
 DROP INDEX idx_user_fact_latest;

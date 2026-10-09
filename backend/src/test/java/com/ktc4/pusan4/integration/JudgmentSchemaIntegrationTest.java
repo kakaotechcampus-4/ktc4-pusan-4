@@ -727,6 +727,19 @@ class JudgmentSchemaIntegrationTest {
     }
 
     @Test
+    void user_fact_owner_must_match_batch_owner() {
+        UUID otherUsersBatchId = insertUserWithBatch("fact-owner");
+        UUID userId = UUID.randomUUID();
+        jdbcTemplate.update(
+            "insert into app_user(id, email) values (?, ?)", userId, userId + "@example.com"
+        );
+
+        assertThatThrownBy(() -> userFactPersistenceService.save(userId, otherUsersBatchId, new UserFact(
+            "merchant:스타벅스", "용도", Map.of("value", "업무")
+        ))).isInstanceOf(DataAccessException.class);
+    }
+
+    @Test
     void judgment_requires_exactly_one_origin() {
         UUID userId = UUID.randomUUID();
         UUID batchId = UUID.randomUUID();
