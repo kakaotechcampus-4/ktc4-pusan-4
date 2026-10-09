@@ -6,8 +6,10 @@ import com.ktc4.pusan4.merchant.api.ClassificationMockData;
 import com.ktc4.pusan4.shared.UuidV7Generator;
 import com.ktc4.pusan4.shared.auth.TemporaryCurrentUserProvider;
 import com.ktc4.pusan4.transaction.api.TransactionMockData;
-import com.ktc4.pusan4.user.api.UserMockData;
 import com.ktc4.pusan4.user.domain.AppUser;
+import com.ktc4.pusan4.user.domain.BookkeepingDuty;
+import com.ktc4.pusan4.user.domain.BusinessContext;
+import com.ktc4.pusan4.user.persistence.BusinessContextService;
 import com.ktc4.pusan4.user.persistence.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,9 +25,12 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -44,7 +49,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @WebMvcTest
 @Import({ApiExceptionHandler.class, UuidV7Generator.class, TemporaryCurrentUserProvider.class,
-    UserMockData.class, TransactionMockData.class, ClassificationMockData.class, JudgmentMockData.class})
+    TransactionMockData.class, ClassificationMockData.class, JudgmentMockData.class})
 class ApiResponseContractTest {
 
     private static final String ID = "0199c8f2-0000-7000-8000-000000000001";
@@ -59,11 +64,21 @@ class ApiResponseContractTest {
     @MockitoBean
     private UserService userService;
 
+    @MockitoBean
+    private BusinessContextService contextService;
+
     @BeforeEach
     void stubServices() {
         given(userService.get(any())).willReturn(new AppUser(
             TemporaryCurrentUserProvider.TEMPORARY_USER_ID, "demo@example.com",
             OffsetDateTime.parse("2026-09-01T10:00:00+09:00")));
+
+        BusinessContext context = new BusinessContext(UUID.fromString(ID),
+            TemporaryCurrentUserProvider.TEMPORARY_USER_ID, 1, "62010", 82_000_000L, LocalDate.parse("2024-03-15"),
+            BookkeepingDuty.간편장부, false, 20, OffsetDateTime.parse("2026-09-01T10:05:00+09:00"));
+        given(contextService.create(any(), any())).willReturn(context);
+        given(contextService.current(any())).willReturn(context);
+        given(contextService.history(any())).willReturn(List.of(context));
     }
 
     static Stream<Arguments> endpoints() {

@@ -68,7 +68,7 @@ bash ./backend/gradlew -p backend bootRun --args='--spring.profiles.active=local
 
 ## 목 응답
 
-서비스 레이어가 구현되기 전의 API는 기능별 `*MockData` Bean(`UserMockData`, `TransactionMockData`, `ClassificationMockData`, `JudgmentMockData`)이 만든 고정 응답을 반환합니다. 입력과 id에 상관없이 같은 값이고, 상태를 저장하지 않습니다. 이런 API에는 `@MockResponse`가 붙어 있고 스웨거 설명이 `[목 응답]`으로 시작합니다.
+서비스 레이어가 구현되기 전의 API는 기능별 `*MockData` Bean(`TransactionMockData`, `ClassificationMockData`, `JudgmentMockData`)이 만든 고정 응답을 반환합니다. 입력과 id에 상관없이 같은 값이고, 상태를 저장하지 않습니다. 이런 API에는 `@MockResponse`가 붙어 있고 스웨거 설명이 `[목 응답]`으로 시작합니다.
 
 서비스를 구현하면 엔드포인트 단위로 다음을 바꿉니다.
 
