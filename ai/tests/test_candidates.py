@@ -1,6 +1,6 @@
 """적재 직전에 값을 만드는 부분. SQL 과 모델 호출은 여기서 검증하지 않는다."""
 
-from pipeline.candidates import docs, top_tier
+from pipeline.candidates import docs, hold_reasons, top_tier
 from pipeline.search import Hit
 from pipeline.select import Evidence, StatuteRef
 
@@ -41,6 +41,26 @@ def test_기본_조문만_인용해도_법령이다():
 
 def test_인용이_없으면_없다():
     assert top_tier(ev(), BY_TIER) is None
+
+
+class 현행(list):
+    """missing_statutes 가 쓰는 만큼만 흉내 낸다. 물어본 조문은 전부 현행이다."""
+
+    def execute(self, sql, params):
+        self[:] = [{"statute_id": i} for i in params[0]]
+        return self
+
+    def fetchall(self):
+        return self
+
+
+def test_확인필요는_근거_부족으로_보류하지_않는다():
+    unsure = ev("소득세법-33-1-5").model_copy(update={"sufficient": False})
+    assert hold_reasons(현행(), unsure, BY_TIER) == ["근거 부족"]
+    assert hold_reasons(현행(), unsure.model_copy(update={"direction": "확인필요"}), BY_TIER) == []
+    # 인용이 하나도 없으면 확인필요여도 보류한다
+    empty = ev().model_copy(update={"sufficient": False, "direction": "확인필요"})
+    assert hold_reasons(현행(), empty, BY_TIER) == ["근거 부족"]
 
 
 def test_suggested_docs_에_위계가_붙는다():

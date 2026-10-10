@@ -10,7 +10,7 @@
 # fact_type·값(용도: 업무출장·개인)은 R-208·평가셋 E-033 과 같은 어휘다.
 # priority 505: 휴일에 R-208(500)을 이긴다(R-311 주석 참고).
 id: R-314
-version: 1
+version: 2
 gate: G2
 priority: 505
 effective_period: { start: 2024-01-01, end: null }
@@ -21,6 +21,7 @@ match:
 verdict: 불가
 citations:
   - { id: 소득세법-33-1-5, verified: true }
+  - { id: 소득세법시행령-61-1-1, verified: true }
 question:
   code: HOLIDAY_TRAVEL_PURPOSE
   text: "주말·공휴일 이동이라 개인 용도로 보고 제외했어요. 업무 출장이었다면 알려주세요."

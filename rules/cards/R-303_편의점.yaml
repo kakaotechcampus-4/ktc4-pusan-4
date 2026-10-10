@@ -4,7 +4,7 @@
 # 없어(E-034) 되묻는다. 업무용이면 소모품비, 개인이면 불산입.
 # group_by transaction — 같은 편의점이라도 건마다 산 게 다르다.
 id: R-303
-version: 1
+version: 2
 gate: G2
 priority: 500
 effective_period: { start: 2024-01-01, end: null }
@@ -15,6 +15,7 @@ verdict: 확인필요
 citations:
   - { id: 소득세법-27-1, verified: true }
   - { id: 소득세법-33-1-5, verified: true }
+  - { id: 소득세법시행령-61-1-1, verified: true }
 question:
   code: CONVENIENCE_PURPOSE
   text: "이 편의점 결제에서 산 물품은 업무용인가요?"

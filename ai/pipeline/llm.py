@@ -10,8 +10,6 @@ from pydantic import BaseModel
 
 from app.config import settings
 
-MODEL = "gpt-4o-mini"
-
 # langfuse.openai 는 import 만으로 openai 를 전역 패치한다. 이 모듈을 import 한 프로세스는 임베딩도 기록된다.
 if not settings.langfuse_public_key:
     logging.getLogger("langfuse").setLevel(logging.ERROR)
@@ -37,12 +35,17 @@ def client() -> OpenAI:
 def structured[T: BaseModel](system: str, user: str, schema: type[T], api: OpenAI | None = None) -> T:
     """스키마를 강제해서 받는다. 파싱 실패를 호출부가 떠안지 않게 한다."""
     api = api or client()
+    effort = settings.agent_reasoning_effort
+    extra = {"reasoning_effort": effort} if effort else {}
+    # 추론을 켜면 temperature 는 기본값(1)만 받는다(gpt-6-luna 실측 400).
+    if effort in (None, "none"):
+        extra["temperature"] = 0
     res = api.chat.completions.parse(
-        model=MODEL,
-        temperature=0,
+        model=settings.agent_model,
         response_format=schema,
         messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
         name=schema.__name__,
+        **extra,
     )
     out = res.choices[0].message.parsed
     if out is None:

@@ -7,7 +7,7 @@
 #    (transaction, 용도, 업무출장) 으로 답한다. fact_type 이나 값이 하나라도
 #    어긋나면 답이 카드에 매칭되지 않는다 — v1 에서 '업무목적'으로 썼다가 났던 오류다.
 id: R-208
-version: 1
+version: 2
 gate: G2
 priority: 500
 effective_period: { start: 2024-01-01, end: null }
@@ -18,6 +18,7 @@ verdict: 확인필요
 citations:
   - { id: 소득세법-27-1, verified: true }
   - { id: 소득세법-33-1-5, verified: true }
+  - { id: 소득세법시행령-61-1-1, verified: true }
 question:
   code: TRAVEL_PURPOSE
   text: "이 이동은 업무 목적이었나요?"

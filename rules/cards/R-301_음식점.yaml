@@ -7,7 +7,7 @@
 #
 # fact_type '용도'/값(업무미팅·개인), group_by transaction 은 E-027·E-046·E-050 을 따른다.
 id: R-301
-version: 2
+version: 3
 gate: G2
 priority: 500
 effective_period: { start: 2024-01-01, end: null }
@@ -17,6 +17,7 @@ match:
 verdict: 확인필요
 citations:
   - { id: 소득세법-33-1-5, verified: true }
+  - { id: 소득세법시행령-61-1-1, verified: true }
 question:
   code: RESTAURANT_PURPOSE
   text: "이 식사는 어떤 용도였나요?"

@@ -1,25 +1,17 @@
 # G2 · 게임 — 940909 통상성[게임] = 비통상
 #
-# §33①13 직접 업무와 관련 없다고 인정되는 금액은 불산입. 인적용역 IT 사업자에게 게임은
-# 무관 쪽이나 '인정'이 필요해 결제내역만으로 불가를 확정하지 않고 확인필요로 둔다(E-009).
-# 개인이라고 답하면 §33①5 로 불가, 업무 관련이라 답해도 근거가 필요해 확정하지 않는다.
+# §33①5 가사경비. IT 개발·강의 사업자에게 게임은 사업 수행에 필요한 비용이 아니라
+# 개인 여가 소비다(의료 R-304·미용 R-305 와 같은 축). 결제 내역만으로 불가를 확정한다(E-009).
 id: R-306
-version: 1
+version: 2
 gate: G2
 priority: 500
 effective_period: { start: 2024-01-01, end: null }
 match:
   category: [게임]
   industry: ["940909"]
-verdict: 확인필요
+verdict: 불가
 citations:
   - { id: 소득세법-33-1-5, verified: true }
-question:
-  code: GAME_PURPOSE
-  text: "이 게임 결제는 개인 용도인가요, 업무와 관련이 있나요?"
-  fact_type: 용도
-  group_by: transaction
-  options:
-    - { value: 개인, verdict: 불가 }
-    - { value: 업무관련 }
+  - { id: 소득세법시행령-61-1-1, verified: true }
 review: { by: 미검수, date: 2026-09-16 }

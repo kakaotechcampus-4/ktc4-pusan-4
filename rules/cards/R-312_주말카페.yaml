@@ -6,7 +6,7 @@
 # 2026-08-20). 혼자작업을 가능으로 볼 조문·사례는 찾지 못했다.
 # 주말 추정을 뒤집을 만한 소명이 아니라서 불가다(§33①5, 카드 citations).
 id: R-312
-version: 2
+version: 3
 gate: G2
 priority: 505
 effective_period: { start: 2024-01-01, end: null }
@@ -17,6 +17,7 @@ match:
 verdict: 불가
 citations:
   - { id: 소득세법-33-1-5, verified: true }
+  - { id: 소득세법시행령-61-1-1, verified: true }
 question:
   code: WEEKEND_CAFE_PURPOSE
   text: "주말·공휴일 카페 결제라 개인 용도로 보고 제외했어요. 업무 때문이었다면 알려주세요."

@@ -9,7 +9,7 @@
 # fact_type '용도' 와 값(업무미팅·개인·혼자작업)은 E-028·E-039·E-040 을 따른다.
 # group_by 는 transaction — 같은 카페라도 건마다 용도가 다르다.
 id: R-300
-version: 2
+version: 3
 gate: G2
 priority: 500
 effective_period: { start: 2024-01-01, end: null }
@@ -19,6 +19,7 @@ match:
 verdict: 확인필요
 citations:
   - { id: 소득세법-33-1-5, verified: true }
+  - { id: 소득세법시행령-61-1-1, verified: true }
 question:
   code: CAFE_PURPOSE
   text: "이 카페 결제는 어떤 용도였나요?"

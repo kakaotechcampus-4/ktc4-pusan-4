@@ -23,7 +23,7 @@
 # fact_type 은 R-104(온라인쇼핑)와 같은 '용도'/transaction 이지만 충돌하지 않는다.
 # 거래 하나는 카테고리가 하나라 두 카드가 같은 거래에 동시에 걸릴 수 없다.
 id: R-105
-version: 1
+version: 2
 gate: G2
 priority: 500
 effective_period: { start: 2024-01-01, end: null }
@@ -33,6 +33,7 @@ verdict: 확인필요
 citations:
   - { id: 소득세법-27-1, verified: true }
   - { id: 소득세법-33-1-5, verified: true }
+  - { id: 소득세법시행령-61-1-1, verified: true }
 question:
   code: PG_UNKNOWN_PURPOSE
   text: "결제대행사를 거친 건이라 실제 가맹점을 알 수 없습니다. 사업을 위해 쓴 결제인가요?"
