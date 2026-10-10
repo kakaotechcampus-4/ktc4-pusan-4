@@ -130,9 +130,17 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
               귀속 2026년
             </span>
             <span className="hidden h-4 w-px bg-line sm:inline" />
-            <span className="hidden max-w-[160px] truncate sm:inline">
+            <Link
+              to="/account"
+              aria-current={pathname.startsWith('/account') ? 'page' : undefined}
+              className={`hidden max-w-[160px] truncate rounded-lg px-2 py-1.5 transition-colors duration-150 ease-snap sm:inline ${
+              pathname.startsWith('/account') ?
+              'bg-canvas text-ink' :
+              'hover:bg-canvas hover:text-ink'}`
+              }>
+
               {email}
-            </span>
+            </Link>
             <button
               type="button"
               onClick={() => {
