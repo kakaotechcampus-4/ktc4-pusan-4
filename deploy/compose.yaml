@@ -25,6 +25,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME}
       SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      HOLIDAY_API_KEY: ${HOLIDAY_API_KEY:-}
       JAVA_TOOL_OPTIONS: -Xms128m -Xmx768m
     depends_on:
       postgres:
@@ -46,7 +47,10 @@ services:
       AGENT_BASE_URL: ${AGENT_BASE_URL:-}
       EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
       EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
       LAW_API_OC: ${LAW_API_OC:-test}
+      TEAM_DISCORD_WEBHOOK: ${TEAM_DISCORD_WEBHOOK:-}
     depends_on:
       postgres:
         condition: service_healthy

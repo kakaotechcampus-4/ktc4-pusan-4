@@ -2,7 +2,6 @@ import type {
   ClassificationReview,
   Judgment,
   JudgmentRun,
-  JudgmentSummary,
   QuestionGroup,
   Transaction,
   UploadBatch,
@@ -17,67 +16,29 @@ export const UPLOAD_BATCH: UploadBatch = {
   cardIssuer: '국민',
   periodStart: '2026-01-01',
   periodEnd: '2026-01-31',
-  transactionCount: 292,
+  // transactionCount·classificationPendingCount 는 mock/index.ts 가 실제 배열에서
+  // 다시 계산한다. 여기 적은 값과 시드가 어긋나 화면끼리 숫자가 달라졌던 적이 있다.
+  transactionCount: 0,
   skippedDuplicateCount: 0,
-  classificationPendingCount: 6,
+  classificationPendingCount: 0,
   createdAt: '2026-09-12T13:58:00+09:00'
 };
 
 export const JUDGMENT_RUN: JudgmentRun = {
   id: '0199e5b2-0000-7000-8000-000000000001',
+  batchId: '0199c8f2-0000-7000-8000-000000000001',
+  contextId: '0199d3a1-0000-7000-8000-000000000001',
+  contextVersion: 4,
   status: {
     code: 'COMPLETED',
     label: '완료'
   },
-  totalCount: 292,
-  processedCount: 292,
+  // 판정 대상(JUDGEABLE + 분류 완료) 수와 같게 둔다. 292 는 시드에 없는 숫자였다
+  totalCount: 23,
+  processedCount: 23,
   failedCount: 0,
   startedAt: '2026-09-12T14:01:00+09:00',
   completedAt: '2026-09-12T14:05:00+09:00'
-};
-
-export const JUDGMENT_SUMMARY: JudgmentSummary = {
-  scope: {
-    type: 'RUN',
-    id: '0199e5b2-0000-7000-8000-000000000001'
-  },
-  totalCount: 292,
-  byVerdict: {
-    AVAILABLE: {
-      count: 168,
-      finalAmount: 21_483_000
-    },
-    UNAVAILABLE: {
-      count: 53,
-      finalAmount: 0
-    },
-    NEEDS_REVIEW: {
-      count: 71,
-      finalAmount: 0
-    }
-  },
-  byAccount: [
-    {
-      account: '지급수수료',
-      count: 61,
-      finalAmount: 9_120_000
-    },
-    {
-      account: '소모품비',
-      count: 42,
-      finalAmount: 1_820_000
-    },
-    {
-      account: '여비교통비',
-      count: 38,
-      finalAmount: 640_000
-    },
-    {
-      account: '도서인쇄비',
-      count: 27,
-      finalAmount: 903_000
-    }
-  ]
 };
 
 export const TRANSACTIONS: Transaction[] = [
@@ -588,6 +549,52 @@ export const TRANSACTIONS: Transaction[] = [
     }
   },
   {
+    id: '0199c8f2-0000-7000-8000-00000000001030',
+    batchId: '0199c8f2-0000-7000-8000-000000000001',
+    approvedAt: '2026-01-21',
+    merchantRaw: 'COUPANG PAY',
+    merchantNorm: '쿠팡',
+    merchantCategory: '온라인쇼핑',
+    classificationStatus: {
+      code: 'CLASSIFIED',
+      label: '분류 완료'
+    },
+    amount: 89_000,
+    installmentMonths: 0,
+    sourceStatus: {
+      code: 'CANCELED_OFFSET',
+      label: '취소상계'
+    },
+    userInclusion: 'AUTO',
+    effectiveStatus: {
+      code: 'CANCELED_OFFSET',
+      label: '취소상계'
+    }
+  },
+  {
+    id: '0199c8f2-0000-7000-8000-00000000001031',
+    batchId: '0199c8f2-0000-7000-8000-000000000001',
+    approvedAt: '2026-01-22',
+    merchantRaw: 'COUPANG PAY 취소',
+    merchantNorm: '쿠팡',
+    merchantCategory: '온라인쇼핑',
+    classificationStatus: {
+      code: 'CLASSIFIED',
+      label: '분류 완료'
+    },
+    amount: -89_000,
+    installmentMonths: 0,
+    sourceStatus: {
+      code: 'CANCELED_OFFSET',
+      label: '취소상계'
+    },
+    userInclusion: 'AUTO',
+    effectiveStatus: {
+      code: 'CANCELED_OFFSET',
+      label: '취소상계'
+    }
+  },
+  {
     id: '0199c8f2-0000-7000-8000-00000000001023',
     batchId: '0199c8f2-0000-7000-8000-000000000001',
     approvedAt: '2026-01-31',
@@ -848,7 +855,9 @@ export const JUDGMENTS: Judgment[] = [
     isInference: false,
     unmatchedReason: null,
     attributes: {
-
+      자산: true,
+      내용연수: 5,
+      상각방법: '정액법'
     },
     ruleCardId: 'R-037',
     ruleCardVersion: 3,
@@ -1316,34 +1325,31 @@ export const JUDGMENTS: Judgment[] = [
       type: 'RUN',
       id: '0199e5b2-0000-7000-8000-000000000001'
     },
+    // 2026-01-24 는 토요일이다. develop 의 R-311(주말·공휴일 음식점)은 기본 불가 + 소명 질문이다(소명 대기)
     verdict: {
-      code: 'AVAILABLE',
-      label: '가능'
+      code: 'UNAVAILABLE',
+      label: '불가'
     },
     outOfScope: false,
-    blockedAtGate: null,
-    account: '소모품비',
-    finalAmount: 412_000,
+    blockedAtGate: 'G2',
+    account: null,
+    finalAmount: null,
     isInference: false,
     unmatchedReason: null,
     attributes: {
 
     },
-    ruleCardId: 'R-059',
-    ruleCardVersion: 3,
-    appliedRuleIds: ['R-059'],
+    ruleCardId: 'R-311',
+    ruleCardVersion: 2,
+    appliedRuleIds: ['R-311'],
     rulesCommitSha: '139f8189',
     userContextVersion: 4,
-    explanation: '거래처 접대 목적이 확인된 지출로 접대비 버킷에 태그했습니다. 연말 한도 확정 시 초과분은 불산입으로 조정됩니다.',
+    explanation: '주말·공휴일 음식점 결제는 개인 식사로 추정해 가사 관련 경비로 봅니다. 거래처 미팅이었다면 소명하면 평일과 같게 판정합니다.',
     computedAt: '2026-09-12T14:05:00+09:00',
     citations: [
       {
-        statuteVersionId: 1449,
-        statuteId: '소득세법-33-1-14'
-      },
-      {
-        statuteVersionId: 1418,
-        statuteId: '소득세법-27-1'
+        statuteVersionId: 1435,
+        statuteId: '소득세법-33-1-5'
       }
     ]
   },
@@ -1570,36 +1576,6 @@ export const JUDGMENTS: Judgment[] = [
     ]
   },
   {
-    id: '0199f1c3-0000-7000-8000-00000000001023',
-    transactionId: '0199c8f2-0000-7000-8000-00000000001023',
-    revision: 1,
-    origin: {
-      type: 'RUN',
-      id: '0199e5b2-0000-7000-8000-000000000001'
-    },
-    verdict: {
-      code: 'NEEDS_REVIEW',
-      label: '확인 필요'
-    },
-    outOfScope: false,
-    blockedAtGate: 'G2',
-    account: '소모품비',
-    finalAmount: null,
-    isInference: true,
-    unmatchedReason: 'MERCHANT_UNRESOLVED',
-    attributes: {
-
-    },
-    ruleCardId: null,
-    ruleCardVersion: null,
-    appliedRuleIds: [],
-    rulesCommitSha: '139f8189',
-    userContextVersion: 4,
-    explanation: null,
-    computedAt: '2026-09-12T14:05:00+09:00',
-    citations: []
-  },
-  {
     id: '0199f1c3-0000-7000-8000-00000000001024',
     transactionId: '0199c8f2-0000-7000-8000-00000000001024',
     revision: 1,
@@ -1636,139 +1612,185 @@ export const JUDGMENTS: Judgment[] = [
   }
 ];
 
+/**
+ * 룰엔진 확인 질문 (3.9). 질문 문구·factType·선택지는 rules/cards 의 카드를 그대로 옮겼다.
+ * group_by 가 transaction 인 카드는 거래마다, merchant_norm 인 카드는 가맹점마다 한 그룹이다.
+ * count·totalAmount 는 목업이 거래에서 다시 센다. 미분류 거래는 엔진에 넘기지 않으므로
+ * 질문이 없다 — 분류 확인(3.5)에서 묻는다.
+ */
 export const QUESTION_GROUPS: QuestionGroup[] = [
   {
-    groupKey: 'merchant:카페 · 편의점',
+    // R-300_카페
+    groupKey: 'transaction:0199c8f2-0000-7000-8000-00000000001005',
     factType: '용도',
-    questionIds: [
-      '0199a1b2-0000-7000-8000-00000000001005',
-      '0199a1b2-0000-7000-8000-00000000001017'
-    ],
-    count: 24,
-    totalAmount: 287_400,
-    questionText: '이 가맹점에서 쓴 비용은 주로 어떤 목적이었나요?',
-    options: [
-      '업무 목적',
-      '개인 목적',
-      '섞여 있음'
-    ]
+    questionIds: ['0199a1b2-0000-7000-8000-00000000001005'],
+    count: 1,
+    totalAmount: 0,
+    questionText: '이 카페 결제는 어떤 용도였나요?',
+    options: ['업무미팅', '개인', '혼자작업']
   },
   {
-    groupKey: 'merchant:택시 · 대중교통',
+    // R-303_편의점
+    groupKey: 'transaction:0199c8f2-0000-7000-8000-00000000001017',
     factType: '용도',
-    questionIds: [
-      '0199a1b2-0000-7000-8000-00000000001006'
-    ],
-    count: 18,
-    totalAmount: 214_800,
+    questionIds: ['0199a1b2-0000-7000-8000-00000000001017'],
+    count: 1,
+    totalAmount: 0,
+    questionText: '이 편의점 결제에서 산 물품은 업무용인가요?',
+    options: ['업무용', '개인']
+  },
+  {
+    // R-208_여비교통
+    groupKey: 'transaction:0199c8f2-0000-7000-8000-00000000001006',
+    factType: '용도',
+    questionIds: ['0199a1b2-0000-7000-8000-00000000001006'],
+    count: 1,
+    totalAmount: 0,
     questionText: '이 이동은 업무 목적이었나요?',
-    options: [
-      '업무 이동',
-      '개인 이동',
-      '섞여 있음'
-    ]
+    options: ['업무출장', '개인']
   },
   {
-    groupKey: 'merchant:통신비 · 자택 관리비',
-    factType: '용도',
-    questionIds: [
-      '0199a1b2-0000-7000-8000-00000000001007',
-      '0199a1b2-0000-7000-8000-00000000001008'
-    ],
-    count: 14,
-    totalAmount: 1_642_000,
-    questionText: '업무용으로 쓰는 비율은 몇 %인가요?',
-    options: [
-      '20%',
-      '50%',
-      '80%'
-    ]
+    // R-205_통신
+    groupKey: 'merchant:SK텔레콤',
+    factType: '전용여부',
+    questionIds: ['0199a1b2-0000-7000-8000-00000000001007'],
+    count: 1,
+    totalAmount: 0,
+    questionText: '이 회선은 업무 전용인가요?',
+    options: ['전용', '공용', '개인']
   },
   {
-    groupKey: 'merchant:연간 구독 결제',
-    factType: '용도',
-    questionIds: [
-      '0199a1b2-0000-7000-8000-00000000001004'
-    ],
-    count: 9,
-    totalAmount: 1_884_000,
-    questionText: '이 결제가 커버하는 서비스 기간은 어떻게 되나요?',
-    options: [
-      '올해 안에 끝남',
-      '다음 해까지 걸침',
-      '모르겠음'
-    ]
+    // R-103_수도광열
+    groupKey: 'merchant:자택 관리비',
+    factType: '공간전용여부',
+    questionIds: ['0199a1b2-0000-7000-8000-00000000001008'],
+    count: 1,
+    totalAmount: 0,
+    questionText: '이 요금이 나오는 공간을 사업 전용으로만 쓰나요?',
+    options: ['사업 전용', '자택 겸용']
   },
   {
-    groupKey: 'merchant:분류하지 못한 가맹점',
+    // R-311_주말음식점. 불가인데 질문이 남는 소명 대기다. 일괄 답변 대상에서 빼야 한다(rule-card-fields.md)
+    groupKey: 'transaction:0199c8f2-0000-7000-8000-00000000001016',
     factType: '용도',
-    questionIds: [
-      '0199a1b2-0000-7000-8000-00000000001023'
-    ],
-    count: 6,
-    totalAmount: 284_200,
-    questionText: '이 가맹점은 어떤 업종인가요?',
-    options: [
-      '소프트웨어 · 개발 도구',
-      '광고 · 마케팅',
-      '그 외'
-    ]
+    questionIds: ['0199a1b2-0000-7000-8000-00000000001016'],
+    count: 1,
+    totalAmount: 0,
+    questionText: '주말·공휴일 식사라 개인 식사로 보고 제외했어요. 거래처 미팅이었다면 알려주세요.',
+    options: ['업무미팅', '개인']
+  },
+  {
+    // R-107_해외SaaS_고액. 시드 판정(R-225)이 막힌 이유가 서비스 기간이라 기간을 묻는 카드다
+    groupKey: 'transaction:0199c8f2-0000-7000-8000-00000000001004',
+    factType: '기간',
+    questionIds: ['0199a1b2-0000-7000-8000-00000000001004'],
+    count: 1,
+    totalAmount: 0,
+    questionText: '이 결제는 몇 개월치인가요?',
+    options: ['월 단위 결제', '연간 일시불']
   }
 ];
 
-/** 목업 전용: 질문 그룹 → 해당 거래. 서버에서는 questionId로 이어진다. */
+/** 목업 전용: 질문 그룹 → 해당 거래. questionIds 와 같은 순서다. */
 export const QUESTION_TRANSACTIONS: Record<string, string[]> = {
-  'merchant:카페 · 편의점': [
-    '0199c8f2-0000-7000-8000-00000000001005',
-    '0199c8f2-0000-7000-8000-00000000001017'
-  ],
-  'merchant:택시 · 대중교통': [
-    '0199c8f2-0000-7000-8000-00000000001006'
-  ],
-  'merchant:통신비 · 자택 관리비': [
-    '0199c8f2-0000-7000-8000-00000000001007',
-    '0199c8f2-0000-7000-8000-00000000001008'
-  ],
-  'merchant:연간 구독 결제': [
-    '0199c8f2-0000-7000-8000-00000000001004'
-  ],
-  'merchant:분류하지 못한 가맹점': [
-    '0199c8f2-0000-7000-8000-00000000001023'
-  ]
+  'transaction:0199c8f2-0000-7000-8000-00000000001005': ['0199c8f2-0000-7000-8000-00000000001005'],
+  'transaction:0199c8f2-0000-7000-8000-00000000001017': ['0199c8f2-0000-7000-8000-00000000001017'],
+  'transaction:0199c8f2-0000-7000-8000-00000000001006': ['0199c8f2-0000-7000-8000-00000000001006'],
+  'merchant:SK텔레콤': ['0199c8f2-0000-7000-8000-00000000001007'],
+  'merchant:자택 관리비': ['0199c8f2-0000-7000-8000-00000000001008'],
+  'transaction:0199c8f2-0000-7000-8000-00000000001016': ['0199c8f2-0000-7000-8000-00000000001016'],
+  'transaction:0199c8f2-0000-7000-8000-00000000001004': ['0199c8f2-0000-7000-8000-00000000001004']
 };
 
-/** 목업 전용: 답변 라벨 → 재판정 결과. 서버 룰엔진이 하는 일을 흉내 낸다. */
+/**
+ * 목업 전용: 답변 → 재판정 결과. 서버 룰엔진이 하는 일을 흉내 낸다.
+ * 카드에 verdict 가 없는 선택지(혼자작업·공용·자택 겸용·연간 일시불)는 다음 관문으로 넘어가 금액 조건이
+ * 남는다. 그 상태(확인 필요 ③, docs/rule-card-fields.md)가 화면에 보이도록 NEEDS_REVIEW 로 둔다.
+ */
 export const QUESTION_ANSWER_VERDICT: Record<string, Record<string, Verdict>> = {
-  'merchant:카페 · 편의점': {
-    '업무 목적': 'AVAILABLE',
-    '개인 목적': 'UNAVAILABLE',
-    '섞여 있음': 'NEEDS_REVIEW'
+  'transaction:0199c8f2-0000-7000-8000-00000000001005': { 업무미팅: 'AVAILABLE', 개인: 'UNAVAILABLE', 혼자작업: 'NEEDS_REVIEW' },
+  'transaction:0199c8f2-0000-7000-8000-00000000001017': { 업무용: 'AVAILABLE', 개인: 'UNAVAILABLE' },
+  'transaction:0199c8f2-0000-7000-8000-00000000001006': { 업무출장: 'AVAILABLE', 개인: 'UNAVAILABLE' },
+  'merchant:SK텔레콤': { 전용: 'AVAILABLE', 공용: 'NEEDS_REVIEW', 개인: 'UNAVAILABLE' },
+  'merchant:자택 관리비': { '사업 전용': 'AVAILABLE', '자택 겸용': 'NEEDS_REVIEW' },
+  'transaction:0199c8f2-0000-7000-8000-00000000001016': { 업무미팅: 'AVAILABLE', 개인: 'UNAVAILABLE' },
+  'transaction:0199c8f2-0000-7000-8000-00000000001004': { '월 단위 결제': 'AVAILABLE', '연간 일시불': 'NEEDS_REVIEW' }
+};
+
+interface QuestionCard {
+  ruleCardId: string;
+  ruleCardVersion: number;
+  /** 카드 citations 의 statuteVersionId */
+  citations: number[];
+  /** 선택지별 계정과목·근거·속성. 선택지 citations 는 카드 citations 를 대신한다 (PR #68) */
+  options: Record<string, {account?: string;citations?: number[];attributes?: Record<string, unknown>;}>;
+}
+
+/**
+ * 목업 전용: 질문 그룹 → 그 질문을 낸 카드(develop 의 rules/cards 기준).
+ * 답하면 카드 선택지대로 규칙 카드·계정과목·근거를 붙인다. 시드 판정은 다른 카드에서 온 것이라
+ * 그대로 두면 「가능」에 「가사 경비는 산입하지 않는다」가 근거로 붙었다.
+ * 목업 조문 목록에 없는 조문(§35①, 시행령 §61①)은 원문을 지어내지 않고 뺐다.
+ */
+export const QUESTION_CARDS: Record<string, QuestionCard> = {
+  'transaction:0199c8f2-0000-7000-8000-00000000001005': {
+    ruleCardId: 'R-300',
+    ruleCardVersion: 2,
+    citations: [1435],
+    options: { 업무미팅: { account: '접대비', citations: [], attributes: { limit_bucket: '접대비' } } }
   },
-  'merchant:택시 · 대중교통': {
-    '업무 이동': 'AVAILABLE',
-    '개인 이동': 'UNAVAILABLE',
-    '섞여 있음': 'NEEDS_REVIEW'
+  'transaction:0199c8f2-0000-7000-8000-00000000001016': {
+    ruleCardId: 'R-311',
+    ruleCardVersion: 2,
+    citations: [1435],
+    options: { 업무미팅: { account: '접대비', citations: [], attributes: { limit_bucket: '접대비' } } }
   },
-  'merchant:통신비 · 자택 관리비': {
-    '20%': 'AVAILABLE',
-    '50%': 'AVAILABLE',
-    '80%': 'AVAILABLE'
+  'transaction:0199c8f2-0000-7000-8000-00000000001017': {
+    ruleCardId: 'R-303',
+    ruleCardVersion: 1,
+    citations: [1418, 1435],
+    options: { 업무용: { account: '소모품비' } }
   },
-  'merchant:연간 구독 결제': {
-    '올해 안에 끝남': 'AVAILABLE',
-    '다음 해까지 걸침': 'AVAILABLE',
-    '모르겠음': 'NEEDS_REVIEW'
+  'transaction:0199c8f2-0000-7000-8000-00000000001006': {
+    ruleCardId: 'R-208',
+    ruleCardVersion: 1,
+    citations: [1418, 1435],
+    options: { 업무출장: { account: '여비교통비' } }
   },
-  'merchant:분류하지 못한 가맹점': {
-    '소프트웨어 · 개발 도구': 'AVAILABLE',
-    '광고 · 마케팅': 'AVAILABLE',
-    '그 외': 'AVAILABLE'
+  'merchant:SK텔레콤': {
+    ruleCardId: 'R-205',
+    ruleCardVersion: 2,
+    citations: [1435],
+    options: { 전용: { account: '통신비', citations: [1418] } }
+  },
+  'merchant:자택 관리비': {
+    ruleCardId: 'R-103',
+    ruleCardVersion: 1,
+    citations: [1418, 1435],
+    options: { '사업 전용': { account: '수도광열비' } }
+  },
+  'transaction:0199c8f2-0000-7000-8000-00000000001004': {
+    ruleCardId: 'R-107',
+    ruleCardVersion: 1,
+    citations: [1418],
+    options: { '월 단위 결제': { account: '지급수수료' } }
   }
 };
 
 
 /** 미분류로 남아 분류 확인이 필요한 거래. GET /classification-reviews */
 export const CLASSIFICATION_REVIEWS: ClassificationReview[] = [
+{
+  id: '0199c100-0000-7000-8000-000000000006',
+  batchId: '0199c8f2-0000-7000-8000-000000000001',
+  transactionId: '0199c8f2-0000-7000-8000-00000000001023',
+  merchantRaw: 'ELEVENLABS IO',
+  merchantNorm: '미확인 가맹점',
+  status: { code: 'PENDING', label: '대기' },
+  suggestedCategories: ['해외SaaS', '구독서비스', '기타'],
+  createdAt: '2026-09-12T13:58:09+09:00',
+  resolvedAt: null
+},
 {
   id: '0199c100-0000-7000-8000-000000000001',
   batchId: '0199c8f2-0000-7000-8000-000000000001',

@@ -76,6 +76,14 @@ bash ./backend/gradlew -p backend bootRun --args='--spring.profiles.active=local
 2. 해당 메서드의 `@MockResponse`를 지웁니다.
 3. `*MockData`의 메서드가 더 이상 쓰이지 않으면 지웁니다. 모든 API가 바뀌면 `MockFixtures`, `MockResponse`까지 지웁니다.
 
+### 요청한 사용자 (`CurrentUser`)
+
+서비스는 userId를 요청 본문이나 경로에서 받지 않습니다. 컨트롤러 메서드에 `CurrentUser` 인자를 두면 `CurrentUserArgumentResolver`가 채우고, 서비스에는 `currentUser.id()`를 넘깁니다(`UserController.me` 참고). 스웨거에는 노출되지 않습니다.
+
+인증 도입 전에는 `TemporaryCurrentUserProvider`가 요청과 상관없이 고정 사용자(`MockFixtures.USER_ID`와 같은 id)를 돌려주고, `TemporaryUserSeeder`가 기동할 때 그 사용자 행을 만듭니다. 인증 도입(B9b) 때는 `CurrentUserProvider` 구현체만 Bearer 토큰 검증으로 바꾸고 두 임시 클래스를 지웁니다.
+
+목을 서비스로 바꾼 API는 `ApiResponseContractTest`에서 서비스를 `@MockitoBean`으로 대신해 DB 없이 계약만 봅니다.
+
 `ApiResponseContractTest`는 각 API의 상태 코드와 응답 필드 이름만 확인하고 값은 확인하지 않습니다. 그래서 서비스로 바꿔도 계약이 그대로면 통과해야 합니다.
 
 ## 코드 건강도 리포트

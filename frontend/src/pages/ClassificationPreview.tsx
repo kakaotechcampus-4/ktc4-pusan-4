@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRightIcon, CheckIcon, SparklesIcon } from 'lucide-react';
+import { ArrowRightIcon, CheckIcon, SparklesIcon, UploadIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
-import { api, useApi } from '../api';
+import { api, ApiRequestError, useApi } from '../api';
 import { useSession } from '../contexts/SessionContext';
 import { Badge, Button, Card, Empty, Select } from '../components/ui';
 import { MERCHANT_CATEGORIES } from '../types/domain';
@@ -19,71 +19,76 @@ export function ClassificationPreview() {
   const [resolving, setResolving] = useState<Record<string, true>>({});
 
   const groupsQ = useApi(
-    () => api.classificationReviews.grouped({ batchId: batchId ?? undefined, status: 'PENDING' }),
+    () =>
+    api.classificationReviews.grouped({
+      batchId: batchId ?? undefined,
+      status: 'PENDING',
+      size: 100
+    }),
     [batchId]
   );
   const batchQ = useApi(
     () => batchId ? api.uploads.get(batchId) : Promise.resolve(null),
     [batchId]
   );
-  // 그룹 응답에는 건별 정보가 없어(api.md 3.5) 개별 리뷰와 거래를 함께 읽는다
-  const reviewsQ = useApi(
-    () => api.classificationReviews.list({ batchId: batchId ?? undefined, status: 'PENDING' }),
-    [batchId]
-  );
-  const txQ = useApi(
-    () =>
-    api.transactions.list({
-      batchId: batchId ?? undefined,
-      classificationStatus: 'NEEDS_REVIEW',
-      size: 100
-    }),
-    [batchId]
-  );
-
-  const txById = new Map((txQ.data?.items ?? []).map((t) => [t.id, t]));
-  const reviewById = new Map((reviewsQ.data?.items ?? []).map((r) => [r.id, r]));
-
-  /**
-   * 그룹에 묶인 리뷰. `reviewIds` 로만 찾는다 —
-   * merchantNorm 으로 맞추면 같은 가게가 카드사 트랙에 따라 다른 그룹으로 갈릴 때 섞인다.
-   */
-  const reviewsOf = (group: { reviewIds: string[] }) =>
-  group.reviewIds.
-  map((id) => reviewById.get(id)).
-  filter((r): r is NonNullable<typeof r> => Boolean(r));
-
-  /** 그룹에 묶인 거래 (승인일 오름차순) */
-  const rowsOf = (group: { reviewIds: string[] }) =>
-  reviewsOf(group).
-  map((review) => txById.get(review.transactionId)).
-  filter((t): t is NonNullable<typeof t> => Boolean(t)).
-  sort((a, b) => a.approvedAt.localeCompare(b.approvedAt));
 
   const groups = groupsQ.data?.items ?? [];
   const batch = batchQ.data;
   const total = batch?.transactionCount ?? 0;
-  const pendingCount = groups.reduce((sum, group) => sum + group.count, 0);
-  const pendingAmount = groups.reduce((sum, group) => sum + group.totalAmount, 0);
+
+  /**
+   * 서버가 주는 미해소 집계. page·size 와 무관하게 배치 전체 기준이다 (api.md 3.5).
+   * 그룹 배열을 더하면 지금 페이지만 더하게 되어 그룹이 한 페이지를 넘으면 틀린다.
+   */
+  const unresolved = groupsQ.data?.unresolved;
+  const pendingCount = unresolved?.count ?? 0;
+  const pendingAmount = unresolved?.amount ?? null;
+  const groupsComplete =
+  groupsQ.data !== null &&
+  groupsQ.data.items.length === groupsQ.data.page.totalElements;
   const classified = Math.max(0, total - pendingCount);
   const coverage = total ? classified / total * 100 : 100;
-  const done = groups.length === 0;
+
+  const loading = groupsQ.loading || batchQ.loading;
+  const loadError = groupsQ.error ?? batchQ.error;
+  /** 다 읽고 나서 0건일 때만 「다 분류했다」다 */
+  const done = !loading && !loadError && groups.length === 0;
+  /** 올린 배치 자체가 없으면 「다 분류했다」가 아니라 「올린 게 없다」다 */
+  const noBatch = !batchId || (!batchQ.loading && !batchQ.error && batch === null);
+
+  const timers = useRef<number[]>([]);
+  useEffect(() => () => timers.current.forEach(window.clearTimeout), []);
+
+  const [resolveError, setResolveError] = useState<string | null>(null);
 
   const resolve = async (groupKey: string, reviewIds: string[], category: string) => {
     setResolving((prev) => ({ ...prev, [groupKey]: true }));
-    await api.classificationReviews.respond({ reviewIds, merchantCategory: category });
-    // 카드가 빠지는 게 보이도록 전환이 끝난 뒤 다시 읽는다
-    window.setTimeout(() => {
-      groupsQ.reload();
-      batchQ.reload();
-      reviewsQ.reload();
-      txQ.reload();
+    setResolveError(null);
+    try {
+      await api.classificationReviews.respond({ reviewIds, merchantCategory: category });
+    } catch (caught) {
+      setResolveError(
+        caught instanceof ApiRequestError ?
+        caught.message :
+        '업종을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.'
+      );
       setResolving((prev) => {
         const next = { ...prev };
         delete next[groupKey];
         return next;
       });
-    }, 280);
+      return;
+    }
+    // 카드가 빠지는 게 보이도록 전환이 끝난 뒤 다시 읽는다
+    timers.current.push(window.setTimeout(() => {
+      groupsQ.reload();
+      batchQ.reload();
+      setResolving((prev) => {
+        const next = { ...prev };
+        delete next[groupKey];
+        return next;
+      });
+    }, 280));
   };
 
   return (
@@ -92,15 +97,66 @@ export function ClassificationPreview() {
         <header>
           <p className="text-small font-semibold text-accent">2단계 · 분류 확인</p>
           <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
-            {done ? '모든 거래를 분류했습니다' : '읽지 못한 가맹점만 확인합니다'}
+            {loadError ?
+            '분류 결과를 불러오지 못했습니다' :
+            noBatch ?
+            '올린 카드내역이 없습니다' :
+            done ?
+            '모든 거래를 분류했습니다' :
+            '읽지 못한 가맹점만 확인합니다'}
           </h1>
           <p className="mt-2 max-w-2xl text-body leading-6 text-ink2">
-            {done ?
+            {loadError ?
+            '잠시 후 다시 시도해 주세요. 네트워크나 서버 상태를 확인해 주세요.' :
+            noBatch ?
+            '카드내역을 먼저 올리면 분류 결과를 여기서 확인할 수 있습니다.' :
+            done ?
             '모든 거래에 업종이 붙었습니다. 판정은 이제 규칙이 순서대로 실행하며 내립니다.' :
             '가맹점 이름을 업종으로 바꾸는 일까지는 AI가 합니다. 확신이 없는 건만 남겨 두었으니 여기서 골라 주세요. 판정은 그다음에 규칙이 합니다.'}
           </p>
         </header>
 
+        {resolveError &&
+        <p
+          role="alert"
+          className="mt-4 rounded-xl border border-deny-line bg-deny-bg px-4 py-3 text-body text-deny">
+
+            {resolveError}
+          </p>
+        }
+
+        {loadError ?
+        <Empty
+          className="mt-8"
+          icon={<UploadIcon className="h-5 w-5" />}
+          title="분류 결과를 불러오지 못했습니다"
+          description="잠시 후 다시 시도해 주세요."
+          action={
+          <Button
+            size="md"
+            variant="secondary"
+            onClick={() => {
+              groupsQ.reload();
+              batchQ.reload();
+            }}>
+
+                다시 시도
+              </Button>
+          } /> :
+
+        noBatch ?
+        <Empty
+          className="mt-8"
+          icon={<UploadIcon className="h-5 w-5" />}
+          title="아직 올린 카드내역이 없습니다"
+          description="국민·기업카드 이용내역을 올리면 분류 결과를 여기서 확인합니다."
+          action={
+          <Button to="/upload" size="md">
+                카드내역 올리기
+              </Button>
+          } /> :
+
+        <>
         {/* 분류 진척 */}
         <Card tone="canvas" padding="md" className="mt-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
@@ -119,8 +175,8 @@ export function ClassificationPreview() {
               </Badge> :
 
             <p className="text-small tabular-nums text-warn">
-                확인 필요 {formatNumber(pendingCount)}건 ·{' '}
-                {formatWon(pendingAmount)}
+                확인 필요 {formatNumber(pendingCount)}건
+                {pendingAmount !== null && ` · ${formatWon(pendingAmount)}`}
               </p>
             }
           </div>
@@ -144,7 +200,9 @@ export function ClassificationPreview() {
         <section className="mt-8">
           {!done &&
           <h2 className="text-h4 font-bold text-ink">
-              확인이 필요한 가맹점 {groups.length}곳
+              확인이 필요한 가맹점{' '}
+              {formatNumber(groupsQ.data?.page.totalElements ?? groups.length)}곳
+              {!groupsComplete && ` (${formatNumber(groups.length)}곳 표시)`}
             </h2>
           }
 
@@ -164,13 +222,13 @@ export function ClassificationPreview() {
 
           <ul className="mt-4 space-y-3">
               {groups.map((group) => {
-              const rows = rowsOf(group);
+              // 승인일 오름차순으로 이미 정렬돼 온다 (api.md 3.5)
+              const rows = group.transactions;
               // 한 가맹점이 카드사에서 여러 표기로 찍힌 경우 제목은 정규화된 이름을 쓴다.
-              // groupKey 문자열 형식은 계약이 보장하지 않으므로 리뷰의 merchantNorm 을 읽는다.
+              // groupKey 는 형식을 보장하지 않으므로 파싱하지 않고 merchantNorm 을 쓴다.
               const rawVariants = new Set(rows.map((row) => row.merchantRaw)).size;
-              const merchantNorm = reviewsOf(group)[0]?.merchantNorm;
               const title =
-              rawVariants > 1 && merchantNorm ? merchantNorm : group.merchantRaw;
+              rawVariants > 1 ? group.merchantNorm : group.merchantRaw;
               return (
                 <Card
               key={group.groupKey}
@@ -200,7 +258,7 @@ export function ClassificationPreview() {
                   <ul className="mt-4 divide-y divide-line2 rounded-xl border border-line2 bg-canvas">
                     {rows.slice(0, 4).map((row) =>
                 <li
-                  key={row.id}
+                  key={row.transactionId}
                   className="flex items-baseline justify-between gap-3 px-3.5 py-2.5">
                   
                         <span className="w-24 shrink-0 text-small tabular-nums text-ink2">
@@ -298,6 +356,8 @@ export function ClassificationPreview() {
               </Button>
             </div>
           </div>
+        }
+        </>
         }
       </div>
     </AppShell>);

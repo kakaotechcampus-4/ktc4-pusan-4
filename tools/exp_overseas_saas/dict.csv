@@ -1,0 +1,749 @@
+alias,name,category,source
+NOTION,Notion,해외SaaS,comparedge:project-management
+CLICKUP,ClickUp,해외SaaS,comparedge:project-management
+ASANA,Asana,해외SaaS,comparedge:project-management
+MONDAYCOM,monday.com,해외SaaS,comparedge:project-management
+MONDAY,monday.com,해외SaaS,comparedge:project-management
+TRELLO,Trello,해외SaaS,comparedge:project-management
+JIRA,Jira,해외SaaS,comparedge:project-management
+ATLASSIAN,Jira,해외SaaS,comparedge:project-management
+BASECAMP,Basecamp,해외SaaS,comparedge:project-management
+WRIKE,Wrike,해외SaaS,comparedge:project-management
+TEAMWORK,Teamwork,해외SaaS,comparedge:project-management
+LINEAR,Linear,해외SaaS,comparedge:project-management
+HEIGHT,Height,해외SaaS,comparedge:project-management
+HIVE,Hive,해외SaaS,comparedge:project-management
+SMARTSHEET,Smartsheet,해외SaaS,comparedge:project-management
+AIRTABLE,Airtable,해외SaaS,comparedge:project-management
+TODOIST,Todoist,해외SaaS,comparedge:project-management
+MIRO,Miro,해외SaaS,comparedge:project-management
+CODA,Coda,해외SaaS,comparedge:project-management
+SHORTCUTFORMERLYCLUBHOUSE,Shortcut (formerly Clubhouse),해외SaaS,comparedge:project-management
+SHORTCUT,Shortcut (formerly Clubhouse),해외SaaS,comparedge:project-management
+NIFTY,Nifty,해외SaaS,comparedge:project-management
+NIFTYPM,Nifty,해외SaaS,comparedge:project-management
+ZOHOPROJECTS,Zoho Projects,해외SaaS,comparedge:project-management
+ZOHO,Zoho Projects,해외SaaS,comparedge:project-management
+SALESFORCE,Salesforce,해외SaaS,comparedge:crm
+HUBSPOT,HubSpot,해외SaaS,comparedge:crm
+PIPEDRIVE,Pipedrive,해외SaaS,comparedge:crm
+ZOHOCRM,Zoho CRM,해외SaaS,comparedge:crm
+FRESHSALES,Freshsales,해외SaaS,comparedge:crm
+FRESHWORKS,Freshsales,해외SaaS,comparedge:crm
+CLOSE,Close,해외SaaS,comparedge:crm
+COPPER,Copper,해외SaaS,comparedge:crm
+INSIGHTLY,Insightly,해외SaaS,comparedge:crm
+KEAP,Keap,해외SaaS,comparedge:crm
+STREAK,Streak,해외SaaS,comparedge:crm
+NUTSHELL,Nutshell,해외SaaS,comparedge:crm
+LESSANNOYINGCRM,Less Annoying CRM,해외SaaS,comparedge:crm
+MONDAYCRM,monday CRM,해외SaaS,comparedge:crm
+FOLK,Folk,해외SaaS,comparedge:crm
+CAPSULECRM,Capsule CRM,해외SaaS,comparedge:crm
+ATTIO,Attio,해외SaaS,comparedge:crm
+MAILCHIMP,Mailchimp,해외SaaS,comparedge:email-marketing
+KITCONVERTKIT,Kit (ConvertKit),해외SaaS,comparedge:email-marketing
+KIT,Kit (ConvertKit),해외SaaS,comparedge:email-marketing
+ACTIVECAMPAIGN,ActiveCampaign,해외SaaS,comparedge:email-marketing
+BREVOSENDINBLUE,Brevo (Sendinblue),해외SaaS,comparedge:email-marketing
+BREVO,Brevo (Sendinblue),해외SaaS,comparedge:email-marketing
+KLAVIYO,Klaviyo,해외SaaS,comparedge:email-marketing
+DRIP,Drip,해외SaaS,comparedge:email-marketing
+AWEBER,AWeber,해외SaaS,comparedge:email-marketing
+GETRESPONSE,GetResponse,해외SaaS,comparedge:email-marketing
+CONSTANTCONTACT,Constant Contact,해외SaaS,comparedge:email-marketing
+MAILERLITE,MailerLite,해외SaaS,comparedge:email-marketing
+BEEHIIV,beehiiv,해외SaaS,comparedge:email-marketing
+OMNISEND,Omnisend,해외SaaS,comparedge:email-marketing
+MOOSEND,Moosend,해외SaaS,comparedge:email-marketing
+CAMPAIGNMONITOR,Campaign Monitor,해외SaaS,comparedge:email-marketing
+SENDER,Sender,해외SaaS,comparedge:email-marketing
+FLODESK,Flodesk,해외SaaS,comparedge:email-marketing
+BUTTONDOWN,Buttondown,해외SaaS,comparedge:email-marketing
+LOOPS,Loops,해외SaaS,comparedge:email-marketing
+WORDPRESSCOM,WordPress.com,해외SaaS,comparedge:website-builders
+WORDPRESS,WordPress.com,해외SaaS,comparedge:website-builders
+WIX,Wix,해외SaaS,comparedge:website-builders
+SQUARESPACE,Squarespace,해외SaaS,comparedge:website-builders
+WEBFLOW,Webflow,해외SaaS,comparedge:website-builders
+FRAMER,Framer,해외SaaS,comparedge:website-builders
+CARRD,Carrd,해외SaaS,comparedge:website-builders
+GHOST,Ghost,해외SaaS,comparedge:website-builders
+SHOPIFY,Shopify,해외SaaS,comparedge:website-builders
+WEEBLY,Weebly,해외SaaS,comparedge:website-builders
+DUDA,Duda,해외SaaS,comparedge:website-builders
+WEBNODE,Webnode,해외SaaS,comparedge:website-builders
+STRIKINGLY,Strikingly,해외SaaS,comparedge:website-builders
+10WEB,10Web,해외SaaS,comparedge:website-builders
+SUPER,Super,해외SaaS,comparedge:website-builders
+TYPEDREAM,Typedream,해외SaaS,comparedge:website-builders
+UNICORNPLATFORM,Unicorn Platform,해외SaaS,comparedge:website-builders
+AMAZONWEBSERVICESAWS,Amazon Web Services (AWS),해외SaaS,comparedge:cloud-hosting
+AWS,Amazon Web Services (AWS),해외SaaS,comparedge:cloud-hosting
+CLOUDWAYS,Cloudways,해외SaaS,comparedge:cloud-hosting
+DIGITALOCEAN,DigitalOcean,해외SaaS,comparedge:cloud-hosting
+HOSTINGER,Hostinger,해외SaaS,comparedge:cloud-hosting
+SITEGROUND,SiteGround,해외SaaS,comparedge:cloud-hosting
+KINSTA,Kinsta,해외SaaS,comparedge:cloud-hosting
+VERCEL,Vercel,해외SaaS,comparedge:cloud-hosting
+NETLIFY,Netlify,해외SaaS,comparedge:cloud-hosting
+FLYIO,Fly.io,해외SaaS,comparedge:cloud-hosting
+FLY,Fly.io,해외SaaS,comparedge:cloud-hosting
+RAILWAY,Railway,해외SaaS,comparedge:cloud-hosting
+RENDER,Render,해외SaaS,comparedge:cloud-hosting
+HETZNER,Hetzner,해외SaaS,comparedge:cloud-hosting
+VULTR,Vultr,해외SaaS,comparedge:cloud-hosting
+LINODEAKAMAICLOUD,Linode (Akamai Cloud),해외SaaS,comparedge:cloud-hosting
+LINODE,Linode (Akamai Cloud),해외SaaS,comparedge:cloud-hosting
+GOOGLECLOUDPLATFORM,Google Cloud Platform,해외SaaS,comparedge:cloud-hosting
+MICROSOFTAZURE,Microsoft Azure,해외SaaS,comparedge:cloud-hosting
+AZURE,Microsoft Azure,해외SaaS,comparedge:cloud-hosting
+A2HOSTING,A2 Hosting,해외SaaS,comparedge:cloud-hosting
+BLUEHOST,Bluehost,해외SaaS,comparedge:cloud-hosting
+NAMECHEAP,Namecheap,해외SaaS,comparedge:cloud-hosting
+WPENGINE,WP Engine,해외SaaS,comparedge:cloud-hosting
+FIGMA,Figma,해외SaaS,comparedge:design-tools
+CANVA,Canva,해외SaaS,comparedge:design-tools
+ADOBEXD,Adobe XD,해외SaaS,comparedge:design-tools
+ADOBE,Adobe XD,해외SaaS,comparedge:design-tools
+SKETCH,Sketch,해외SaaS,comparedge:design-tools
+INVISION,InVision,해외SaaS,comparedge:design-tools
+INVISIONAPP,InVision,해외SaaS,comparedge:design-tools
+PENPOT,Penpot,해외SaaS,comparedge:design-tools
+AFFINITYDESIGNER,Affinity Designer,해외SaaS,comparedge:design-tools
+ADOBEILLUSTRATOR,Adobe Illustrator,해외SaaS,comparedge:design-tools
+ADOBEPHOTOSHOP,Adobe Photoshop,해외SaaS,comparedge:design-tools
+LUNACY,Lunacy,해외SaaS,comparedge:design-tools
+ICONS8,Lunacy,해외SaaS,comparedge:design-tools
+PROCREATE,Procreate,해외SaaS,comparedge:design-tools
+PIXLR,Pixlr,해외SaaS,comparedge:design-tools
+SPLINE,Spline,해외SaaS,comparedge:design-tools
+WHIMSICAL,Whimsical,해외SaaS,comparedge:design-tools
+QUICKBOOKSONLINE,QuickBooks Online,해외SaaS,comparedge:accounting
+QUICKBOOKS,QuickBooks Online,해외SaaS,comparedge:accounting
+XERO,Xero,해외SaaS,comparedge:accounting
+FRESHBOOKS,FreshBooks,해외SaaS,comparedge:accounting
+WAVE,Wave,해외SaaS,comparedge:accounting
+WAVEAPPS,Wave,해외SaaS,comparedge:accounting
+ZOHOBOOKS,Zoho Books,해외SaaS,comparedge:accounting
+SAGEBUSINESSCLOUDACCOUNTING,Sage Business Cloud Accounting,해외SaaS,comparedge:accounting
+SAGE,Sage Business Cloud Accounting,해외SaaS,comparedge:accounting
+KASHOO,Kashoo,해외SaaS,comparedge:accounting
+BENCH,Bench,해외SaaS,comparedge:accounting
+FREEAGENT,FreeAgent,해외SaaS,comparedge:accounting
+BONSAI,Bonsai,해외SaaS,comparedge:accounting
+HELLOBONSAI,Bonsai,해외SaaS,comparedge:accounting
+HARVEST,Harvest,해외SaaS,comparedge:accounting
+GETHARVEST,Harvest,해외SaaS,comparedge:accounting
+AKAUNTING,Akaunting,해외SaaS,comparedge:accounting
+MANAGERIO,Manager.io,해외SaaS,comparedge:accounting
+MANAGER,Manager.io,해외SaaS,comparedge:accounting
+HURDLR,Hurdlr,해외SaaS,comparedge:accounting
+PATRIOTSOFTWARE,Patriot Software,해외SaaS,comparedge:accounting
+ZOOM,Zoom,해외SaaS,comparedge:video-conferencing
+GOOGLEMEET,Google Meet,해외SaaS,comparedge:video-conferencing
+MICROSOFTTEAMS,Microsoft Teams,해외SaaS,comparedge:video-conferencing
+MICROSOFT,Microsoft Teams,해외SaaS,comparedge:video-conferencing
+WHEREBY,Whereby,해외SaaS,comparedge:video-conferencing
+LOOM,Loom,해외SaaS,comparedge:video-conferencing
+WEBEXBYCISCO,Webex by Cisco,해외SaaS,comparedge:video-conferencing
+WEBEX,Webex by Cisco,해외SaaS,comparedge:video-conferencing
+GOTOMEETING,GoTo Meeting,해외SaaS,comparedge:video-conferencing
+GOTO,GoTo Meeting,해외SaaS,comparedge:video-conferencing
+AROUND,Around,해외SaaS,comparedge:video-conferencing
+LIVESTORM,Livestorm,해외SaaS,comparedge:video-conferencing
+JITSIMEET,Jitsi Meet,해외SaaS,comparedge:video-conferencing
+JITSI,Jitsi Meet,해외SaaS,comparedge:video-conferencing
+RIVERSIDEFM,Riverside.fm,해외SaaS,comparedge:video-conferencing
+RIVERSIDE,Riverside.fm,해외SaaS,comparedge:video-conferencing
+DAILY,Daily,해외SaaS,comparedge:video-conferencing
+VOWEL,Vowel,해외SaaS,comparedge:video-conferencing
+CALCOMCALVIDEO,Cal.com (Cal Video),해외SaaS,comparedge:video-conferencing
+CAL,Cal.com (Cal Video),해외SaaS,comparedge:video-conferencing
+BUTTER,Butter,해외SaaS,comparedge:video-conferencing
+DIALPAD,Dialpad,해외SaaS,comparedge:video-conferencing
+SLACK,Slack,해외SaaS,comparedge:video-conferencing
+RINGCENTRAL,RingCentral,해외SaaS,comparedge:video-conferencing
+SUGARCRM,SugarCRM,해외SaaS,comparedge:crm
+ZENDESKSELL,Zendesk Sell,해외SaaS,comparedge:crm
+ZENDESK,Zendesk Sell,해외SaaS,comparedge:crm
+HOSTGATOR,HostGator,해외SaaS,comparedge:cloud-hosting
+HUBSPOTCMS,HubSpot CMS,해외SaaS,comparedge:website-builders
+TILDA,Tilda,해외SaaS,comparedge:website-builders
+CLICKFUNNELS,ClickFunnels,해외SaaS,comparedge:website-builders
+MAILJET,Mailjet,해외SaaS,comparedge:email-marketing
+TWILIOSENDGRID,Twilio SendGrid,해외SaaS,comparedge:email-marketing
+SENDGRID,Twilio SendGrid,해외SaaS,comparedge:email-marketing
+DEMIO,Demio,해외SaaS,comparedge:video-conferencing
+GIMP,GIMP,해외SaaS,comparedge:design-tools
+CORELDRAW,CorelDRAW,해외SaaS,comparedge:design-tools
+CHATGPT,ChatGPT,해외SaaS,comparedge:llm
+CLAUDE,Claude,해외SaaS,comparedge:llm
+GOOGLEGEMINI,Google Gemini,해외SaaS,comparedge:llm
+GEMINI,Google Gemini,해외SaaS,comparedge:llm
+JASPER,Jasper,해외SaaS,comparedge:ai-writing
+COPYAI,Copy.ai,해외SaaS,comparedge:ai-writing
+COPY,Copy.ai,해외SaaS,comparedge:ai-writing
+GRAMMARLY,Grammarly,해외SaaS,comparedge:ai-writing
+1PASSWORD,1Password,해외SaaS,comparedge:password-managers
+BITWARDEN,Bitwarden,해외SaaS,comparedge:password-managers
+LASTPASS,LastPass,해외SaaS,comparedge:password-managers
+DASHLANE,Dashlane,해외SaaS,comparedge:password-managers
+NORDPASS,NordPass,해외SaaS,comparedge:password-managers
+MIDJOURNEY,Midjourney,해외SaaS,comparedge:ai-image
+DALLE3,DALL-E 3,해외SaaS,comparedge:ai-image
+OPENAI,DALL-E 3,해외SaaS,comparedge:ai-image
+STABLEDIFFUSION,Stable Diffusion,해외SaaS,comparedge:ai-image
+STABILITY,Stable Diffusion,해외SaaS,comparedge:ai-image
+ADOBEFIREFLY,Adobe Firefly,해외SaaS,comparedge:ai-image
+FIREFLY,Adobe Firefly,해외SaaS,comparedge:ai-image
+LEONARDOAI,Leonardo AI,해외SaaS,comparedge:ai-image
+LEONARDO,Leonardo AI,해외SaaS,comparedge:ai-image
+SYNTHESIA,Synthesia,해외SaaS,comparedge:ai-video
+HEYGEN,HeyGen,해외SaaS,comparedge:ai-video
+RUNWAY,Runway,해외SaaS,comparedge:ai-video
+RUNWAYML,Runway,해외SaaS,comparedge:ai-video
+PIKA,Pika,해외SaaS,comparedge:ai-video
+GITHUBCOPILOT,GitHub Copilot,해외SaaS,comparedge:ai-coding
+GITHUB,GitHub Copilot,해외SaaS,comparedge:ai-coding
+CURSOR,Cursor,해외SaaS,comparedge:ai-coding
+CODEIUM,Codeium,해외SaaS,comparedge:ai-coding
+WINDSURF,Codeium,해외SaaS,comparedge:ai-coding
+ELEVENLABS,ElevenLabs,해외SaaS,comparedge:ai-voice
+MURFAI,Murf AI,해외SaaS,comparedge:ai-voice
+MURF,Murf AI,해외SaaS,comparedge:ai-voice
+PLAYHT,Play.ht,해외SaaS,comparedge:ai-voice
+PLAY,Play.ht,해외SaaS,comparedge:ai-voice
+N8N,n8n,해외SaaS,comparedge:ai-agents
+MAKEINTEGROMAT,Make (Integromat),해외SaaS,comparedge:ai-agents
+MAKE,Make (Integromat),해외SaaS,comparedge:ai-agents
+PERPLEXITYAI,Perplexity AI,해외SaaS,comparedge:ai-productivity
+PERPLEXITY,Perplexity AI,해외SaaS,comparedge:ai-productivity
+OPENAIAPI,OpenAI API,해외SaaS,comparedge:llm
+HUGGINGFACE,Hugging Face,해외SaaS,comparedge:llm
+REPLICATE,Replicate,해외SaaS,comparedge:llm
+WRITESONIC,Writesonic,해외SaaS,comparedge:ai-writing
+NOTIONAI,Notion AI,해외SaaS,comparedge:ai-productivity
+RYTR,Rytr,해외SaaS,comparedge:ai-writing
+WORDTUNE,Wordtune,해외SaaS,comparedge:ai-writing
+QUILLBOT,QuillBot,해외SaaS,comparedge:ai-writing
+SUDOWRITE,Sudowrite,해외SaaS,comparedge:ai-writing
+PROWRITINGAID,ProWritingAid,해외SaaS,comparedge:ai-writing
+COPYSMITH,Copysmith,해외SaaS,comparedge:ai-writing
+AI21STUDIO,AI21 Studio,해외SaaS,comparedge:ai-writing
+CANVAAI,Canva AI,해외SaaS,comparedge:ai-image
+IDEOGRAM,Ideogram,해외SaaS,comparedge:ai-image
+KLINGAI,Kling AI,해외SaaS,comparedge:ai-image
+KLING,Kling AI,해외SaaS,comparedge:ai-image
+LUMAAIDREAMMACHINE,Luma AI (Dream Machine),해외SaaS,comparedge:ai-image
+LUMALABS,Luma AI (Dream Machine),해외SaaS,comparedge:ai-image
+TOPAZLABSAI,Topaz Labs AI,해외SaaS,comparedge:ai-image
+TOPAZLABS,Topaz Labs AI,해외SaaS,comparedge:ai-image
+LUMINARNEO,Luminar Neo,해외SaaS,comparedge:ai-image
+SKYLUM,Luminar Neo,해외SaaS,comparedge:ai-image
+REMOVEBG,Remove.bg,해외SaaS,comparedge:ai-image
+REMOVE,Remove.bg,해외SaaS,comparedge:ai-image
+TABNINE,Tabnine,해외SaaS,comparedge:ai-coding
+REPLITAI,Replit AI,해외SaaS,comparedge:ai-coding
+REPLIT,Replit AI,해외SaaS,comparedge:ai-coding
+BOLTNEW,Bolt.new,해외SaaS,comparedge:ai-coding
+BOLT,Bolt.new,해외SaaS,comparedge:ai-coding
+V0BYVERCEL,v0 by Vercel,해외SaaS,comparedge:ai-coding
+WINDSURFCODEIUM,Windsurf (Codeium),해외SaaS,comparedge:ai-coding
+PHIND,Phind,해외SaaS,comparedge:ai-coding
+ZAPIERAI,Zapier AI,해외SaaS,comparedge:ai-agents
+ZAPIER,Zapier AI,해외SaaS,comparedge:ai-agents
+CHARACTERAI,Character.AI,해외SaaS,comparedge:ai-assistants
+CHARACTER,Character.AI,해외SaaS,comparedge:ai-assistants
+ANTHROPICAPICLAUDE,Anthropic API (Claude),해외SaaS,comparedge:llm
+ANTHROPIC,Anthropic API (Claude),해외SaaS,comparedge:llm
+GOOGLEAISTUDIO,Google AI Studio,해외SaaS,comparedge:llm
+AISTUDIO,Google AI Studio,해외SaaS,comparedge:llm
+MICROSOFTCOPILOT,Microsoft Copilot,해외SaaS,comparedge:ai-assistants
+COPILOT,Microsoft Copilot,해외SaaS,comparedge:ai-assistants
+COHERE,Cohere,해외SaaS,comparedge:llm
+MISTRALAI,Mistral AI,해외SaaS,comparedge:llm
+MISTRAL,Mistral AI,해외SaaS,comparedge:llm
+YOUCOM,You.com,해외SaaS,comparedge:ai-productivity
+YOU,You.com,해외SaaS,comparedge:ai-productivity
+CONSENSUS,Consensus,해외SaaS,comparedge:ai-productivity
+ELICIT,Elicit,해외SaaS,comparedge:ai-productivity
+SUNO,Suno,해외SaaS,comparedge:ai-voice
+UDIO,Udio,해외SaaS,comparedge:ai-voice
+ADOBEPODCASTENHANCE,Adobe Podcast (Enhance),해외SaaS,comparedge:ai-voice
+OTTERAI,Otter.ai,해외SaaS,comparedge:ai-productivity
+OTTER,Otter.ai,해외SaaS,comparedge:ai-productivity
+FIREFLIESAI,Fireflies.ai,해외SaaS,comparedge:ai-productivity
+FIREFLIES,Fireflies.ai,해외SaaS,comparedge:ai-productivity
+MEMAI,Mem AI,해외SaaS,comparedge:ai-productivity
+MEM,Mem AI,해외SaaS,comparedge:ai-productivity
+BEAUTIFULAI,Beautiful.ai,해외SaaS,comparedge:ai-productivity
+BEAUTIFUL,Beautiful.ai,해외SaaS,comparedge:ai-productivity
+GAMMA,Gamma,해외SaaS,comparedge:ai-productivity
+TOME,Tome,해외SaaS,comparedge:ai-productivity
+DESCRIPT,Descript,해외SaaS,comparedge:ai-video
+CAPCUTAI,CapCut AI,해외SaaS,comparedge:ai-video
+CAPCUT,CapCut AI,해외SaaS,comparedge:ai-video
+VIDIQAI,vidIQ AI,해외SaaS,comparedge:ai-video
+VIDIQ,vidIQ AI,해외SaaS,comparedge:ai-video
+INVIDEOAI,InVideo AI,해외SaaS,comparedge:ai-video
+INVIDEO,InVideo AI,해외SaaS,comparedge:ai-video
+OBVIOUSLYAI,Obviously AI,해외SaaS,comparedge:ai-productivity
+ZAMS,Obviously AI,해외SaaS,comparedge:ai-productivity
+DATAROBOT,DataRobot,해외SaaS,comparedge:ai-productivity
+GROK,Grok,해외SaaS,comparedge:llm
+DEEPSEEK,DeepSeek,해외SaaS,comparedge:llm
+METAAI,Meta AI,해외SaaS,comparedge:llm
+META,Meta AI,해외SaaS,comparedge:llm
+LLAMAMETA,Llama (Meta),해외SaaS,comparedge:llm
+LLAMA,Llama (Meta),해외SaaS,comparedge:llm
+GEMINIADVANCED,Gemini Advanced,해외SaaS,comparedge:llm
+GPT4O,GPT-4o,해외SaaS,comparedge:llm
+CLAUDE35SONNET,Claude 3.5 Sonnet,해외SaaS,comparedge:llm
+GEMINI15PRO,Gemini 1.5 Pro,해외SaaS,comparedge:llm
+DEEPSEEKV3,DeepSeek V3,해외SaaS,comparedge:llm
+LLAMA31,Llama 3.1,해외SaaS,comparedge:llm
+MISTRALLARGE,Mistral Large,해외SaaS,comparedge:llm
+GROK2,Grok 2,해외SaaS,comparedge:llm
+OPENAIO1,OpenAI o1,해외SaaS,comparedge:llm
+COMMANDR,Command R+,해외SaaS,comparedge:llm
+PHI3,Phi-3,해외SaaS,comparedge:llm
+AUTOGPT,AutoGPT,해외SaaS,comparedge:ai-agents
+AGPT,AutoGPT,해외SaaS,comparedge:ai-agents
+CREWAI,CrewAI,해외SaaS,comparedge:ai-agents
+DEVIN,Devin,해외SaaS,comparedge:ai-agents
+OPENAIAGENTSSDK,OpenAI Agents SDK,해외SaaS,comparedge:ai-agents
+RELEVANCEAI,Relevance AI,해외SaaS,comparedge:ai-agents
+INTERCOMFIN,Intercom Fin,해외SaaS,comparedge:ai-assistants
+INTERCOM,Intercom Fin,해외SaaS,comparedge:ai-assistants
+TIDIO,Tidio,해외SaaS,comparedge:ai-assistants
+CHATBASE,Chatbase,해외SaaS,comparedge:ai-assistants
+BOTPRESS,Botpress,해외SaaS,comparedge:ai-assistants
+VOICEFLOW,Voiceflow,해외SaaS,comparedge:ai-assistants
+SURFERSEO,Surfer SEO,해외SaaS,comparedge:ai-writing
+FLUX,Flux,해외SaaS,comparedge:ai-image
+BLACKFORESTLABS,Flux,해외SaaS,comparedge:ai-image
+SORA,Sora,해외SaaS,comparedge:ai-video
+SPEECHIFY,Speechify,해외SaaS,comparedge:ai-voice
+LINKEDIN,LinkedIn,해외SaaS,companyenrich:social media
+GOOGLE,Google,해외SaaS,companyenrich:law
+GOOGLETAGMANAGER,Google,해외SaaS,companyenrich:technology
+LINKTREE,Linktree,해외SaaS,companyenrich:technology
+LINKTR,Linktree,해외SaaS,companyenrich:technology
+DROPBOX,Dropbox,해외SaaS,companyenrich:technology
+BING,Microsoft,해외SaaS,companyenrich:technology
+STRIPE,Stripe,해외SaaS,companyenrich:financial services
+ORACLE,Oracle,해외SaaS,companyenrich:technology
+SURVEYMONKEY,SurveyMonkey,해외SaaS,companyenrich:software
+FOURSQUARE,Foursquare,해외SaaS,companyenrich:technology
+ZECDATATECHNOLOGY,ZecData Technology,해외SaaS,companyenrich:information technology
+EXAMPLE,ZecData Technology,해외SaaS,companyenrich:information technology
+GODADDY,GoDaddy,해외SaaS,companyenrich:technology
+CALENDLY,Calendly,해외SaaS,companyenrich:software
+MATRIX,Matrix,해외SaaS,companyenrich:communication
+AUTOMATTIC,Automattic,해외SaaS,companyenrich:technology
+BITBUCKET,Bitbucket,해외SaaS,companyenrich:software
+STREAMELEMENTS,StreamElements,해외SaaS,companyenrich:technology
+BUFFER,Buffer,해외SaaS,companyenrich:software
+FEEDLY,Feedly,해외SaaS,companyenrich:software
+MAGNETOEMPLEOS,Magneto Empleos,해외SaaS,companyenrich:human resources
+CUTT,Magneto Empleos,해외SaaS,companyenrich:human resources
+SEMRUSH,Semrush,해외SaaS,companyenrich:software
+BITLY,Bitly,해외SaaS,companyenrich:marketing
+SKYPE,Skype,해외SaaS,companyenrich:education
+HOOTSUITE,Hootsuite,해외SaaS,companyenrich:software
+MOZ,Moz,해외SaaS,companyenrich:marketing
+GITLAB,GitLab,해외SaaS,companyenrich:software
+DISQUS,Disqus,해외SaaS,companyenrich:technology
+WOOCOMMERCE,WooCommerce,해외SaaS,companyenrich:ecommerce
+TWILIO,Twilio,해외SaaS,companyenrich:software
+JOTFORM,Jotform,해외SaaS,companyenrich:software
+JETBRAINS,JetBrains,해외SaaS,companyenrich:software
+IUBENDA,Iubenda,해외SaaS,companyenrich:legal services
+XING,XING,해외SaaS,companyenrich:employment services
+ANIMOTO,Animoto,해외SaaS,companyenrich:technology
+CRUNCHBASE,Crunchbase,해외SaaS,companyenrich:data services
+AUTODESK,Autodesk,해외SaaS,companyenrich:software
+DEEPL,DeepL,해외SaaS,companyenrich:software
+CODEPEN,CodePen,해외SaaS,companyenrich:software
+RELATIVEWAVE,Relative Wave,해외SaaS,companyenrich:software
+MATERIAL,Relative Wave,해외SaaS,companyenrich:software
+COREFILING,CoreFiling,해외SaaS,companyenrich:technology
+GUMROAD,Gumroad,해외SaaS,companyenrich:e-commerce
+NPM,Npm,해외SaaS,companyenrich:software
+NPMJS,Npm,해외SaaS,companyenrich:software
+PADLET,Padlet,해외SaaS,companyenrich:software
+PROOFPOINT,Proofpoint,해외SaaS,companyenrich:cybersecurity
+URLDEFENSE,Proofpoint,해외SaaS,companyenrich:cybersecurity
+VIRUSTOTAL,VirusTotal,해외SaaS,companyenrich:cybersecurity
+SNIPFEED,Snipfeed,해외SaaS,companyenrich:ecommerce
+SIMILARWEB,SimilarWeb,해외SaaS,companyenrich:data analytics
+EPIDEMICSOUND,Epidemic Sound,해외SaaS,companyenrich:music licensing
+BESBRISITSOLUTIONS,Besbris IT Solutions,해외SaaS,companyenrich:it services
+GRAVATAR,Besbris IT Solutions,해외SaaS,companyenrich:it services
+AHREFS,Ahrefs,해외SaaS,companyenrich:software
+DOCKER,Docker,해외SaaS,companyenrich:software
+WETRANSFER,WeTransfer,해외SaaS,companyenrich:technology
+JQUERY,jQuery,해외SaaS,companyenrich:software
+FLATICON,Flaticon,해외SaaS,companyenrich:design
+COSCHEDULE,CoSchedule,해외SaaS,companyenrich:marketing
+SAP,SAP,해외SaaS,companyenrich:software
+TAWK,Tawk,해외SaaS,companyenrich:software
+FOREM,Forem,해외SaaS,companyenrich:software
+DEV,Forem,해외SaaS,companyenrich:software
+ALEXA,Alexa,해외SaaS,companyenrich:analytics
+ECRSOFTWARECORPORATION,ECR Software Corporation,해외SaaS,companyenrich:software
+ECRS,ECR Software Corporation,해외SaaS,companyenrich:software
+REDHAT,Red Hat,해외SaaS,companyenrich:software
+PULLPANDA,Pull Panda,해외SaaS,companyenrich:software
+PREZI,Prezi,해외SaaS,companyenrich:software
+QUALTRICS,Qualtrics,해외SaaS,companyenrich:software
+AMPACCELERATEDMOBILEPAGES,AMP - Accelerated Mobile Pages,해외SaaS,companyenrich:technology
+AMP,AMP - Accelerated Mobile Pages,해외SaaS,companyenrich:technology
+KASPERSKY,Kaspersky,해외SaaS,companyenrich:cybersecurity
+QSPAINRELIEF,QSPainRelief,해외SaaS,companyenrich:healthcare
+BOX,Box,해외SaaS,companyenrich:cloud computing
+JSFIDDLE,JSFiddle,해외SaaS,companyenrich:software development
+PROGESOFT,ProgeSOFT,해외SaaS,companyenrich:software
+AGRIMETSOFT,AgriMetSoft,해외SaaS,companyenrich:software
+HOTJAR,Hotjar,해외SaaS,companyenrich:software
+INTREPIDGEOPHYSICS,Intrepid Geophysics,해외SaaS,companyenrich:geophysics
+BIOKEYINTERNATIONAL,BIO-key International,해외SaaS,companyenrich:information technology
+BIOKEY,BIO-key International,해외SaaS,companyenrich:information technology
+UNREALENGINE,Unreal Engine,해외SaaS,companyenrich:software
+UDACITY,Udacity,해외SaaS,companyenrich:education
+BIGCOMMERCE,BigCommerce,해외SaaS,companyenrich:ecommerce
+INTELLICTI,Intelli-CTi,해외SaaS,companyenrich:software
+MAPBOX,Mapbox,해외SaaS,companyenrich:software
+TABLEAU,Tableau,해외SaaS,companyenrich:software
+TICKETTAILOR,Ticket Tailor,해외SaaS,companyenrich:software
+STATCOUNTER,StatCounter,해외SaaS,companyenrich:online analytics
+PRESTASHOP,PrestaShop,해외SaaS,companyenrich:ecommerce
+NGINX,NGINX,해외SaaS,companyenrich:software
+PIVOTALSOFTWARE,Pivotal Software,해외SaaS,companyenrich:software
+VMWARE,Pivotal Software,해외SaaS,companyenrich:software
+ESRIENVIRONMENTALSYSTEMSRESEARCHINSTITUTE,Esri - Environmental Systems Research Institute,해외SaaS,companyenrich:software
+ESRI,Esri - Environmental Systems Research Institute,해외SaaS,companyenrich:software
+FORTINET,Fortinet,해외SaaS,companyenrich:cybersecurity
+UNITY,Unity,해외SaaS,companyenrich:software
+MYSQL,MySQL,해외SaaS,companyenrich:software
+CALM,Calm,해외SaaS,companyenrich:healthcare
+CBINSIGHTS,CB Insights,해외SaaS,companyenrich:information technology
+DOCUMENTCLOUD,DocumentCloud,해외SaaS,companyenrich:information services
+CRAZYEGG,Crazy Egg,해외SaaS,companyenrich:digital marketing
+FONTAWESOME,Font Awesome,해외SaaS,companyenrich:design
+HACKMD,HackMD,해외SaaS,companyenrich:software
+TECHSMITH,TechSmith,해외SaaS,companyenrich:software
+MEGA,Mega,해외SaaS,companyenrich:technology
+YOAST,Yoast,해외SaaS,companyenrich:digital marketing
+GITTER,Gitter,해외SaaS,companyenrich:software
+NEWRELIC,New Relic,해외SaaS,companyenrich:software
+WORDSTREAM,WordStream,해외SaaS,companyenrich:digital marketing
+PAYSCALE,Payscale,해외SaaS,companyenrich:human resources
+PAYHIP,Payhip,해외SaaS,companyenrich:ecommerce
+OKTA,Okta,해외SaaS,companyenrich:software
+MINDBODY,Mindbody,해외SaaS,companyenrich:software
+MINDBODYONLINE,Mindbody,해외SaaS,companyenrich:software
+ADDTOANY,AddToAny,해외SaaS,companyenrich:technology
+NOUNPROJECT,Noun Project,해외SaaS,companyenrich:design
+THENOUNPROJECT,Noun Project,해외SaaS,companyenrich:design
+ZSTANDARD,Zstandard,해외SaaS,companyenrich:software
+BITDEFENDER,Bitdefender,해외SaaS,companyenrich:cybersecurity
+OPTIMIZELY,Optimizely,해외SaaS,companyenrich:software
+PODBEAN,Podbean,해외SaaS,companyenrich:podcasting
+JETPACK,Jetpack,해외SaaS,companyenrich:software
+BITRIX24,Bitrix24,해외SaaS,companyenrich:software
+LOTTIEFILES,LottieFiles,해외SaaS,companyenrich:technology
+HEADSPACE,Headspace,해외SaaS,companyenrich:healthcare
+PLAUSIBLEANALYTICS,Plausible Analytics,해외SaaS,companyenrich:analytics
+PLAUSIBLE,Plausible Analytics,해외SaaS,companyenrich:analytics
+WOLFRAMALPHA,Wolfram Alpha,해외SaaS,companyenrich:technology
+SENDPULSE,SendPulse,해외SaaS,companyenrich:marketing
+DUOSECURITY,Duo Security,해외SaaS,companyenrich:cybersecurity
+DUO,Duo Security,해외SaaS,companyenrich:cybersecurity
+LITMUS,Litmus,해외SaaS,companyenrich:marketing
+PROQUEST,ProQuest,해외SaaS,companyenrich:education
+MIXPANEL,Mixpanel,해외SaaS,companyenrich:analytics
+APPSFLYER,AppsFlyer,해외SaaS,companyenrich:technology
+ELEMENTOR,Elementor,해외SaaS,companyenrich:software
+SSKTECHNOLOGIES,SSK Technologies,해외SaaS,companyenrich:software
+JAVA,SSK Technologies,해외SaaS,companyenrich:software
+CVENT,Cvent,해외SaaS,companyenrich:event management
+PARALLELS,Parallels,해외SaaS,companyenrich:technology
+F5NETWORKS,F5 Networks,해외SaaS,companyenrich:technology
+SPLUNK,Splunk,해외SaaS,companyenrich:software
+TINIFY,Tinify,해외SaaS,companyenrich:technology
+TINYPNG,Tinify,해외SaaS,companyenrich:technology
+DIGITALINSPIRATION,Digital Inspiration,해외SaaS,companyenrich:software development
+LABNOL,Digital Inspiration,해외SaaS,companyenrich:software development
+VENNGAGE,Venngage,해외SaaS,companyenrich:design
+SPROUTSOCIAL,Sprout Social,해외SaaS,companyenrich:software
+LIVERAMP,LiveRamp,해외SaaS,companyenrich:data services
+COGNITOFORMS,Cognito Forms,해외SaaS,companyenrich:software
+PYPIPYTHONPACKAGEINDEX,PyPI - Python Package Index,해외SaaS,companyenrich:software
+PYPI,PyPI - Python Package Index,해외SaaS,companyenrich:software
+ECWID,Ecwid,해외SaaS,companyenrich:e-commerce
+TYPESCRIPT,TypeScript,해외SaaS,companyenrich:software
+TYPESCRIPTLANG,TypeScript,해외SaaS,companyenrich:software
+SASS,Sass,해외SaaS,companyenrich:software
+SASSLANG,Sass,해외SaaS,companyenrich:software
+GIT,Git,해외SaaS,companyenrich:software
+GITSCM,Git,해외SaaS,companyenrich:software
+TEAMVIEWER,TeamViewer,해외SaaS,companyenrich:technology
+AFTERSHIP,AfterShip,해외SaaS,companyenrich:software
+SCOOPIT,Scoop.it,해외SaaS,companyenrich:marketing
+SCOOP,Scoop.it,해외SaaS,companyenrich:marketing
+INTUIT,Intuit,해외SaaS,companyenrich:financial services
+POSTGRESQLGLOBALDEVELOPMENTGROUP,PostgreSQL Global Development Group,해외SaaS,companyenrich:software
+POSTGRESQL,PostgreSQL Global Development Group,해외SaaS,companyenrich:software
+WEBPAGETEST,WebPageTest,해외SaaS,companyenrich:internet services
+BLACKBAUD,Blackbaud,해외SaaS,companyenrich:software
+MCAFEE,McAfee,해외SaaS,companyenrich:cybersecurity
+KOTLINKOLKATA,Kotlin Kolkata,해외SaaS,companyenrich:software
+KOTLINLANG,Kotlin Kolkata,해외SaaS,companyenrich:software
+WHAT3WORDS,What3words,해외SaaS,companyenrich:technology
+AKISMET,Akismet,해외SaaS,companyenrich:software
+CROWDCAST,Crowdcast,해외SaaS,companyenrich:technology
+PLESK,Plesk,해외SaaS,companyenrich:software
+SHORESBEYOND,Shores Beyond,해외SaaS,companyenrich:marketing
+GETREVUE,Shores Beyond,해외SaaS,companyenrich:marketing
+JIVO,Jivo,해외SaaS,companyenrich:technology
+JIVOCHAT,Jivo,해외SaaS,companyenrich:technology
+AUTH0,Auth0,해외SaaS,companyenrich:software
+LUCIDCHART,Lucidchart,해외SaaS,companyenrich:software
+WPFORMS,WPForms,해외SaaS,companyenrich:software
+BRIGHTCOVE,Brightcove,해외SaaS,companyenrich:technology
+JOOMLA,Joomla,해외SaaS,companyenrich:software
+DOCUSIGN,DocuSign,해외SaaS,companyenrich:software
+UPTIMEROBOT,Uptime Robot,해외SaaS,companyenrich:internet services
+MATOMO,Matomo,해외SaaS,companyenrich:software
+PORTSWIGGER,PortSwigger,해외SaaS,companyenrich:software
+CREDLY,Credly,해외SaaS,companyenrich:education
+WORLDTIMEBUDDY,World Time Buddy,해외SaaS,companyenrich:software
+SENTRY,Sentry,해외SaaS,companyenrich:software
+JQUERYUI,jQuery UI,해외SaaS,companyenrich:software
+GPGCOMMUNICATIONS,Gpg Communications,해외SaaS,companyenrich:software
+GNUPG,Gpg Communications,해외SaaS,companyenrich:software
+OPTINMONSTER,OptinMonster,해외SaaS,companyenrich:software
+SHARETHIS,ShareThis,해외SaaS,companyenrich:marketing
+TRADINGVIEW,TradingView,해외SaaS,companyenrich:finance
+ELASTIC,Elastic,해외SaaS,companyenrich:technology
+AUPHONIC,Auphonic,해외SaaS,companyenrich:audio production
+GEOGEBRA,GeoGebra,해외SaaS,companyenrich:software
+UNBOUNCE,Unbounce,해외SaaS,companyenrich:digital marketing
+CYBERLINK,CyberLink,해외SaaS,companyenrich:software
+CLOUDINARY,Cloudinary,해외SaaS,companyenrich:technology
+DZONE,DZone,해외SaaS,companyenrich:software
+DOODLE,Doodle,해외SaaS,companyenrich:software
+OBERLO,Oberlo,해외SaaS,companyenrich:e-commerce
+TRENDMICRO,Trend Micro,해외SaaS,companyenrich:cybersecurity
+TOGGL,Toggl,해외SaaS,companyenrich:software
+LEAFLET,Leaflet,해외SaaS,companyenrich:software
+LEAFLETJS,Leaflet,해외SaaS,companyenrich:software
+CROWDSTRIKE,CrowdStrike,해외SaaS,companyenrich:cybersecurity
+CHARTBEAT,Chartbeat,해외SaaS,companyenrich:software
+FILEZILLA,FileZilla,해외SaaS,companyenrich:software
+FILEZILLAPROJECT,FileZilla,해외SaaS,companyenrich:software
+SKETCHUP,SketchUp,해외SaaS,companyenrich:software
+FIDOALLIANCE,FIDO Alliance,해외SaaS,companyenrich:technology
+VUETECHNOLOGY,Vue Technology,해외SaaS,companyenrich:software
+VUEJS,Vue Technology,해외SaaS,companyenrich:software
+NUANCECOMMUNICATIONS,Nuance Communications,해외SaaS,companyenrich:technology
+NUANCE,Nuance Communications,해외SaaS,companyenrich:technology
+WISTIA,Wistia,해외SaaS,companyenrich:technology
+MATRIXFOUNDATION,Matrix Foundation,해외SaaS,companyenrich:communication tech
+STEINBERGMEDIATECHNOLOGIES,Steinberg Media Technologies,해외SaaS,companyenrich:audio
+STEINBERG,Steinberg Media Technologies,해외SaaS,companyenrich:audio
+MOMENTJS,Moment.js,해외SaaS,companyenrich:software
+ONLYOFFICE,OnlyOffice,해외SaaS,companyenrich:software
+SQLITE,SQLite,해외SaaS,companyenrich:software
+TERMSFEED,TermsFeed,해외SaaS,companyenrich:software
+BACKBONE,Backbone,해외SaaS,companyenrich:software
+BACKBONEJS,Backbone,해외SaaS,companyenrich:software
+WESSELGRDENBRYGGHUS,Wesselgården Brygghus,해외SaaS,companyenrich:software
+GYAZO,Wesselgården Brygghus,해외SaaS,companyenrich:software
+DIGISTORE24,Digistore24,해외SaaS,companyenrich:e-commerce
+SURFER,Surfer,해외SaaS,companyenrich:digital marketing
+MOUSEFLOW,Mouseflow,해외SaaS,companyenrich:software
+BABEL,Babel,해외SaaS,companyenrich:software
+BABELJS,Babel,해외SaaS,companyenrich:software
+MOODLE,Moodle,해외SaaS,companyenrich:educational services
+REALVNC,RealVNC,해외SaaS,companyenrich:software
+MARIADB,MariaDB,해외SaaS,companyenrich:software
+BUDDYPRESS,BuddyPress,해외SaaS,companyenrich:software
+POWR,POWR,해외SaaS,companyenrich:software
+MENDELEY,Mendeley,해외SaaS,companyenrich:technology
+MINDMEISTER,MindMeister,해외SaaS,companyenrich:software
+RINGCENTRALEVENTS,RingCentral Events,해외SaaS,companyenrich:event management
+HOPIN,RingCentral Events,해외SaaS,companyenrich:event management
+GTMETRIX,GTmetrix,해외SaaS,companyenrich:software
+QUICKSPROUT,Quick Sprout,해외SaaS,companyenrich:software
+INVALUABLE,Invaluable,해외SaaS,companyenrich:ecommerce
+ONELOGIN,OneLogin,해외SaaS,companyenrich:software
+MEDIAAREA,MediaArea,해외SaaS,companyenrich:software
+SMALLPDF,Smallpdf,해외SaaS,companyenrich:software
+SMARTINSIGHTS,Smart Insights,해외SaaS,companyenrich:education
+JOBPOTATO,JobPotato,해외SaaS,companyenrich:software
+TALLY,JobPotato,해외SaaS,companyenrich:software
+CHECKPOINTSOFTWARE,Check Point Software,해외SaaS,companyenrich:cybersecurity
+CHECKPOINT,Check Point Software,해외SaaS,companyenrich:cybersecurity
+NEXTCLOUD,Nextcloud,해외SaaS,companyenrich:software
+MICROSOFTOFFICE,Microsoft Office,해외SaaS,companyenrich:software
+OFFICE,Microsoft Office,해외SaaS,companyenrich:software
+LOVEFIELD,Lovefield,해외SaaS,companyenrich:software
+BLACKBERRY,BlackBerry,해외SaaS,companyenrich:cybersecurity
+AUTHY,Authy,해외SaaS,companyenrich:cybersecurity
+ZOOMINFO,ZoomInfo,해외SaaS,companyenrich:software
+CYBOT,Cybot,해외SaaS,companyenrich:technology
+COOKIEBOT,Cybot,해외SaaS,companyenrich:technology
+QIITA,Qiita,해외SaaS,companyenrich:software
+TEAMUPSOLUTIONS,Teamup Solutions,해외SaaS,companyenrich:software
+TEAMUP,Teamup Solutions,해외SaaS,companyenrich:software
+NEXTJS,Next.js,해외SaaS,companyenrich:software development
+WOLTERSKLUWER,Wolters Kluwer,해외SaaS,companyenrich:information services
+LATER,Later,해외SaaS,companyenrich:marketing
+IMAGEMAGICKSTUDIO,ImageMagick Studio,해외SaaS,companyenrich:software
+IMAGEMAGICK,ImageMagick Studio,해외SaaS,companyenrich:software
+DATACAMP,DataCamp,해외SaaS,companyenrich:education
+WORKDAY,Workday,해외SaaS,companyenrich:software
+INFOGRAM,Infogram,해외SaaS,companyenrich:software
+CONSULTANT,КонсультантПлюс,해외SaaS,companyenrich:legal services
+RENDERFOREST,Renderforest,해외SaaS,companyenrich:design
+BROWSERSTACK,BrowserStack,해외SaaS,companyenrich:software
+BACKBLAZE,Backblaze,해외SaaS,companyenrich:cloud services
+COFFEESCRIPT,CoffeeScript,해외SaaS,companyenrich:software
+JWT,JWT,해외SaaS,companyenrich:technology
+WORDFENCE,Wordfence,해외SaaS,companyenrich:software
+DATAXU,Dataxu,해외SaaS,companyenrich:marketing
+ROKU,Dataxu,해외SaaS,companyenrich:marketing
+MONGODB,MongoDB,해외SaaS,companyenrich:software
+DEMANDSAGE,Demand Sage,해외SaaS,companyenrich:technology
+PINGDOM,Pingdom,해외SaaS,companyenrich:technology
+LIVECHAT,LiveChat,해외SaaS,companyenrich:software
+FSECURE,F-Secure,해외SaaS,companyenrich:cybersecurity
+MUCKRACK,Muck Rack,해외SaaS,companyenrich:software
+MOOTOOLS,MooTools,해외SaaS,companyenrich:software
+SONICWALL,SonicWall,해외SaaS,companyenrich:cybersecurity
+SEGMENT,Segment,해외SaaS,companyenrich:software
+OPENCART,OpenCart,해외SaaS,companyenrich:e-commerce
+KUBERNETES,Kubernetes,해외SaaS,companyenrich:software
+REDIS,Redis,해외SaaS,companyenrich:software
+PERFECTCORPORATION,Perfect Corporation,해외SaaS,companyenrich:technology
+PERFECTCORP,Perfect Corporation,해외SaaS,companyenrich:technology
+CALIFORNIAURBANANDREGIONALINFORMATIONSYSTEMSASSOCIATION,California Urban and Regional Information Systems Association,해외SaaS,companyenrich:gis
+ARCGIS,California Urban and Regional Information Systems Association,해외SaaS,companyenrich:gis
+STABILITYAI,Stability AI,해외SaaS,companyenrich:technology
+VEEQO,Veeqo,해외SaaS,companyenrich:software
+3CX,3CX,해외SaaS,companyenrich:telecommunications
+Q1LABS,Q1 Labs,해외SaaS,companyenrich:security
+SECURITYINTELLIGENCE,Q1 Labs,해외SaaS,companyenrich:security
+RESCUETIME,RescueTime,해외SaaS,companyenrich:software
+TRANSIFEX,Transifex,해외SaaS,companyenrich:software
+FULLCONTACT,FullContact,해외SaaS,companyenrich:software
+T3NET,T3NET,해외SaaS,companyenrich:technology
+SYMFONY,T3NET,해외SaaS,companyenrich:technology
+PHANTOMJS,PhantomJS,해외SaaS,companyenrich:software
+PEARLTREES,Pearltrees,해외SaaS,companyenrich:education
+APPBRAIN,AppBrain,해외SaaS,companyenrich:mobile apps
+SLIDES,Slides,해외SaaS,companyenrich:software
+PITCH,Pitch,해외SaaS,companyenrich:software
+BENCHMARKEMAIL,Benchmark Email,해외SaaS,companyenrich:marketing
+PALOALTONETWORKS,Palo Alto Networks,해외SaaS,companyenrich:information security
+WOLFRAM,Wolfram,해외SaaS,companyenrich:software
+PICMONKEY,PicMonkey,해외SaaS,companyenrich:graphic design
+HELPSCOUT,Help Scout,해외SaaS,companyenrich:software
+FEEDSTER,Feedster,해외SaaS,companyenrich:marketing
+SELLFY,Sellfy,해외SaaS,companyenrich:e-commerce
+UNDERSCORE,Underscore,해외SaaS,companyenrich:software
+UNDERSCOREJS,Underscore,해외SaaS,companyenrich:software
+FILESFM,Files.fm,해외SaaS,companyenrich:information
+FILES,Files.fm,해외SaaS,companyenrich:information
+SPEEDCURVE,SpeedCurve,해외SaaS,companyenrich:software
+KAHOOT,Kahoot!,해외SaaS,companyenrich:education
+CCLEANER,CCleaner,해외SaaS,companyenrich:software
+COURTLISTENER,CourtListener,해외SaaS,companyenrich:legal services
+DISCOURSE,Discourse,해외SaaS,companyenrich:internet
+DATADRIVENDOCUMENTS,Data-Driven Documents,해외SaaS,companyenrich:software
+D3JS,Data-Driven Documents,해외SaaS,companyenrich:software
+ITRSUPTRENDS,ITRS Uptrends,해외SaaS,companyenrich:information technology
+UPTRENDS,ITRS Uptrends,해외SaaS,companyenrich:information technology
+BUBBLE,Bubble,해외SaaS,companyenrich:technology
+POSTMAN,Postman,해외SaaS,companyenrich:software
+BAZAARVOICE,Bazaarvoice,해외SaaS,companyenrich:marketing
+MELTWATER,Meltwater,해외SaaS,companyenrich:business intelligence
+POLICY,Policy,해외SaaS,companyenrich:digital archiving
+PERMA,Policy,해외SaaS,companyenrich:digital archiving
+PACKAGISTMIRROR,Packagist Mirror,해외SaaS,companyenrich:software
+PACKAGIST,Packagist Mirror,해외SaaS,companyenrich:software
+PHPMYADMIN,phpMyAdmin,해외SaaS,companyenrich:software
+ICOMOON,IcoMoon,해외SaaS,companyenrich:graphic design
+JOBBER,Jobber,해외SaaS,companyenrich:software
+GETJOBBER,Jobber,해외SaaS,companyenrich:software
+GLITCH,Glitch,해외SaaS,companyenrich:software
+EMBEDLY,Embedly,해외SaaS,companyenrich:information technology
+EMBED,Embedly,해외SaaS,companyenrich:information technology
+37SIGNALS,37signals,해외SaaS,companyenrich:software
+CLOCKIFY,Clockify,해외SaaS,companyenrich:software
+INTERNETINFORMATIONSERVICES,Internet Information Services,해외SaaS,companyenrich:software
+IIS,Internet Information Services,해외SaaS,companyenrich:software
+PODIUM,Podium,해외SaaS,companyenrich:technology
+IMPERVA,Imperva,해외SaaS,companyenrich:cybersecurity
+INTENSEDEBATE,Intense Debate,해외SaaS,companyenrich:internet
+FIGSHARE,Figshare,해외SaaS,companyenrich:scientific publishing
+CROWDIN,Crowdin,해외SaaS,companyenrich:software
+BETTERUP,BetterUp,해외SaaS,companyenrich:coaching
+ESETNORTHAMERICA,ESET North America,해외SaaS,companyenrich:software
+ESET,ESET North America,해외SaaS,companyenrich:software
+ACDSYSTEMS,ACD Systems,해외SaaS,companyenrich:software
+ACDSEE,ACD Systems,해외SaaS,companyenrich:software
+RANKMATH,Rank Math,해외SaaS,companyenrich:software
+DYNATRACE,Dynatrace,해외SaaS,companyenrich:software
+OPENSEARCHPROJECT,OpenSearch Project,해외SaaS,companyenrich:software
+OPENSEARCH,OpenSearch Project,해외SaaS,companyenrich:software
+HONEYBOOK,HoneyBook,해외SaaS,companyenrich:software
+BALSAMIQ,Balsamiq,해외SaaS,companyenrich:software
+MAMP,MAMP,해외SaaS,companyenrich:software
+BOOGWEBSALESCONSULTING,Boogweb Sales Consulting,해외SaaS,companyenrich:consulting
+RENTRY,Boogweb Sales Consulting,해외SaaS,companyenrich:consulting
+RIOSOFT,Riosoft,해외SaaS,companyenrich:software
+DIRECT,Riosoft,해외SaaS,companyenrich:software
+ELEMENT,Element,해외SaaS,companyenrich:software
+ZOOMVIDEOCOMMUNICATIONS,Zoom Video Communications,해외SaaS,companyenrich:telecommunications
+NMAP,Nmap,해외SaaS,companyenrich:cybersecurity
+TRIPWIRE,Tripwire,해외SaaS,companyenrich:cybersecurity
+COMPOSER,Composer,해외SaaS,companyenrich:software
+GETCOMPOSER,Composer,해외SaaS,companyenrich:software
+ARCHITIZER,Architizer,해외SaaS,companyenrich:architecture
+OASISORGANIZATIONFORTHEADVANCEMENTOFSTRUCTUREDINFORMATIONSTANDARDS,OASIS - Organization for the Advancement of Structured Information Standards,해외SaaS,companyenrich:standards
+OASISOPEN,OASIS - Organization for the Advancement of Structured Information Standards,해외SaaS,companyenrich:standards
+YOTPO,Yotpo,해외SaaS,companyenrich:marketing
+IVANTI,Ivanti,해외SaaS,companyenrich:software
+DOCSEND,DocSend,해외SaaS,companyenrich:software
+HCAPTCHA,hCaptcha,해외SaaS,companyenrich:information technology
+PRINTFRIENDLY,PrintFriendly,해외SaaS,companyenrich:internet services
+SURVEYSPARROW,SurveySparrow,해외SaaS,companyenrich:software
+ADROLL,AdRoll,해외SaaS,companyenrich:marketing
+SCHEDULICITY,Schedulicity,해외SaaS,companyenrich:scheduling
+CRISPINSTANTMESSAGING,Crisp Instant Messaging,해외SaaS,companyenrich:software
+CRISP,Crisp Instant Messaging,해외SaaS,companyenrich:software
+SENDINBLUE,Sendinblue,해외SaaS,companyenrich:marketing
+GITEE,Gitee,해외SaaS,companyenrich:software
+ONTHEGOSYSTEMS,OnTheGoSystems,해외SaaS,companyenrich:software
+WPML,OnTheGoSystems,해외SaaS,companyenrich:software
+TERMLY,Termly,해외SaaS,companyenrich:legal services
+SMORE,Smore,해외SaaS,companyenrich:education
+MANAGEENGINE,ManageEngine,해외SaaS,companyenrich:software
+LANGCHAIN,LangChain,해외SaaS,companyenrich:ai
+SENDZILLA,Sendzilla,해외SaaS,companyenrich:marketing
+HELLOBAR,HelloBar,해외SaaS,companyenrich:software
+OPENLAYERS,OpenLayers,해외SaaS,companyenrich:software
+GRAFANALABS,Grafana Labs,해외SaaS,companyenrich:software
+GRAFANA,Grafana Labs,해외SaaS,companyenrich:software
+CLARIS,Claris,해외SaaS,companyenrich:software
+AMPLITUDE,Amplitude,해외SaaS,companyenrich:software
+NETFLIX,NETFLIX,구독서비스,keyword_rules
+SPOTIFY,SPOTIFY,구독서비스,keyword_rules
+YOUTUBEPREMIUM,YOUTUBEPREMIUM,구독서비스,keyword_rules
+STEAM,STEAM,게임,keyword_rules
+NINTENDO,NINTENDO,게임,keyword_rules
+PLAYSTATION,PLAYSTATION,게임,keyword_rules

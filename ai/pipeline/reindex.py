@@ -20,6 +20,7 @@ from typing import Any
 import psycopg
 from psycopg.rows import dict_row
 
+# pipeline.llm 은 import 하지 않는다. langfuse.openai 전역 패치로 재색인 임베딩 수천 건이 기록돼 무료 한도를 넘긴다.
 from app.config import settings
 from pipeline.chunk import Chunk, chunk
 from pipeline.embed import client, embed

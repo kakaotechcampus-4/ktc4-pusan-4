@@ -9,10 +9,12 @@ dependencies = [
     "pydantic-settings>=2.6",
     "psycopg[binary]>=3.2",
     "openai>=3.16",
+    "langfuse>=4.16",
+    "pyyaml>=6",
 ]
 
 [dependency-groups]
-dev = ["pytest>=8", "httpx2>=2.12", "ruff>=0.8", "pyyaml>=6"]
+dev = ["pytest>=8", "httpx2>=2.12", "ruff>=0.8"]
 
 [tool.uv]
 package = false

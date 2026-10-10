@@ -4,6 +4,7 @@ WORKDIR /src
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ ./
+COPY rules/categories.yaml /rules/categories.yaml
 RUN npm run build
 
 FROM caddy:2-alpine

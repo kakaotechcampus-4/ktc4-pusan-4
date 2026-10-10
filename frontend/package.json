@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "npx vite",
-    "build": "npm run check:categories && npx vite build",
+    "build": "npm run check:categories && npm run typecheck && npx vite build",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "preview": "npx vite preview",
-    "check:categories": "node scripts/check-categories.mjs"
+    "check:categories": "node scripts/check-categories.mjs",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "react": "^18.3.1",

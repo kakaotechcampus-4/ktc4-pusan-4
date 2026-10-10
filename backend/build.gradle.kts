@@ -63,7 +63,8 @@ tasks.test {
     // 레포 루트의 평가셋·규칙카드를 입력으로 추적한다. 없으면 YAML만 고쳐도 테스트가 UP-TO-DATE로 건너뛴다.
     val evalRulesDir = providers.environmentVariable("EVAL_RULES_DIR").orElse("../rules")
     inputs.property("evalRulesDir", evalRulesDir)
-    inputs.files(fileTree("../eval"), fileTree(evalRulesDir), fileTree("../profiles"))
+    // 정규화기 테스트는 ../rules 와 브랜드 fixture(../tools/fixtures)를 읽는다.
+    inputs.files(fileTree("../eval"), fileTree(evalRulesDir), fileTree("../profiles"), fileTree("../rules"), fileTree("../tools/fixtures"))
 }
 
 val integrationTestTask = tasks.register<Test>("integrationTest") {

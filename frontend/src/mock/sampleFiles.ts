@@ -29,7 +29,8 @@ export const SAMPLE_FILES: SampleFile[] = [
   issuer: '홈택스 사업용카드',
   format: 'XLSX',
   sourceType: 'APPROVAL',
-  rowCount: 292,
+  // API 목의 거래 시드 수와 같게 둔다 (어긋나면 /confirm 과 /transactions 가 다른 말을 한다)
+  rowCount: 31,
   periodStart: '2026-01-01',
   periodEnd: '2026-01-31',
   encoding: 'UTF-8',

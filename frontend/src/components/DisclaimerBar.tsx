@@ -1,4 +1,3 @@
-import React from 'react';
 import { InfoIcon } from 'lucide-react';
 
 /** 전 화면 상시 노출. 세무대리로 오인될 소지를 화면에서 차단한다. */

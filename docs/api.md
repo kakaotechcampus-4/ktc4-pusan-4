@@ -1080,6 +1080,31 @@ include/exclude 자체는 새 Judgment revision을 만들지 않는다.
 
 ---
 
+## 거래 요약
+
+다른 리소스의 응답이 거래를 함께 보여줄 때 쓰는 공통 필드다. 목록 화면이 거래 정보 없이 한 줄도 그릴 수 없을 때만 응답에 붙이고, 붙일 때는 이 필드를 모두 넣는다.
+
+| 필드 | 뜻 |
+| --- | --- |
+| approvedAt | 승인일 |
+| merchantRaw | 가맹점 원문 표기 |
+| merchantNorm | 정규화 가맹점 이름 |
+| merchantCategory | 가맹점 카테고리(2.12) |
+| amount | 금액(원) |
+| installmentMonths | 할부 개월. 일시불은 0 |
+
+필드 이름과 뜻은 `GET /transactions`와 같다. 판정 당시가 아니라 응답 시점의 거래 값이다.
+
+붙이는 곳과 모양:
+
+| 응답 | 모양 |
+| --- | --- |
+| Judgment(3.7, 3.8) | `transaction` 객체 |
+| ClassificationReview 그룹 `transactions[]`(3.5) | `reviewId`, `transactionId`와 같은 층에 펼쳐서 |
+| Question 그룹 `transactions[]`(3.9) | `questionId`, `transactionId`, `overridden`과 같은 층에 펼쳐서 |
+
+---
+
 # 3.5 가맹점 분류 확인
 
 RuleCard Question과 별도 리소스다.
@@ -1104,7 +1129,7 @@ createdAt ASC, id ASC
 
 ### grouped=false (기본)
 
-Review 개별 항목을 반환한다.
+Review 개별 항목을 반환한다. `unresolved` 집계는 grouped 여부와 무관하게 항상 최상위에 포함한다(아래 "미해소 집계" 참고).
 
 ```
 {
@@ -1128,6 +1153,10 @@ Review 개별 항목을 반환한다.
       "resolvedAt": null
     }
   ],
+  "unresolved": {
+    "count": 5,
+    "amount": 230000
+  },
   "page": {}
 }
 ```
@@ -1141,6 +1170,7 @@ Review 개별 항목을 반환한다.
   "items": [
     {
       "groupKey": "merchant:XYZ PAYMENTS",
+      "merchantNorm": "XYZ PAYMENTS",
       "reviewIds": [
         "0199c1...",
         "0199c2...",
@@ -1153,14 +1183,81 @@ Review 개별 항목을 반환한다.
         "해외SaaS",
         "온라인쇼핑",
         "기타"
+      ],
+      "transactions": [
+        {
+          "reviewId": "0199c1...",
+          "transactionId": "0199f1...",
+          "approvedAt": "2026-01-03",
+          "merchantRaw": "XYZ PAYMENTS",
+          "merchantNorm": "XYZ PAYMENTS",
+          "merchantCategory": "미분류",
+          "amount": 47000,
+          "installmentMonths": 0
+        },
+        {
+          "reviewId": "0199c2...",
+          "transactionId": "0199f2...",
+          "approvedAt": "2026-01-17",
+          "merchantRaw": "XYZ PAYMENTS",
+          "merchantNorm": "XYZ PAYMENTS",
+          "merchantCategory": "미분류",
+          "amount": 50000,
+          "installmentMonths": 0
+        },
+        {
+          "reviewId": "0199c3...",
+          "transactionId": "0199f3...",
+          "approvedAt": "2026-02-03",
+          "merchantRaw": "XYZPAY*KR",
+          "merchantNorm": "XYZ PAYMENTS",
+          "merchantCategory": "미분류",
+          "amount": 50000,
+          "installmentMonths": 0
+        }
       ]
     }
   ],
+  "unresolved": {
+    "count": 5,
+    "amount": 230000
+  },
   "page": {}
 }
 ```
 
-`count`는 `reviewIds.length`와 항상 같아야 한다.
+`count`는 `reviewIds.length`, `transactions.length`와 항상 같아야 한다.
+
+`totalAmount`는 `transactions[].amount`의 합이다.
+
+`merchantNorm`은 그룹 안 Review들이 공유하는 정규화 이름이다. 화면에서 그룹 제목은 이 값을 쓴다.
+
+`groupKey`는 그룹을 구분하는 식별 문자열이다. 형식을 보장하지 않으므로 파싱하지 않는다. 같은 `merchantNorm`이라도 분류 키(카드사 트랙 등)가 다르면 별도 그룹이 될 수 있다.
+
+`merchantRaw`는 그룹 대표 표기로, `transactions`의 첫 거래 표기다. 한 그룹에 표기가 여러 개면 `transactions[].merchantRaw`로 각 표기를 본다.
+
+`transactions`는 그룹에 묶인 Review마다 `reviewId`, `transactionId`와 거래 요약(3.4)을 하나씩 담는다. 잘라내지 않고 전부 포함한다.
+
+`transactions` 정렬:
+
+```
+approvedAt ASC, transactionId ASC
+```
+
+`page`, `size`는 그룹 단위로 적용한다.
+
+### 미해소 집계
+
+`items`, `page`와 별도로 응답 최상위에 미해소 집계를 포함한다.
+
+| 필드 | 뜻 |
+| --- | --- |
+| `count` | 페이지네이션 전 `PENDING` Review 수 |
+| `amount` | `PENDING` Review가 참조하는 Transaction 금액 합계(원) |
+
+집계에는 `batchId` 필터를 적용하지만 `status`, `grouped`, `page`, `size`는 적용하지 않는다. 따라서 `page.totalElements`와 `unresolved.count`는 다를 수 있다.
+
+프론트가 "확인 필요 5건 · 230,000원"을 표시하기 위한 값이다. 현재 페이지 항목의 `count`, `totalAmount`를 더하면 페이지 밖 그룹이 빠진다.
 
 ---
 
@@ -1479,6 +1576,8 @@ computedAt DESC, id DESC
 
 `latestOnly=false`로 특정 Transaction 이력을 조회하면 한 Transaction의 여러 revision이 함께 반환된다.
 
+각 항목의 `transaction`(거래 요약, 3.4) 덕분에 목록 화면은 거래를 따로 조회하지 않는다.
+
 ---
 
 ## `GET /api/v1/judgments/summary`
@@ -1549,6 +1648,14 @@ GET /api/v1/judgments/summary?runId=R1
 {
   "id": "0199f1c3-...",
   "transactionId": "0199c8f2-...",
+  "transaction": {
+    "approvedAt": "2026-01-12",
+    "merchantRaw": "스타벅스코리아 서면점",
+    "merchantNorm": "스타벅스",
+    "merchantCategory": "카페",
+    "amount": 12800,
+    "installmentMonths": 0
+  },
   "revision": 2,
 
   "origin": {
@@ -1601,6 +1708,7 @@ GET /api/v1/judgments/summary?runId=R1
 
 | 필드 | 설명 |
 | --- | --- |
+| transaction | 판정한 거래의 거래 요약(3.4). 판정 당시가 아니라 응답 시점의 거래 값이다 |
 | revision | Transaction 재판정마다 증가 |
 | origin | 이 revision이 생성된 직접 원인 |
 | outOfScope | 룰엔진 판정 범위 밖(핸드오프)인지. `verdict = NEEDS_REVIEW`일 때만 `true`일 수 있고 그 외 verdict에서는 항상 `false` |
@@ -1684,7 +1792,7 @@ JudgmentOverride 생성
 
 응답 `200`:
 
-새 Judgment 객체.
+새 Judgment 객체. 필드는 `GET /judgments/{judgmentId}`와 같고, 아래 예시는 일부만 보인다.
 
 예시:
 
@@ -1712,6 +1820,7 @@ JudgmentOverride 생성
 
 ```
 id
+transaction_id
 source_judgment_id
 to_verdict
 reason
@@ -1797,6 +1906,7 @@ Question 개별 항목을 반환한다. `unresolved` 집계는 grouped 여부와
         "label": "대기"
       },
       "answeredFactId": null,
+      "answer": null,
       "createdAt": "2026-09-12T14:05:00+09:00",
       "answeredAt": null
     }
@@ -1809,6 +1919,8 @@ Question 개별 항목을 반환한다. `unresolved` 집계는 grouped 여부와
 }
 ```
 
+`answer`는 답한 값이다. 3.10 요청의 `answer`와 같은 모양(`{ "value": "개인" }`)이고, `ANSWERED`가 아니면 `null`이다. 정정했으면 마지막 답이다.
+
 ### grouped=true
 
 ```
@@ -1817,6 +1929,10 @@ Question 개별 항목을 반환한다. `unresolved` 집계는 grouped 여부와
     {
       "groupKey": "merchant:스타벅스",
       "factType": "용도",
+      "status": {
+        "code": "PENDING",
+        "label": "대기"
+      },
 
       "questionIds": [
         "0199a1...",
@@ -1833,15 +1949,75 @@ Question 개별 항목을 반환한다. `unresolved` 집계는 grouped 여부와
         "사업",
         "개인",
         "혼용"
+      ],
+
+      "answer": null,
+      "bulkAnswerable": true,
+
+      "transactions": [
+        {
+          "questionId": "0199a1...",
+          "transactionId": "0199f1...",
+          "approvedAt": "2026-01-12",
+          "merchantRaw": "스타벅스코리아 서면점",
+          "merchantNorm": "스타벅스",
+          "merchantCategory": "카페",
+          "amount": 12800,
+          "installmentMonths": 0,
+          "overridden": false
+        },
+        {
+          "questionId": "0199a2...",
+          "transactionId": "0199f2...",
+          "approvedAt": "2026-01-20",
+          "merchantRaw": "스타벅스코리아 서면점",
+          "merchantNorm": "스타벅스",
+          "merchantCategory": "카페",
+          "amount": 9700,
+          "installmentMonths": 0,
+          "overridden": false
+        },
+        {
+          "questionId": "0199a3...",
+          "transactionId": "0199f3...",
+          "approvedAt": "2026-02-02",
+          "merchantRaw": "스타벅스 해운대점",
+          "merchantNorm": "스타벅스",
+          "merchantCategory": "카페",
+          "amount": 10500,
+          "installmentMonths": 0,
+          "overridden": true
+        }
       ]
     }
   ],
-
+  "unresolved": {
+    "count": 24,
+    "amount": 340000
+  },
   "page": {}
 }
 ```
 
-`count`는 반드시 `questionIds.length`와 같다.
+그룹은 같은 Batch·`groupKey`·`factType`·`status`의 Question을 묶는다. 3.10이 같은 Batch·`groupKey`·`factType`의 Question만 함께 받기 때문이다.
+
+`count`는 반드시 `questionIds.length`, `transactions.length`와 같다.
+
+`totalAmount`는 `transactions[].amount`의 합이다.
+
+| 필드 | 뜻 |
+| --- | --- |
+| status | 그룹 안 Question의 상태. 그룹 안에서 모두 같다 |
+| answer | `status = ANSWERED`면 그룹이 공유하는 답, 아니면 `null`. 3.10은 답변·정정 때 같은 Batch·`groupKey`·`factType`의 Question을 모두 같은 UserFact로 바꾸므로 그룹 안에서 답이 갈리지 않는다 |
+| bulkAnswerable | 그룹의 Question이 모두 3.11 일괄 응답 대상이면 `true`. `PENDING`이 아니거나 3.11 제외 대상(소명 대기 거래의 Question)이 하나라도 있으면 `false` |
+| transactions | Question마다 `questionId`, `transactionId`, 거래 요약(3.4), `overridden`을 하나씩 담는다. 잘라내지 않고 전부 포함한다 |
+| transactions[].overridden | 그 Transaction에 활성 JudgmentOverride가 있으면 `true`. 답해도 현재 결과는 Override 판정 그대로다 |
+
+`transactions` 정렬:
+
+```
+approvedAt ASC, transactionId ASC
+```
 
 Question grouping은 RuleCard의 `group_by`를 따른다.
 
@@ -2045,9 +2221,17 @@ T3 rev2 → F10
 batchId 일치
 status = PENDING
 factType 일치
+제외 대상이 아님
 ```
 
-모든 대상 Question이 `answer.value`를 허용해야 한다. 하나라도 허용하지 않으면 아무것도 변경하지 않고 `422 INVALID_ANSWER_VALUE`를 반환한다.
+제외 대상은 소명 대기 거래의 Question이다. Override를 뺀 최신 자동 판정 revision의 verdict가 `UNAVAILABLE`인데 `PENDING` Question이 남은 Transaction의 Question을 모두 뺀다.
+
+- 엔진은 불가가 확정되면 그 거래의 Question을 지우고, 답으로 불가가 풀릴 수 있을 때만 남긴다(`rule-card-fields.md`의 소명 대기). 그래서 이 조건이 소명 대기다. 주말·공휴일 카드(R-311~314)와 생활용품(R-207)이 여기에 해당하고, 같은 구조의 카드가 늘어도 이 조건으로 잡힌다.
+- 일괄 응답에서 빼는 이유: 소명 대기 질문도 일반 카드와 같은 `factType`(`용도`)을 쓴다. 빼지 않으면 「용도 전부 업무미팅」 한 번으로 개인 지출 추정이 소명 없이 모두 풀린다.
+- 현재 결과가 아니라 자동 판정을 보는 이유: Override를 해제하면 자동 판정이 다시 현재 결과가 된다.
+- 거래 단위로 빼므로 같은 거래의 다른 Question(예: 증빙유무, 자산여부)도 함께 빠진다. 의도한 동작이다. 소명 답이 「개인」이면 불가가 확정되어 그 Question은 취소되고, 「업무미팅」처럼 불가를 푸는 답이면 거래가 소명 대기에서 벗어나 그 Question도 일괄 응답 대상이 된다.
+
+모든 대상 Question이 `answer.value`를 허용해야 한다. 하나라도 허용하지 않으면 아무것도 변경하지 않고 `422 INVALID_ANSWER_VALUE`를 반환한다. 제외 대상은 이 검사에도 넣지 않는다.
 
 각 `(scopeKey, factType)`마다 UserFact를 하나 생성하고, 영향받는 Transaction만 재판정해 새 Judgment revision을 만든다. 동일 Transaction이 여러 Question에 걸려도 한 번만 재판정한다. 새 `JudgmentRun`은 생성하지 않는다.
 
@@ -2059,6 +2243,7 @@ factType 일치
 {
   "answeredCount": 12,
   "skippedCount": 3,
+  "excludedCount": 2,
   "factIds": [
     "0199fact-..."
   ],
@@ -2074,6 +2259,7 @@ factType 일치
 | --- | --- |
 | answeredCount | `ANSWERED`로 전환된 질문 수 |
 | skippedCount | 요청 당시 해당 Batch의 `PENDING` 중 factType이 달라 건너뛴 수 |
+| excludedCount | 요청 당시 해당 Batch의 `PENDING` 중 factType은 같지만 제외 대상이라 건너뛴 수 |
 | factIds | 생성된 UserFact ID. scopeKey가 다르면 여러 개 |
 | rejudgedTransactionCount | 중복을 제거한 재판정 Transaction 수 |
 | unresolved | 처리 후 해당 Batch에 남은 미해소 집계. 3.9와 같은 형태 |
@@ -2088,7 +2274,7 @@ factType 일치
 422 UNKNOWN_FACT_TYPE
 ```
 
-해당 factType의 Question 이력은 있지만 `PENDING` 대상이 0건이면 에러가 아니다. `answeredCount = 0`으로 응답한다.
+해당 factType의 Question 이력은 있지만 `PENDING` 대상이 0건이면 에러가 아니다. `answeredCount = 0`으로 응답한다. 대상이 모두 제외 대상이어도 같다.
 
 ---
 
@@ -2471,6 +2657,7 @@ resolved_at
 
 ```
 id
+transaction_id
 source_judgment_id
 to_verdict
 reason
@@ -2478,6 +2665,8 @@ active
 created_at
 released_at
 ```
+
+`transaction_id`는 "거래당 활성 Override 하나"를 DB가 보장하려고 둔다. `source_judgment_id`는 같은 거래의 판정만 가리킨다.
 
 ---
 

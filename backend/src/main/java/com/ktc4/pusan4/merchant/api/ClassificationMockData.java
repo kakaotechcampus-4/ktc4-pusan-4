@@ -3,6 +3,7 @@ package com.ktc4.pusan4.merchant.api;
 import com.ktc4.pusan4.shared.api.Coded;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 
@@ -18,19 +19,24 @@ import static com.ktc4.pusan4.shared.api.MockFixtures.singlePage;
 public class ClassificationMockData {
 
     private static final List<String> SUGGESTED_CATEGORIES = List.of("해외SaaS", "구독서비스", "기타");
+    private static final ClassificationUnresolved UNRESOLVED = new ClassificationUnresolved(1, 33_000L);
 
     public ClassificationReviewPage reviews() {
         ClassificationReviewResponse review = new ClassificationReviewResponse(REVIEW_ID, BATCH_ID,
             UNCLASSIFIED_TRANSACTION_ID, "ELEVENLABS IO", "미확인 가맹점",
             new Coded<>(ClassificationReviewStatus.PENDING, "대기"), SUGGESTED_CATEGORIES,
             OffsetDateTime.parse("2026-09-12T13:59:00+09:00"), null);
-        return new ClassificationReviewPage(List.of(review), singlePage(1));
+        return new ClassificationReviewPage(List.of(review), UNRESOLVED, singlePage(1));
     }
 
     public ClassificationReviewGroupPage reviewGroups() {
+        ClassificationReviewGroupResponse.ReviewTransaction transaction =
+            new ClassificationReviewGroupResponse.ReviewTransaction(REVIEW_ID, UNCLASSIFIED_TRANSACTION_ID,
+                LocalDate.parse("2026-01-31"), "ELEVENLABS IO", "미확인 가맹점", "미분류", 33_000L, 0);
         ClassificationReviewGroupResponse group = new ClassificationReviewGroupResponse(
-            "merchant:미확인 가맹점", List.of(REVIEW_ID), 1, 33_000L, "ELEVENLABS IO", SUGGESTED_CATEGORIES);
-        return new ClassificationReviewGroupPage(List.of(group), singlePage(1));
+            "merchant:미확인 가맹점", "미확인 가맹점", List.of(REVIEW_ID), 1, 33_000L, "ELEVENLABS IO",
+            SUGGESTED_CATEGORIES, List.of(transaction));
+        return new ClassificationReviewGroupPage(List.of(group), UNRESOLVED, singlePage(1));
     }
 
     public ClassificationAnswerResponse answer() {

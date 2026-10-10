@@ -4,6 +4,7 @@ import com.ktc4.pusan4.judgment.domain.Gate;
 import com.ktc4.pusan4.judgment.domain.UnmatchedReason;
 import com.ktc4.pusan4.judgment.domain.Verdict;
 import com.ktc4.pusan4.shared.api.Coded;
+import com.ktc4.pusan4.transaction.api.TransactionSummary;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.OffsetDateTime;
@@ -14,6 +15,7 @@ import java.util.UUID;
 public record JudgmentResponse(
     UUID id,
     UUID transactionId,
+    @Schema(description = "판정한 거래의 요약. 목록 화면이 거래를 따로 조회하지 않게 붙인다") TransactionSummary transaction,
     @Schema(description = "Transaction 재판정마다 증가") int revision,
     JudgmentOrigin origin,
     Coded<Verdict> verdict,

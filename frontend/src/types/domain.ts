@@ -181,14 +181,31 @@ export interface ClassificationReview {
   resolvedAt: string | null;
 }
 
+/** 그룹에 묶인 Review 하나의 거래 요약. 필드 뜻은 GET /transactions 와 같다 */
+export interface ClassificationReviewTransaction {
+  reviewId: string;
+  transactionId: string;
+  approvedAt: string;
+  merchantRaw: string;
+  amount: number;
+  installmentMonths: number;
+}
+
 export interface ClassificationReviewGroup {
+  /** 형식을 보장하지 않는다. 파싱하지 않는다 */
   groupKey: string;
+  /** 그룹 안 Review 들이 공유하는 정규화 이름. 그룹 제목은 이 값을 쓴다 */
+  merchantNorm: string;
   reviewIds: string[];
-  /** 항상 reviewIds.length 와 같다 */
+  /** 항상 reviewIds.length · transactions.length 와 같다 */
   count: number;
+  /** transactions[].amount 의 합 */
   totalAmount: number;
+  /** 그룹 대표 표기(첫 거래). 표기가 여러 개면 transactions[].merchantRaw 를 본다 */
   merchantRaw: string;
   suggestedCategories: string[];
+  /** 묶인 Review 마다 하나씩. 잘라내지 않고 전부 온다 */
+  transactions: ClassificationReviewTransaction[];
 }
 
 export interface ClassificationResponseRequest {
@@ -209,12 +226,17 @@ export interface ClassificationResponseResult {
 /** POST /judgment-runs 응답 (202) */
 export interface JudgmentRunCreated {
   id: string;
+  batchId: string;
+  contextId: string;
+  contextVersion: number;
   status: Coded<RunStatus>;
+  /** 미분류·취소상계·대상제외 거래는 포함하지 않는다 */
   totalCount: number;
 }
 
 /** GET /judgment-runs/{runId} 응답 */
 export interface JudgmentRun extends JudgmentRunCreated {
+  /** 성공적으로 처리가 끝난 수. NEEDS_REVIEW 도 성공으로 센다 */
   processedCount: number;
   failedCount: number;
   startedAt: string | null;
@@ -288,10 +310,19 @@ export interface JudgmentSummary {
   byAccount: { account: string; count: number; finalAmount: number }[];
 }
 
+/**
+ * 근거 위계. 화면에서 근거·참고 해석기준·참고 사례로 나눠 보여준다 (CONTEXT.md §6).
+ * 명세(3.13)는 「법률, 시행령, 기본통칙, 판례 등」이라 이 목록 밖의 값도 올 수 있다.
+ */
+export type StatuteHierarchy =
+'법률' | '시행령' | '시행규칙' | '기본통칙' | '고시' | '예규' | '심판례' | '판례';
+
 export interface Statute {
   statuteVersionId: number;
   statuteId: string;
   title: string;
+  /** 알려진 값 외의 문자열도 올 수 있다 */
+  hierarchy: StatuteHierarchy | (string & Record<never, never>);
   effectiveFrom: string;
   effectiveTo: string | null;
   sourceUrl: string;
@@ -307,12 +338,18 @@ export interface OverrideRequest {
 
 export interface Question {
   id: string;
+  batchId: string;
   transactionId: string;
+  /** 형식을 보장하지 않는다. 화면에서 파싱하지 않는다 */
+  groupKey: string;
   factType: string;
-  status: Coded<QuestionStatus>;
   questionText: string;
   options: string[];
+  status: Coded<QuestionStatus>;
+  /** 답한 UserFact. 답한 값 자체는 응답에 없다 */
+  answeredFactId: string | null;
   createdAt: string;
+  answeredAt: string | null;
 }
 
 export interface QuestionGroup {
@@ -333,9 +370,13 @@ export interface UnresolvedSummary {
   amount: number;
 }
 
-export interface QuestionPage<T> extends Page<T> {
+/** 미해소 집계를 함께 주는 목록 응답. grouped 여부와 무관하게 항상 온다 (3.5 · 3.9) */
+export interface UnresolvedPage<T> extends Page<T> {
   unresolved: UnresolvedSummary;
 }
+
+/** 3.9 질문 목록. UnresolvedPage 와 같은 모양이다 */
+export type QuestionPage<T> = UnresolvedPage<T>;
 
 export interface QuestionResponseRequest {
   questionIds: string[];
@@ -344,7 +385,8 @@ export interface QuestionResponseRequest {
 
 export interface QuestionResponseResult {
   answeredCount: number;
-  runId: string;
+  factId: string;
+  rejudgedTransactionCount: number;
 }
 
 export interface BulkAnswerRequest {
@@ -357,4 +399,6 @@ export interface BulkAnswerResult {
   answeredCount: number;
   skippedCount: number;
   factIds: string[];
+  rejudgedTransactionCount: number;
+  unresolved: UnresolvedSummary;
 }

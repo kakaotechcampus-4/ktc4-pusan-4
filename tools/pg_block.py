@@ -10,6 +10,7 @@
 사용:
     python tools/pg_block.py --text "토스페이_요기요-(주) 비바리퍼블리카"
     python tools/pg_block.py --report      # docs/pg_blocklist_report.md 생성
+    python tools/pg_block.py --fixture tools/fixtures/pg_block.yaml   # Java 와 같은 기대값
 """
 
 from __future__ import annotations
@@ -42,6 +43,7 @@ class PGBlocklist:
     def __init__(self, spec: dict) -> None:
         self.spec = spec or {}
         self.on_match = self.spec.get("on_match") or {}
+        self.ignore_tokens, self.ignore_pat = nz.hint_ignore(self.spec)
         self.patterns = []
         for p in self.spec.get("patterns") or []:
             self.patterns.append((p.get("match", ""), re.compile(p.get("match", ""), re.I),
@@ -79,8 +81,8 @@ class PGBlocklist:
 
         # '대표' '청구' '일반' 같은 구조 토큰은 힌트가 되지 않는다.
         # 버리지는 않고 dropped 로 남긴다.
-        hint = [tk for tk in rest if tk not in nz.GENERIC_TOKENS
-                and not re.match(nz.GENERIC_TOKEN_PAT, tk)]
+        hint = [tk for tk in rest if tk not in self.ignore_tokens
+                and not re.match(self.ignore_pat, tk)]
         dropped = [tk for tk in rest if tk not in hint]
 
         blocked = bool(pg_tokens)
@@ -242,10 +244,33 @@ NOT_PG = [
 ]
 
 
+# fixture 기대값 키 -> check() 결과 키. Java PgBlocklistRulesTest 가 같은 파일을 읽는다.
+FIXTURE_FIELDS = {"blocked": "blocked", "pg_tokens": "pg_tokens",
+                  "hint": "matched_suffix", "dropped": "dropped_tokens"}
+
+
+def run_fixture(path: str, pg: PGBlocklist, norm) -> int:
+    with open(path, encoding="utf-8") as f:
+        cases = (yaml.safe_load(f) or {}).get("cases") or []
+    bad = 0
+    for c in cases:
+        r = norm.normalize(c["in"])
+        got = pg.check(c["in"], r.tokens or [r.string_norm])
+        diff = ["%s=%r(기대 %r)" % (k, got[v], c[k]) for k, v in FIXTURE_FIELDS.items()
+                if k in c and got[v] != c[k]]
+        if diff:
+            bad += 1
+            print("  FAIL  %-24s %s" % (c["in"], "  ".join(diff)))
+    print()
+    print("  %d/%d 통과" % (len(cases) - bad, len(cases)))
+    return 1 if bad else 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--text", help="문자열 하나를 판정한다")
     ap.add_argument("--report", action="store_true", help="docs/pg_blocklist_report.md 생성")
+    ap.add_argument("--fixture", help="fixture 파일(tools/fixtures/pg_block.yaml)의 기대값을 검사한다")
     args = ap.parse_args()
 
     pg = load()
@@ -257,6 +282,9 @@ def main() -> int:
         for k, v in c.items():
             print("  %-17s %s" % (k, v))
         return 0
+
+    if args.fixture:
+        return run_fixture(args.fixture, pg, norm)
 
     if args.report:
         REPORT_MD.parent.mkdir(parents=True, exist_ok=True)

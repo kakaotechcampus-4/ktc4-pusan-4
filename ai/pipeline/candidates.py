@@ -23,6 +23,7 @@ import sys
 from datetime import UTC, date, datetime
 
 import psycopg
+from langfuse import observe
 from psycopg.rows import dict_row
 from psycopg.types.json import Json
 
@@ -89,6 +90,7 @@ def docs(ev: Evidence, by_tier: dict[str, list[Hit]]) -> list[dict]:
     ]
 
 
+@observe()
 def propose(
     conn: psycopg.Connection, row: dict, meta: dict, as_of: date, today: date
 ) -> tuple[dict, str]:

@@ -1,21 +1,26 @@
 name: PR review reminder
 # 리뷰 요청을 받고 24시간 동안 리뷰하지 않은 리뷰어를, 24시간이 되는 시점에 팀 Discord 채널에서 멘션한다.
+# 그 뒤로도 리뷰하지 않으면 12시간마다 다시 멘션한다 (문장 앞뒤 느낌표가 2개씩 늘어난다).
 #   - opened / ready_for_review / review_requested 마다 run 이 뜨고 environment 대기로 24시간 잔다.
 #   - 깨어나면 다시 조회해 아직 리뷰하지 않았을 때만 보낸다. 그 사이 재요청·ready 가 있었으면 그때 뜬 run 이 맡는다.
+#   - 보낸 run 은 workflow_dispatch 로 후속 run 을 띄우고, 후속 run 은 12시간 자고 같은 판정을 한다.
+#     보내지 않은 run 은 다음 run 을 띄우지 않아 반복이 거기서 끝난다.
 #   - PR 과 함께(2분 안) 지정된 리뷰어는 opened·ready run 이 한 메시지로 묶는다 (새 PR 알림과 같은 규칙).
 # pull_request_review 는 relay 만 한다. fork PR 의 리뷰 이벤트에는 secret 이 넘어오지 않아서, run 제목에
 # PR 번호·리뷰 ID 만 남기고 pr-discord-notify.yml 이 workflow_run 으로 받아 보낸다.
 # 로직과 설정(secret·variable)은 pr-discord-notify.yml 머리말 참고.
 #
 # 설정 (Settings → Environments)
-#   - environment review-reminder : wait timer 1440분 (tools/pr_discord_bot.py 의 REVIEW_WAIT_THRESHOLD 와 같게)
+#   - environment review-reminder          : wait timer 1440분 (tools/pr_discord_bot.py 의 REVIEW_WAIT_THRESHOLD 와 같게)
+#   - environment review-reminder-followup : wait timer 720분 (REMIND_INTERVAL 과 같게)
 #
 # ⚠️ environment 가 없으면 GitHub 가 대기 없이 새로 만든다 → 판정이 전부 "아직 24시간 전" 으로 끝나 알림이 조용히 빠진다.
+#   followup 이 없으면 같은 이유로 24시간 알림만 가고 12시간 반복이 조용히 빠진다.
 # ⚠️ concurrency 를 넣지 말 것. 대기 중인 run 이 조용히 취소된다.
 # ⚠️ name 과 run-name 형식은 pr-discord-notify.yml(workflow_run)과 tools/pr_discord_bot.py 가 읽는다. 바꾸면 같이 바꿀 것.
 # ⚠️ 이벤트가 섞여 있어 job 조건마다 github.event_name 을 확인한다.
 # ⚠️ pull_request_target 인 이유와 제약은 pr-discord-notify.yml 머리말 참고 (fork PR 에서도 secret 을 쓰려는 것).
-run-name: "${{ github.event.review && format('review #{0} {1}', github.event.pull_request.number, github.event.review.id) || github.event.pull_request.title }}"
+run-name: "${{ github.event.review && format('review #{0} {1}', github.event.pull_request.number, github.event.review.id) || inputs.pr && format('remind #{0} nth={1}', inputs.pr, inputs.nth) || github.event.pull_request.title }}"
 
 on:
   pull_request_target:
@@ -23,18 +28,27 @@ on:
     branches-ignore: [main]
   pull_request_review:
     types: [submitted]
+  workflow_dispatch:  # 후속 리마인드. remind job 이 보낸 뒤 tools/pr_discord_bot.py 가 띄운다.
+    inputs:
+      pr: {required: true}
+      action: {required: true}
+      reviewer: {required: false}
+      nth: {required: true}
 
 permissions:
   contents: read
   pull-requests: read
   issues: read  # 리뷰 요청 시각(issue events) 조회
+  actions: write  # 후속 리마인드 run 을 workflow_dispatch 로 띄운다
 
 jobs:
   remind:
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request_target' && github.event.pull_request.draft == false
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request_target' && github.event.pull_request.draft == false)
     environment:
-      name: review-reminder
+      name: ${{ github.event_name == 'workflow_dispatch' && 'review-reminder-followup' || 'review-reminder' }}
       deployment: false
     steps:
       - uses: actions/checkout@v4

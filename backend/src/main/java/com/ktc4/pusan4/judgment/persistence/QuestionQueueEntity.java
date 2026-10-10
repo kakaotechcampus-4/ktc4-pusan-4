@@ -59,11 +59,11 @@ class QuestionQueueEntity {
         this.groupKey = question.groupBy();
         this.factType = question.factType();
         this.options = question.options();
-        this.status = "대기";
+        this.status = "PENDING";
     }
 
     void answer(UUID factId, UserFact fact, OffsetDateTime answeredAt) {
-        if (!"대기".equals(status)) {
+        if (!"PENDING".equals(status)) {
             throw new IllegalStateException("Question is not pending: " + id);
         }
         if (!groupKey.equals(fact.scopeKey())) {
@@ -83,6 +83,6 @@ class QuestionQueueEntity {
         }
         this.answeredFactId = factId;
         this.answeredAt = answeredAt;
-        this.status = "응답";
+        this.status = "ANSWERED";
     }
 }

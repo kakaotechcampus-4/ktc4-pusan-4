@@ -4,8 +4,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ktc4.pusan4.judgment.api.JudgmentMockData;
 import com.ktc4.pusan4.merchant.api.ClassificationMockData;
 import com.ktc4.pusan4.shared.UuidV7Generator;
+import com.ktc4.pusan4.shared.auth.TemporaryCurrentUserProvider;
 import com.ktc4.pusan4.transaction.api.TransactionMockData;
 import com.ktc4.pusan4.user.api.UserMockData;
+import com.ktc4.pusan4.user.domain.AppUser;
+import com.ktc4.pusan4.user.persistence.UserService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -16,13 +20,19 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
+import java.time.OffsetDateTime;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -33,7 +43,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 목 응답이 api.md 의 상태 코드를 지키는지 확인한다. 값은 보지 않는다 — 서비스로 바꿔도 깨지지 않아야 한다.
  */
 @WebMvcTest
-@Import({ApiExceptionHandler.class, UuidV7Generator.class,
+@Import({ApiExceptionHandler.class, UuidV7Generator.class, TemporaryCurrentUserProvider.class,
     UserMockData.class, TransactionMockData.class, ClassificationMockData.class, JudgmentMockData.class})
 class ApiResponseContractTest {
 
@@ -44,6 +54,17 @@ class ApiResponseContractTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    /** 서비스로 바뀐 API 는 DB 없이 계약만 보도록 서비스를 대신한다. */
+    @MockitoBean
+    private UserService userService;
+
+    @BeforeEach
+    void stubServices() {
+        given(userService.get(any())).willReturn(new AppUser(
+            TemporaryCurrentUserProvider.TEMPORARY_USER_ID, "demo@example.com",
+            OffsetDateTime.parse("2026-09-01T10:00:00+09:00")));
+    }
 
     static Stream<Arguments> endpoints() {
         return Stream.of(
@@ -114,31 +135,60 @@ class ApiResponseContractTest {
         mockMvc.perform(request).andExpect(status().is(expectedStatus));
     }
 
+    private static final Set<String> USER_KEYS = Set.of("id", "email", "createdAt");
     private static final Set<String> CONTEXT_KEYS = Set.of("id", "userId", "version", "industryCode",
         "prevYearRevenue", "businessOpenDate", "bookkeepingDuty", "hasEmployee", "homeOfficeRatio", "createdAt");
     private static final Set<String> UPLOAD_BATCH_KEYS = Set.of("id", "sourceType", "cardIssuer", "periodStart",
         "periodEnd", "transactionCount", "skippedDuplicateCount", "classificationPendingCount", "createdAt");
-    private static final Set<String> JUDGMENT_KEYS = Set.of("id", "transactionId", "revision", "origin", "verdict",
-        "outOfScope", "blockedAtGate", "account", "finalAmount", "isInference", "unmatchedReason", "attributes",
+    /** api.md 3.4 거래 요약. 거래를 함께 보여주는 응답은 이 필드를 모두 넣는다 */
+    private static final Set<String> TRANSACTION_SUMMARY_KEYS = Set.of("approvedAt", "merchantRaw", "merchantNorm",
+        "merchantCategory", "amount", "installmentMonths");
+    private static final Set<String> JUDGMENT_KEYS = Set.of("id", "transactionId", "transaction", "revision", "origin",
+        "verdict", "outOfScope", "blockedAtGate", "account", "finalAmount", "isInference", "unmatchedReason", "attributes",
         "ruleCardId", "ruleCardVersion", "appliedRuleIds", "rulesCommitSha", "userContextVersion", "explanation",
         "computedAt", "citations");
     private static final Set<String> QUESTION_KEYS = Set.of("id", "batchId", "transactionId", "groupKey", "factType",
-        "questionText", "options", "status", "answeredFactId", "createdAt", "answeredAt");
+        "questionText", "options", "status", "answeredFactId", "answer", "createdAt", "answeredAt");
+    private static final Set<String> QUESTION_GROUP_KEYS = Set.of("groupKey", "factType", "status", "questionIds",
+        "count", "totalAmount", "questionText", "options", "answer", "bulkAnswerable", "transactions");
+    private static final Set<String> QUESTION_GROUP_TRANSACTION_KEYS =
+        withTransactionSummary("questionId", "transactionId", "overridden");
     private static final Set<String> CLASSIFICATION_REVIEW_KEYS = Set.of("id", "batchId", "transactionId",
         "merchantRaw", "merchantNorm", "status", "suggestedCategories", "createdAt", "resolvedAt");
+    private static final Set<String> CLASSIFICATION_REVIEW_GROUP_KEYS = Set.of("groupKey", "merchantNorm",
+        "reviewIds", "count", "totalAmount", "merchantRaw", "suggestedCategories", "transactions");
+    private static final Set<String> CLASSIFICATION_GROUP_TRANSACTION_KEYS =
+        withTransactionSummary("reviewId", "transactionId");
+    private static final Set<String> UNRESOLVED_KEYS = Set.of("count", "amount");
+
+    private static Set<String> withTransactionSummary(String... keys) {
+        return Stream.concat(Stream.of(keys), TRANSACTION_SUMMARY_KEYS.stream()).collect(Collectors.toSet());
+    }
 
     /**
      * 응답 타입이 Map 이던 자리. 키 집합은 api.md 의 응답 예시에서 옮겼다.
      */
     static Stream<Arguments> documentedShapes() {
         return Stream.of(
+            Arguments.of("/api/v1/users/me", "", USER_KEYS),
             Arguments.of("/api/v1/users/me/contexts/current", "", CONTEXT_KEYS),
             Arguments.of("/api/v1/users/me/contexts", "/0", CONTEXT_KEYS),
             Arguments.of("/api/v1/upload-batches", "/items/0", UPLOAD_BATCH_KEYS),
             Arguments.of("/api/v1/upload-batches/" + ID, "", UPLOAD_BATCH_KEYS),
             Arguments.of("/api/v1/judgments?batchId=" + ID, "/items/0", JUDGMENT_KEYS),
+            Arguments.of("/api/v1/judgments?batchId=" + ID, "/items/0/transaction", TRANSACTION_SUMMARY_KEYS),
+            Arguments.of("/api/v1/judgments/" + ID, "", JUDGMENT_KEYS),
             Arguments.of("/api/v1/questions?batchId=" + ID, "/items/0", QUESTION_KEYS),
-            Arguments.of("/api/v1/classification-reviews", "/items/0", CLASSIFICATION_REVIEW_KEYS)
+            Arguments.of("/api/v1/questions?batchId=" + ID + "&grouped=true", "/items/0", QUESTION_GROUP_KEYS),
+            Arguments.of("/api/v1/questions?batchId=" + ID + "&grouped=true", "/items/0/transactions/0",
+                QUESTION_GROUP_TRANSACTION_KEYS),
+            Arguments.of("/api/v1/questions?batchId=" + ID + "&grouped=true", "/unresolved", UNRESOLVED_KEYS),
+            Arguments.of("/api/v1/classification-reviews", "/items/0", CLASSIFICATION_REVIEW_KEYS),
+            Arguments.of("/api/v1/classification-reviews", "/unresolved", UNRESOLVED_KEYS),
+            Arguments.of("/api/v1/classification-reviews?grouped=true", "/items/0", CLASSIFICATION_REVIEW_GROUP_KEYS),
+            Arguments.of("/api/v1/classification-reviews?grouped=true", "/items/0/transactions/0",
+                CLASSIFICATION_GROUP_TRANSACTION_KEYS),
+            Arguments.of("/api/v1/classification-reviews?grouped=true", "/unresolved", UNRESOLVED_KEYS)
         );
     }
 
@@ -155,6 +205,15 @@ class ApiResponseContractTest {
         Set<String> actualKeys = new TreeSet<>();
         objectMapper.readTree(body).at(pointer).fieldNames().forEachRemaining(actualKeys::add);
         assertThat(actualKeys).containsExactlyInAnyOrderElementsOf(expectedKeys);
+    }
+
+    @Test
+    void users_me_looks_up_current_user() throws Exception {
+        // when
+        mockMvc.perform(get("/api/v1/users/me")).andExpect(status().isOk());
+
+        // then: 요청 값이 아니라 CurrentUserProvider 가 정한 사용자로 조회한다
+        verify(userService).get(TemporaryCurrentUserProvider.TEMPORARY_USER_ID);
     }
 
     @Test

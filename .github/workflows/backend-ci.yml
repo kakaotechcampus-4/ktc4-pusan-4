@@ -7,6 +7,7 @@ on:
       - "rules/**"
       - "profiles/**"
       - "eval/**"
+      - "tools/fixtures/**"
       - "compose.yaml"
       - ".github/workflows/backend-ci.yml"
   push:
@@ -16,6 +17,7 @@ on:
       - "rules/**"
       - "profiles/**"
       - "eval/**"
+      - "tools/fixtures/**"
       - "compose.yaml"
       - ".github/workflows/backend-ci.yml"
 

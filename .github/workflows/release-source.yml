@@ -1,0 +1,29 @@
+name: Release source
+
+# release 로는 이 레포의 develop 에서 온 PR 만 받는다. ruleset 의 필수 체크로 머지를 막는다.
+# edited 는 base 를 release 로 바꾼 PR 을 다시 검사하려고 넣었다.
+# 빠지면 develop 대상일 때 통과한 체크가 남아 그대로 머지된다.
+# pull_request_target 은 PR 쪽이 아닌 기본 브랜치(develop) 의 이 파일로 돈다. PR 안에서 이 파일을 고쳐 통과시킬 수 없다.
+# checkout 이 없고 권한도 비워 두어 PR 코드를 실행하지 않는다.
+
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened]
+    branches: [release]
+
+permissions: {}
+
+jobs:
+  release-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require develop of this repository
+        env:
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [[ $HEAD_REPO != "$REPO" || $HEAD_REF != develop ]]; then
+            echo "::error::release PR은 $REPO 의 develop 에서만 연다. 현재: $HEAD_REPO:$HEAD_REF"
+            exit 1
+          fi

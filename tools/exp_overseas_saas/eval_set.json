@@ -1,0 +1,660 @@
+[
+{
+"descriptor": "GITHUB.COM *2YBN2 SAN FRANCISCO CA",
+"service": "GitHub",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/github"
+},
+{
+"descriptor": "GITHUB.COM 1ZV1, 4154486673 US",
+"service": "GitHub",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/github"
+},
+{
+"descriptor": "FIGMA MONTHLY RENEWAL",
+"service": "Figma",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://ramp.com/charge-finder/figma"
+},
+{
+"descriptor": "NOTION.SO SAN FRANCISCO",
+"service": "Notion",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/notion"
+},
+{
+"descriptor": "SLACK T62P4PC8H DUBLIN",
+"service": "Slack",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/slack"
+},
+{
+"descriptor": "ZOOM.US 888-799-9666",
+"service": "Zoom",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://ramp.com/charge-finder/zoom"
+},
+{
+"descriptor": "GOOGLE *ZOOMdotUS",
+"service": "Zoom",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://ramp.com/charge-finder/zoom"
+},
+{
+"descriptor": "VERCEL MKT MONGODB ATL",
+"service": "Vercel",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://www.brex.com/tools/charge-finder/vercel"
+},
+{
+"descriptor": "DIGITALOCEAN.COM 646-397-8051 NY",
+"service": "DigitalOcean",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/digitalocean"
+},
+{
+"descriptor": "AMAZON WEB SERVICES AWS.AMAZONCOM WA",
+"service": "AWS",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/aws"
+},
+{
+"descriptor": "AWS EMEA",
+"service": "AWS",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/aws"
+},
+{
+"descriptor": "Google*Cloud m44pzq",
+"service": "Google Cloud",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://merchants.letsweel.com/merchants/google-cloud"
+},
+{
+"descriptor": "GOOGLE *Workspace_1871",
+"service": "Google Workspace",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://www.brex.com/tools/charge-finder/google-workspace"
+},
+{
+"descriptor": "MSFT *<E0600GPLXR> MSBILL.INFO",
+"service": "Microsoft 365",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://learn.microsoft.com/en-us/answers/questions/5136026/recurring-monthly-charges-all-prefixed-with-msft-*"
+},
+{
+"descriptor": "GOOGLE *Microsoft 365",
+"service": "Microsoft 365",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://www.brex.com/tools/charge-finder/microsoft"
+},
+{
+"descriptor": "ATLASSIAN ATLASSIAN B.V NLD",
+"service": "Atlassian",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/atlassian"
+},
+{
+"descriptor": "JETBRAINS*1XINTELLIJ ID PRAGUE",
+"service": "JetBrains",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/jetbrains"
+},
+{
+"descriptor": "CURSOR, AI POWERED IDE",
+"service": "Cursor",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://www.brex.com/tools/charge-finder/cursor"
+},
+{
+"descriptor": "OPENAI *CHATGPT SUBSCR OPENAI.COM CA",
+"service": "OpenAI",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://www.whatsthatcharge.com/OPENAI-CHATGPT-SUBSCR-OPENAI-COM-CA"
+},
+{
+"descriptor": "CHATGPT SUBSCR+1415879968CAUS",
+"service": "OpenAI",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/chatgpt"
+},
+{
+"descriptor": "ANTHROPIC CLAUDE TEAM",
+"service": "Anthropic",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://www.brex.com/tools/charge-finder/anthropic"
+},
+{
+"descriptor": "Midjourney Inc.",
+"service": "Midjourney",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/midjourney"
+},
+{
+"descriptor": "CANVA* FOR WORK MO",
+"service": "Canva",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/canva"
+},
+{
+"descriptor": "ADOBE CREATIVE CLOUD 044-207-3650 IE",
+"service": "Adobe",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/adobe"
+},
+{
+"descriptor": "PAYPAL, *ADOBESYSTEM, 35314369001 GB",
+"service": "Adobe",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/adobe"
+},
+{
+"descriptor": "DROPBOX DB.TT/CCHELP IRL",
+"service": "Dropbox",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/dropbox"
+},
+{
+"descriptor": "DROPBOXINTE 35314369001 GBR",
+"service": "Dropbox",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/dropbox"
+},
+{
+"descriptor": "1PASSWORD 8778877815 ON",
+"service": "1Password",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/1password"
+},
+{
+"descriptor": "LINEAR.APP",
+"service": "Linear",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://www.brex.com/tools/charge-finder/linear"
+},
+{
+"descriptor": "HEROKU*HEROKU SAN FRANCIS CA",
+"service": "Heroku",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/heroku"
+},
+{
+"descriptor": "CLOUDFLARE 650-3198939 CA",
+"service": "Cloudflare",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/cloudflare"
+},
+{
+"descriptor": "POSTMAN BASIC(MONTHLY)",
+"service": "Postman",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://www.brex.com/tools/charge-finder/postman"
+},
+{
+"descriptor": "GRAMMARLY CO*CELO-2BGN SAN FANCISCO CA",
+"service": "Grammarly",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/grammarly"
+},
+{
+"descriptor": "NAME-CHEAP.COM PHOENIX",
+"service": "Namecheap",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/namecheap"
+},
+{
+"descriptor": "NAMECHEAP 4029357733 AZ",
+"service": "Namecheap",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/namecheap"
+},
+{
+"descriptor": "GODADDY.COM EUROPE 480-5058855 AZ",
+"service": "GoDaddy",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/godaddy"
+},
+{
+"descriptor": "CREDIT FROM DNH*GODADDY.COM EUROPE",
+"service": "GoDaddy",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/godaddy"
+},
+{
+"descriptor": "WEBFLOW.COM, 4159640555",
+"service": "Webflow",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/webflow"
+},
+{
+"descriptor": "MIRO.COM",
+"service": "Miro",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://www.brex.com/tools/charge-finder/miro"
+},
+{
+"descriptor": "NETFLIX.COM 866-579-7172 NLD",
+"service": "Netflix",
+"label": "구독서비스",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/netflix"
+},
+{
+"descriptor": "NETFLIX G.CO/HELPPAY# GBR",
+"service": "Netflix",
+"label": "구독서비스",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/netflix"
+},
+{
+"descriptor": "SPOTIFY P071539757 LONDON GBR",
+"service": "Spotify",
+"label": "구독서비스",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/spotify"
+},
+{
+"descriptor": "SPOTIFY*USA-SUBS 877-778-1161 NY",
+"service": "Spotify",
+"label": "구독서비스",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/spotify"
+},
+{
+"descriptor": "ADY*SPOTIFY P00 HTTPS://WWW.S NY USA",
+"service": "Spotify",
+"label": "구독서비스",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/spotify"
+},
+{
+"descriptor": "GOOGLE *YOUTUBE G.CO/PAYHELP CA",
+"service": "YouTube Premium",
+"label": "구독서비스",
+"set": "해외조회사이트",
+"source_url": "https://discover.hubpages.com/money/google-youtube-gco-payhelp-ca-charge"
+},
+{
+"descriptor": "DISNEY *SUBSCRIPTION",
+"service": "Disney+",
+"label": "구독서비스",
+"set": "해외조회사이트",
+"source_url": "https://www.whatisthischarge.net/blog/what-is-disney-subscription"
+},
+{
+"descriptor": "DISNEY MOBILE G.CO/HELPPAY# GBR",
+"service": "Disney+",
+"label": "구독서비스",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/disney"
+},
+{
+"descriptor": "APPLE.COM/BILL",
+"service": "Apple",
+"label": "PG_미상",
+"set": "해외조회사이트",
+"source_url": "https://nednex.com/en/what-is-an-apple-com-bill-charge-on-the-bank-statement/"
+},
+{
+"descriptor": "ITUNES.COM/BILL CORK IE",
+"service": "Apple",
+"label": "PG_미상",
+"set": "해외조회사이트",
+"source_url": "https://nednex.com/en/what-is-an-apple-com-bill-charge-on-the-bank-statement/"
+},
+{
+"descriptor": "AMAZON PRIME AMZN.CO.UK/PM LUX",
+"service": "Amazon Prime",
+"label": "구독서비스",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/amazon-prime"
+},
+{
+"descriptor": "AMAZONPRIME MEMBER, AMZN.COM/PRME",
+"service": "Amazon Prime",
+"label": "구독서비스",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/amazon-prime"
+},
+{
+"descriptor": "AUDIBLE LTD ADBL.CO/PYMT GBR",
+"service": "Audible",
+"label": "구독서비스",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/audible"
+},
+{
+"descriptor": "AUDIBLE, ADBL.CO/BILL",
+"service": "Audible",
+"label": "구독서비스",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/audible"
+},
+{
+"descriptor": "AMAZON SERVICES-KINDLE 866-321-8851",
+"service": "Kindle",
+"label": "구독서비스",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/kindle"
+},
+{
+"descriptor": "KINDLE-THEECONOMIS AMAZON.CO.UK",
+"service": "Kindle",
+"label": "구독서비스",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/kindle"
+},
+{
+"descriptor": "PATREON* MEMBERSHIP SAN FRANCISCO CA",
+"service": "Patreon",
+"label": "구독서비스",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/patreon"
+},
+{
+"descriptor": "VISIT PATREON.COM/INFO 877-887-7815 CA",
+"service": "Patreon",
+"label": "구독서비스",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/patreon"
+},
+{
+"descriptor": "JTI*TWITCHTV SUB SRVCS 844-5658623 CA",
+"service": "Twitch",
+"label": "구독서비스",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/twitch"
+},
+{
+"descriptor": "XSOLLA *TWITCH 442033181985 CA",
+"service": "Twitch",
+"label": "구독서비스",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/twitch"
+},
+{
+"descriptor": "CRI*CRUNCHYROLL MEMBER 415-503-9235 CA",
+"service": "Crunchyroll",
+"label": "구독서비스",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/crunchyroll"
+},
+{
+"descriptor": "STEAMGAMES.COM 425-952-2985 GBR",
+"service": "Steam",
+"label": "게임",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/steam"
+},
+{
+"descriptor": "VALVE GMBH HAMBURG DE",
+"service": "Steam",
+"label": "게임",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/steam"
+},
+{
+"descriptor": "STEAM PURCHASE",
+"service": "Steam",
+"label": "게임",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/steam"
+},
+{
+"descriptor": "PLAYSTATIONNETWORK LONDON GBR",
+"service": "PlayStation Network",
+"label": "게임",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/playstation-network"
+},
+{
+"descriptor": "PLAYSTATION SONYENTERT 800-345-7669 CA",
+"service": "PlayStation Network",
+"label": "게임",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/playstation-network"
+},
+{
+"descriptor": "XBOX LIVE GO MSBILL.INFO IRL",
+"service": "Xbox",
+"label": "게임",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/xbox-game-pass"
+},
+{
+"descriptor": "MICROSOFT *XBOX MSBILL.INFO",
+"service": "Xbox",
+"label": "게임",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/xbox-game-pass"
+},
+{
+"descriptor": "NINTENDO *OF EUROPE 800-255-3700 DEU",
+"service": "Nintendo eShop",
+"label": "게임",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/nintendo"
+},
+{
+"descriptor": "NINTENDO OF EUROPE NIN.3DS.WIIU DEU",
+"service": "Nintendo eShop",
+"label": "게임",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/nintendo"
+},
+{
+"descriptor": "EPC*EPIC GAMES STORE",
+"service": "Epic Games",
+"label": "게임",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/epic-games"
+},
+{
+"descriptor": "EPIC GAMES *UE MKPL 919-854-0070 LUX",
+"service": "Epic Games",
+"label": "게임",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/epic-games"
+},
+{
+"descriptor": "RIOTGAM*LOL LW7GKMLKX737 IRL",
+"service": "Riot Games",
+"label": "게임",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/riot-games"
+},
+{
+"descriptor": "RIOTGAM LOL DUBLIN 2 IRL",
+"service": "Riot Games",
+"label": "게임",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/riot-games"
+},
+{
+"descriptor": "BLIZZARD ENTERTAINMENT EU.BATTLE.NET FR",
+"service": "Blizzard",
+"label": "게임",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/blizzard-entertainment"
+},
+{
+"descriptor": "BLIZZARD ENT WOW SUB BLIZZARD.COM",
+"service": "Blizzard",
+"label": "게임",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/blizzard-entertainment"
+},
+{
+"descriptor": "PADDLE.NET* GETASTRA",
+"service": "Paddle",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://help.getastra.com/articles/3103635113-why-is-paddle-net-getastra-written-on-my-bank-card-statement"
+},
+{
+"descriptor": "PADDLE.NET* - CLASSMARKR",
+"service": "Paddle",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://www.classmarker.com/online-testing/blog/What-is-paddle-classmarkr-charge-on-credit-card"
+},
+{
+"descriptor": "PAYPAL *PADDLE.NET",
+"service": "Paddle",
+"label": "PG_미상",
+"set": "해외조회사이트",
+"source_url": "https://chargeonmycard.com/paddle-net/"
+},
+{
+"descriptor": "FS *FSPRG.COM",
+"service": "FastSpring",
+"label": "PG_미상",
+"set": "해외조회사이트",
+"source_url": "https://scamcharge.com/c/fs-fsprg-com"
+},
+{
+"descriptor": "FASTSPRING 4029357733 US",
+"service": "FastSpring",
+"label": "PG_미상",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/fastspring"
+},
+{
+"descriptor": "2CO.COM",
+"service": "2Checkout",
+"label": "PG_미상",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/2checkout"
+},
+{
+"descriptor": "PAYPAL *DROPBOX 402-935-7733 CA",
+"service": "PayPal",
+"label": "해외SaaS",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/dropbox"
+},
+{
+"descriptor": "PAYPAL INST XFER CRUNCHYROLL WEB ID: PAYPALSI77",
+"service": "PayPal",
+"label": "구독서비스",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/crunchyroll"
+},
+{
+"descriptor": "PAYPAL, *NETFLIX.COM, 35314369001 GB",
+"service": "PayPal",
+"label": "구독서비스",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/netflix"
+},
+{
+"descriptor": "GOOGLE *GOOGLE PLAY AP G.CO/HELPPAY# GBR",
+"service": "Google Play",
+"label": "PG_미상",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/google-play"
+},
+{
+"descriptor": "GOOGLE PLAY AP G.CO/HELPPAY# GB",
+"service": "Google Play",
+"label": "PG_미상",
+"set": "해외조회사이트",
+"source_url": "https://emma-app.com/who-charged-me/google-play"
+},
+{
+"descriptor": "APPLE.COM/BILL DUBLIN IE",
+"service": "Apple",
+"label": "PG_미상",
+"set": "해외조회사이트",
+"source_url": "https://nednex.com/en/what-is-an-apple-com-bill-charge-on-the-bank-statement/"
+},
+{
+"descriptor": "ANTHROPIC* CLA",
+"service": "Anthropic",
+"label": "해외SaaS",
+"set": "국내카드실증",
+"source_url": "keyword_rules.yaml note / 성진 카드"
+},
+{
+"descriptor": "CLAUDE.AI SUBS",
+"service": "Anthropic",
+"label": "해외SaaS",
+"set": "국내카드실증",
+"source_url": "keyword_rules.yaml note / 성진 카드"
+},
+{
+"descriptor": "OPENAI *CHATGPT SUBSCR",
+"service": "OpenAI",
+"label": "해외SaaS",
+"set": "국내카드실증",
+"source_url": "keyword_rules.yaml note / 성진 카드"
+},
+{
+"descriptor": "구글클라우드코리아",
+"service": "Google Cloud",
+"label": "해외SaaS",
+"set": "국내카드실증",
+"source_url": "keyword_rules.yaml note / 성진 카드"
+},
+{
+"descriptor": "NETFLIX_INICIS",
+"service": "Netflix",
+"label": "구독서비스",
+"set": "국내카드실증",
+"source_url": "keyword_rules.yaml note / 성진 카드"
+},
+{
+"descriptor": "구글플레이",
+"service": "Google Play",
+"label": "PG_미상",
+"set": "국내카드실증",
+"source_url": "keyword_rules.yaml note / 성진 카드"
+},
+{
+"descriptor": "구글플레이-구글페이먼트코리아 유한회사",
+"service": "Google Play",
+"label": "PG_미상",
+"set": "국내카드실증",
+"source_url": "keyword_rules.yaml note / 성진 카드"
+}
+]

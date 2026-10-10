@@ -53,7 +53,7 @@ rules:
   - { priority: 800, match: "SLACK|LINEAR|CANVA|ADOBE", category: 해외SaaS }
   - { priority: 800, match: "CURSOR|SUPABASE|CLOUDFLARE|DIGITALOCEAN|HEROKU", category: 해외SaaS }
   - { priority: 800, match: "구글클라우드|GOOGLE\\s*CLOUD|GCP", category: 해외SaaS, note: "실증: 구글클라우드코리아 (memo: Google Cloud Platform). PG 아님" }
-  - { priority: 800, match: "MICROSOFT|ONEDRIVE|AZURE|OFFICE\\s*365", category: 해외SaaS }
+  - { priority: 800, match: "MICROSOFT\\s*365|OFFICE\\s*365|ONEDRIVE|AZURE", category: 해외SaaS, note: "회사명 MICROSOFT 단독은 Xbox(게임) 같은 개인 결제와 섞여 제품명만 둔다. 실증: MICROSOFT *XBOX MSBILL.INFO" }
   - { priority: 800, match: "GEMINI|GOOGLE\\s*ONE", category: 해외SaaS }
 
   # ── 구독 서비스 ───────────────────────────────────────────

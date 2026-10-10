@@ -96,29 +96,44 @@ class Evidence(BaseModel):
     note: str
 
 
+def _shared(a: list[str], b: list[str]) -> int:
+    """앞에서부터 같은 줄 수. b 의 마지막 줄은 남긴다 — 라벨 아래가 비면 안 된다."""
+    n = 0
+    while n < min(len(a), len(b) - 1) and a[n] == b[n]:
+        n += 1
+    return n
+
+
+def _split(hits: list[Hit]) -> list[tuple[list[str], int, int]]:
+    """잎마다 (줄, 앞 잎과 겹친 줄 수, 머리말 줄 수). 머리말은 앞이나 뒤 형제와 겹치는 앞줄이다."""
+    rows = [h.body[:BODY_CHARS].strip().split("\n") for h in hits]
+    pad = [[], *rows, []]
+    out = []
+    for prev, lines, nxt in zip(pad, rows, pad[2:]):
+        same = _shared(prev, lines)
+        out.append((lines, same, max(same, _shared(nxt, lines))))
+    return out
+
+
 def _candidates(by_tier: dict[str, list[Hit]]) -> str:
-    """ID 한 줄에 본문 한 덩이. 앞 잎과 겹치는 머리말 줄은 다시 찍지 않는다.
+    """ID 한 줄에 본문 한 덩이. 형제 잎과 겹치는 머리말은 라벨 위에 한 번만 찍는다.
 
     ID 여럿을 한 줄에 묶고 본문을 한 덩이만 두면 모델이 어느 문장이 어느 호
     소속인지 못 맞춘다(실측: 시행령 문구를 법률 ID 로 인용해 검증 실패 2건).
     머리말을 잎마다 되풀이하면 "…산입하지 아니한다" 가 호마다 붙어 모든 호가 해당하는
-    것처럼 보인다(실측: 33조 잎 17개를 통째로 인용). 검증은 생략 전 본문(_pool)으로 한다.
+    것처럼 보인다(실측: 33조 잎 17개를 통째로 인용). 첫 잎 라벨 아래 두면 그 문장을 첫 호
+    것으로 인용한다(실측: 33-1-1 오적용이 전부 33조 머리말이었고 그대로 G1 오판이 됐다).
     """
     out = []
     for tier, hits in by_tier.items():
         if not hits:
             continue
         out.append(f"[{tier}] {_TIER_NOTE.get(tier, '')}")
-        prev: list[str] = []
-        for h in hits:
+        for h, (lines, same, head) in zip(hits, _split(hits)):
             sec = f" ({h.section})" if h.section else ""
-            lines = h.body[:BODY_CHARS].strip().split("\n")
-            same = 0
-            while same < min(len(prev), len(lines) - 1) and prev[same] == lines[same]:
-                same += 1
+            out += [f"  {line}" for line in lines[same:head]]
             out.append(f"  {h.statute_id}{sec}")
-            out += [f"    {line}" for line in lines[same:]]
-            prev = lines
+            out += [f"    {line}" for line in lines[head:]]
         out.append("")
     return "\n".join(out)
 
@@ -135,20 +150,20 @@ def _norm(s: str) -> str:
     return "".join(s.split())
 
 
-def _pool(by_tier: dict[str, list[Hit]]) -> dict[str, list[str]]:
-    """statute_id 하나에 본문이 여럿일 수 있다(심판례는 요지·심리판단이 같은 id).
+def _pool(by_tier: dict[str, list[Hit]]) -> dict[str, list[tuple[str, str]]]:
+    """statute_id 하나에 (본문, 머리말)이 여럿일 수 있다(심판례는 요지·심리판단이 같은 id).
 
     라벨마다 제 본문만 넣는다 — 조 전문까지 인용처로 두면 형제 호 본문을 엉뚱한
     호 ID 로 인용해도 통과한다.
     """
     out = defaultdict(list)
     for hits in by_tier.values():
-        for h in hits:
-            out[h.statute_id].append(h.body)
+        for h, (lines, _, head) in zip(hits, _split(hits)):
+            out[h.statute_id].append((h.body, "\n".join(lines[:head])))
     return out
 
 
-def _check(ev: Evidence, pool: dict[str, list[str]]) -> list[str]:
+def _check(ev: Evidence, pool: dict[str, list[tuple[str, str]]]) -> list[str]:
     """모델 출력에서 기계로 잡히는 것만. 근거 오적용은 여기서 안 걸린다."""
     bad = []
     if ev.sufficient and not ev.refs:
@@ -156,14 +171,21 @@ def _check(ev: Evidence, pool: dict[str, list[str]]) -> list[str]:
     for r in ev.refs:
         chunks = pool.get(r.statute_id) or []
         quote = _norm(_LEAD_NO.sub("", r.quote))
-        if len(quote) < MIN_QUOTE:
+        # 조항 문장 전체가 짧으면('14. 선급비용') 그 전체를 옮긴 건 통과시킨다
+        whole = any(quote == _LEAD_NO.sub("", _norm(b)[len(_norm(head)):]) for b, head in chunks)
+        if len(quote) < MIN_QUOTE and not whole:
             bad.append(f"{r.statute_id} 의 인용문이 너무 짧다. 한 문장을 통째로 복사해라.")
         elif not chunks:
             bad.append(f"{r.statute_id} 는 후보에 없다. 후보 밖 조문은 근거가 될 수 없으니 빼고 결론을 다시 세워라.")
-        elif not any(quote in _norm(b) for b in chunks):
+        elif not any(quote in _norm(b) for b, _ in chunks):
             bad.append(
                 f"{r.statute_id} 의 인용문 \"{r.quote[:40]}...\" 가 본문에 없다."
                 " 요약하지 말고 한 문장을 그대로 복사해라."
+            )
+        elif all(quote in _norm(head) for _, head in chunks):
+            bad.append(
+                f"{r.statute_id} 의 인용문은 형제 조항에 공통인 머리말(조 제목·항 도입문)이다."
+                " 머리말은 어느 조항의 근거도 아니다. 그 라벨 아래 문장을 인용해라."
             )
     return bad
 
