@@ -1,4 +1,4 @@
-package com.ktc4.pusan4.judgment.api;
+package com.ktc4.pusan4.judgment.domain;
 
 /**
  * 이 revision 이 생성된 직접 원인 (api.md 2.8).

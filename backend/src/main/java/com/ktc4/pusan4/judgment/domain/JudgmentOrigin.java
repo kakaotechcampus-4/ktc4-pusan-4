@@ -1,4 +1,4 @@
-package com.ktc4.pusan4.judgment.api;
+package com.ktc4.pusan4.judgment.domain;
 
 import java.util.UUID;
 

@@ -5,6 +5,8 @@ import com.ktc4.pusan4.merchant.MerchantDictionaryRepository;
 import com.ktc4.pusan4.judgment.domain.Citation;
 import com.ktc4.pusan4.judgment.domain.Gate;
 import com.ktc4.pusan4.judgment.domain.Judgment;
+import com.ktc4.pusan4.judgment.domain.JudgmentOrigin;
+import com.ktc4.pusan4.judgment.domain.JudgmentOriginType;
 import com.ktc4.pusan4.judgment.domain.QuestionSpec;
 import com.ktc4.pusan4.judgment.domain.UnmatchedReason;
 import com.ktc4.pusan4.judgment.domain.UserFact;
@@ -459,7 +461,7 @@ class JudgmentSchemaIntegrationTest {
         );
 
         UUID judgmentId = judgmentService.save(new SaveJudgmentCommand(
-            transactionId, "abc123", 1, 2025, LocalDate.of(2025, 12, 31),
+            transactionId, runOrigin(batchId), "abc123", 1, 2025, LocalDate.of(2025, 12, 31),
             List.of(), result
         ));
 
@@ -486,7 +488,7 @@ class JudgmentSchemaIntegrationTest {
             List.of(), List.of(), Map.of(), List.of()
         );
         SaveJudgmentCommand command = new SaveJudgmentCommand(
-            transactionId, "concurrent-revisions", 1, 2025, LocalDate.of(2025, 12, 31),
+            transactionId, runOrigin(batchId), "concurrent-revisions", 1, 2025, LocalDate.of(2025, 12, 31),
             List.of(), judgment
         );
         runConcurrently(8, () -> judgmentService.save(command));
@@ -518,7 +520,7 @@ class JudgmentSchemaIntegrationTest {
         );
 
         UUID judgmentId = judgmentService.save(new SaveJudgmentCommand(
-            transactionId, "def456", 3, 2025, LocalDate.of(2025, 3, 14),
+            transactionId, runOrigin(batchId), "def456", 3, 2025, LocalDate.of(2025, 3, 14),
             "기타", "미분류 가맹점", "940909",
             List.of(new UserFact("merchant:미분류", "purpose", Map.of("answer", "업무"))),
             result
@@ -570,7 +572,7 @@ class JudgmentSchemaIntegrationTest {
         );
 
         assertThatThrownBy(() -> judgmentService.save(new SaveJudgmentCommand(
-            transactionId, "rollback", 1, 2025, LocalDate.of(2025, 12, 31),
+            transactionId, runOrigin(batchId), "rollback", 1, 2025, LocalDate.of(2025, 12, 31),
             List.of(), judgment
         ))).isInstanceOf(NullPointerException.class);
 
@@ -635,9 +637,11 @@ class JudgmentSchemaIntegrationTest {
     @Test
     void user_facts_are_versioned_and_latest_answer_is_loaded() {
         UUID userId = UUID.randomUUID();
+        UUID batchId = UUID.randomUUID();
         jdbcTemplate.update(
             "insert into app_user(id, email) values (?, ?)", userId, userId + "@example.com"
         );
+        insertBatch(batchId, userId, "fact-version-file-hash");
         UserFact first = new UserFact(
             "merchant:스타벅스", "용도", Map.of("value", "개인")
         );
@@ -645,13 +649,13 @@ class JudgmentSchemaIntegrationTest {
             "merchant:스타벅스", "용도", Map.of("value", "업무미팅")
         );
 
-        UUID firstFactId = userFactPersistenceService.save(userId, first);
-        UUID correctedFactId = userFactPersistenceService.save(userId, corrected);
+        UUID firstFactId = userFactPersistenceService.save(userId, batchId, first);
+        UUID correctedFactId = userFactPersistenceService.save(userId, batchId, corrected);
 
         assertThat(firstFactId.version()).isEqualTo(7);
         assertThat(correctedFactId.version()).isEqualTo(7);
         assertThat(userFactPersistenceService.findLatest(
-            userId, "merchant:스타벅스", "용도"
+            userId, batchId, "merchant:스타벅스", "용도"
         )).contains(corrected);
         assertThat(jdbcTemplate.queryForList("""
             select version
@@ -664,13 +668,15 @@ class JudgmentSchemaIntegrationTest {
     @Test
     void concurrent_user_fact_saves_assign_distinct_versions() throws Exception {
         UUID userId = UUID.randomUUID();
+        UUID batchId = UUID.randomUUID();
         jdbcTemplate.update(
             "insert into app_user(id, email) values (?, ?)", userId, userId + "@example.com"
         );
+        insertBatch(batchId, userId, "fact-concurrent-file-hash");
         UserFact fact = new UserFact(
             "merchant:스타벅스", "용도", Map.of("value", "업무")
         );
-        runConcurrently(8, () -> userFactPersistenceService.save(userId, fact));
+        runConcurrently(8, () -> userFactPersistenceService.save(userId, batchId, fact));
 
         assertThat(jdbcTemplate.queryForList("""
             select version
@@ -681,31 +687,118 @@ class JudgmentSchemaIntegrationTest {
     }
 
     @Test
-    void loads_only_the_latest_version_of_each_user_fact() {
+    void loads_only_the_latest_version_of_each_user_fact_in_the_batch() {
         UUID userId = UUID.randomUUID();
         UUID otherUserId = UUID.randomUUID();
+        UUID batchId = UUID.randomUUID();
+        UUID otherBatchId = UUID.randomUUID();
+        UUID otherUserBatchId = UUID.randomUUID();
         jdbcTemplate.update(
             "insert into app_user(id, email) values (?, ?), (?, ?)",
             userId, userId + "@example.com", otherUserId, otherUserId + "@example.com"
         );
+        insertBatch(batchId, userId, "fact-latest-file-hash");
+        insertBatch(otherBatchId, userId, "fact-latest-other-file-hash");
+        insertBatch(otherUserBatchId, otherUserId, "fact-latest-other-user-file-hash");
         UserFact latestPurpose = new UserFact(
             "merchant:스타벅스", "용도", Map.of("value", "업무미팅")
         );
         UserFact dedicatedLine = new UserFact(
             "merchant:통신사", "전용여부", Map.of("value", "전용")
         );
-        userFactPersistenceService.save(userId, new UserFact(
+        userFactPersistenceService.save(userId, batchId, new UserFact(
             "merchant:스타벅스", "용도", Map.of("value", "개인")
         ));
-        userFactPersistenceService.save(userId, latestPurpose);
-        userFactPersistenceService.save(userId, dedicatedLine);
-        userFactPersistenceService.save(otherUserId, new UserFact(
+        userFactPersistenceService.save(userId, batchId, latestPurpose);
+        userFactPersistenceService.save(userId, batchId, dedicatedLine);
+        UUID otherBatchFactId = userFactPersistenceService.save(userId, otherBatchId, new UserFact(
+            "merchant:스타벅스", "용도", Map.of("value", "개인")
+        ));
+        userFactPersistenceService.save(otherUserId, otherUserBatchId, new UserFact(
             "merchant:스타벅스", "용도", Map.of("value", "개인")
         ));
 
-        List<UserFact> result = userFactPersistenceService.findAllLatest(userId);
+        List<UserFact> result = userFactPersistenceService.findAllLatest(userId, batchId);
 
         assertThat(result).containsExactlyInAnyOrder(latestPurpose, dedicatedLine);
+        assertThat(jdbcTemplate.queryForObject(
+            "select version from user_fact where id = ?", Integer.class, otherBatchFactId
+        )).isEqualTo(1);
+    }
+
+    @Test
+    void user_fact_owner_must_match_batch_owner() {
+        UUID otherUsersBatchId = insertUserWithBatch("fact-owner");
+        UUID userId = UUID.randomUUID();
+        jdbcTemplate.update(
+            "insert into app_user(id, email) values (?, ?)", userId, userId + "@example.com"
+        );
+
+        assertThatThrownBy(() -> userFactPersistenceService.save(userId, otherUsersBatchId, new UserFact(
+            "merchant:스타벅스", "용도", Map.of("value", "업무")
+        ))).isInstanceOf(DataAccessException.class);
+    }
+
+    @Test
+    void judgment_requires_exactly_one_origin() {
+        UUID userId = UUID.randomUUID();
+        UUID batchId = UUID.randomUUID();
+        UUID transactionId = UUID.randomUUID();
+        UUID judgmentId = UUID.randomUUID();
+        insertJudgmentFixture(userId, batchId, transactionId, judgmentId, "one-origin");
+        UUID runId = insertRun(batchId);
+        UUID factId = UUID.randomUUID();
+        jdbcTemplate.update("""
+            insert into user_fact(id, user_id, batch_id, scope_key, fact_type, value, version)
+            values (?, ?, ?, 'merchant:가맹점', '용도', '{"value": "업무"}', 1)
+            """, factId, userId, batchId);
+
+        assertThatThrownBy(() -> jdbcTemplate.update("""
+            insert into judgment(
+                id, transaction_id, revision, rules_commit_sha, user_context_version,
+                tax_year, verdict, is_inference
+            ) values (?, ?, 2, 'fixture', 1, 2025, 'AVAILABLE', false)
+            """, UUID.randomUUID(), transactionId)).isInstanceOf(DataAccessException.class);
+        assertThatThrownBy(() -> jdbcTemplate.update("""
+            insert into judgment(
+                id, transaction_id, revision, rules_commit_sha, user_context_version,
+                tax_year, verdict, is_inference, run_id, trigger_user_fact_id
+            ) values (?, ?, 2, 'fixture', 1, 2025, 'AVAILABLE', false, ?, ?)
+            """, UUID.randomUUID(), transactionId, runId, factId)).isInstanceOf(DataAccessException.class);
+    }
+
+    @Test
+    void saved_judgment_stores_origin_in_its_own_column() {
+        UUID userId = UUID.randomUUID();
+        UUID batchId = UUID.randomUUID();
+        UUID transactionId = UUID.randomUUID();
+        jdbcTemplate.update(
+            "insert into app_user(id, email) values (?, ?)", userId, userId + "@example.com"
+        );
+        insertBatch(batchId, userId, "origin-column-file-hash");
+        insertTransaction(transactionId, batchId, "origin-column-natural-key");
+        UUID factId = userFactPersistenceService.save(userId, batchId, new UserFact(
+            "transaction:" + transactionId, "용도", Map.of("value", "업무")
+        ));
+        Judgment judgment = new Judgment(
+            Verdict.AVAILABLE, null, false, null, null,
+            List.of(), List.of(), Map.of(), List.of()
+        );
+
+        UUID judgmentId = judgmentService.save(new SaveJudgmentCommand(
+            transactionId, new JudgmentOrigin(JudgmentOriginType.USER_FACT, factId),
+            "origin-column", 1, 2025, LocalDate.of(2025, 3, 14), List.of(), judgment
+        ));
+
+        assertThat(jdbcTemplate.queryForMap("""
+            select run_id, trigger_user_fact_id, classification_review_id, judgment_override_id
+            from judgment
+            where id = ?
+            """, judgmentId))
+            .containsEntry("trigger_user_fact_id", factId)
+            .containsEntry("run_id", null)
+            .containsEntry("classification_review_id", null)
+            .containsEntry("judgment_override_id", null);
     }
 
     @Test
@@ -735,6 +828,9 @@ class JudgmentSchemaIntegrationTest {
             .containsEntry("status", "ANSWERED")
             .containsEntry("answered_fact_id", factId)
             .containsEntry("has_answered_at", true);
+        assertThat(jdbcTemplate.queryForObject(
+            "select batch_id from user_fact where id = ?", UUID.class, factId
+        )).isEqualTo(batchId);
     }
 
     @Test
@@ -1055,11 +1151,34 @@ class JudgmentSchemaIntegrationTest {
     }
 
     private void insertBareJudgment(UUID judgmentId, UUID transactionId) {
+        UUID batchId = jdbcTemplate.queryForObject(
+            "select batch_id from transaction where id = ?", UUID.class, transactionId
+        );
+        insertOriginJudgment(judgmentId, transactionId, 1, "run_id", insertRun(batchId));
+    }
+
+    private JudgmentOrigin runOrigin(UUID batchId) {
+        return new JudgmentOrigin(JudgmentOriginType.RUN, insertRun(batchId));
+    }
+
+    /** batch 소유자의 새 Context 버전으로 완료된 run 하나를 만든다. */
+    private UUID insertRun(UUID batchId) {
+        UUID contextId = UUID.randomUUID();
+        UUID runId = UUID.randomUUID();
         jdbcTemplate.update("""
-            insert into judgment(
-                id, transaction_id, revision, rules_commit_sha, user_context_version,
-                tax_year, verdict, is_inference
-            ) values (?, ?, 1, 'fixture', 1, 2025, 'AVAILABLE', false)
-            """, judgmentId, transactionId);
+            insert into user_context(
+                id, user_id, industry_code, prev_year_revenue, business_open_date,
+                bookkeeping_duty, has_employee, version
+            )
+            select ?, batch.user_id, '940909', 0, '2024-01-01', '간편장부', false,
+                   coalesce((select max(version) from user_context where user_id = batch.user_id), 0) + 1
+            from upload_batch batch
+            where batch.id = ?
+            """, contextId, batchId);
+        jdbcTemplate.update("""
+            insert into judgment_run(id, batch_id, context_id, context_version, status)
+            select ?, ?, id, version, 'COMPLETED' from user_context where id = ?
+            """, runId, batchId, contextId);
+        return runId;
     }
 }
