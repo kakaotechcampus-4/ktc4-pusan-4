@@ -10,14 +10,20 @@ CONTEXT.md 9.5 의 에이전트 ① 이다. 규칙 후보 추출과 보고서 �
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
+import yaml
 from pydantic import BaseModel
 
 from pipeline.llm import structured
 
 ROOT = Path(__file__).resolve().parents[2]
 CATEGORIES = ROOT / "docs" / "categories.md"
+PROFILES = ROOT / "profiles"
+# 판정 이유와 페르소나 전제는 프로파일 주석에만 있어서 원문 줄을 읽는다.
+_CELL = re.compile(r"^\s+(\S+):\s+(통상|조건부|비통상)\b\s*(?:#\s*(.*))?$")
+_PREMISE = "# 전제 (페르소나)"
 
 
 class SearchPlan(BaseModel):
@@ -71,9 +77,13 @@ def category_meta() -> dict[str, str]:
 
 
 def context(
-    category: str, industry_code: str, reason: str, meta: dict[str, str] | None = None
+    category: str,
+    industry_code: str,
+    reason: str,
+    meta: dict[str, str] | None = None,
+    profile: bool = True,
 ) -> str:
-    """집계 한 줄을 프롬프트에 넣을 블록으로. 질의 작성과 근거 선택이 같이 쓴다."""
+    """집계 한 줄을 프롬프트에 넣을 블록으로. 질의 작성 · 근거 선택 · 초안이 같이 쓴다."""
     meta = category_meta() if meta is None else meta
     fields = [
         f"카테고리: {category}",
@@ -81,10 +91,42 @@ def context(
         f"업종코드: {industry_code}",
         f"미판정 사유: {reason}",
     ]
+    if profile:
+        fields += industry(industry_code, category)
     return "\n".join(fields)
+
+
+def industry(industry_code: str, category: str) -> list[str]:
+    """업종 프로파일. 대상 카테고리 자기 칸은 뺀다.
+
+    카드가 그 칸에서 만들어지므로 하네스에서는 정답이 되고, 운영에서는 칸이 있으면 카드도 있어
+    에이전트가 돌 일이 거의 없다(docs/rag-eval.md §13).
+    """
+    path = PROFILES / f"{industry_code}.yaml"
+    if not path.exists():
+        return []
+    text = path.read_text(encoding="utf-8")
+    lines = text.splitlines()
+    premise = []
+    for line in lines[lines.index(_PREMISE) + 1 :] if _PREMISE in lines else []:
+        if not line.startswith("#   - "):
+            break
+        premise.append(line[6:].strip())
+    cells = [
+        f"  {m[1]}: {m[2]}" + (f" — {m[3]}" if m[3] else "")
+        for m in map(_CELL.match, lines)
+        if m and m[1] != category
+    ]
+    return [
+        f"업종: {yaml.safe_load(text).get('label', '')}",
+        *(["업종 전제: " + " / ".join(premise)] if premise else []),
+        "이 업종의 다른 카테고리 통상성 (통상: 늘 업무 지출 · 조건부: 용도에 따라 갈림 · 비통상: 대개 개인 소비)",
+        *cells,
+    ]
 
 
 def rewrite(
     category: str, industry_code: str, reason: str, meta: dict[str, str] | None = None
 ) -> SearchPlan:
-    return structured(SYSTEM, context(category, industry_code, reason, meta), SearchPlan)
+    # 질의 작성에는 업종 정보를 넣지 않는다. 넣은 채로 잰 적이 없다(.plans.json 은 넣기 전 계획).
+    return structured(SYSTEM, context(category, industry_code, reason, meta, profile=False), SearchPlan)

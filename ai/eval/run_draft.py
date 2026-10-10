@@ -26,7 +26,7 @@ import argparse
 import contextlib
 import json
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import date
 from pathlib import Path
 
@@ -34,10 +34,11 @@ import yaml
 from langfuse import observe
 
 from eval.run_search import cached_plan
+from pipeline.candidates import hold_reasons
 from pipeline.draft import draft
 from pipeline.query import category_meta, context
 from pipeline.search import FRAME, connect, retrieve
-from pipeline.select import _candidates, needs_review, select
+from pipeline.select import _candidates, select
 
 with contextlib.suppress(Exception):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -72,15 +73,20 @@ def wanted() -> dict[tuple[str, str], dict]:
         if match.get("holiday") is True:
             continue
         industry = (match.get("industry") or [PERSONA])[0]
+        # 답마다 근거가 다르면 카드는 인용을 선택지에 둔다(docs/rule-card-fields.md). 그것도 정답이다.
+        options = (card.get("question") or {}).get("options") or []
+        cites = {
+            c["id"]
+            for c in (card.get("citations") or []) + [c for o in options for c in o.get("citations") or []]
+            if c.get("verified") is True
+        }
         for cat in match.get("category") or []:
             w = out[(cat, industry)]
             w["cards"].append(card["id"])
             w["gates"].add(card["gate"])
             if card.get("verdict"):
                 w["verdicts"].add(card["verdict"])
-            w["cites"] |= {
-                c["id"] for c in (card.get("citations") or []) if c.get("verified") is True
-            }
+            w["cites"] |= cites
     return dict(out)
 
 
@@ -135,7 +141,7 @@ def produce(conn, cat: str, industry: str, meta: dict, plans: dict, search_only:
         "evidence": ev.model_dump(),
         "gate": card.gate,
         "verdict": card.verdict,
-        "hold": needs_review(ev, by_tier) or not ev.sufficient,
+        "hold": bool(hold_reasons(conn, ev, by_tier)),
     }
 
 
@@ -164,19 +170,81 @@ def missing(got: dict, want: dict) -> list[str]:
     return [c for c in sorted(want["cites"]) if not any(_same(p, c) for p in got["pool"])]
 
 
+def _base(c: str) -> bool:
+    return any(_same(c, f) for f in FRAME)
+
+
 def recall(rows: list) -> str:
-    """후보에 정답 인용이 들어왔나. 틀(27·33조)은 검색 대상이 아니라 따로 센다."""
+    """후보에 정답 인용이 들어왔나. 기본 조문(27·33조)은 검색 없이 늘 붙으니 따로 센다."""
     seen = []
     for r in rows:
         miss = missing(r[2], r[1])
-        seen += [(any(_same(c, f) for f in FRAME), c not in miss) for c in r[1]["cites"]]
-    part ={fr: [ok for f, ok in seen if f is fr] for fr in (True, False)}
+        seen += [(_base(c), c not in miss) for c in r[1]["cites"]]
+    part = {b: [ok for f, ok in seen if f is b] for b in (True, False)}
     chars = sum(r[2].get("chars", 0) for r in rows) / max(len(rows), 1) / 1000
     return (
-        f"후보 재현율 {sum(ok for _, ok in seen)}/{len(seen)}"
-        f" (틀 {sum(part[True])}/{len(part[True])} · 틀 밖 {sum(part[False])}/{len(part[False])})"
-        f" · 후보 평균 {chars:.1f}k자"
+        f"그 외 조문 후보 재현율 {sum(part[False])}/{len(part[False])}"
+        f" (기본 조문 {sum(part[True])}/{len(part[True])}) · 후보 평균 {chars:.1f}k자"
     )
+
+
+def _of(rows: list, pred) -> str:
+    return f"{sum(1 for r in rows if pred(r))}/{len(rows)}"
+
+
+def summary(rows: list) -> list[str]:
+    """판정 기준표(docs/rag-eval.md §2). 오류 키는 결론·G1·근거의 분모에서 뺀다.
+
+    오류 키는 결론도 인용도 비어 있어서, 분모에 넣으면 오류가 늘 때 숫자가 좋아지거나 나빠진다.
+    """
+    ok = [r for r in rows if not r[2]["error"]]
+    ask = [r for r in ok if r[1]["verdicts"] == {"확인필요"}]
+    sure = [r for r in ok if r[1]["verdicts"] & {"가능", "불가"}]
+    one = [r for r in sure if "확인필요" not in r[1]["verdicts"]]
+    risky = [r for r in ok if r[3]["verdict"] in ("과잉확정", "반대")]
+    g1 = [r for r in ok if "G1" in r[1]["gates"]]
+    no_g1 = [r for r in ok if "G1" not in r[1]["gates"]]
+    odd = [
+        f"{r[0][0]} {r[2]['gate']}/{'·'.join(sorted(r[1]['gates']))}"
+        for r in no_g1
+        if not r[3]["gate_ok"] and r[2]["gate"] != "G1"
+    ]
+
+    hits, totals, strays = Counter(), Counter(), Counter()
+    for r in ok:
+        missed = {*r[3]["unfound"], *r[3]["unpicked"]}
+        for c in r[1]["cites"]:
+            totals[c] += 1
+            hits[c] += c not in missed
+        strays.update(r[3]["stray"])
+    base = [c for c in totals if _base(c)]
+    other = [c for c in totals if not _base(c)]
+    unfound = sum(not _base(c) for r in ok for c in r[3]["unfound"])
+    unpicked = sum(not _base(c) for r in ok for c in r[3]["unpicked"])
+    top = max(ok, key=lambda r: len(r[3]["stray"]), default=None)
+
+    return [
+        (
+            f"결론  과잉확정 {_of(ask, lambda r: r[3]['verdict'] == '과잉확정')}"
+            f" · 반대 {_of(sure, lambda r: r[3]['verdict'] == '반대')}"
+            f" · 확정 적중 {_of(one, lambda r: r[3]['verdict'] == '일치')}"
+        ),
+        (
+            f"보류  위험 결론 중 {_of(risky, lambda r: r[2]['hold'])} · 전체 {_of(rows, lambda r: r[2]['hold'])}"
+            f" (오류 {len(rows) - len(ok)} · 결론이 맞는데 보류 {sum(r[2]['hold'] and r[3]['verdict'] == '일치' for r in ok)})"
+        ),
+        f"G1    오판 {_of(no_g1, lambda r: r[2]['gate'] == 'G1')} · 적중 {_of(g1, lambda r: r[2]['gate'] == 'G1')}"
+        + (f" · 그 밖의 게이트 불일치 {', '.join(odd)}" if odd else ""),
+        f"근거  기본 조문 {sum(hits[c] for c in base)}/{sum(totals[c] for c in base)}"
+        f" · 그 외 조문 {sum(hits[c] for c in other)}/{sum(totals[c] for c in other)}"
+        f" (검색누락 {unfound} · 선택누락 {unpicked})"
+        f" · 키당 카드 밖 인용 {strays.total() / max(len(ok), 1):.2f}"
+        + (f" (최다 {top[0][0]} {len(top[3]['stray'])})" if top and top[3]["stray"] else ""),
+        "      정답 조문별 적중 " + " · ".join(f"{c} {hits[c]}/{n}" for c, n in totals.most_common(5)),
+        "      카드 밖 인용 " + " · ".join(f"{c} {n}" for c, n in strays.most_common(5)),
+        f"검색  {recall(rows)}",
+        f"오류  {len(rows) - len(ok)}/{len(rows)}",
+    ]
 
 
 def main() -> int:
@@ -231,7 +299,7 @@ def main() -> int:
         if s["unpicked"]:
             note.append(f"선택누락 {len(s['unpicked'])}")
         if s["stray"]:
-            note.append(f"오적용 {len(s['stray'])}건")
+            note.append(f"카드 밖 {len(s['stray'])}건")
         if got["hold"]:
             note.append("보류")
         print(
@@ -241,23 +309,10 @@ def main() -> int:
         if args.show and got["refs"]:
             print(f"{'':<14} 인용: {', '.join(got['refs'])}")
 
-    n = len(rows)
-    gate_ok = sum(r[3]["gate_ok"] for r in rows)
-    hit = sum(r[3]["hit"] for r in rows)
-    need = sum(r[3]["want"] for r in rows)
-    stray = sum(len(r[3]["stray"]) for r in rows)
-    unfound = sum(len(r[3]["unfound"]) for r in rows)
-    unpicked = sum(len(r[3]["unpicked"]) for r in rows)
-    grades = defaultdict(int)
-    for r in rows:
-        grades[r[3]["verdict"]] += 1
-
-    print(f"\n게이트 {gate_ok}/{n}   근거 적중 {hit}/{need} (검색누락 {unfound} · 선택누락 {unpicked})   오적용 {stray}건")
-    print("결론  " + "  ".join(f"{k} {v}" for k, v in sorted(grades.items())))
-    print(recall(rows))
+    print("\n" + "\n".join(summary(rows)))
 
     # 반대 결론이 제일 나쁘다. 카드가 가능이라는데 초안이 불가면 경비를 잃는다.
-    return 1 if grades["반대"] else 0
+    return 1 if any(r[3]["verdict"] == "반대" for r in rows) else 0
 
 
 if __name__ == "__main__":

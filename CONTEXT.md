@@ -1575,8 +1575,9 @@ chunking 전략 변경(**10월에 반드시 겪음**), 임베딩 모델 교체 �
 
 [4] 근거 선택  ← 에이전트 ②
     Evidence(sufficient, refs[statute_id+quote], direction, note)
+    집계 블록에 업종 프로파일(대상 카테고리 칸 제외)을 붙여 준다 (docs/rag-eval.md §13)
     quote ∈ 원문, statute_id ∈ 후보(검색결과 + 기본 조문) 를 코드가 검증한다
-    refs 가 비거나 sufficient=false 면 보류
+    refs 가 비거나, 가능 · 불가인데 sufficient=false 면 보류 (확인필요는 sufficient 를 보지 않는다)
 
 [5] 초안 생성 — Pydantic 스키마 강제  ← 에이전트 ③
     validator: 조문 ID 실재 → 실패 시 재시도
