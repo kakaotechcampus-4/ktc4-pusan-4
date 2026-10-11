@@ -119,6 +119,23 @@ export function Uploads() {
   {
     header: '',
     align: 'right',
+    width: 'w-28',
+    cell: (row) =>
+    row.id === batchId ?
+    <Badge tone="ok" symbol="✓">보는 중</Badge> :
+    <Button
+      variant="secondary"
+      size="sm"
+      aria-label={`${row.cardIssuer}카드 ${formatPeriod(row.periodStart, row.periodEnd)} 보기`}
+      onClick={() => setBatchId(row.id)}>
+
+          이 파일 보기
+        </Button>
+
+  },
+  {
+    header: '',
+    align: 'right',
     width: 'w-24',
     cell: (row) =>
     <Button
@@ -142,7 +159,8 @@ export function Uploads() {
         </h1>
         <p className="mt-2 max-w-2xl text-body leading-6 text-ink2">
           같은 파일을 다시 올리면 막히고, 기간이 겹쳐도 같은 거래는 한 번만
-          들어갑니다.
+          들어갑니다. 「이 파일 보기」를 누르면 거래·분류·판정 화면이 그 파일을
+          기준으로 바뀝니다.
         </p>
       </header>
 

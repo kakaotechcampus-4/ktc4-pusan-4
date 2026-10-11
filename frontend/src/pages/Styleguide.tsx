@@ -366,7 +366,7 @@ export function Styleguide() {
           </div>
         </Block>
 
-        <Block title="StatuteCitation" note="GET /statutes/{id} 응답 그대로. 시행일·버전·원문 링크가 항상 붙는다.">
+        <Block title="StatuteCitation" note="GET /statutes/{id} 응답 그대로. 시행일·버전·원문 링크가 항상 붙고, hierarchy 로 근거와 참고(해석기준·사례)를 나눈다.">
           <div className="grid max-w-2xl gap-3">
             <StatuteCitation statuteVersionId={1435} />
             <StatuteCitation statuteVersionId={2071} />

@@ -1,5 +1,6 @@
 package com.ktc4.pusan4.merchant.api;
 
+import com.ktc4.pusan4.transaction.api.MerchantCategories;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDate;
@@ -18,15 +19,17 @@ public record ClassificationReviewGroupResponse(
     @Schema(description = "그룹 대표 표기. transactions 의 첫 거래 표기다") String merchantRaw,
     List<String> suggestedCategories,
     @Schema(description = "Review 마다 거래 요약 하나. 잘라내지 않는다. 정렬: approvedAt ASC, transactionId ASC")
-    List<TransactionSummary> transactions
+    List<ReviewTransaction> transactions
 ) {
 
-    @Schema(description = "그룹에 묶인 거래 요약. 필드 뜻은 GET /transactions 와 같다")
-    public record TransactionSummary(
+    @Schema(description = "Review 와 그 거래 요약. 거래 요약 필드는 api.md 3.4 와 같다")
+    public record ReviewTransaction(
         UUID reviewId,
         UUID transactionId,
         LocalDate approvedAt,
         String merchantRaw,
+        String merchantNorm,
+        @Schema(description = MerchantCategories.DESCRIPTION, example = "미분류") String merchantCategory,
         long amount,
         int installmentMonths
     ) {

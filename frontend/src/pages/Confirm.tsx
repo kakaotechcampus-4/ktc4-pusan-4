@@ -2,17 +2,22 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { CheckIcon, PlayIcon, ShieldCheckIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
-import { DEFAULT_CONTEXT, useSession } from '../contexts/SessionContext';
-import { api, ApiRequestError } from '../api';
+import { useSession } from '../contexts/SessionContext';
+import { api, ApiRequestError, useApi } from '../api';
 import { formatFullDate, formatNumber, formatPeriod } from '../utils/format';
 
 export function Confirm() {
   const navigate = useNavigate();
-  const { batch, batchId, context, contextRef, setRunId } = useSession();
+  const { batchId, context, contextRef, setRunId } = useSession();
+  // 업로드 이력에서 고르고 들어올 수도 있으므로 세션의 파싱 결과가 아니라 서버에서 읽는다
+  const batchQ = useApi(
+    () => batchId ? api.uploads.get(batchId) : Promise.resolve(null),
+    [batchId]
+  );
+  const batch = batchQ.data;
   const [agreed, setAgreed] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const resolved = context ?? DEFAULT_CONTEXT;
 
   /** POST /judgment-runs — batchId·contextId 둘 다 있어야 실행할 수 있다 */
   const missing = !batchId ?
@@ -43,32 +48,36 @@ export function Confirm() {
   // 올린 내역이 없으면 비워 둔다. 없는 파일 이름과 건수를 지어내지 않는다
   const batchRows = batch ?
   [
-  { term: '파일', value: batch.fileName },
-  { term: '카드사 어댑터', value: batch.issuer },
+  { term: '카드사', value: `${batch.cardIssuer}카드 · ${batch.sourceType}` },
   {
-    term: '판정 대상',
-    value: `${formatNumber(batch.rowCount)}건 (취소 상계·중복 제외 후)`
+    term: '거래',
+    value: `${formatNumber(batch.transactionCount)}건${
+    batch.skippedDuplicateCount > 0 ?
+    ` (중복 ${formatNumber(batch.skippedDuplicateCount)}건 제외 후)` :
+    ''}`
   },
   { term: '기간', value: formatPeriod(batch.periodStart, batch.periodEnd) }] :
   [];
 
 
-  const contextRows = [
-  { term: '업종', value: `${resolved.industryCode} · 컴퓨터 프로그래밍` },
+  const contextRows = context ?
+  [
+  { term: '업종', value: `${context.industryCode} · 컴퓨터 프로그래밍` },
   {
     term: '직전연도 수입금액',
-    value: `${formatNumber(resolved.prevYearRevenue)}원`
+    value: `${formatNumber(context.prevYearRevenue)}원`
   },
-  { term: '개업일', value: formatFullDate(resolved.businessOpenDate) },
-  { term: '기장의무', value: resolved.bookkeepingDuty },
-  { term: '직원', value: resolved.hasEmployee ? '있음' : '없음 (1인)' },
+  { term: '개업일', value: formatFullDate(context.businessOpenDate) },
+  { term: '기장의무', value: context.bookkeepingDuty },
+  { term: '직원', value: context.hasEmployee ? '있음' : '없음 (1인)' },
   {
     term: '자택 작업 비율',
     value:
-    resolved.homeOfficeRatio > 0 ?
-    `${resolved.homeOfficeRatio}%` :
+    context.homeOfficeRatio > 0 ?
+    `${context.homeOfficeRatio}%` :
     '해당 없음'
-  }];
+  }] :
+  [];
 
 
   return (
@@ -92,7 +101,9 @@ export function Confirm() {
           <dl className="divide-y divide-line2">
             {batchRows.length === 0 &&
             <div className="px-5 py-3">
-                <p className="text-small text-muted">아직 올린 카드내역이 없습니다.</p>
+                <p className="text-small text-muted">
+                  {batchQ.loading ? '불러오는 중…' : '아직 올린 카드내역이 없습니다.'}
+                </p>
               </div>
             }
             {batchRows.map((row) =>
@@ -116,9 +127,14 @@ export function Confirm() {
 
         <section className="mt-4 overflow-hidden rounded-2xl border border-line bg-surface">
           <h2 className="border-b border-line px-5 py-3.5 text-body font-semibold text-ink">
-            사업자 문진 · 버전 4
+            사업자 문진{contextRef && ` · 버전 ${contextRef.version}`}
           </h2>
           <dl className="divide-y divide-line2">
+            {contextRows.length === 0 &&
+            <div className="px-5 py-3">
+                <p className="text-small text-muted">아직 문진을 마치지 않았습니다.</p>
+              </div>
+            }
             {contextRows.map((row) =>
             <div key={row.term} className="flex gap-4 px-5 py-3">
                 <dt className="w-36 shrink-0 text-small text-muted">

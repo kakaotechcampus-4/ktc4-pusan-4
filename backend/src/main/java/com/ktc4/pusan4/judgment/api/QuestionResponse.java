@@ -18,6 +18,7 @@ public record QuestionResponse(
     List<String> options,
     Coded<QuestionStatus> status,
     UUID answeredFactId,
+    @Schema(description = "답한 값. ANSWERED 가 아니면 null. 정정했으면 마지막 답") QuestionAnswer answer,
     OffsetDateTime createdAt,
     OffsetDateTime answeredAt
 ) {

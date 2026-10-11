@@ -23,7 +23,7 @@ git diff --name-only @{push}..HEAD
 | 변경 경로 | 도메인 |
 |---|---|
 | `frontend/` | `fe` |
-| `backend/`, `db/`, `docker/`, `engine/`, `tools/` | `be` |
+| `backend/`, `db/`, `docker/`, `tools/` | `be` |
 | `ai/`, `eval/`, `rules/`,  `profiles/` | `ai` |
 | 그 외 (`docs/`, `.github/`, 빌드·설정) | `etc` |
 

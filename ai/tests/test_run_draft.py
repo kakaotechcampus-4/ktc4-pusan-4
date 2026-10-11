@@ -2,7 +2,7 @@
 
 import pytest
 
-from eval.run_draft import _same, grade_verdict, score, wanted
+from eval.run_draft import _same, grade_verdict, score, summary, wanted
 
 
 @pytest.mark.parametrize(
@@ -58,11 +58,32 @@ def test_놓친_근거를_검색_탓과_선택_탓으로_가른다():
     }
 
 
+def test_요약은_오류_키를_분모에서_빼고_기본_조문을_따로_센다():
+    ask = {"gates": {"G2"}, "verdicts": {"확인필요"}, "cites": {"소득세법-33-1-5", "소득세법-35-1"}}
+    split = {"gates": {"G2"}, "verdicts": {"불가", "확인필요"}, "cites": {"소득세법-27-1"}}
+    pool = ["소득세법-33-1-5", "소득세법-27-1"]
+    cases = [
+        # 물어볼 카드인데 불가로 단정했다. 33-1-5 는 후보에 있었고 35-1 은 없었다
+        (ask, {"error": None, "refs": ["소득세법-33-1-13"], "pool": pool, "gate": "G2", "verdict": "불가", "hold": False}),
+        # 오류는 결론·근거 분모에서 빠지고 보류에는 남는다
+        (ask, {"error": "재시도 소진", "refs": [], "pool": pool, "gate": None, "verdict": None, "hold": True}),
+        (split, {"error": None, "refs": ["소득세법-27-1"], "pool": pool, "gate": "G2", "verdict": "가능", "hold": True}),
+    ]
+    text = "\n".join(summary([(("키", "940909"), w, g, score(g, w)) for w, g in cases]))
+
+    assert "과잉확정 1/1 · 반대 1/1 · 확정 적중 0/0" in text
+    assert "위험 결론 중 1/2 · 전체 2/3 (오류 1" in text
+    assert "기본 조문 1/2 · 그 외 조문 0/1 (검색누락 1 · 선택누락 0)" in text
+    assert "키당 카드 밖 인용 0.50" in text
+
+
 def test_정답지는_카드에서_나온다():
     keys = wanted()
     assert ("카페", "940909") in keys
     카페 = keys[("카페", "940909")]
     assert 카페["gates"] == {"G2"} and 카페["verdicts"] == {"확인필요"}
+    # 카드 인용(개인 §33①5)과 선택지 인용(업무미팅 §35①) 모두 정답이다
+    assert {"소득세법-33-1-5", "소득세법-35-1"} <= 카페["cites"]
     # 한 카테고리에 카드가 여럿이면 묶어서 본다
     쇼핑 = keys[("온라인쇼핑", "940909")]
     assert len(쇼핑["cards"]) > 1 and 쇼핑["gates"] == {"G2", "G4"}

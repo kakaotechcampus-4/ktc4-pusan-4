@@ -321,17 +321,33 @@ def selftest_detail():
     assert km2["split"] == {} and km2["n_track"] == 0 and km2["n_bizno"] == 0
     print("selftest_key_split ok")
 
-    # 같은 raw_merchant 가 사업자번호 있는 행 + 없는 행 -> 트랙이 달라 두 행 모두 남아야 한다.
+    # 같은 사업자번호 2행이 서로 다른 키 -> 1건 갈림. 사업자번호 없는 행은 세지 않는다.
+    class _FakeNorm2:
+        @staticmethod
+        def normalize(raw, biz_no=""):
+            return {"norm_key": raw}
+
+    fake2 = [{"raw_merchant": "가나다상사", "biz_no": "111-11-11111"},
+             {"raw_merchant": "가나다상", "biz_no": "111-11-11111"},
+             {"raw_merchant": "라마바", "biz_no": "222-22-22222"},
+             {"raw_merchant": "라마바", "biz_no": "222-22-22222"},
+             {"raw_merchant": "사아자", "biz_no": ""}]
+    bm = measure_bizno_split(fake2, _FakeNorm2)
+    assert bm["n_biz"] == 2 and len(bm["split"]) == 1 and bm["excess"] == 1, bm
+    assert set(bm["split"]) == {"111-11-11111"}
+    print("selftest_bizno_split ok")
+
+    # 같은 raw_merchant 가 사업자번호 있는 행 + 없는 행 -> 키가 하나로 모여 한 행이 된다.
+    # norm_key 는 사업자번호와 무관하게 문자열이다(#22 A안). 예전에는 트랙이 달라 두 행으로 갈렸다.
     # 실제 정규화·키워드룰을 쓰되 상호는 합성이다(어느 룰에도 안 걸려 미분류로 남는다).
     norm_, pg_, rules_ = nz.load(), pg_block.load(), kw.load()
     syn = "가나다테스트합성상점"
     rows_ = [{"raw_merchant": syn, "biz_no": "123-45-67890", "amount": "1000", "source_card": "ibk"},
              {"raw_merchant": syn, "biz_no": "", "amount": "2000", "source_card": "kb"}]
     dr = detail_rows(rows_, rows_, norm_, pg_, rules_)
-    assert len(dr) == 2, dr
-    assert {d["track"] for d in dr} == {"bizno", "string"}
-    # 건수·금액은 행별로 나뉘어야 한다(한 행이 전체를 들고 나오면 이중 집계)
-    assert sorted((d["거래건수"], d["합계금액"]) for d in dr) == [(1, 1000), (1, 2000)]
+    assert len(dr) == 1, dr
+    # 건수·금액은 합쳐져야 한다(두 행이 한 키로 모였으므로)
+    assert (dr[0]["거래건수"], dr[0]["합계금액"]) == (2, 3000), dr
     print("selftest_dedup_track ok")
     print("selftest_detail ok")
 
@@ -342,6 +358,10 @@ def selftest_detail():
 #
 # 되묻기는 norm_key 단위로 묶이므로, 키가 갈리면 같은 가맹점을 여러 번 묻는다.
 # #22(트랙 분기)와 #35(브랜드 사전)의 효과를 재려면 이 숫자가 있어야 한다.
+#
+# ★ measure_key_split(string_norm -> norm_key 1:N)은 #22 A안 이후 의미가 없다.
+#   norm_key 가 항상 string_norm 이라 구조적으로 0 이 된다. 비교용으로만 남긴다.
+#   A안 이후에는 measure_bizno_split(같은 사업자번호 -> norm_key 1:N)을 본다.
 
 BLOCKED_CSV = ROOT / "data" / "branch_blocked.csv"
 
@@ -389,6 +409,39 @@ def measure_key_split(rows, norm):
         "n_bizno": sum(1 for c in cause.values() if "bizno" in c),
         "blocked_merchants": blocked,
     }
+
+
+def measure_bizno_split(rows, norm):
+    """같은 사업자번호가 서로 다른 norm_key 로 갈리는 정도.
+
+    #22 A안 이후 키는 문자열이다. 같은 사업장(같은 사업자번호)인데 상호 표기가
+    달라(절단·법인 표기·별칭) 키가 갈리면 같은 가맹점을 두 번 묻는다. A안이 사업자번호를
+    키에서 빼면서 생길 수 있는 분열이라, 이 숫자로 그 비용을 잰다.
+    A안 전에는 사업자번호가 곧 키여서 이 값이 구조적으로 0 이었다.
+    """
+    keys = collections.defaultdict(set)
+    rowcnt = collections.Counter()
+    for r in rows:
+        biz = (r.get("biz_no") or "").strip()
+        if not biz:
+            continue
+        keys[biz].add(norm.normalize(r["raw_merchant"], biz)["norm_key"])
+        rowcnt[biz] += 1
+    split = {b: ks for b, ks in keys.items() if len(ks) > 1}
+    return {
+        "n_biz": len(keys), "split": split, "rowcnt": rowcnt,
+        "excess": sum(len(ks) - 1 for ks in keys.values()),
+    }
+
+
+def print_bizno_split(label, m, anon):
+    print("[%s]" % label)
+    print("  사업자번호 %d개 / 그중 키가 갈린 것 %d개 (초과 키 %d개) / 갈린 거래 %d건"
+          % (m["n_biz"], len(m["split"]), m["excess"], sum(m["rowcnt"][b] for b in m["split"])))
+    for biz, ks in sorted(m["split"].items(), key=lambda kv: -m["rowcnt"][kv[0]]):
+        print("    %s  키 %d개 / %d건  %s" % (nz.mask_bizno(biz), len(ks), m["rowcnt"][biz],
+                                          ", ".join(safe_key(k, anon) for k in sorted(ks))))
+    print()
 
 
 def print_key_split(label, m, anon):
@@ -486,7 +539,11 @@ def main() -> int:
         print("    %s <- %s" % (safe_key(k, anon), ", ".join(anon.label(x) for x in ms)))
     print()
 
-    print("=== 키 분열 (미분류율이 못 보는 지표) ===")
+    print("=== 사업자번호 분열 (같은 사업자번호가 여러 norm_key 로) ===")
+    print_bizno_split("전체 %d건" % len(rows), measure_bizno_split(rows, norm), anon)
+    print_bizno_split("제품 경로 %d건" % len(product), measure_bizno_split(product, norm), anon)
+
+    print("=== 키 분열 — #22 A안 이후 구조적으로 0, 비교용 ===")
     print_key_split("전체 %d건" % len(rows), measure_key_split(rows, norm), anon)
     print_key_split("제품 경로 %d건" % len(product),
                     measure_key_split(product, norm), anon)

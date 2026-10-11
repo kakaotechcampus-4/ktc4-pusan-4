@@ -1,0 +1,111 @@
+version: 1
+
+# 브랜드 사전 — T4 1겹(점포 -> 브랜드).
+#
+# 정규화(rules/normalize.yaml 의 resolve_brand 단계)가 이 파일을 읽어 상호 앞부분을
+# 브랜드와 대조한다. 맞으면 norm_key 를 브랜드 키로 모으고, 뒤는 지점으로 뗀다.
+# 기준은 docs/labeling_guide.md 1층(T5)이다.
+#
+# - 키는 회사가 아니라 브랜드다. 하위 업태(예: ○○익스프레스)는 별도 브랜드로 둔다.
+#   여기 없는 하위 업태는 부모 브랜드에 붙지 않는다 — 뒤가 지점 모양이 아니면 떼지 않는다.
+# - aliases 는 카드 전표에 실제로 찍히는 표기다. 공백을 뺀 대문자로 앞부분을 대조한다.
+#   긴 표기부터 대조하므로 'BHC치킨' 이 'BHC' 보다 먼저 걸린다.
+# - category 는 2겹(브랜드 -> 카테고리)이라 이번 범위가 아니다. 비워 둔다.
+#
+# 시드 30개: 상권정보 점포 수 상위 체인(PR #45 / T4 착수 조사). 개인 상점명은 넣지 않는다.
+
+brands:
+  - brand_key: CU
+    aliases: ["CU", "씨유", "씨유CU"]
+    category: null
+  - brand_key: GS25
+    aliases: ["GS25", "지에스25", "지에스GS25"]
+    category: null
+  # GS25 와 같은 회사의 다른 브랜드(슈퍼마켓). 사전 키는 회사가 아니라 브랜드다.
+  - brand_key: GS더프레시
+    aliases: ["GS더프레시", "지에스더프레시", "GSTHEFRESH"]
+    category: null
+  - brand_key: 세븐일레븐
+    aliases: ["세븐일레븐", "7-ELEVEN", "7ELEVEN"]
+    category: null
+  - brand_key: 이마트24
+    aliases: ["이마트24"]
+    category: null
+  - brand_key: 컴포즈커피
+    aliases: ["컴포즈커피"]
+    category: null
+  - brand_key: 메가MGC커피
+    aliases: ["메가MGC커피", "메가엠지씨커피", "메가커피"]
+    category: null
+  - brand_key: 파리바게뜨
+    aliases: ["파리바게뜨", "파리바게트"]
+    category: null
+  - brand_key: BHC
+    aliases: ["BHC치킨", "BHC", "비에이치씨"]
+    category: null
+  - brand_key: 더벤티
+    aliases: ["더벤티"]
+    category: null
+  - brand_key: 이디야
+    aliases: ["이디야커피", "이디야"]
+    category: null
+  - brand_key: BBQ
+    aliases: ["BBQ치킨", "BBQ", "비비큐"]
+    category: null
+  - brand_key: 스타벅스
+    aliases: ["스타벅스", "STARBUCKS"]
+    category: null
+  - brand_key: 배스킨라빈스
+    aliases: ["배스킨라빈스", "베스킨라빈스"]
+    category: null
+  - brand_key: 투다리
+    aliases: ["투다리"]
+    category: null
+  - brand_key: 본죽
+    aliases: ["본죽"]
+    category: null
+  - brand_key: 역전할머니맥주
+    aliases: ["역전할머니맥주"]
+    category: null
+  - brand_key: 맘스터치
+    aliases: ["맘스터치"]
+    category: null
+  - brand_key: 교촌치킨
+    aliases: ["교촌치킨"]
+    category: null
+  - brand_key: 김밥나라
+    aliases: ["김밥나라"]
+    category: null
+  - brand_key: 투썸플레이스
+    aliases: ["투썸플레이스"]
+    category: null
+  - brand_key: 굽네치킨
+    aliases: ["굽네치킨"]
+    category: null
+  - brand_key: 빽다방
+    aliases: ["빽다방"]
+    category: null
+  - brand_key: 뚜레쥬르
+    aliases: ["뚜레쥬르"]
+    category: null
+  - brand_key: 처갓집양념치킨
+    aliases: ["처갓집양념치킨"]
+    category: null
+  - brand_key: 피자스쿨
+    aliases: ["피자스쿨"]
+    category: null
+  - brand_key: 롯데리아
+    aliases: ["롯데리아"]
+    category: null
+  - brand_key: 노랑통닭
+    aliases: ["노랑통닭"]
+    category: null
+  - brand_key: 네네치킨
+    aliases: ["네네치킨"]
+    category: null
+  - brand_key: 국수나무
+    aliases: ["국수나무"]
+    category: null
+  - brand_key: 자담치킨
+    aliases: ["자담치킨"]
+    category: null

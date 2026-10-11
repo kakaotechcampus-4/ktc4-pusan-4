@@ -1,6 +1,8 @@
 package com.ktc4.pusan4.user.api;
 
 import com.ktc4.pusan4.shared.api.MockResponse;
+import com.ktc4.pusan4.shared.auth.CurrentUser;
+import com.ktc4.pusan4.user.persistence.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
@@ -15,17 +17,16 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/users/me")
 public class UserController {
 
-    private final UserMockData mockData;
+    private final UserService userService;
 
-    public UserController(UserMockData mockData) {
-        this.mockData = mockData;
+    public UserController(UserService userService) {
+        this.userService = userService;
     }
 
-    @MockResponse
     @Operation(summary = "내 정보 조회")
     @GetMapping
-    public UserResponse me() {
-        return mockData.me();
+    public UserResponse me(CurrentUser currentUser) {
+        return UserResponse.from(userService.get(currentUser.id()));
     }
 
     @MockResponse
@@ -33,6 +34,6 @@ public class UserController {
     @DeleteMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteMe() {
-        // 목 응답: 지울 데이터가 없다
+        // 목 응답: 지울 데이터가 없다. 삭제 정책이 갖춰진 뒤 B6 에서 구현한다.
     }
 }

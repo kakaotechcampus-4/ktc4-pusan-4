@@ -2,12 +2,13 @@ import React, {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState } from
 'react';
 import type { BusinessContext, BusinessContextRef } from '../types/domain';
 import type { ParsedBatch } from '../mock/sampleFiles';
-import { seedSession } from '../api';
+import { api, seedSession } from '../api';
 
 /** 업종은 IT(62010) 고정 */
 export const DEFAULT_CONTEXT: BusinessContext = {
@@ -57,6 +58,29 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
   const signIn = useCallback((nextEmail: string) => {
     setEmail(nextEmail);
   }, []);
+
+  /**
+   * 3.2 — 서버에 이미 문진이 있으면 그것을 쓴다. 저장만 하고 다시 읽지 않으면
+   * 새로고침할 때마다 「사업자 문진을 먼저 마쳐 주세요」로 돌아간다.
+   * 문진 전이면 404 이고 http 구현이 null 로 바꿔 준다.
+   */
+  useEffect(() => {
+    if (email === null) return;
+    let cancelled = false;
+    void api.contexts.
+    current().
+    then((current) => {
+      if (cancelled || !current) return;
+      setContext(current);
+      setContextRef({ id: current.id, version: current.version });
+    }).
+    catch(() => {
+      // 조회 실패는 「문진 전」과 같게 다룬다. 화면이 막아 주고 안내도 거기서 한다
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [email]);
 
   const signOut = useCallback(() => {
     setEmail(null);

@@ -88,4 +88,15 @@ class ApiContractIntegrationTest {
 
         assertThat(actual).containsExactlyInAnyOrderElementsOf(CONTRACT);
     }
+
+    @Test
+    void current_user_is_not_exposed_as_request_parameter() throws Exception {
+        String body = mockMvc.perform(get("/v3/api-docs"))
+            .andExpect(status().isOk())
+            .andReturn().getResponse().getContentAsString();
+
+        JsonNode me = objectMapper.readTree(body).path("paths").path("/api/v1/users/me").path("get");
+        assertThat(me.isMissingNode()).isFalse();
+        assertThat(me.path("parameters").size()).isZero();
+    }
 }

@@ -25,6 +25,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME}
       SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      HOLIDAY_API_KEY: ${HOLIDAY_API_KEY:-}
       JAVA_TOOL_OPTIONS: -Xms128m -Xmx768m
     depends_on:
       postgres:

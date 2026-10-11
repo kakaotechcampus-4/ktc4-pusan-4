@@ -10,14 +10,10 @@ import static com.ktc4.pusan4.shared.api.MockFixtures.CONTEXT_ID;
 import static com.ktc4.pusan4.shared.api.MockFixtures.USER_ID;
 
 /**
- * 서비스 레이어가 붙기 전까지 users·contexts API 가 반환하는 고정 응답.
+ * 서비스 레이어가 붙기 전까지 contexts API 가 반환하는 고정 응답. GET /users/me 는 UserService 로 바뀌었다.
  */
 @Component
 public class UserMockData {
-
-    public UserResponse me() {
-        return new UserResponse(USER_ID, "demo@example.com", OffsetDateTime.parse("2026-09-01T10:00:00+09:00"));
-    }
 
     public ContextCreatedResponse createContext() {
         return new ContextCreatedResponse(CONTEXT_ID, 1);

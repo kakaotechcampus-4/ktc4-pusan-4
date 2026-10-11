@@ -100,7 +100,13 @@
 
 ### StatuteCitation
 - `statuteVersionId`로 조문 1건. `GET /statutes/{id}` 응답(제목·시행일·버전·원문 링크)을 그대로 보여준다.
-- 법률/시행령(근거)과 기본통칙·판례(참고)의 구분은 API에 `hierarchy`가 생기면 붙인다 (명세 4.3 #8).
+- `hierarchy` 로 근거 위계를 나눠 보여준다(CONTEXT.md §6). 나누지 않으면 사용자가 판례·예규를 법령과 같은 무게로 읽는다.
+  - 법률·시행령·시행규칙: 「근거」(ink 배지, 흰 바탕)
+  - 기본통칙·예규: 「참고 해석기준」 + 「법적 구속력은 없습니다」 안내. 고시도 「참고 해석기준」이지만 위임 고시는 구속력이
+    있을 수 있어 안내를 붙이지 않는다(ai/pipeline 은 위임 고시를 확정 근거로 쓴다 — 팀 확인 필요).
+  - 심판례·판례: 「참고 사례」 + 「개별 사건의 판단입니다」 안내
+  - 목록에 없는 값(훈령·해석례 등): 「참고 (값)」으로 낮춘다. 참고는 모두 neutral 배지 + canvas 바탕.
+  - 조문을 불러오지 못하면 조용히 빼지 않고 「조문을 불러오지 못했습니다」를 남긴다.
 
 ### SectionHeading
 `eyebrow → title → description` 순서 고정. `size` lg(h1)·md(h2, 기본)·sm(h3). 다크 배경은 `inverse`.
@@ -166,4 +172,4 @@
 Toast/알림, 파일 드롭존, Drawer, StatTile, Timeline.
 - Tabs 는 만들지 않았다. 목록 필터는 `FilterBar`(버튼 묶음)로 하고, 보여줄 패널이 갈리는 진짜 탭이 필요해지면 그때 만든다.
 - 진행 표시는 `AppShell` 의 단계 표시와, `Run`·`ClassificationPreview` 가 각자 그리는 진척 바가 있다. 같은 모양이 세 번째로 필요해지면 `Progress` 로 뽑는다.
-- `Upload`, `Interview`, `Results`, `Questions`, `Summary` 는 아직 옛 클래스(생 px)가 남아 있다. 치오님과 나눠 교체한다. `Confirm`·`Run`·`Transactions`·`Uploads`·`ClassificationPreview`·`AppShell` 은 토큰으로 옮겼다.
+- `Upload`, `Interview` 는 아직 옛 클래스(생 px)가 남아 있다. 치오님과 나눠 교체한다. `Confirm`·`Run`·`Transactions`·`Uploads`·`ClassificationPreview`·`AppShell`·`Results`·`Summary`·`Questions` 는 토큰으로 옮겼다.

@@ -30,6 +30,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -90,8 +91,171 @@ class JudgmentSchemaIntegrationTest {
             "question_queue",
             "unmatched_log",
             "merchant_dict",
-            "rule_candidate"
+            "rule_candidate",
+            "judgment_run",
+            "judgment_run_item",
+            "classification_review",
+            "judgment_override"
         );
+    }
+
+    @Test
+    void deleting_batch_removes_everything_derived_from_it_but_keeps_shared_data() {
+        UUID userId = UUID.randomUUID();
+        UUID batchId = UUID.randomUUID();
+        insertDerivedGraph(userId, batchId, "delete-batch");
+        assertThat(countRowsOwnedBy(userId)).allSatisfy((table, count) ->
+            assertThat(count).as(table).isPositive()
+        );
+
+        jdbcTemplate.update("delete from upload_batch where id = ?", batchId);
+
+        assertThat(countRowsOwnedBy(userId)).allSatisfy((table, count) ->
+            assertThat(count).as(table).isZero()
+        );
+        assertThat(jdbcTemplate.queryForObject(
+            "select count(*) from user_context where user_id = ?", Long.class, userId
+        )).isEqualTo(1L);
+        assertThat(jdbcTemplate.queryForObject(
+            "select count(*) from statute_version where statute_id = 'delete-batch-statute'", Long.class
+        )).isEqualTo(1L);
+    }
+
+    @Test
+    void deleting_user_removes_all_owned_data_but_keeps_shared_data() {
+        UUID userId = UUID.randomUUID();
+        UUID batchId = UUID.randomUUID();
+        insertDerivedGraph(userId, batchId, "delete-user");
+        jdbcTemplate.update("""
+            insert into merchant_dict(user_id, pattern, merchant_norm, merchant_category, source, confidence)
+            values (?, 'delete-user-가맹점', '가맹점', '음식점', 'user', 1.0),
+                   (null, 'delete-user-전역', '가맹점', '음식점', '수기', 1.0)
+            """, userId);
+
+        jdbcTemplate.update("delete from app_user where id = ?", userId);
+
+        assertThat(countRowsOwnedBy(userId)).allSatisfy((table, count) ->
+            assertThat(count).as(table).isZero()
+        );
+        assertThat(jdbcTemplate.queryForObject(
+            "select count(*) from user_context where user_id = ?", Long.class, userId
+        )).isZero();
+        assertThat(jdbcTemplate.queryForList(
+            "select pattern from merchant_dict where pattern like 'delete-user-%'", String.class
+        )).containsExactly("delete-user-전역");
+        assertThat(jdbcTemplate.queryForObject(
+            "select count(*) from statute_version where statute_id = 'delete-user-statute'", Long.class
+        )).isEqualTo(1L);
+    }
+
+    @Test
+    void batch_referenced_by_another_batchs_judgment_is_not_deleted() {
+        UUID userId = UUID.randomUUID();
+        UUID batchId = UUID.randomUUID();
+        insertDerivedGraph(userId, batchId, "cross-origin");
+        UUID runId = jdbcTemplate.queryForObject(
+            "select id from judgment_run where batch_id = ?", UUID.class, batchId
+        );
+        UUID otherBatchId = UUID.randomUUID();
+        UUID otherTransactionId = UUID.randomUUID();
+        UUID wronglyLinkedJudgmentId = UUID.randomUUID();
+        insertBatch(otherBatchId, userId, "cross-origin-other-file-hash");
+        insertTransaction(otherTransactionId, otherBatchId, "cross-origin-other-natural-key");
+        // 다른 batch 의 run 을 origin 으로 가리키는 잘못된 판정
+        insertOriginJudgment(wronglyLinkedJudgmentId, otherTransactionId, 1, "run_id", runId);
+
+        assertThatThrownBy(() -> jdbcTemplate.update("delete from upload_batch where id = ?", batchId))
+            .isInstanceOf(DataAccessException.class);
+        assertThat(jdbcTemplate.queryForObject(
+            "select count(*) from judgment where id = ?", Integer.class, wronglyLinkedJudgmentId
+        )).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+            "select count(*) from upload_batch where id = ?", Integer.class, batchId
+        )).isEqualTo(1);
+    }
+
+    @Test
+    void context_version_used_by_a_run_is_not_deleted() {
+        UUID userId = UUID.randomUUID();
+        UUID batchId = UUID.randomUUID();
+        UUID contextId = UUID.randomUUID();
+        UUID runId = UUID.randomUUID();
+        jdbcTemplate.update(
+            "insert into app_user(id, email) values (?, ?)", userId, userId + "@example.com"
+        );
+        insertBatch(batchId, userId, "context-reference-file-hash");
+        jdbcTemplate.update("""
+            insert into user_context(
+                id, user_id, industry_code, prev_year_revenue, business_open_date,
+                bookkeeping_duty, has_employee, version
+            ) values (?, ?, '940909', 0, '2024-01-01', '간편장부', false, 1)
+            """, contextId, userId);
+        // 판정이 아직 없는 run 이다. 판정이 있으면 judgment.run_id 가 run 삭제를 막아서 이 FK 를 시험하지 못한다.
+        jdbcTemplate.update("""
+            insert into judgment_run(id, batch_id, context_id, context_version, status)
+            values (?, ?, ?, 1, 'QUEUED')
+            """, runId, batchId, contextId);
+
+        assertThatThrownBy(() -> jdbcTemplate.update("delete from user_context where id = ?", contextId))
+            .isInstanceOf(DataAccessException.class);
+        assertThat(jdbcTemplate.queryForObject(
+            "select count(*) from judgment_run where id = ?", Integer.class, runId
+        )).isEqualTo(1);
+    }
+
+    @Test
+    void transaction_can_have_only_one_active_override() {
+        UUID userId = UUID.randomUUID();
+        UUID batchId = UUID.randomUUID();
+        UUID transactionId = UUID.randomUUID();
+        UUID judgmentId = UUID.randomUUID();
+        insertJudgmentFixture(userId, batchId, transactionId, judgmentId, "single-override");
+        insertOverride(transactionId, judgmentId, true);
+        insertOverride(transactionId, judgmentId, false);
+
+        assertThatThrownBy(() -> insertOverride(transactionId, judgmentId, true))
+            .isInstanceOf(DataAccessException.class);
+    }
+
+    @Test
+    void override_source_must_be_a_judgment_of_the_same_transaction() {
+        UUID userId = UUID.randomUUID();
+        UUID batchId = UUID.randomUUID();
+        UUID transactionId = UUID.randomUUID();
+        UUID judgmentId = UUID.randomUUID();
+        insertJudgmentFixture(userId, batchId, transactionId, judgmentId, "override-pair");
+        UUID otherTransactionId = UUID.randomUUID();
+        UUID otherJudgmentId = UUID.randomUUID();
+        insertTransaction(otherTransactionId, batchId, "override-pair-other-natural-key");
+        insertBareJudgment(otherJudgmentId, otherTransactionId);
+
+        insertOverride(transactionId, judgmentId, false);
+        assertThatThrownBy(() -> insertOverride(transactionId, otherJudgmentId, true))
+            .isInstanceOf(DataAccessException.class);
+    }
+
+    @Test
+    void question_status_accepts_only_api_codes() {
+        UUID userId = UUID.randomUUID();
+        UUID batchId = UUID.randomUUID();
+        UUID transactionId = UUID.randomUUID();
+        UUID judgmentId = UUID.randomUUID();
+        insertJudgmentFixture(userId, batchId, transactionId, judgmentId, "question-status");
+        UUID questionId = UUID.randomUUID();
+        jdbcTemplate.update("""
+            insert into question_queue(id, judgment_id, reason_code, question_text, group_key, fact_type)
+            values (?, ?, 'PURPOSE', '용도는 무엇인가요?', 'merchant:스타벅스', '용도')
+            """, questionId, judgmentId);
+
+        assertThat(jdbcTemplate.queryForObject(
+            "select status from question_queue where id = ?", String.class, questionId
+        )).isEqualTo("PENDING");
+        assertThatThrownBy(() -> jdbcTemplate.update(
+            "update question_queue set status = '대기' where id = ?", questionId
+        )).isInstanceOf(DataAccessException.class);
+        assertThatThrownBy(() -> jdbcTemplate.update(
+            "update question_queue set status = 'ANSWERED' where id = ?", questionId
+        )).isInstanceOf(DataAccessException.class);
     }
 
     @Test
@@ -177,6 +341,86 @@ class JudgmentSchemaIntegrationTest {
         assertThatThrownBy(() ->
             insertTransaction(UUID.randomUUID(), secondBatchId, "same-natural-key")
         ).isInstanceOf(DataAccessException.class);
+    }
+
+    @Test
+    void different_users_can_store_same_natural_key() {
+        UUID firstBatchId = insertUserWithBatch("other-user-1");
+        UUID secondBatchId = insertUserWithBatch("other-user-2");
+        insertTransaction(UUID.randomUUID(), firstBatchId, "shared-natural-key");
+        insertTransaction(UUID.randomUUID(), secondBatchId, "shared-natural-key");
+
+        assertThat(jdbcTemplate.queryForObject(
+            "select count(*) from transaction where natural_key = 'shared-natural-key'", Integer.class
+        )).isEqualTo(2);
+    }
+
+    @Test
+    void transaction_owner_must_match_batch_owner() {
+        UUID batchId = insertUserWithBatch("owner");
+        UUID otherUserId = UUID.randomUUID();
+        jdbcTemplate.update(
+            "insert into app_user(id, email) values (?, ?)", otherUserId, otherUserId + "@example.com"
+        );
+
+        assertThatThrownBy(() -> jdbcTemplate.update("""
+            insert into transaction(
+                id, batch_id, user_id, approved_at, merchant_raw, merchant_norm,
+                merchant_category, amount, natural_key, source_status, classification_status
+            ) values (?, ?, ?, '2025-03-14', '가맹점', '가맹점', '기타', 10000, 'owner-mismatch',
+                      'JUDGEABLE', 'CLASSIFIED')
+            """, UUID.randomUUID(), batchId, otherUserId)).isInstanceOf(DataAccessException.class);
+    }
+
+    @Test
+    void new_transaction_defaults_to_auto_inclusion_and_lump_sum() {
+        UUID batchId = insertUserWithBatch("defaults");
+        UUID transactionId = UUID.randomUUID();
+        insertTransaction(transactionId, batchId, "defaults-natural-key");
+
+        Map<String, Object> stored = jdbcTemplate.queryForMap("""
+            select user_inclusion, installment_months, is_aggregated, needs_review
+            from transaction
+            where id = ?
+            """, transactionId);
+        assertThat(stored)
+            .containsEntry("user_inclusion", "AUTO")
+            .containsEntry("installment_months", 0)
+            .containsEntry("is_aggregated", false)
+            .containsEntry("needs_review", false);
+    }
+
+    @Test
+    void canceled_offset_transaction_cannot_be_included() {
+        UUID batchId = insertUserWithBatch("canceled");
+
+        assertThatThrownBy(() -> jdbcTemplate.update("""
+            insert into transaction(
+                id, batch_id, user_id, approved_at, merchant_raw, merchant_norm,
+                merchant_category, amount, natural_key, source_status, user_inclusion,
+                classification_status
+            )
+            select ?, b.id, b.user_id, '2025-03-14', '가맹점', '가맹점', '기타', 10000,
+                   'canceled-included', 'CANCELED_OFFSET', 'INCLUDED', 'CLASSIFIED'
+            from upload_batch b
+            where b.id = ?
+            """, UUID.randomUUID(), batchId)).isInstanceOf(DataAccessException.class);
+    }
+
+    @Test
+    void unclassified_transaction_must_need_review() {
+        UUID batchId = insertUserWithBatch("unclassified");
+
+        assertThatThrownBy(() -> jdbcTemplate.update("""
+            insert into transaction(
+                id, batch_id, user_id, approved_at, merchant_raw, merchant_norm,
+                merchant_category, amount, natural_key, source_status, classification_status
+            )
+            select ?, b.id, b.user_id, '2025-03-14', '가맹점', '가맹점', '미분류', 10000,
+                   'unclassified-classified', 'JUDGEABLE', 'CLASSIFIED'
+            from upload_batch b
+            where b.id = ?
+            """, UUID.randomUUID(), batchId)).isInstanceOf(DataAccessException.class);
     }
 
     @Test
@@ -488,7 +732,7 @@ class JudgmentSchemaIntegrationTest {
             from question_queue
             where id = ?
             """, questionId))
-            .containsEntry("status", "응답")
+            .containsEntry("status", "ANSWERED")
             .containsEntry("answered_fact_id", factId)
             .containsEntry("has_answered_at", true);
     }
@@ -523,7 +767,7 @@ class JudgmentSchemaIntegrationTest {
         )).isZero();
         assertThat(jdbcTemplate.queryForObject(
             "select status from question_queue where id = ?", String.class, questionId
-        )).isEqualTo("대기");
+        )).isEqualTo("PENDING");
     }
 
     @Test
@@ -552,7 +796,7 @@ class JudgmentSchemaIntegrationTest {
         )).isZero();
         assertThat(jdbcTemplate.queryForObject(
             "select status from question_queue where id = ?", String.class, questionId
-        )).isEqualTo("대기");
+        )).isEqualTo("PENDING");
     }
 
     @Test
@@ -581,7 +825,7 @@ class JudgmentSchemaIntegrationTest {
         )).isZero();
         assertThat(jdbcTemplate.queryForObject(
             "select status from question_queue where id = ?", String.class, questionId
-        )).isEqualTo("대기");
+        )).isEqualTo("PENDING");
     }
 
     @Test
@@ -610,7 +854,7 @@ class JudgmentSchemaIntegrationTest {
         )).isZero();
         assertThat(jdbcTemplate.queryForObject(
             "select status from question_queue where id = ?", String.class, questionId
-        )).isEqualTo("대기");
+        )).isEqualTo("PENDING");
     }
 
     private void runConcurrently(int taskCount, Callable<?> task) throws Exception {
@@ -647,13 +891,29 @@ class JudgmentSchemaIntegrationTest {
             """, batchId, userId, fileHash);
     }
 
+    private UUID insertUserWithBatch(String fileHash) {
+        UUID userId = UUID.randomUUID();
+        UUID batchId = UUID.randomUUID();
+        jdbcTemplate.update(
+            "insert into app_user(id, email) values (?, ?)", userId, userId + "@example.com"
+        );
+        insertBatch(batchId, userId, fileHash);
+        return batchId;
+    }
+
+    /** 소유자는 batch 에서 가져온다. 거래와 batch 의 user_id 는 FK 로 묶여 있다. */
     private void insertTransaction(UUID transactionId, UUID batchId, String naturalKey) {
-        jdbcTemplate.update("""
+        int inserted = jdbcTemplate.update("""
             insert into transaction(
-                id, batch_id, approved_at, merchant_raw, merchant_norm,
-                merchant_category, amount, natural_key, status
-            ) values (?, ?, '2025-03-14', '가맹점', '가맹점', '기타', 10000, ?, '판정대상')
-            """, transactionId, batchId, naturalKey);
+                id, batch_id, user_id, approved_at, merchant_raw, merchant_norm,
+                merchant_category, amount, natural_key, source_status, classification_status
+            )
+            select ?, b.id, b.user_id, '2025-03-14', '가맹점', '가맹점', '기타', 10000, ?,
+                   'JUDGEABLE', 'CLASSIFIED'
+            from upload_batch b
+            where b.id = ?
+            """, transactionId, naturalKey, batchId);
+        assertThat(inserted).as("batch %s 가 먼저 있어야 한다", batchId).isEqualTo(1);
     }
 
     private void insertJudgmentFixture(
@@ -669,6 +929,129 @@ class JudgmentSchemaIntegrationTest {
         insertBatch(batchId, userId, keySuffix + "-file-hash");
         insertTransaction(transactionId, batchId, keySuffix + "-natural-key");
         insertBareJudgment(judgmentId, transactionId);
+    }
+
+    /**
+     * batch 하나에서 파생되는 행을 테이블마다 하나 이상 만든다(api.md §6 삭제 대상).
+     * 판정은 run 이 만든 revision 1, 질문 답변이 만든 revision 2, 분류 응답·override 가 만든 revision 3·4 다.
+     */
+    private void insertDerivedGraph(UUID userId, UUID batchId, String keySuffix) {
+        UUID contextId = UUID.randomUUID();
+        UUID transactionId = UUID.randomUUID();
+        UUID runId = UUID.randomUUID();
+        UUID reviewId = UUID.randomUUID();
+        UUID factId = UUID.randomUUID();
+        UUID overrideId = UUID.randomUUID();
+        UUID runJudgmentId = UUID.randomUUID();
+        jdbcTemplate.update(
+            "insert into app_user(id, email) values (?, ?)", userId, userId + "@example.com"
+        );
+        jdbcTemplate.update("""
+            insert into user_context(
+                id, user_id, industry_code, prev_year_revenue, business_open_date,
+                bookkeeping_duty, has_employee, version
+            ) values (?, ?, '940909', 0, '2024-01-01', '간편장부', false, 1)
+            """, contextId, userId);
+        insertBatch(batchId, userId, keySuffix + "-file-hash");
+        insertTransaction(transactionId, batchId, keySuffix + "-natural-key");
+        Long statuteVersionId = jdbcTemplate.queryForObject("""
+            insert into statute_version(
+                statute_id, doc_type, hierarchy, effective_from, body, body_hash,
+                doc_id, unit_level, title, source_url
+            ) values (?, '법령', '법률', '2025-01-01', '원문', 'hash', 'DOC', '조', '제목', 'https://law.go.kr/test')
+            returning id
+            """, Long.class, keySuffix + "-statute");
+        jdbcTemplate.update("""
+            insert into judgment_run(id, batch_id, context_id, context_version, status, total_count)
+            values (?, ?, ?, 1, 'COMPLETED', 1)
+            """, runId, batchId, contextId);
+        jdbcTemplate.update("""
+            insert into judgment_run_item(run_id, transaction_id, status, processed_at)
+            values (?, ?, 'SUCCEEDED', now())
+            """, runId, transactionId);
+        jdbcTemplate.update("""
+            insert into classification_review(id, transaction_id, status, selected_category, resolved_at)
+            values (?, ?, 'RESOLVED', '음식점', now())
+            """, reviewId, transactionId);
+        jdbcTemplate.update("""
+            insert into user_fact(id, user_id, batch_id, scope_key, fact_type, value, version)
+            values (?, ?, ?, 'merchant:가맹점', '용도', '{"value": "업무"}', 1)
+            """, factId, userId, batchId);
+        insertOriginJudgment(runJudgmentId, transactionId, 1, "run_id", runId);
+        insertOriginJudgment(UUID.randomUUID(), transactionId, 2, "trigger_user_fact_id", factId);
+        insertOriginJudgment(UUID.randomUUID(), transactionId, 3, "classification_review_id", reviewId);
+        jdbcTemplate.update("""
+            insert into judgment_override(id, transaction_id, source_judgment_id, to_verdict, active)
+            values (?, ?, ?, 'AVAILABLE', true)
+            """, overrideId, transactionId, runJudgmentId);
+        insertOriginJudgment(UUID.randomUUID(), transactionId, 4, "judgment_override_id", overrideId);
+        jdbcTemplate.update(
+            "insert into judgment_citation(judgment_id, statute_version_id) values (?, ?)",
+            runJudgmentId, statuteVersionId
+        );
+        jdbcTemplate.update("""
+            insert into question_queue(
+                judgment_id, id, reason_code, question_text, group_key, fact_type,
+                status, answered_fact_id, answered_at
+            ) values (?, ?, 'PURPOSE', '용도는 무엇인가요?', 'merchant:가맹점', '용도', 'ANSWERED', ?, now())
+            """, runJudgmentId, UUID.randomUUID(), factId);
+        jdbcTemplate.update("""
+            insert into unmatched_log(judgment_id, reason, merchant_category, merchant_raw, industry_code)
+            values (?, 'RULE_NOT_FOUND', '기타', '가맹점', '940909')
+            """, runJudgmentId);
+        jdbcTemplate.update("""
+            insert into limit_bucket_entry(
+                user_id, tax_year, bucket_code, judgment_id, tagged_amount, allowed_amount, state
+            ) values (?, 2025, 'BUSINESS_PROMOTION', ?, 10000, 10000, '잠정')
+            """, userId, runJudgmentId);
+    }
+
+    private void insertOriginJudgment(
+        UUID judgmentId, UUID transactionId, int revision, String originColumn, UUID originId
+    ) {
+        jdbcTemplate.update("""
+            insert into judgment(
+                id, transaction_id, revision, rules_commit_sha, user_context_version,
+                tax_year, verdict, is_inference, %s
+            ) values (?, ?, ?, 'fixture', 1, 2025, 'AVAILABLE', false, ?)
+            """.formatted(originColumn), judgmentId, transactionId, revision, originId);
+    }
+
+    /** 사용자의 batch 에서 파생된 행 수를 테이블별로 센다. */
+    private Map<String, Long> countRowsOwnedBy(UUID userId) {
+        String byBatch = "in (select id from upload_batch where user_id = '%s')".formatted(userId);
+        String byTransaction = "in (select id from transaction where batch_id %s)".formatted(byBatch);
+        String byJudgment = "in (select id from judgment where transaction_id %s)".formatted(byTransaction);
+        Map<String, String> queries = new LinkedHashMap<>();
+        queries.put("upload_batch", "select count(*) from upload_batch where user_id = '%s'".formatted(userId));
+        queries.put("transaction", "select count(*) from transaction where batch_id " + byBatch);
+        queries.put("judgment_run", "select count(*) from judgment_run where batch_id " + byBatch);
+        queries.put("judgment_run_item",
+            "select count(*) from judgment_run_item where transaction_id " + byTransaction);
+        queries.put("classification_review",
+            "select count(*) from classification_review where transaction_id " + byTransaction);
+        queries.put("judgment", "select count(*) from judgment where transaction_id " + byTransaction);
+        queries.put("judgment_override",
+            "select count(*) from judgment_override where transaction_id " + byTransaction);
+        queries.put("judgment_citation",
+            "select count(*) from judgment_citation where judgment_id " + byJudgment);
+        queries.put("question_queue", "select count(*) from question_queue where judgment_id " + byJudgment);
+        queries.put("unmatched_log", "select count(*) from unmatched_log where judgment_id " + byJudgment);
+        queries.put("user_fact", "select count(*) from user_fact where user_id = '%s'".formatted(userId));
+        queries.put("limit_bucket_entry",
+            "select count(*) from limit_bucket_entry where user_id = '%s'".formatted(userId));
+
+        Map<String, Long> counts = new LinkedHashMap<>();
+        queries.forEach((table, sql) -> counts.put(table, jdbcTemplate.queryForObject(sql, Long.class)));
+        return counts;
+    }
+
+    private void insertOverride(UUID transactionId, UUID judgmentId, boolean active) {
+        jdbcTemplate.update("""
+            insert into judgment_override(
+                id, transaction_id, source_judgment_id, to_verdict, active, released_at
+            ) values (?, ?, ?, 'UNAVAILABLE', ?, case when ? then null else now() end)
+            """, UUID.randomUUID(), transactionId, judgmentId, active, active);
     }
 
     private void insertBareJudgment(UUID judgmentId, UUID transactionId) {

@@ -178,13 +178,32 @@ flowchart TD
 
 ### natural_key (중복 방지 키)
 
-`natural_key = hash(승인일 + 상호원문 + 금액 + 승인번호)`이고 UNIQUE다. 같은 파일을 두 번 올려도 중복으로 계상되지 않게 막는다.
+`natural_key = hash(승인일 + 상호원문 + 금액 + 승인번호)`이고 사용자 단위로 UNIQUE(`user_id, natural_key`)다. 같은 파일을 두 번 올려도 중복으로 계상되지 않게 막는다. 다른 사용자의 같은 키는 다른 거래라 막지 않는다.
 
 승인번호를 재료에 넣은 이유와 실데이터 137건 검증 결과(추가 전에는 별개 거래 5행이 충돌했으나 추가 후 0건이고, 중복 차단 기능은 그대로다)는 [`docs/schema_mapping.md`의 §4](./schema_mapping.md)에 있다. 승인번호만 단독으로 쓰지 않는 이유(8자리라 재사용될 수 있고 카드사마다 체계가 다르다)도 같은 문서에 정리돼 있다.
 
 ### 판정의 결정론
 
 `judge()`는 순수 함수이다. LLM도, DB나 현재 시각, 난수도 참조하지 않는다. 그래서 같은 입력에는 항상 같은 결과가 나온다. 분류 모델이 틀리더라도 규칙 매칭이 실패해 확인 필요로 떨어질 뿐, 틀린 판정이 나가지는 않는다.
+
+### 삭제 정책
+
+삭제는 DB의 `ON DELETE CASCADE`가 맡는다. 서비스 코드는 루트 행 하나만 지운다.
+
+- **batch 삭제**: `upload_batch`를 지우면 그 업로드에서 파생된 행이 함께 지워진다. 거래, 분류 확인, run과 run 항목, 판정 revision 전부, 인용, 질문, batch 범위 UserFact, override, 미매칭 로그, 한도 배분이 대상이다(`api.md` §6).
+- **탈퇴**: `app_user`를 지우면 사용자 소유 행(문진 Context, batch와 위의 파생 행, UserFact, 개인 `merchant_dict`, 한도 배분)이 지워진다.
+- **남는 것**: 공용 `statute_version`, 전역 `merchant_dict`(`user_id IS NULL`), `rule_candidate`. 앞의 둘은 사용자 데이터가 아니고, `rule_candidate`는 사용자 FK 없이 집계만 담는다.
+- **소유 FK만 CASCADE다.** 소유 경로는 batch → 거래 → 판정, batch → run, 사용자 → batch 같은 것이다. revision을 직접 지우는 경로는 없고(append-only), 판정은 거래를 거쳐서만 지워진다.
+- **참조 FK는 지우지 않고 막는다.** 판정의 origin 4개(`run_id` 등), run의 `context_id`, override의 `source_judgment_id`, 질문의 `answered_fact_id`가 여기에 해당한다(NO ACTION).
+  - 참조까지 CASCADE면 잘못 이어진 참조 하나가 다른 batch의 이력을 조용히 지운다. 예를 들어 다른 batch의 run을 가리키는 판정이 있으면, 그 batch를 지울 때 이 판정까지 사라진다.
+  - 막아 두면 그런 삭제는 실패하고 데이터가 남는다.
+  - override의 `source_judgment_id`는 `(source_judgment_id, transaction_id)` 쌍으로 판정을 가리킨다. 다른 거래의 판정을 원래 판정으로 둘 수 없다.
+- **참조 FK는 커밋 때 검사한다**(`DEFERRABLE INITIALLY DEFERRED`). 즉시 검사하면 탈퇴처럼 여러 경로로 함께 지워질 때 순서에 따라 실패한다. 예를 들어 사용자 → UserFact가 batch → 거래 → 판정보다 먼저 지워지면 아직 남은 판정에 걸린다.
+- `answered_fact_id`를 SET NULL로 두지 않은 건 "ANSWERED면 답변 fact 필수" CHECK와 부딪히기 때문이다.
+
+테스트가 세 가지를 확인한다.
+- `JudgmentSchemaIntegrationTest`: 테이블마다 행을 채운 뒤 batch 삭제와 탈퇴, 다른 batch를 잘못 가리키는 참조가 있을 때 삭제가 막히는지.
+- `JudgmentRunsMigrationUpgradeIntegrationTest`: 행이 있는 DB에 마이그레이션을 적용했을 때 기존 행이 보존·변환되는지.
 
 ### 관련 문서
 

@@ -31,70 +31,26 @@ export function ClassificationPreview() {
     () => batchId ? api.uploads.get(batchId) : Promise.resolve(null),
     [batchId]
   );
-  // 그룹 응답에는 건별 정보가 없어(api.md 3.5) 개별 리뷰와 거래를 함께 읽는다
-  const reviewsQ = useApi(
-    () =>
-    api.classificationReviews.list({
-      batchId: batchId ?? undefined,
-      status: 'PENDING',
-      size: 100
-    }),
-    [batchId]
-  );
-  const txQ = useApi(
-    () =>
-    api.transactions.list({
-      batchId: batchId ?? undefined,
-      classificationStatus: 'NEEDS_REVIEW',
-      size: 100
-    }),
-    [batchId]
-  );
-
-  const txById = new Map((txQ.data?.items ?? []).map((t) => [t.id, t]));
-  const reviewById = new Map((reviewsQ.data?.items ?? []).map((r) => [r.id, r]));
-
-  /**
-   * 그룹에 묶인 리뷰. `reviewIds` 로만 찾는다 —
-   * merchantNorm 으로 맞추면 같은 가게가 카드사 트랙에 따라 다른 그룹으로 갈릴 때 섞인다.
-   */
-  const reviewsOf = (group: { reviewIds: string[] }) =>
-  group.reviewIds.
-  map((id) => reviewById.get(id)).
-  filter((r): r is NonNullable<typeof r> => Boolean(r));
-
-  /** 그룹에 묶인 거래 (승인일 오름차순) */
-  const rowsOf = (group: { reviewIds: string[] }) =>
-  reviewsOf(group).
-  map((review) => txById.get(review.transactionId)).
-  filter((t): t is NonNullable<typeof t> => Boolean(t)).
-  sort((a, b) => a.approvedAt.localeCompare(b.approvedAt));
 
   const groups = groupsQ.data?.items ?? [];
   const batch = batchQ.data;
   const total = batch?.transactionCount ?? 0;
 
   /**
-   * 건수는 개별 리뷰 응답의 `page.totalElements` 를 쓴다 — 그룹 배열을 더하면
-   * 지금 페이지만 더하게 되어 그룹이 한 페이지를 넘으면 틀린다.
-   * (#74 가 머지되면 `unresolved{count,amount}` 로 바꾼다)
+   * 서버가 주는 미해소 집계. page·size 와 무관하게 배치 전체 기준이다 (api.md 3.5).
+   * 그룹 배열을 더하면 지금 페이지만 더하게 되어 그룹이 한 페이지를 넘으면 틀린다.
    */
-  const pendingCount = reviewsQ.data?.page.totalElements ?? 0;
-  const reviewsComplete =
-  reviewsQ.data !== null &&
-  reviewsQ.data.items.length === reviewsQ.data.page.totalElements;
+  const unresolved = groupsQ.data?.unresolved;
+  const pendingCount = unresolved?.count ?? 0;
+  const pendingAmount = unresolved?.amount ?? null;
   const groupsComplete =
   groupsQ.data !== null &&
   groupsQ.data.items.length === groupsQ.data.page.totalElements;
-  /** 금액은 받은 거래로만 더할 수 있다. 다 못 받았으면 숫자를 말하지 않는다 */
-  const pendingAmount = reviewsComplete ?
-  groups.reduce((sum, group) => sum + group.totalAmount, 0) :
-  null;
   const classified = Math.max(0, total - pendingCount);
   const coverage = total ? classified / total * 100 : 100;
 
-  const loading = groupsQ.loading || batchQ.loading || reviewsQ.loading;
-  const loadError = groupsQ.error ?? reviewsQ.error ?? txQ.error ?? batchQ.error;
+  const loading = groupsQ.loading || batchQ.loading;
+  const loadError = groupsQ.error ?? batchQ.error;
   /** 다 읽고 나서 0건일 때만 「다 분류했다」다 */
   const done = !loading && !loadError && groups.length === 0;
   /** 올린 배치 자체가 없으면 「다 분류했다」가 아니라 「올린 게 없다」다 */
@@ -127,8 +83,6 @@ export function ClassificationPreview() {
     timers.current.push(window.setTimeout(() => {
       groupsQ.reload();
       batchQ.reload();
-      reviewsQ.reload();
-      txQ.reload();
       setResolving((prev) => {
         const next = { ...prev };
         delete next[groupKey];
@@ -183,8 +137,6 @@ export function ClassificationPreview() {
             variant="secondary"
             onClick={() => {
               groupsQ.reload();
-              reviewsQ.reload();
-              txQ.reload();
               batchQ.reload();
             }}>
 
@@ -270,13 +222,13 @@ export function ClassificationPreview() {
 
           <ul className="mt-4 space-y-3">
               {groups.map((group) => {
-              const rows = rowsOf(group);
+              // 승인일 오름차순으로 이미 정렬돼 온다 (api.md 3.5)
+              const rows = group.transactions;
               // 한 가맹점이 카드사에서 여러 표기로 찍힌 경우 제목은 정규화된 이름을 쓴다.
-              // groupKey 문자열 형식은 계약이 보장하지 않으므로 리뷰의 merchantNorm 을 읽는다.
+              // groupKey 는 형식을 보장하지 않으므로 파싱하지 않고 merchantNorm 을 쓴다.
               const rawVariants = new Set(rows.map((row) => row.merchantRaw)).size;
-              const merchantNorm = reviewsOf(group)[0]?.merchantNorm;
               const title =
-              rawVariants > 1 && merchantNorm ? merchantNorm : group.merchantRaw;
+              rawVariants > 1 ? group.merchantNorm : group.merchantRaw;
               return (
                 <Card
               key={group.groupKey}
@@ -306,7 +258,7 @@ export function ClassificationPreview() {
                   <ul className="mt-4 divide-y divide-line2 rounded-xl border border-line2 bg-canvas">
                     {rows.slice(0, 4).map((row) =>
                 <li
-                  key={row.id}
+                  key={row.transactionId}
                   className="flex items-baseline justify-between gap-3 px-3.5 py-2.5">
                   
                         <span className="w-24 shrink-0 text-small tabular-nums text-ink2">

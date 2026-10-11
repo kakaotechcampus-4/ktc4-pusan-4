@@ -19,6 +19,7 @@ import type {
   Question,
   QuestionGroup,
   QuestionPage,
+  UnresolvedPage,
   QuestionResponseRequest,
   QuestionResponseResult,
   QuestionStatus,
@@ -57,6 +58,8 @@ export interface JudgmentQuery extends PageQuery {
   transactionId?: string;
   runId?: string;
   verdict?: Verdict;
+  /** 기본 true(현재 판정만). transactionId 와 false 로 쓰면 revision 이력 전체. runId 와 함께 쓰지 않는다 */
+  latestOnly?: boolean;
 }
 
 /** batchId · year · runId 중 정확히 하나. 0개거나 2개 이상이면 400 INVALID_SUMMARY_SCOPE */
@@ -109,8 +112,8 @@ export interface Api {
   };
   /** 3.5 가맹점 분류 확인 */
   classificationReviews: {
-    list(query?: ReviewQuery): Promise<Page<ClassificationReview>>;
-    grouped(query?: ReviewQuery): Promise<Page<ClassificationReviewGroup>>;
+    list(query?: ReviewQuery): Promise<UnresolvedPage<ClassificationReview>>;
+    grouped(query?: ReviewQuery): Promise<UnresolvedPage<ClassificationReviewGroup>>;
     /** 카테고리 확정. Run 이력이 있으면 해결된 거래만 재판정한다 */
     respond(body: ClassificationResponseRequest): Promise<ClassificationResponseResult>;
   };

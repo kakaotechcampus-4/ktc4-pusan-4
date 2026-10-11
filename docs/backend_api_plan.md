@@ -215,7 +215,7 @@ flowchart LR
 | B2 | B | 10/5 | 거래 스키마를 api.md에 맞춘다. `transaction.user_id`를 추가하고 기존 행을 채운 뒤 FK를 적용한다. 전역 `UNIQUE(natural_key)`는 `UNIQUE(user_id, natural_key)`로 변경한다. `status` 하나를 `source_status`, `user_inclusion`, `classification_status`로 나눈다. `installment_months`는 기본값을 0으로, CHECK를 `>= 0`으로 변경한다. 업로드로 받는 `approval_no`, `biz_no`, `branch`, `branch_raw`, `memo`, `is_aggregated`, `needs_review`, `review_reason`, `source_card` 컬럼을 추가한다(`docs/schema_mapping.md`). `UNIQUE(user_id, file_hash)`는 `upload_batch`에 이미 있다. `TransactionRecordEntity`와 `UploadBatchEntity`에 전체 컬럼을 매핑한다. |
 | B1a | B | 10/6 | `CurrentUser` 리졸버와 임시 사용자 시드를 구현한다. `GET /users/me`를 구현하고 `app_user` 엔티티를 V1 테이블에 매핑한다. 첫 mock 교체 PR에서 패턴을 정한다. 탈퇴(`DELETE /users/me`)는 삭제 정책이 갖춰진 뒤 B6에서 구현한다. |
 | B1b | B | 10/7 | `POST/GET /users/me/contexts`, `contexts/current`를 구현한다. `user_context` 엔티티를 V1 테이블에 매핑한다. |
-| B3a | B | 10/8 | `engine/.../T1Normalizer` 로직을 backend로 이전하고 `rules/normalize.yaml`을 읽는다. 순수 컴포넌트로 유지하며 fixture 기반 단위 테스트도 함께 옮긴다. |
+| B3a | B | 10/8 | `engine/.../T1Normalizer` 로직을 backend로 이전하고 `rules/normalize.yaml`을 읽는다. Python `load()`와 같이 `rules/brands.yaml`(브랜드 사전)과 `rules/pg_blocklist.yaml`(PG 힌트)도 단계에 넣는다. 순수 컴포넌트로 유지하며 fixture 기반 단위 테스트도 함께 옮긴다. `engine/`은 지운다(#79). |
 
 ### 2주차 (10/12~10/16): 업로드, 조회, 질문
 
@@ -239,7 +239,7 @@ flowchart LR
 | A5 | A | 10/26 | `POST /judgments/{id}/override`와 `DELETE /judgment-overrides/{id}`를 구현한다. 생성되는 override revision의 origin은 `judgment_override_id`로 지정한다. |
 | A6a | A | 10/27 | 금액 계산 최소판을 구현하고 G3 안분 비율을 적용한다. 자산 처리 규칙은 착수 전에 `CONTEXT.md` §14를 기준으로 확정한다. 자산 경계는 100만 원 "초과"이고, 무신고 시 건축물 외 유형자산의 기본 상각방법은 정률법이다. 정액 5년은 맥북 예시일 뿐 일반 규칙이 아니다. 상각방법이나 내용연수를 알 수 없으면 금액을 확정하지 않고 확인 필요로 둔다. |
 | A6b | A | 10/28 | run 실행 순서를 `judge → computeAmount → settleLimits(잠정)`으로 구성하고 `LimitBucketPersistenceService.replaceProvisional`을 연결한다. |
-| A7 | A | 10/29 | `POST /questions/bulk-answer`를 구현한다. 단건 답변 로직을 반복해서 호출하되, 같은 거래는 한 번만 재판정한다. 휴일 소명 질문은 일반 카드 13장과 같은 `fact_type: 용도`를 사용한다. 그대로 두면 "용도 전부 업무미팅" 일괄 답변에 휴일 식사까지 포함된다. 처리 방식은 [미리 정해야 할 것](#미리-정해야-할-것)에서 정한다. |
+| A7 | A | 10/29 | `POST /questions/bulk-answer`를 구현한다. 단건 답변 로직을 반복해서 호출하되, 같은 거래는 한 번만 재판정한다. 소명 대기 거래(Override를 뺀 최신 자동 판정이 불가인데 대기 질문이 남은 거래)의 질문은 대상과 `answer.value` 허용 검사에서 빼고 `excludedCount`로 센다(api.md 3.11, #103). |
 | R1 | A | 10/30 | 보고서 1단계. [발표 준비](#발표-준비)를 참고한다. |
 | B8 | B | 10/26 | `GET /classification-reviews`와 `POST /classification-responses`를 구현한다. 사용자 응답은 개인 scope의 `merchant_dict`에 저장한다. 해당 batch에 완료된 run이 없으면 분류만 확정하고 `judgedCount=0`으로 응답한다. 완료된 run이 있으면 최근 run의 Context로 `rejudge`한다(api.md "판정 처리" 절). |
 | B9a | B | 10/27 | Redis 인프라를 추가한다. 로컬 `compose.yaml`, `deploy/compose.yaml`(`maxmemory` 128MB, AOF 켜기), `deploy/deploy.sh` 헬스체크, `spring-boot-starter-data-redis`, Testcontainers Redis 설정을 포함한다. |
@@ -265,7 +265,7 @@ flowchart LR
 | 10/16 | 인증 방식(카카오 OAuth, 자체 JWT 등)과 인증 API 계약. 로그인·재발급·로그아웃 엔드포인트, 토큰 전달 위치(헤더 또는 쿠키), 액세스·리프레시 토큰 만료 기간, 로그아웃 범위를 api.md에 먼저 작성한다. 리프레시 토큰 저장소는 Redis로 확정했다. | B9b, B9c |
 | 10/16 | 분류 단계 배치, 담당, 분류 API 계약(분류 실험 담당·AI 담당과 협의). 어느 분류 단계부터 AI 서버로 넘길지 먼저 정한다. `CONTEXT.md` §12는 분류를 AI 서버에 두지만, 단계별로 나눈 기록은 없고 서비스 구현도 아직 없다. 사전과 `keyword_rules.yaml`은 백엔드(B3b)에서 처리하고, 모델과 웹 검색만 AI 서버에 두는 것을 추천한다. 해외 SaaS 사전(PR #73)과 상권정보 매칭(PR #61)을 어느 쪽에 둘지, 분류 API를 누가 구현할지도 함께 정한다. AI 서버에 두는 경우 배치 요청 `[{ merchantNorm, merchantRaw, bizNo? }]`, 응답 `[{ category 또는 null, confidence }]` 형태를 제안한다. cutoff 미만이면 `null`이다. stub은 10/30까지 필요하다. | B10 |
 | 10/16 | 금액 계산 규칙. 안분과 부가세 중 무엇을 먼저 적용할지(`CONTEXT.md` 미결정 #6), 자산 판단과 상각방법 기본값을 정한다. | A6a |
-| 10/16 | 휴일 소명 질문의 bulk-answer 처리. 휴일 카드 4장(R-311~314)의 질문에 별도 fact_type(예: `휴일용도`)을 부여하는 방식을 추천한다. 그러면 api.md의 대상 규칙을 바꾸지 않아도 된다. 다른 방법은 api.md에 제외 규칙과 `skippedCount`의 의미를 추가하는 것이다. | A7 |
+| 10/16 | 휴일 소명 질문의 bulk-answer 처리. **결정(10/7, #103)**: fact_type은 그대로 두고, 휴일 카드(R-311~314)와 생활용품(R-207)을 포함한 소명 대기 거래의 질문을 일괄 응답 대상에서 뺀다. 뺀 수는 `skippedCount`와 별도인 `excludedCount`로 센다(api.md 3.11). 별도 fact_type 안은 그 fact_type으로 일괄 응답하면 같은 문제가 남고 R-207을 놓쳐 쓰지 않았다. | A7 |
 | 10/26 | 보고서 스펙(AI 담당자와 협의). 1단계에 포함할 항목과 형식, 2단계 AI 참고 조문의 범위와 표시 방식, 핸드오프 임계값(`CONTEXT.md` 미결정 #8)을 정하고 api.md에 계약을 작성한다. | R1, R2 |
 | 10/26 | 관리자 페이지 범위와 담당. 화면 담당(프론트), 관리자 판별 방식, 승인 후 처리 범위를 정한다. 발표에는 후보 큐 조회와 승인·반려까지만 포함하고, GitHub PR 자동 생성은 제외하는 것을 추천한다. | M1 |
 

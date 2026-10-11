@@ -30,9 +30,9 @@ public class ClassificationMockData {
     }
 
     public ClassificationReviewGroupPage reviewGroups() {
-        ClassificationReviewGroupResponse.TransactionSummary transaction =
-            new ClassificationReviewGroupResponse.TransactionSummary(REVIEW_ID, UNCLASSIFIED_TRANSACTION_ID,
-                LocalDate.parse("2026-01-31"), "ELEVENLABS IO", 33_000L, 0);
+        ClassificationReviewGroupResponse.ReviewTransaction transaction =
+            new ClassificationReviewGroupResponse.ReviewTransaction(REVIEW_ID, UNCLASSIFIED_TRANSACTION_ID,
+                LocalDate.parse("2026-01-31"), "ELEVENLABS IO", "미확인 가맹점", "미분류", 33_000L, 0);
         ClassificationReviewGroupResponse group = new ClassificationReviewGroupResponse(
             "merchant:미확인 가맹점", "미확인 가맹점", List.of(REVIEW_ID), 1, 33_000L, "ELEVENLABS IO",
             SUGGESTED_CATEGORIES, List.of(transaction));
