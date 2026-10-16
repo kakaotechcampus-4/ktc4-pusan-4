@@ -18,6 +18,9 @@ const SHOWN_TRANSACTIONS = 3;
 const errorMessage = (caught: unknown, fallback: string) =>
 caught instanceof ApiRequestError ? caught.message : fallback;
 
+/** 그룹 응답과 어긋난 질문을 보낸 경우다. 목록을 다시 읽으면 맞는 묶음으로 돌아온다 (3.10) */
+const MIXED_BATCHES = '다른 업로드의 질문이 섞여 함께 답할 수 없습니다. 목록을 다시 불러왔습니다.';
+
 const groupId = (group: QuestionGroup) => `${group.groupKey}|${group.factType}`;
 
 /** 같은 factType 질문들이 모두 허용하는 선택지. 일괄 답변은 이 값만 보낼 수 있다 (3.11) */
@@ -103,6 +106,11 @@ export function Questions() {
       );
       reload();
     } catch (caught) {
+      if (caught instanceof ApiRequestError && caught.code === 'QUESTIONS_FROM_DIFFERENT_BATCHES') {
+        fail(MIXED_BATCHES);
+        reload();
+        return;
+      }
       fail(errorMessage(caught, '답을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.'));
     } finally {
       setBusy(null);
