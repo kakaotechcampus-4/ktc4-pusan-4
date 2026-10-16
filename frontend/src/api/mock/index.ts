@@ -727,11 +727,22 @@ export const mockApi: Api = {
       const out = j && withTransaction(j);
       return out ? delay(out) : notFound('JUDGMENT_NOT_FOUND', '판정을 찾을 수 없습니다.');
     },
+    // 목업은 Idempotency-Key 재사용을 흉내 내지 않는다 (업로드와 같다)
     override: (id, body) => {
       const prev = store.judgments.find((x) => x.id === id);
       if (!prev) return notFound('JUDGMENT_NOT_FOUND', '판정을 찾을 수 없습니다.');
+      // 확인 필요로 되돌리면 질문 없는 확인 필요가 된다 (#62)
+      if (body.toVerdict === 'NEEDS_REVIEW')
+      return Promise.reject(
+        new ApiRequestError(422, 'UNPROCESSABLE_ENTITY', '확인 필요로는 바꿀 수 없습니다.')
+      );
+      // 현재 판정이 아니거나 판정 대상이 아닌 거래는 막는다 (#62). 활성 Override 가 있으면
+      // 그 뒤에 자동 판정이 더 쌓여도 현재 판정은 Override 다 (3.7)
       const t = transactionOf(prev.transactionId);
-      if (!t) return notFound('JUDGMENT_NOT_FOUND', '판정을 찾을 수 없습니다.');
+      if (!t || t.effectiveStatus.code !== 'JUDGEABLE' || currentOf(t.id)?.id !== id)
+      return Promise.reject(
+        new ApiRequestError(409, 'CONFLICT', '지금 판정이 아니어서 바꿀 수 없습니다.')
+      );
       const amount = t.amount;
       const overrideId = nextId('0199ab12');
       const next: JudgmentSeed = {

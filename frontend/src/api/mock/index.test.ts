@@ -53,6 +53,44 @@ describe('판정 (3.7)', () => {
   });
 });
 
+describe('사용자 수정 (3.8, #62)', () => {
+  it('확인 필요로는 바꿀 수 없다', async () => {
+    const judgment = await currentOf(tx('1001'));
+    await expect(
+      api.judgments.override(judgment.id, { toVerdict: 'NEEDS_REVIEW', reason: '모름' }, 'k1')
+    ).rejects.toMatchObject({ status: 422 });
+  });
+
+  it('현재 판정이 아닌 revision 은 409 다', async () => {
+    const old = await currentOf(tx('1005'));
+    const group = await groupOf(tx('1005'));
+    await api.questions.respond({ questionIds: group.questionIds, answer: { value: '개인' } });
+    await expect(
+      api.judgments.override(old.id, { toVerdict: 'AVAILABLE', reason: '업무' }, 'k1')
+    ).rejects.toMatchObject({ status: 409 });
+  });
+
+  it('수정 뒤 답변으로 자동 판정이 쌓여도 현재 판정(수정)은 다시 바꿀 수 있다', async () => {
+    const first = await api.judgments.override((await currentOf(tx('1005'))).id, { toVerdict: 'AVAILABLE', reason: '업무' }, 'k1');
+    const group = await groupOf(tx('1005'));
+    await api.questions.respond({ questionIds: group.questionIds, answer: { value: '개인' } });
+
+    const current = await currentOf(tx('1005'));
+    expect(current.id).toBe(first.id);
+    const second = await api.judgments.override(current.id, { toVerdict: 'UNAVAILABLE', reason: '개인' }, 'k2');
+    expect(second.verdict.code).toBe('UNAVAILABLE');
+    expect(second.transaction.merchantNorm).toBe(first.transaction.merchantNorm);
+  });
+
+  it('판정 대상이 아닌 거래는 409 다', async () => {
+    const judgment = await currentOf(tx('1005'));
+    await api.transactions.exclude(tx('1005'));
+    await expect(
+      api.judgments.override(judgment.id, { toVerdict: 'AVAILABLE', reason: '업무' }, 'k1')
+    ).rejects.toMatchObject({ status: 409 });
+  });
+});
+
 describe('분류 확인 (3.5)', () => {
   it('batchId 로 거르고, 답하면 배치의 대기 수가 준다', async () => {
     const other = await api.classificationReviews.list({ batchId: 'other-batch' });
@@ -90,7 +128,7 @@ describe('질문 (3.9, #134)', () => {
     expect((await groupOf(tx('1016'))).bulkAnswerable).toBe(false);
     expect((await groupOf(tx('1005'))).bulkAnswerable).toBe(true);
 
-    await api.judgments.override((await currentOf(tx('1016'))).id, { toVerdict: 'AVAILABLE', reason: '업무' });
+    await api.judgments.override((await currentOf(tx('1016'))).id, { toVerdict: 'AVAILABLE', reason: '업무' }, 'k1');
     const group = await groupOf(tx('1016'));
     expect(group.bulkAnswerable).toBe(false);
     expect(group.transactions[0].overridden).toBe(true);

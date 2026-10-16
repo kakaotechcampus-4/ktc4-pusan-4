@@ -135,8 +135,11 @@ export interface Api {
     summary(scope: SummaryScope): Promise<JudgmentSummary>;
     list(query?: JudgmentQuery): Promise<Page<Judgment>>;
     get(judgmentId: string): Promise<Judgment>;
-    /** 3.8 사용자 수정. 새 revision 을 만들고 이전 판정은 보존한다 */
-    override(judgmentId: string, body: OverrideRequest): Promise<Judgment>;
+    /**
+     * 3.8 사용자 수정. 새 revision 을 만들고 이전 판정은 보존한다.
+     * 현재 판정이 아니거나 판정 대상이 아닌 거래면 409 (#62). idempotencyKey 는 같은 내용을 다시 보낼 때만 재사용한다
+     */
+    override(judgmentId: string, body: OverrideRequest, idempotencyKey: string): Promise<Judgment>;
     /** 활성 Override 해제 */
     removeOverride(overrideId: string): Promise<void>;
   };
