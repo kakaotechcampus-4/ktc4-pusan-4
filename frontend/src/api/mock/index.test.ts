@@ -211,3 +211,14 @@ describe('문진·판정 실행', () => {
     expect(run.contextVersion).toBe(seed.version);
   });
 });
+
+describe('로그인 (목업)', () => {
+  it('로그인한 이메일과 역할을 users/me 로 준다. admin@… 만 관리자다', async () => {
+    await api.auth.login({ email: 'me@example.com', password: 'x' });
+    expect(await api.users.me()).toMatchObject({ email: 'me@example.com', role: 'USER' });
+
+    await api.auth.login({ email: 'admin@example.com', password: 'x' });
+    expect((await api.users.me()).role).toBe('ADMIN');
+  });
+
+});

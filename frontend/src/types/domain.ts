@@ -85,6 +85,17 @@ export interface User {
   id: string;
   email: string;
   createdAt: string;
+  /**
+   * 관리자 판별. api.md 에는 아직 없다 — 관리자 판별 방식은 10/26 에 정한다(backend_api_plan.md).
+   * 없으면 일반 사용자로 본다
+   */
+  role?: 'USER' | 'ADMIN';
+}
+
+/** 로그인 요청. 인증 계약은 아직 api.md 에 없다(#139) */
+export interface LoginRequest {
+  email: string;
+  password: string;
 }
 
 // ── 3.2 사업자 Context ──────────────────────────────
@@ -442,3 +453,4 @@ export interface BulkAnswerResult {
   rejudgedTransactionCount: number;
   unresolved: UnresolvedSummary;
 }
+

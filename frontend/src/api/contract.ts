@@ -14,6 +14,7 @@ import type {
   JudgmentRunCreated,
   JudgmentRunFailure,
   JudgmentSummary,
+  LoginRequest,
   OverrideRequest,
   Page,
   Question,
@@ -83,6 +84,20 @@ export interface ReviewQuery extends PageQuery {
 }
 
 export interface Api {
+  /**
+   * 인증. 계약이 아직 api.md 에 없어 #139 에 적은 대로 가정한다 — 액세스 토큰은 Authorization 헤더(메모리),
+   * 리프레시 토큰은 httpOnly 쿠키. 토큰은 이 층 안에만 있고 화면은 보지 않는다
+   */
+  auth: {
+    /** 성공하면 이후 요청에 토큰이 붙는다. 이메일·비밀번호가 틀리면 401 */
+    login(body: LoginRequest): Promise<void>;
+    /** 새로고침 뒤 리프레시 쿠키로 로그인을 이어 간다. 이어 갈 수 없으면 false */
+    restore(): Promise<boolean>;
+    /** 이 브라우저의 토큰은 부르는 즉시 지운다. 서버 응답은 기다리지 않아도 된다 */
+    logout(): Promise<void>;
+    /** 재발급까지 실패해 로그인이 풀렸을 때 부른다. 해제 함수를 돌려준다 */
+    onLost(listener: () => void): () => void;
+  };
   /** 3.1 사용자 */
   users: {
     me(): Promise<User>;

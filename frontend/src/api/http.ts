@@ -28,17 +28,55 @@ interface Options {
 }
 
 /**
+ * 인증 (#139 가정). 액세스 토큰은 메모리에만 두고 Authorization 헤더로 보낸다.
+ * 리프레시 토큰은 서버가 httpOnly 쿠키로 둔다 — 같은 오리진이라 fetch 가 그대로 실어 보낸다.
+ * 경로와 응답 모양(`{accessToken}`)은 api.md 에 적히면 맞춘다.
+ */
+let accessToken: string | null = null;
+const lostListeners = new Set<() => void>();
+
+/** 로그인·재발급은 만료된 토큰을 싣지 않는다. 서버가 헤더의 토큰부터 검사하면 거기서 401 이 난다 */
+const NO_BEARER = new Set(['/auth/login', '/auth/refresh']);
+/** 이 경로의 401 은 재발급으로 풀리지 않는다 */
+const isAuthPath = (path: string) => path.startsWith('/auth/');
+
+/** 로그인이 풀렸다. 토큰이 있던 경우에만 한 번 알린다 — 동시에 실패한 요청이 여러 번 알리지 않게 */
+const lose = () => {
+  if (accessToken === null) return;
+  accessToken = null;
+  lostListeners.forEach((listener) => listener());
+};
+
+let refreshing: Promise<boolean> | null = null;
+/** 동시에 401 을 받은 요청들이 재발급을 한 번만 하도록 진행 중인 재발급을 나눠 쓴다 */
+const refresh = () => {
+  refreshing ??= request<{ accessToken: string }>('POST', '/auth/refresh').
+  then((result) => {
+    accessToken = result.accessToken;
+    return true;
+  }).
+  catch(() => false).
+  finally(() => {
+    refreshing = null;
+  });
+  return refreshing;
+};
+
+/**
  * 1.3 에러 응답(`{code, message, traceId}`)을 그대로 ApiRequestError 로 올린다.
  * traceId 를 버리지 않는다 — 서버 로그와 맞춰 봐야 할 때 이것 하나로 찾는다.
+ * 401 이면 재발급을 한 번 해 보고 같은 요청(같은 Idempotency-Key)을 다시 보낸다. 그것도 안 되면 로그인이 풀린다.
  */
 async function request<T>(
 method: string,
 path: string,
-options: Options = {})
+options: Options = {},
+retried = false)
 : Promise<T> {
   const headers: Record<string, string> = {};
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
   if (options.idempotencyKey) headers['Idempotency-Key'] = options.idempotencyKey;
+  if (accessToken && !NO_BEARER.has(path)) headers.Authorization = `Bearer ${accessToken}`;
 
   let response: Response;
   try {
@@ -60,6 +98,11 @@ options: Options = {})
     } catch {
       data = null;
     }
+  }
+
+  if (response.status === 401 && !retried && !isAuthPath(path) && accessToken !== null) {
+    if (await refresh()) return request<T>(method, path, options, true);
+    lose();
   }
 
   if (!response.ok) {
@@ -86,6 +129,26 @@ const page = (query?: { page?: number; size?: number }): Query => ({
 });
 
 export const httpApi: Api = {
+  auth: {
+    login: async (body) => {
+      const result = await post<{ accessToken: string }>('/auth/login', body);
+      accessToken = result.accessToken;
+    },
+    restore: () => refresh(),
+    logout: () => {
+      // 헤더는 부르는 순간 만들어지므로 토큰을 실은 채로 보내고, 기다리지 않고 바로 지운다
+      const sent = post<void>('/auth/logout');
+      accessToken = null;
+      return sent;
+    },
+    onLost: (listener) => {
+      lostListeners.add(listener);
+      return () => {
+        lostListeners.delete(listener);
+      };
+    }
+  },
+
   users: {
     me: () => get('/users/me'),
     remove: () => del('/users/me')
