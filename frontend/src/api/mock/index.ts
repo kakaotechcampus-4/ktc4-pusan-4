@@ -1,8 +1,6 @@
 import type { Api } from '../contract';
 import { ApiRequestError } from '../contract';
 import type {
-  BusinessContext,
-  BusinessContextRef,
   ClassificationReview,
   ClassificationReviewGroup,
   EffectiveStatus,
@@ -13,12 +11,16 @@ import type {
   Question,
   QuestionGroup,
   QuestionPage,
+  StoredBusinessContext,
   UnresolvedPage,
   Transaction,
+  TransactionInclusion,
+  TransactionSummary,
   UploadBatch,
   UserInclusion,
   Verdict } from
 '../../types/domain';
+import type { JudgmentSeed, QuestionGroupSeed } from './data';
 import {
   CLASSIFICATION_REVIEWS,
   JUDGMENTS,
@@ -57,11 +59,12 @@ const effectiveOf = (t: Transaction): EffectiveStatus => {
   return t.sourceStatus.code;
 };
 
-const applyInclusion = (t: Transaction, inclusion: UserInclusion): Transaction => {
+/** include·exclude 응답은 바뀐 상태만 담는다 (3.4) */
+const applyInclusion = (t: Transaction, inclusion: UserInclusion): TransactionInclusion => {
   t.userInclusion = inclusion;
   const code = effectiveOf(t);
   t.effectiveStatus = { code, label: STATUS_LABEL[code] };
-  return t;
+  return { id: t.id, userInclusion: t.userInclusion, effectiveStatus: t.effectiveStatus };
 };
 
 const LATENCY_MS = 120;
@@ -73,6 +76,8 @@ const nextId = (prefix: string) =>
 `${prefix}-${String(++seq).padStart(4, '0')}-7000-8000-000000000000`;
 
 const now = () => new Date().toISOString();
+
+const USER_ID = '0199c8f2-user';
 
 const paginate = <T,>(items: T[], page = 0, size = 20): Page<T> => {
   const start = page * size;
@@ -103,9 +108,11 @@ const store = {
     businessOpenDate: '2024-03-01',
     bookkeepingDuty: '복식부기',
     hasEmployee: false,
-    homeOfficeRatio: 20
+    homeOfficeRatio: 20,
+    userId: USER_ID,
+    createdAt: '2026-09-01T10:00:00+09:00'
   }] as
-  (BusinessContext & BusinessContextRef)[],
+  StoredBusinessContext[],
   batches: [
   {
     ...UPLOAD_BATCH,
@@ -117,8 +124,8 @@ const store = {
   UploadBatch[],
   transactions: TRANSACTIONS.map((t) => ({ ...t })) as Transaction[],
   runs: new Map<string, JudgmentRun>([[JUDGMENT_RUN.id, { ...JUDGMENT_RUN }]]),
-  /** 모든 Revision. 최신은 revision 최댓값 */
-  judgments: JUDGMENTS.map((j) => ({ ...j })) as Judgment[],
+  /** 모든 Revision. 최신은 revision 최댓값. 거래 요약은 읽을 때 붙인다 (withTransaction) */
+  judgments: JUDGMENTS.map((j) => ({ ...j })) as JudgmentSeed[],
   /** groupKey → 답변 라벨과 답한 시각. 같은 그룹에 다시 답하면 정정이다 (3.10) */
   answers: new Map<string, { value: string; at: string }>(),
   /** groupKey → UserFact version. 정정할 때마다 올라간다 */
@@ -144,7 +151,7 @@ sort((a, b) => b.revision - a.revision)[0];
  * 없으면 Override 가 아닌 revision 중 최신이다. 그래서 수정 뒤에 답변으로 새 revision 이
  * 생겨도 현재 결과는 수정한 값으로 남는다.
  */
-const currentOf = (transactionId: string): Judgment | undefined => {
+const currentOf = (transactionId: string): JudgmentSeed | undefined => {
   const active = [...store.overrides.values()].find(
     (o) => o.active && o.transactionId === transactionId
   );
@@ -157,13 +164,41 @@ const currentOf = (transactionId: string): Judgment | undefined => {
 const currentAll = () =>
 [...new Set(store.judgments.map((j) => j.transactionId))].
 map(currentOf).
-filter((j): j is Judgment => j !== undefined);
+filter((j): j is JudgmentSeed => j !== undefined);
+
+/** Override 를 뺀 최신 자동 판정. 엔진은 이 위에서 다시 판정한다 */
+const automaticOf = (transactionId: string): JudgmentSeed | undefined =>
+store.judgments.
+filter((j) => j.transactionId === transactionId && j.origin.type !== 'OVERRIDE').
+sort((a, b) => b.revision - a.revision)[0];
+
+const hasActiveOverride = (transactionId: string) =>
+[...store.overrides.values()].some((o) => o.active && o.transactionId === transactionId);
 
 /** 그 Run 이 직접 만든 판정. 이후 답변·수정으로 생긴 revision 은 포함하지 않는다 */
 const producedBy = (runId: string) =>
 store.judgments.filter((j) => j.origin.type === 'RUN' && j.origin.id === runId);
 
 const transactionOf = (id: string) => store.transactions.find((t) => t.id === id);
+
+const summaryOf = (t: Transaction): TransactionSummary => ({
+  approvedAt: t.approvedAt,
+  merchantRaw: t.merchantRaw,
+  merchantNorm: t.merchantNorm,
+  merchantCategory: t.merchantCategory,
+  amount: t.amount,
+  installmentMonths: t.installmentMonths
+});
+
+/** 판정에 거래 요약을 붙인다. 판정 당시가 아니라 응답 시점의 거래 값이다 (3.4 거래 요약) */
+const withTransaction = (j: JudgmentSeed): Judgment | null => {
+  const t = transactionOf(j.transactionId);
+  return t ? { ...j, transaction: summaryOf(t) } : null;
+};
+
+/** §5 판정 대상: 판정대상이면서 분류가 끝난 거래 */
+const isJudgeable = (t: Transaction) =>
+t.effectiveStatus.code === 'JUDGEABLE' && t.classificationStatus.code === 'CLASSIFIED';
 
 const ratioOf = (answer: string): number | null =>
 /^\d+%$/.test(answer) ? Number(answer.replace('%', '')) : null;
@@ -179,18 +214,17 @@ ids.map((statuteVersionId) => ({
 }));
 
 /** 답변 → 새 Revision. 서버 룰엔진이 하는 일을 흉내 낸다. */
-const rejudge = (transactionId: string, groupKey: string, answer: string): Judgment => {
+const rejudge = (transactionId: string, groupKey: string, answer: string) => {
   // 엔진은 사용자 수정이 아니라 자기 판정 위에서 다시 판정한다
-  const prev = store.judgments.
-  filter((j) => j.transactionId === transactionId && j.origin.type !== 'OVERRIDE').
-  sort((a, b) => b.revision - a.revision)[0];
+  const prev = automaticOf(transactionId);
+  if (!prev) return;
   const verdict = QUESTION_ANSWER_VERDICT[groupKey]?.[answer] ?? 'NEEDS_REVIEW';
   // 질문을 낸 카드의 선택지대로 규칙 카드·계정과목·근거를 붙인다
   const card = QUESTION_CARDS[groupKey];
   const option = card?.options[answer];
   const ratio = ratioOf(answer);
   const amount = transactionOf(transactionId)?.amount ?? 0;
-  const next: Judgment = {
+  const next: JudgmentSeed = {
     ...prev,
     id: nextId('0199f1c3'),
     revision: latestOf(transactionId).revision + 1,
@@ -221,7 +255,6 @@ const rejudge = (transactionId: string, groupKey: string, answer: string): Judgm
     computedAt: now()
   };
   store.judgments.push(next);
-  return next;
 };
 
 /**
@@ -254,44 +287,106 @@ const judgeRun = (run: JudgmentRun) => {
   });
 };
 
-/**
- * 배치가 지워지면 그 거래에 걸린 질문도 함께 사라진다 (api.md 3.3).
- * count·totalAmount 는 시드 숫자를 쓰지 않고 거래에서 센다. count 는 questionIds.length 와 같아야 한다 (3.9)
- */
-const liveGroups = () =>
-QUESTION_GROUPS.filter((g) =>
-(QUESTION_TRANSACTIONS[g.groupKey] ?? []).some((id) =>
-store.transactions.some((t) => t.id === id)
-)
-).map((g) => ({
-  ...g,
-  count: g.questionIds.length,
-  totalAmount: (QUESTION_TRANSACTIONS[g.groupKey] ?? []).reduce(
-    (sum, id) => sum + (transactionOf(id)?.amount ?? 0),
-    0
-  )
-}));
+/** 그룹의 질문 하나와 그 거래 */
+interface QuestionPair {
+  questionId: string;
+  transaction: Transaction;
+}
 
-/** 그 배치의 거래에 걸린 그룹. batchId 를 주지 않으면 전부 */
-const groupsIn = (batchId?: string) =>
-liveGroups().filter((g) =>
-!batchId ||
-(QUESTION_TRANSACTIONS[g.groupKey] ?? []).some((id) => transactionOf(id)?.batchId === batchId)
+/** 지금 남아 있는 그룹과 질문. 배치가 지워지면 그 거래에 걸린 질문도 함께 사라진다 (api.md 3.3) */
+interface LiveGroup {
+  seed: QuestionGroupSeed;
+  pairs: QuestionPair[];
+}
+
+const liveGroups = (): LiveGroup[] =>
+QUESTION_GROUPS.map((seed) => ({
+  seed,
+  pairs: seed.questionIds.flatMap((questionId, index) => {
+    const transaction = transactionOf((QUESTION_TRANSACTIONS[seed.groupKey] ?? [])[index] ?? '');
+    return transaction ? [{ questionId, transaction }] : [];
+  })
+})).filter((g) => g.pairs.length > 0);
+
+/**
+ * 조회·집계에 보이는 그룹. 사용자가 제외한 거래의 질문은 지우지 않고 여기서만 거른다.
+ * 다시 포함하면 그대로 돌아온다 (#134)
+ */
+const visibleGroups = (): LiveGroup[] =>
+liveGroups().
+map((g) => ({ ...g, pairs: g.pairs.filter((p) => p.transaction.effectiveStatus.code === 'JUDGEABLE') })).
+filter((g) => g.pairs.length > 0);
+
+const isAnswered = (g: LiveGroup) => store.answers.has(g.seed.groupKey);
+
+/**
+ * 소명 대기 (3.11). Override 를 뺀 최신 자동 판정이 불가인데 PENDING 질문이 남은 거래.
+ * 현재 결과가 아니라 자동 판정을 본다 — Override 를 해제하면 자동 판정이 다시 현재 결과가 된다
+ */
+const isPresumed = (transactionId: string) =>
+automaticOf(transactionId)?.verdict.code === 'UNAVAILABLE' &&
+liveGroups().some(
+  (g) => !isAnswered(g) && g.pairs.some((p) => p.transaction.id === transactionId)
 );
 
+/** 3.9 그룹 응답. count·totalAmount 는 시드 숫자를 쓰지 않고 거래에서 센다 */
+const groupOut = (g: LiveGroup): QuestionGroup => {
+  const answer = store.answers.get(g.seed.groupKey);
+  // 승인일 오름차순, 같으면 transactionId 오름차순. questionIds 도 이 순서를 따른다
+  const transactions = g.pairs.
+  map(({ questionId, transaction: t }) => ({
+    questionId,
+    transactionId: t.id,
+    ...summaryOf(t),
+    overridden: hasActiveOverride(t.id)
+  })).
+  sort((a, b) => a.approvedAt.localeCompare(b.approvedAt) || a.transactionId.localeCompare(b.transactionId));
+  return {
+    groupKey: g.seed.groupKey,
+    factType: g.seed.factType,
+    status: answer ? { code: 'ANSWERED', label: '응답' } : { code: 'PENDING', label: '대기' },
+    questionIds: transactions.map((t) => t.questionId),
+    count: transactions.length,
+    totalAmount: transactions.reduce((sum, t) => sum + t.amount, 0),
+    questionText: g.seed.questionText,
+    options: [...g.seed.options],
+    answer: answer ? { value: answer.value } : null,
+    bulkAnswerable: !answer && !transactions.some((t) => isPresumed(t.transactionId)),
+    transactions
+  };
+};
+
+/** 그 배치의 거래에 걸린 그룹. batchId 를 주지 않으면 전부 */
+const inBatch = (groups: LiveGroup[], batchId?: string) =>
+groups.filter((g) => !batchId || g.pairs.some((p) => p.transaction.batchId === batchId));
+
 const pendingGroups = (status?: string, batchId?: string) => {
-  const groups = groupsIn(batchId);
-  if (status === 'PENDING') return groups.filter((g) => !store.answers.has(g.groupKey));
-  if (status === 'ANSWERED') return groups.filter((g) => store.answers.has(g.groupKey));
+  const groups = inBatch(visibleGroups(), batchId);
+  if (status === 'PENDING') return groups.filter((g) => !isAnswered(g));
+  if (status === 'ANSWERED') return groups.filter(isAnswered);
+  // 목업은 질문을 취소하지 않는다
+  if (status === 'CANCELED') return [];
   return groups;
 };
 
-const filterReviews = (status?: string) =>
-status ? store.reviews.filter((r) => r.status.code === status) : store.reviews;
+/** grouped=true 정렬. 거래 건수 DESC → 금액 DESC → id ASC (#54, #134) */
+const byImpact = (a: QuestionGroup, b: QuestionGroup) =>
+b.count - a.count || b.totalAmount - a.totalAmount || a.questionIds[0].localeCompare(b.questionIds[0]);
 
-/** 3.5 분류 확인의 미해소 집계. PENDING 리뷰 전체 기준이라 page·size 와 무관하다 */
-const withReviewUnresolved = <T,>(page: Page<T>): UnresolvedPage<T> => {
-  const pending = filterReviews('PENDING');
+const filterReviews = (status?: string, batchId?: string) =>
+store.reviews.filter((r) => (!status || r.status.code === status) && (!batchId || r.batchId === batchId));
+
+const pendingReviewCount = (batchId: string) => filterReviews('PENDING', batchId).length;
+
+/** 배치의 분류 확인 대기 수는 저장하지 않고 지금 리뷰에서 센다 */
+const batchOut = (b: UploadBatch): UploadBatch => ({
+  ...b,
+  classificationPendingCount: pendingReviewCount(b.id)
+});
+
+/** 3.5 분류 확인의 미해소 집계. batchId 는 적용하고 page·size 와 무관하다 */
+const withReviewUnresolved = <T,>(page: Page<T>, batchId?: string): UnresolvedPage<T> => {
+  const pending = filterReviews('PENDING', batchId);
   return {
     ...page,
     unresolved: {
@@ -306,13 +401,12 @@ const withReviewUnresolved = <T,>(page: Page<T>): UnresolvedPage<T> => {
  * amount 는 거래 단위 합이라 한 거래가 여러 질문에 걸려도 한 번만 더한다.
  */
 const unresolvedIn = (batchId?: string, transactionId?: string) => {
-  const questions = groupsIn(batchId).
-  filter((g) => !store.answers.has(g.groupKey)).
-  flatMap((g) => (QUESTION_TRANSACTIONS[g.groupKey] ?? []).slice(0, g.questionIds.length)).
-  filter((id) => !transactionId || id === transactionId);
+  const transactions = pendingGroups('PENDING', batchId).
+  flatMap((g) => g.pairs.map((p) => p.transaction)).
+  filter((t) => !transactionId || t.id === transactionId);
   return {
-    count: questions.length,
-    amount: [...new Set(questions)].reduce((sum, id) => sum + (transactionOf(id)?.amount ?? 0), 0)
+    count: transactions.length,
+    amount: [...new Set(transactions)].reduce((sum, t) => sum + t.amount, 0)
   };
 };
 
@@ -335,7 +429,7 @@ Promise.reject(new ApiRequestError(404, code, message));
 export const mockApi: Api = {
   users: {
     me: () =>
-    delay({ id: '0199c8f2-user', email: 'dev@example.com', createdAt: '2026-09-01T10:00:00+09:00' }),
+    delay({ id: USER_ID, email: 'dev@example.com', createdAt: '2026-09-01T10:00:00+09:00' }),
     remove: () => delay(undefined)
   },
 
@@ -346,7 +440,7 @@ export const mockApi: Api = {
         id: nextId('0199d3a1'),
         version: Math.max(0, ...store.contexts.map((c) => c.version)) + 1
       };
-      store.contexts.push({ ...body, ...ref });
+      store.contexts.push({ ...body, ...ref, userId: USER_ID, createdAt: now() });
       return delay(ref);
     },
     current: () => delay(store.contexts.at(-1) ?? null),
@@ -369,23 +463,23 @@ export const mockApi: Api = {
         periodEnd: body.periodEnd,
         transactionCount: body.transactions.length,
         skippedDuplicateCount: 0,
-        classificationPendingCount: store.reviews.filter((r) => r.status.code === 'PENDING').length,
+        classificationPendingCount: 0,
         createdAt: now()
       };
       store.batches.unshift(batch);
-      // 201 응답은 다섯 필드뿐이다 (api.md 3.3)
+      // 201 응답은 다섯 필드뿐이다 (api.md 3.3). 목업은 올린 거래를 저장하지 않아 분류 확인 대기도 0 이다
       return delay({
         id: batch.id,
         transactionCount: batch.transactionCount,
         skippedDuplicateCount: batch.skippedDuplicateCount,
-        classificationPendingCount: batch.classificationPendingCount,
+        classificationPendingCount: pendingReviewCount(batch.id),
         createdAt: batch.createdAt
       });
     },
-    list: (q) => delay(paginate(store.batches, q?.page, q?.size)),
+    list: (q) => delay(paginate(store.batches.map(batchOut), q?.page, q?.size)),
     get: (id) => {
       const b = store.batches.find((x) => x.id === id);
-      return b ? delay(b) : notFound('BATCH_NOT_FOUND', '업로드를 찾을 수 없습니다.');
+      return b ? delay(batchOut(b)) : notFound('BATCH_NOT_FOUND', '업로드를 찾을 수 없습니다.');
     },
     remove: (id) => {
       if (!store.batches.some((x) => x.id === id))
@@ -458,8 +552,8 @@ export const mockApi: Api = {
     create: ({ batchId, contextId }) => {
       if (!store.batches.some((b) => b.id === batchId))
       return notFound('BATCH_NOT_FOUND', '업로드를 찾을 수 없습니다.');
-      if (!store.contexts.some((c) => c.id === contextId))
-      return notFound('CONTEXT_NOT_FOUND', '사업자 문진을 찾을 수 없습니다.');
+      const context = store.contexts.find((c) => c.id === contextId);
+      if (!context) return notFound('CONTEXT_NOT_FOUND', '사업자 문진을 찾을 수 없습니다.');
       // 판정 대상은 JUDGEABLE 이면서 분류가 끝난 거래다. 미분류는 엔진에 넘기지 않는다(api.md 3.3)
       const judgeable = (t: Transaction) =>
       t.batchId === batchId &&
@@ -471,7 +565,7 @@ export const mockApi: Api = {
         id: nextId('0199e5b2'),
         batchId,
         contextId,
-        contextVersion: store.contexts.at(-1)?.version ?? 4,
+        contextVersion: context.version,
         status: { code: 'QUEUED', label: '대기' },
         totalCount: total,
         processedCount: 0,
@@ -565,8 +659,8 @@ export const mockApi: Api = {
       currentAll().filter((j) => {
         const t = transactionOf(j.transactionId);
         if (!t) return false;
-        // 사용자가 지금 제외한 거래는 집계하지 않는다 (api.md 3.7)
-        if (t.effectiveStatus.code !== 'JUDGEABLE') return false;
+        // 지금 판정 대상이 아닌 거래(제외·미분류)는 집계하지 않는다 (api.md 3.7, §5)
+        if (!isJudgeable(t)) return false;
         if (scope.batchId && t.batchId !== scope.batchId) return false;
         if (scope.year && !t.approvedAt.startsWith(String(scope.year))) return false;
         return true;
@@ -595,7 +689,7 @@ export const mockApi: Api = {
         byVerdict: by,
         byAccount: [...accounts].
         map(([account, v]) => ({ account, ...v })).
-        sort((a, b) => b.finalAmount - a.finalAmount)
+        sort((a, b) => b.finalAmount - a.finalAmount || a.account.localeCompare(b.account))
       });
     },
     list: (q) => {
@@ -615,24 +709,32 @@ export const mockApi: Api = {
       items = items.filter((j) =>
       transactionOf(j.transactionId)?.approvedAt.startsWith(String(q.year))
       );
-      // 거래·Run 을 지정하지 않은 현재 판정 조회에서는 지금 제외된 거래를 빼낸다 (api.md 3.7)
+      // 거래·Run 을 지정하지 않은 현재 판정 조회에서는 지금 판정 대상이 아닌 거래(제외·미분류)를 빼낸다.
+      // transactionId 를 주면 제외한 거래라도 그 거래의 판정을 준다 (api.md 3.7, §5)
       if (!q?.transactionId && !q?.runId)
-      items = items.filter(
-        (j) => transactionOf(j.transactionId)?.effectiveStatus.code === 'JUDGEABLE'
-      );
-      items.sort((a, b) => b.computedAt.localeCompare(a.computedAt) || b.id.localeCompare(a.id));
-      return delay(paginate(items, q?.page, q?.size ?? 20));
+      items = items.filter((j) => {
+        const t = transactionOf(j.transactionId);
+        return t !== undefined && isJudgeable(t);
+      });
+      const out = items.
+      map(withTransaction).
+      filter((j): j is Judgment => j !== null).
+      sort((a, b) => b.computedAt.localeCompare(a.computedAt) || b.id.localeCompare(a.id));
+      return delay(paginate(out, q?.page, q?.size ?? 20));
     },
     get: (id) => {
       const j = store.judgments.find((x) => x.id === id);
-      return j ? delay(j) : notFound('JUDGMENT_NOT_FOUND', '판정을 찾을 수 없습니다.');
+      const out = j && withTransaction(j);
+      return out ? delay(out) : notFound('JUDGMENT_NOT_FOUND', '판정을 찾을 수 없습니다.');
     },
     override: (id, body) => {
       const prev = store.judgments.find((x) => x.id === id);
       if (!prev) return notFound('JUDGMENT_NOT_FOUND', '판정을 찾을 수 없습니다.');
-      const amount = transactionOf(prev.transactionId)?.amount ?? null;
+      const t = transactionOf(prev.transactionId);
+      if (!t) return notFound('JUDGMENT_NOT_FOUND', '판정을 찾을 수 없습니다.');
+      const amount = t.amount;
       const overrideId = nextId('0199ab12');
-      const next: Judgment = {
+      const next: JudgmentSeed = {
         ...prev,
         id: nextId('0199f1c3'),
         revision: latestOf(prev.transactionId).revision + 1,
@@ -651,7 +753,7 @@ export const mockApi: Api = {
         judgmentId: next.id,
         active: true
       });
-      return delay(next);
+      return delay({ ...next, transaction: summaryOf(t) });
     },
     removeOverride: (overrideId) => {
       const found = store.overrides.get(overrideId);
@@ -672,62 +774,73 @@ export const mockApi: Api = {
 
   questions: {
     list: (q) => {
-      const groups = pendingGroups(q?.status, q?.batchId);
-      const items: Question[] = groups.flatMap((g) =>
-      g.questionIds.map((id, index) => {
-        const transactionId = (QUESTION_TRANSACTIONS[g.groupKey] ?? [])[index] ?? '';
-        const answer = store.answers.get(g.groupKey);
-        return {
-          id,
-          batchId: transactionOf(transactionId)?.batchId ?? '',
-          transactionId,
-          groupKey: g.groupKey,
-          factType: g.factType,
-          questionText: g.questionText,
-          options: [...g.options],
+      const items: Question[] = pendingGroups(q?.status, q?.batchId).flatMap((g) => {
+        const answer = store.answers.get(g.seed.groupKey);
+        return g.pairs.map(({ questionId, transaction }) => ({
+          id: questionId,
+          batchId: transaction.batchId,
+          transactionId: transaction.id,
+          groupKey: g.seed.groupKey,
+          factType: g.seed.factType,
+          questionText: g.seed.questionText,
+          options: [...g.seed.options],
           status: answer ?
           { code: 'ANSWERED' as const, label: '응답' } :
           { code: 'PENDING' as const, label: '대기' },
-          answeredFactId: answer ? factIdOf(g.groupKey) : null,
+          answeredFactId: answer ? factIdOf(g.seed.groupKey) : null,
+          answer: answer ? { value: answer.value } : null,
           createdAt: '2026-09-12T14:05:00+09:00',
           answeredAt: answer?.at ?? null
-        };
-      })
-      ).filter((question) => !q?.transactionId || question.transactionId === q.transactionId);
+        }));
+      }).filter((question) => !q?.transactionId || question.transactionId === q.transactionId);
       return delay(withUnresolved(paginate(items, q?.page, q?.size ?? 20), q?.batchId, q?.transactionId));
     },
     grouped: (q) =>
     delay(
       withUnresolved(
-        paginate(pendingGroups(q?.status, q?.batchId), q?.page, q?.size ?? 20),
+        paginate(pendingGroups(q?.status, q?.batchId).map(groupOut).sort(byImpact), q?.page, q?.size ?? 20),
         q?.batchId,
         q?.transactionId
       )
     ),
     respond: ({ questionIds, answer }) => {
+      // 검사 순서와 첫 실패만 돌려주는 것은 api.md 3.10 을 따른다
+      if (questionIds.length === 0 || !answer?.value)
+      return Promise.reject(new ApiRequestError(400, 'VALIDATION_ERROR', '질문과 답을 모두 보내야 합니다.'));
       // 살아 있는 그룹에서 찾는다. 배치를 지운 뒤에는 404 여야 한다 (정적 배열을 보면 TypeError 가 난다)
       const groups = liveGroups();
-      const owners = questionIds.map((id) => groups.find((g) => g.questionIds.includes(id)));
+      const owners = questionIds.map((id) => groups.find((g) => g.pairs.some((p) => p.questionId === id)));
       const group = owners[0];
       if (!group || owners.some((g) => g === undefined))
       return notFound('QUESTION_NOT_FOUND', '질문을 찾을 수 없습니다.');
+      const batches = new Set(
+        questionIds.map((id) => owners.flatMap((g) => g?.pairs ?? []).find((p) => p.questionId === id)?.transaction.batchId)
+      );
+      if (batches.size > 1)
+      return Promise.reject(
+        new ApiRequestError(422, 'QUESTIONS_FROM_DIFFERENT_BATCHES', '서로 다른 업로드의 질문은 함께 답할 수 없습니다.')
+      );
       // 한 요청의 질문은 같은 Batch·groupKey·factType 이어야 한다 (3.10)
       if (owners.some((g) => g !== group))
       return Promise.reject(
         new ApiRequestError(409, 'QUESTION_GROUP_MISMATCH', '서로 다른 질문을 함께 답할 수 없습니다.')
       );
-      if (!group.options.includes(answer.value))
+      if (!group.seed.options.includes(answer.value))
       return Promise.reject(new ApiRequestError(422, 'INVALID_ANSWER_VALUE', '선택지에 없는 값입니다.'));
       // 이미 답한 그룹이면 정정이다. 기존 UserFact 를 고치지 않고 새 version 을 만든다 (3.10 답변 정정)
-      const version = (store.factVersions.get(group.groupKey) ?? 0) + 1;
-      store.factVersions.set(group.groupKey, version);
-      store.answers.set(group.groupKey, { value: answer.value, at: now() });
-      const rejudged = QUESTION_TRANSACTIONS[group.groupKey] ?? [];
-      rejudged.forEach((tid) => rejudge(tid, group.groupKey, answer.value));
+      const { groupKey } = group.seed;
+      const version = (store.factVersions.get(groupKey) ?? 0) + 1;
+      store.factVersions.set(groupKey, version);
+      store.answers.set(groupKey, { value: answer.value, at: now() });
+      // 제외·미분류·판정 이력 없는 거래는 다시 판정하지 않는다. 다시 포함해도 새 Run 전까지 옛 판정이 남는다 (3.10)
+      const rejudged = group.pairs.
+      map((p) => p.transaction).
+      filter((t) => isJudgeable(t) && automaticOf(t.id) !== undefined);
+      rejudged.forEach((t) => rejudge(t.id, groupKey, answer.value));
       // 명세 3.10: 새 JudgmentRun 은 만들지 않는다. runId 는 응답에서 제거됐다
       return delay({
-        answeredCount: group.count,
-        factId: factIdOf(group.groupKey),
+        answeredCount: group.pairs.length,
+        factId: factIdOf(groupKey),
         rejudgedTransactionCount: rejudged.length
       });
     },
@@ -735,40 +848,39 @@ export const mockApi: Api = {
       // 이 배치의 PENDING 중 factType 이 같은 질문만 한 번에 닫는다. 새 Run 은 만들지 않는다 (3.11)
       if (!store.batches.some((b) => b.id === batchId))
       return notFound('BATCH_NOT_FOUND', '업로드를 찾을 수 없습니다.');
-      if (!groupsIn(batchId).some((g) => g.factType === factType))
+      if (!inBatch(liveGroups(), batchId).some((g) => g.seed.factType === factType))
       return Promise.reject(new ApiRequestError(422, 'UNKNOWN_FACT_TYPE', '알 수 없는 질문 종류입니다.'));
       const pending = pendingGroups('PENDING', batchId);
       // 소명 대기(불가인데 질문이 남음)는 일괄 응답 대상에서 뺀다. 휴일 카드도 같은 「용도」를 써서
       // 한 번에 답하면 주말 불가 추정이 전부 풀린다 (rule-card-fields.md)
-      const presumed = (g: QuestionGroup) =>
-      (QUESTION_TRANSACTIONS[g.groupKey] ?? []).some((id) => {
-        const current = currentOf(id);
-        return current?.verdict.code === 'UNAVAILABLE' && current.origin.type !== 'OVERRIDE';
-      });
-      const targets = pending.filter((g) => g.factType === factType && !presumed(g));
-      // 하나라도 허용하지 않으면 아무것도 바꾸지 않는다
-      if (targets.some((g) => !g.options.includes(answer.value)))
+      const presumed = (g: LiveGroup) => g.pairs.some((p) => isPresumed(p.transaction.id));
+      const sameType = pending.filter((g) => g.seed.factType === factType);
+      const targets = sameType.filter((g) => !presumed(g));
+      const excluded = sameType.filter(presumed);
+      // 하나라도 허용하지 않으면 아무것도 바꾸지 않는다. 제외 대상은 이 검사에 넣지 않는다
+      if (targets.some((g) => !g.seed.options.includes(answer.value)))
       return Promise.reject(
         new ApiRequestError(422, 'INVALID_ANSWER_VALUE', '모든 대상 질문이 허용하는 값이 아닙니다.')
       );
+      const questionCount = (list: LiveGroup[]) => list.reduce((sum, g) => sum + g.pairs.length, 0);
       const rejudged = new Set<string>();
       targets.forEach((group) => {
         // 일괄 답변도 그룹마다 새 UserFact 다
-        store.factVersions.set(group.groupKey, (store.factVersions.get(group.groupKey) ?? 0) + 1);
-        store.answers.set(group.groupKey, { value: answer.value, at: now() });
-        (QUESTION_TRANSACTIONS[group.groupKey] ?? []).forEach((tid) => {
-          if (rejudged.has(tid)) return;
-          rejudge(tid, group.groupKey, answer.value);
-          rejudged.add(tid);
+        const { groupKey } = group.seed;
+        store.factVersions.set(groupKey, (store.factVersions.get(groupKey) ?? 0) + 1);
+        store.answers.set(groupKey, { value: answer.value, at: now() });
+        group.pairs.forEach(({ transaction: t }) => {
+          if (rejudged.has(t.id) || !isJudgeable(t) || !automaticOf(t.id)) return;
+          rejudge(t.id, groupKey, answer.value);
+          rejudged.add(t.id);
         });
       });
       return delay({
-        answeredCount: targets.reduce((sum, g) => sum + g.count, 0),
-        // 요청 당시 PENDING 중 건너뛴 수(factType 이 다르거나 소명 대기)
-        skippedCount: pending.
-        filter((g) => !targets.includes(g)).
-        reduce((sum, g) => sum + g.count, 0),
-        factIds: targets.map((g) => factIdOf(g.groupKey)),
+        answeredCount: questionCount(targets),
+        // 요청 당시 PENDING 중 factType 이 달라 건너뛴 수와, 같지만 소명 대기라 건너뛴 수 (3.11)
+        skippedCount: questionCount(pending.filter((g) => g.seed.factType !== factType)),
+        excludedCount: questionCount(excluded),
+        factIds: targets.map((g) => factIdOf(g.seed.groupKey)),
         rejudgedTransactionCount: rejudged.size,
         unresolved: unresolvedIn(batchId)
       });
@@ -777,12 +889,14 @@ export const mockApi: Api = {
 
   classificationReviews: {
     list: (q) =>
-    delay(withReviewUnresolved(paginate(filterReviews(q?.status), q?.page, q?.size ?? 20))),
+    delay(
+      withReviewUnresolved(paginate(filterReviews(q?.status, q?.batchId), q?.page, q?.size ?? 20), q?.batchId)
+    ),
     grouped: (q) => {
       // 서버는 카드사 트랙(사업자번호/문자열)까지 섞어 묶으므로 같은 merchantNorm 이
       // 다른 그룹으로 갈릴 수 있다. 목업도 그 상황을 만들어 둔다 (#63 리뷰).
       const byMerchant = new Map<string, ClassificationReview[]>();
-      filterReviews(q?.status).forEach((r) => {
+      filterReviews(q?.status, q?.batchId).forEach((r) => {
         const track = r.merchantRaw.startsWith('PADDLE.NET* CURSOR') ? ':bizno' : '';
         const key = `merchant:${r.merchantNorm}${track}`;
         byMerchant.set(key, [...(byMerchant.get(key) ?? []), r]);
@@ -795,10 +909,7 @@ export const mockApi: Api = {
         map(({ review, t }) => ({
           reviewId: review.id,
           transactionId: t.id,
-          approvedAt: t.approvedAt,
-          merchantRaw: t.merchantRaw,
-          amount: t.amount,
-          installmentMonths: t.installmentMonths
+          ...summaryOf(t)
         })).
         sort((a, b) => a.approvedAt.localeCompare(b.approvedAt) || a.transactionId.localeCompare(b.transactionId));
         return {
@@ -812,7 +923,7 @@ export const mockApi: Api = {
           transactions
         };
       });
-      return delay(withReviewUnresolved(paginate(items, q?.page, q?.size ?? 20)));
+      return delay(withReviewUnresolved(paginate(items, q?.page, q?.size ?? 20), q?.batchId));
     },
     respond: ({ reviewIds, merchantCategory }) => {
       if (merchantCategory === '미분류')

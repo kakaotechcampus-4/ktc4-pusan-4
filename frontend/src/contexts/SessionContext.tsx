@@ -6,7 +6,7 @@ import React, {
   useMemo,
   useState } from
 'react';
-import type { BusinessContext, BusinessContextRef } from '../types/domain';
+import type { BusinessContext, BusinessContextRef, StoredBusinessContext } from '../types/domain';
 import { api, seedSession } from '../api';
 
 /** 업종은 IT(62010) 고정 */
@@ -31,9 +31,9 @@ interface SessionValue {
   /** 서버에 저장된 배치 id */
   batchId: string | null;
   setBatchId: (id: string | null) => void;
-  /** 문진 입력값과 서버 참조 */
-  context: BusinessContext | null;
-  setContext: (context: BusinessContext) => void;
+  /** 문진 입력값과 서버 참조. 서버에서 읽은 것이면 자택 비율이 null(미입력)일 수 있다 */
+  context: BusinessContext | StoredBusinessContext | null;
+  setContext: (context: BusinessContext | StoredBusinessContext) => void;
   contextRef: BusinessContextRef | null;
   setContextRef: (ref: BusinessContextRef | null) => void;
   /** 현재 판정 실행 */
@@ -46,7 +46,7 @@ const SessionContext = createContext<SessionValue | null>(null);
 export function SessionProvider({ children }: {children: React.ReactNode;}) {
   const [email, setEmail] = useState<string | null>(null);
   const [batchId, setBatchId] = useState<string | null>(seedSession?.batchId ?? null);
-  const [context, setContext] = useState<BusinessContext | null>(null);
+  const [context, setContext] = useState<BusinessContext | StoredBusinessContext | null>(null);
   const [contextRef, setContextRef] = useState<BusinessContextRef | null>(seedSession?.contextRef ?? null);
   const [runId, setRunId] = useState<string | null>(seedSession?.runId ?? null);
 

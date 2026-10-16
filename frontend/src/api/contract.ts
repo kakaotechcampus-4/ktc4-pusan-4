@@ -25,7 +25,9 @@ import type {
   QuestionStatus,
   ReviewStatus,
   Statute,
+  StoredBusinessContext,
   Transaction,
+  TransactionInclusion,
   UploadBatch,
   UploadBatchCreated,
   UploadBatchRequest,
@@ -90,8 +92,8 @@ export interface Api {
   contexts: {
     create(body: BusinessContext): Promise<BusinessContextRef>;
     /** 문진 전이면 null (404) */
-    current(): Promise<(BusinessContext & BusinessContextRef) | null>;
-    list(): Promise<(BusinessContext & BusinessContextRef)[]>;
+    current(): Promise<StoredBusinessContext | null>;
+    list(): Promise<StoredBusinessContext[]>;
   };
   /** 3.3 업로드 */
   uploads: {
@@ -110,9 +112,9 @@ export interface Api {
     list(query?: TransactionQuery): Promise<Page<Transaction>>;
     get(transactionId: string): Promise<Transaction>;
     /** userInclusion = INCLUDED. 취소상계는 409 CANCELED_TRANSACTION_NOT_INCLUDABLE */
-    include(transactionId: string): Promise<Transaction>;
+    include(transactionId: string): Promise<TransactionInclusion>;
     /** userInclusion = EXCLUDED */
-    exclude(transactionId: string): Promise<Transaction>;
+    exclude(transactionId: string): Promise<TransactionInclusion>;
   };
   /** 3.5 가맹점 분류 확인 */
   classificationReviews: {
