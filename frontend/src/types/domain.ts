@@ -415,9 +415,13 @@ export interface UnresolvedPage<T> extends Page<T> {
 /** 3.9 질문 목록. UnresolvedPage 와 같은 모양이다 */
 export type QuestionPage<T> = UnresolvedPage<T>;
 
+/** 답의 출처 (agent-secretary.md 10장 필드 추가). 사용자가 직접 고르면 보내지 않는다 */
+export type AnswerSource = 'ASSISTANT' | 'PREVIOUS_ANSWER';
+
 export interface QuestionResponseRequest {
   questionIds: string[];
   answer: { value: string };
+  source?: AnswerSource;
 }
 
 export interface QuestionResponseResult {
@@ -441,4 +445,88 @@ export interface BulkAnswerResult {
   factIds: string[];
   rejudgedTransactionCount: number;
   unresolved: UnresolvedSummary;
+}
+
+// ── 비서 Really (docs/agent-secretary.md 9·10장) ────
+// 중계·진행 상황·지난번 답·세무대리인 질문 API 는 아직 백엔드 일정에 없다.
+// 모양은 비서 도구 코드(ai/assistant/tools.py, ai/eval/assistant_fake.py)를 따른다 — 실제 모양이 있는 곳이 여기뿐이다
+
+export interface AssistantMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+/** 지금 화면과 보고 있는 대상. 없으면 null */
+export interface AssistantContext {
+  screen: string;
+  batchId: string | null;
+  transactionId: string | null;
+  year: number | null;
+}
+
+export interface AssistantChatRequest {
+  /** 1~1,000자 */
+  message: string;
+  /** 최근 20개 이하, 각 2,000자 이하. 서버는 저장하지 않는다 */
+  history: AssistantMessage[];
+  context: AssistantContext;
+  /** 영문·숫자·-·_, 64자 이하 */
+  sessionId: string;
+}
+
+/** 제안 카드. 프론트는 AI 가 준 경로를 부르지 않고 kind 로 API 를 고른다. card 는 한 줄 요약 */
+export type AssistantProposal = {card: string;} & (
+{kind: 'answer';questionIds: string[];value: string;source: AnswerSource;} |
+{kind: 'bulk_answer';batchId: string;factType: string;value: string;} |
+{kind: 'classification';reviewIds: string[];merchantCategory: string;} |
+{kind: 'override';judgmentId: string;toVerdict: Verdict;reason: string;} |
+{kind: 'navigation';route: string;} |
+{kind: 'handoff_note';text: string;transactionIds: string[];});
+
+
+export interface AssistantChatResponse {
+  answer: string;
+  proposals: AssistantProposal[];
+  traceId: string | null;
+}
+
+/** GET /progress?batchId. 비서 도구 get_status 가 읽는 필드 */
+export interface Progress {
+  batch: { label: string; transactionCount: number } | null;
+  /** 수입·이름·이메일은 담지 않는다 */
+  context: { version: number; bookkeeping: BookkeepingDuty; hasEmployee: boolean } | null;
+  classification: { pendingCount: number; pendingAmount: number };
+  run: { status: RunStatus } | null;
+  questions: { pendingCount: number; pendingAmount: number; fillableFromPrevious: number };
+  next: { step: string; route: string; label: string } | null;
+}
+
+/**
+ * GET /questions/suggestions 한 줄. 미답변 그룹마다 하나 (명세 3.1).
+ * A 이어받기(value·sourceLabel, 충돌이면 history), B 이력만(historyCounts), C 띄우지 않음(reason)
+ */
+export interface QuestionSuggestion {
+  groupKey: string;
+  factType: string;
+  tier: 'A' | 'B' | 'C';
+  value?: string | null;
+  sourceLabel?: string;
+  conflict?: boolean;
+  history?: { value: string; sourceLabel: string }[];
+  historyCounts?: Record<string, number>;
+  reason?: string;
+}
+
+/** 세무대리인에게 물을 질문. 사용자 소유이고 요약의 「세무대리인에게 넘길 문장」에 들어간다 */
+export interface HandoffNote {
+  id: string;
+  text: string;
+  transactionIds: string[];
+  createdAt: string;
+}
+
+export interface HandoffNoteRequest {
+  /** 300자 이하 */
+  text: string;
+  transactionIds: string[];
 }

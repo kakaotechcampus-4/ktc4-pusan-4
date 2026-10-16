@@ -64,11 +64,14 @@ options: Options = {})
 
   if (!response.ok) {
     const error = (data ?? {}) as { code?: string; message?: string; traceId?: string };
+    // 초 단위만 읽는다. 날짜 형식이면 버린다
+    const retryAfter = Number(response.headers.get('Retry-After'));
     throw new ApiRequestError(
       response.status,
       error.code ?? 'UNKNOWN',
       error.message ?? `요청을 처리하지 못했습니다. (${response.status})`,
-      error.traceId ?? ''
+      error.traceId ?? '',
+      response.headers.has('Retry-After') && Number.isFinite(retryAfter) ? retryAfter : undefined
     );
   }
   return data as T;
@@ -194,6 +197,21 @@ export const httpApi: Api = {
       grouped: true
     }),
     respond: (body) => post('/question-responses', body),
-    bulkAnswer: (body) => post('/questions/bulk-answer', body)
+    bulkAnswer: (body) => post('/questions/bulk-answer', body),
+    suggestions: (batchId) => get('/questions/suggestions', { batchId })
+  },
+
+  // 아래 경로는 명세 10장의 이름을 따른 가정이다. 백엔드가 정하면 맞춘다
+  assistant: {
+    chat: (body) => post('/assistant/chat', body)
+  },
+
+  progress: {
+    get: (batchId) => get('/progress', { batchId })
+  },
+
+  handoffNotes: {
+    list: () => get('/handoff-notes'),
+    create: (body) => post('/handoff-notes', body)
   }
 };

@@ -1,7 +1,9 @@
 import React from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import { SessionProvider } from './contexts/SessionContext';
 import { RequireAuth } from './components/RequireAuth';
+import { Assistant } from './components/assistant/Assistant';
+import { AssistantProvider } from './components/assistant/AssistantProvider';
 import { Landing } from './pages/Landing';
 import { Login } from './pages/Login';
 import { Upload } from './pages/Upload';
@@ -32,6 +34,21 @@ const PROTECTED: { path: string; element: React.ReactElement }[] = [
 { path: '/account', element: <Account /> }];
 
 
+/**
+ * 로그인 뒤 화면을 감싼다. 비서는 여기 한 번만 올라가 화면을 옮겨도 대화가 이어지고(FR-1),
+ * 로그아웃하면 함께 내려가 대화가 사라진다. 화면마다 AppShell 을 그리는 것은 그대로다
+ */
+function SignedIn() {
+  return (
+    <RequireAuth>
+      <AssistantProvider>
+        <Outlet />
+        <Assistant />
+      </AssistantProvider>
+    </RequireAuth>);
+
+}
+
 export function App() {
   return (
     <SessionProvider>
@@ -40,13 +57,11 @@ export function App() {
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/styleguide" element={<Styleguide />} />
-          {PROTECTED.map((route) =>
-          <Route
-            key={route.path}
-            path={route.path}
-            element={<RequireAuth>{route.element}</RequireAuth>} />
-
-          )}
+          <Route element={<SignedIn />}>
+            {PROTECTED.map((route) =>
+            <Route key={route.path} path={route.path} element={route.element} />
+            )}
+          </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>

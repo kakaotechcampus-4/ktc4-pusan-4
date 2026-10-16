@@ -23,6 +23,7 @@ import type {
 '../parser';
 import type { UploadBatchCreated } from '../types/domain';
 import { formatNumber, formatPeriod, formatWon } from '../utils/format';
+import { APPROVAL_EXPORT_STEPS, ASSISTANT_DOES_NOT_SEND, ASSISTANT_SENDS } from '../components/assistant/help';
 
 /** 실제 파일은 25–103KB 다. 5MB 면 몇 년치라 브라우저에서 바로 읽어도 느리지 않다 */
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -421,9 +422,7 @@ function BlockedCard({
           {billing &&
           <div className="mt-4 rounded-xl border border-warn-line bg-surface p-4">
               <h3 className="text-small font-semibold text-ink">승인내역 받는 방법</h3>
-              <p className="mt-1 text-small text-ink2">
-                카드사 홈페이지·앱 → 이용(승인)내역 조회 → 엑셀 저장
-              </p>
+              <p className="mt-1 text-small text-ink2">{APPROVAL_EXPORT_STEPS}</p>
             </div>
           }
           <Button className="mt-5" onClick={onReset}>
@@ -691,6 +690,13 @@ function DataBoundary() {
         <div>
           <p className="font-semibold text-ink">로그에 남지 않는 것</p>
           <p className="mt-0.5 text-muted">소득 금액, 이름</p>
+        </div>
+        <div className="h-px bg-line2" />
+        <div>
+          {/* QR-7. 비서 도구가 모델에 넘기는 필드에서 뽑았다. 목록은 AI 쪽이 확정한다(agent-secretary.md 10장) */}
+          <p className="font-semibold text-ink">비서 Really 에게 물을 때 외부 모델로 보내는 것</p>
+          <p className="mt-0.5 text-muted">{ASSISTANT_SENDS}</p>
+          <p className="mt-1.5 text-caption text-muted">{ASSISTANT_DOES_NOT_SEND} 묻지 않으면 보내지 않습니다.</p>
         </div>
       </div>
     </aside>);
