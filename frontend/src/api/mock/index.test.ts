@@ -212,13 +212,22 @@ describe('문진·판정 실행', () => {
   });
 });
 
-describe('로그인 (목업)', () => {
+describe('로그인·관리자 (목업)', () => {
   it('로그인한 이메일과 역할을 users/me 로 준다. admin@… 만 관리자다', async () => {
     await api.auth.login({ email: 'me@example.com', password: 'x' });
     expect(await api.users.me()).toMatchObject({ email: 'me@example.com', role: 'USER' });
+    await expect(api.admin.ruleCandidates.list()).rejects.toMatchObject({ status: 403 });
 
     await api.auth.login({ email: 'admin@example.com', password: 'x' });
     expect((await api.users.me()).role).toBe('ADMIN');
   });
 
+  it('후보를 승인하면 검토한 사람이 남고, 다시 처리하면 409 다', async () => {
+    await api.auth.login({ email: 'admin@example.com', password: 'x' });
+    const { items } = await api.admin.ruleCandidates.list({ status: 'PENDING' });
+    const approved = await api.admin.ruleCandidates.approve(items[0].id);
+    expect(approved).toMatchObject({ status: { code: 'APPROVED' }, reviewedBy: 'admin@example.com' });
+    expect((await api.admin.ruleCandidates.list({ status: 'PENDING' })).items).toHaveLength(items.length - 1);
+    await expect(api.admin.ruleCandidates.reject(items[0].id)).rejects.toMatchObject({ status: 409 });
+  });
 });

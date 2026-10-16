@@ -454,3 +454,34 @@ export interface BulkAnswerResult {
   unresolved: UnresolvedSummary;
 }
 
+// ── 관리자: 규칙 후보 (M1) ──────────────────────────
+// api.md 에 아직 없다. rule_candidate 테이블(V3)과 AI 파이프라인(ai/pipeline/candidates.py)이 쓰는 값을 따른다
+
+/** DB 의 대기·검토중·승인·기각·보류 */
+export type RuleCandidateStatus = 'PENDING' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED' | 'ON_HOLD';
+
+/** 초안이 인용한 근거 */
+export interface RuleCandidateDoc {
+  statuteId: string;
+  quote: string;
+  /** 인용이 나온 위계(법령·행정규칙·심판례해석·판례). 못 찾았으면 null */
+  tier: string | null;
+}
+
+/** 여러 사용자에게서 판정할 규칙이 없던 업종·카테고리 조합과 그 규칙 카드 초안 */
+export interface RuleCandidate {
+  id: number;
+  merchantCategory: string;
+  industryCode: string;
+  distinctUsers: number;
+  occurrenceCount: number;
+  suggestedDocs: RuleCandidateDoc[];
+  /** 인용이 나온 가장 위 위계 */
+  searchedTier: string | null;
+  /** 초안을 만들지 못했으면 null(보류) */
+  draftYaml: string | null;
+  status: Coded<RuleCandidateStatus>;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+}

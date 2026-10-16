@@ -25,6 +25,8 @@ import type {
   QuestionResponseResult,
   QuestionStatus,
   ReviewStatus,
+  RuleCandidate,
+  RuleCandidateStatus,
   Statute,
   StoredBusinessContext,
   Transaction,
@@ -81,6 +83,10 @@ export interface QuestionQuery extends PageQuery {
 export interface ReviewQuery extends PageQuery {
   batchId?: string;
   status?: ReviewStatus;
+}
+
+export interface RuleCandidateQuery extends PageQuery {
+  status?: RuleCandidateStatus;
 }
 
 export interface Api {
@@ -168,6 +174,14 @@ export interface Api {
     respond(body: QuestionResponseRequest): Promise<QuestionResponseResult>;
     /** 남은 꼬리 질문을 factType 단위로 한 번에 닫는다 */
     bulkAnswer(body: BulkAnswerRequest): Promise<BulkAnswerResult>;
+  };
+  /** 관리자 (M1). 계약이 아직 없다 — 경로·모양은 가정이다 */
+  admin: {
+    ruleCandidates: {
+      list(query?: RuleCandidateQuery): Promise<Page<RuleCandidate>>;
+      approve(candidateId: number): Promise<RuleCandidate>;
+      reject(candidateId: number): Promise<RuleCandidate>;
+    };
   };
 }
 

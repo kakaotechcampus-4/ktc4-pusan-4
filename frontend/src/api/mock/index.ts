@@ -11,6 +11,7 @@ import type {
   Question,
   QuestionGroup,
   QuestionPage,
+  RuleCandidate,
   StoredBusinessContext,
   UnresolvedPage,
   Transaction,
@@ -29,6 +30,7 @@ import {
   QUESTION_CARDS,
   QUESTION_GROUPS,
   QUESTION_TRANSACTIONS,
+  RULE_CANDIDATES,
   TRANSACTIONS,
   UPLOAD_BATCH } from
 './data';
@@ -140,7 +142,8 @@ const store = {
   /** 다음 업로드를 이 오류로 실패시킨다 (개발용) */
   failUpload: null as ApiRequestError | null,
   /** 로그인한 이메일. 목업은 비밀번호를 보지 않고 무엇이든 받는다 */
-  email: null as string | null
+  email: null as string | null,
+  ruleCandidates: RULE_CANDIDATES.map((c) => ({ ...c })) as RuleCandidate[]
 };
 
 /** 목업에서 관리자 화면을 보려면 admin@… 으로 로그인한다 */
@@ -428,6 +431,20 @@ transactionId?: string)
 
 const notFound = (code: string, message: string) =>
 Promise.reject(new ApiRequestError(404, code, message));
+
+/** 승인·기각. 검토한 사람과 시각을 남긴다. 이미 처리한 후보는 다시 바꾸지 않는다 */
+const reviewCandidate = (id: number, status: RuleCandidate['status']) => {
+  if (!isAdminEmail(store.email))
+  return Promise.reject(new ApiRequestError(403, 'FORBIDDEN', '관리자만 할 수 있습니다.'));
+  const candidate = store.ruleCandidates.find((c) => c.id === id);
+  if (!candidate) return notFound('RULE_CANDIDATE_NOT_FOUND', '규칙 후보를 찾을 수 없습니다.');
+  if (candidate.status.code === 'APPROVED' || candidate.status.code === 'REJECTED')
+  return Promise.reject(new ApiRequestError(409, 'CONFLICT', '이미 처리한 후보입니다.'));
+  candidate.status = status;
+  candidate.reviewedBy = store.email;
+  candidate.reviewedAt = now();
+  return delay({ ...candidate });
+};
 
 // ── 구현 ────────────────────────────────────────────
 
@@ -993,6 +1010,21 @@ export const mockApi: Api = {
         merchantCategory,
         judgedCount: hasCompletedRun ? rows.length : 0
       });
+    }
+  },
+
+  admin: {
+    ruleCandidates: {
+      list: (q) => {
+        if (!isAdminEmail(store.email))
+        return Promise.reject(new ApiRequestError(403, 'FORBIDDEN', '관리자만 볼 수 있습니다.'));
+        const items = store.ruleCandidates.
+        filter((c) => !q?.status || c.status.code === q.status).
+        sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id - a.id);
+        return delay(paginate(items, q?.page, q?.size ?? 20));
+      },
+      approve: (id) => reviewCandidate(id, { code: 'APPROVED', label: '승인' }),
+      reject: (id) => reviewCandidate(id, { code: 'REJECTED', label: '기각' })
     }
   }
 };

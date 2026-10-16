@@ -258,5 +258,13 @@ export const httpApi: Api = {
     }),
     respond: (body) => post('/question-responses', body),
     bulkAnswer: (body) => post('/questions/bulk-answer', body)
+  },
+
+  admin: {
+    ruleCandidates: {
+      list: (query) => get('/admin/rule-candidates', { ...page(query), status: query?.status }),
+      approve: (candidateId) => post(`/admin/rule-candidates/${candidateId}/approve`),
+      reject: (candidateId) => post(`/admin/rule-candidates/${candidateId}/reject`)
+    }
   }
 };
