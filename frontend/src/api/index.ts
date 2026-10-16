@@ -23,7 +23,7 @@ export const seedSession: {
   contextRef: { id: string; version: number };
   runId: string;
 } | null = useHttp ? null : mockSeedSession;
-export { useApi } from './hooks';
+export { invalidateAll, useApi } from './hooks';
 
 // mockControls 는 여기서 다시 내보내지 않는다. 내보내면 실제 서버 빌드에서도
 // 목업 모듈 전체가 번들에 남는다. 쓰는 쪽(검증 하네스)은 './mock' 에서 직접 가져온다.

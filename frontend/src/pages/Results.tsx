@@ -13,6 +13,7 @@ import {
   type Column } from
 '../components/ui';
 import { useSession } from '../contexts/SessionContext';
+import { useAssistantSubject } from '../components/assistant/context';
 import { api, useApi } from '../api';
 import type { Judgment, Verdict } from '../types/domain';
 import { formatFullDate, formatNumber, formatPeriod, formatWon } from '../utils/format';
@@ -32,6 +33,8 @@ export function Results() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   /** 사용자가 고를 때마다 늘린다. 패널은 이 값이 바뀌면 제목으로 초점을 옮긴다. 처음 자동 선택은 0 이라 초점을 뺏지 않는다 */
   const [focusKey, setFocusKey] = useState(0);
+  // 「이거 왜 불가야?」의 「이거」 (FR-2)
+  useAssistantSubject(selectedId);
 
   const batchQ = useApi(
     () => batchId ? api.uploads.get(batchId) : Promise.resolve(null),
