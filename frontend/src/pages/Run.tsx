@@ -9,6 +9,7 @@ import {
 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { useSession } from '../contexts/SessionContext';
+import { useAssistant } from '../components/assistant/context';
 import { api, ApiRequestError } from '../api';
 import type { JudgmentRun, JudgmentRunFailure, Transaction } from '../types/domain';
 import { Badge, Button, Card } from '../components/ui';
@@ -41,6 +42,7 @@ const GATES = [
 export function Run() {
   const navigate = useNavigate();
   const { runId, batchId, contextRef, setRunId } = useSession();
+  const { showNudge } = useAssistant();
   const [run, setRun] = useState<JudgmentRun | null>(null);
   const [counts, setCounts] = useState({ available: 0, needsReview: 0, unavailable: 0 });
   /** null 은 아직 받지 않음. 빈 배열은 받았는데 비어 있음(run 시작 실패 등, #127) */
@@ -99,6 +101,22 @@ export function Run() {
         if (!finished) return;
 
         stop();
+        // FR-3: 지난번 답으로 채울 수 있는 질문이 있으면 이 실행에 한 번 알린다. 못 읽으면 알리지 않는다
+        if (next.status.code !== 'FAILED')
+        void api.progress.
+        get(next.batchId).
+        then(({ questions }) => {
+          if (questions.fillableFromPrevious > 0)
+          showNudge(
+            {
+              text: `지난번 답으로 채울 수 있는 질문이 ${formatNumber(questions.fillableFromPrevious)}개 있습니다. 질문 화면에서 확인하고 적용합니다.`,
+              route: '/questions',
+              actionLabel: '질문 보기'
+            },
+            `run:${id}`
+          );
+        }).
+        catch(() => undefined);
         void api.judgments.
         summary({ runId: id }).
         then((summary) =>
@@ -127,7 +145,7 @@ export function Run() {
     poll();
     timer.current = window.setInterval(poll, 1000);
     return stop;
-  }, [runId]);
+  }, [runId, showNudge]);
 
   // runId 도 없고 만들 재료(batchId·문진)도 없으면 영원히 "판정하고 있습니다"로 남는다
   const waiting = !runId && (!batchId || !contextRef);
