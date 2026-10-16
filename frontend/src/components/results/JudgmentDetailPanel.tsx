@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRightIcon, TriangleAlertIcon } from 'lucide-react';
-import type { Judgment, JudgmentOriginType, Transaction } from '../../types/domain';
+import type { Judgment, JudgmentOriginType } from '../../types/domain';
 import { api, ApiRequestError, useApi } from '../../api';
 import { Badge, Button, ChoiceGroup, Input } from '../ui';
 import { VerdictBadge } from '../VerdictBadge';
@@ -53,9 +53,8 @@ const attributeValue = (value: unknown) =>
 value === true ? '예' : value === false ? '아니오' : String(value);
 
 interface JudgmentDetailPanelProps {
-  /** 거래의 현재 판정 */
+  /** 거래의 현재 판정. 거래 요약(judgment.transaction)도 여기서 읽는다 */
   judgment: Judgment;
-  transaction: Transaction;
   /** 사용자가 행을 고를 때마다 늘어난다. 바뀌면 제목으로 초점을 옮긴다(같은 행을 다시 골라도) */
   focusKey?: number;
   /** 수정·해제로 현재 판정이 바뀌었을 때 */
@@ -64,10 +63,10 @@ interface JudgmentDetailPanelProps {
 
 export function JudgmentDetailPanel({
   judgment,
-  transaction,
   focusKey = 0,
   onChanged
 }: JudgmentDetailPanelProps) {
+  const transaction = judgment.transaction;
   const [target, setTarget] = useState<Target | null>(null);
   const [preset, setPreset] = useState('');
   const [note, setNote] = useState('');

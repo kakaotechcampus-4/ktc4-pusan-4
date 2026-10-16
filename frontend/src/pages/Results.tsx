@@ -14,7 +14,7 @@ import {
 '../components/ui';
 import { useSession } from '../contexts/SessionContext';
 import { api, useApi } from '../api';
-import type { Judgment, Transaction, Verdict } from '../types/domain';
+import type { Judgment, Verdict } from '../types/domain';
 import { formatFullDate, formatNumber, formatPeriod, formatWon } from '../utils/format';
 
 type Filter = 'ALL' | Verdict;
@@ -71,26 +71,7 @@ export function Results() {
 
   const judgments: Judgment[] = judgmentsQ.data?.items ?? [];
 
-  // 판정 응답에는 거래 정보가 없어 지금 페이지의 거래만 따로 받는다 (최대 20건).
-  // [id, 거래 | null] 로 받아, 아직 안 온 것(대기)과 못 받은 것(null)을 구분한다
-  const transactionsQ = useApi(
-    () =>
-    Promise.all(
-      judgments.map((judgment) =>
-      api.transactions.
-      get(judgment.transactionId).
-      catch(() => null).
-      then((transaction) => [judgment.transactionId, transaction] as const)
-      )
-    ),
-    [judgments.map((judgment) => judgment.transactionId).join()]
-  );
-  const fetched = new Map<string, Transaction | null>(transactionsQ.data ?? []);
-  const transactions = new Map(
-    [...fetched].filter((entry): entry is [string, Transaction] => entry[1] !== null)
-  );
-
-  // 패널은 고른 거래의 현재 판정과 거래를 따로 읽는다. 수정하면 그 행이 목록 맨 위로
+  // 패널은 고른 거래의 현재 판정을 따로 읽는다(거래 요약이 함께 온다). 수정하면 그 행이 목록 맨 위로
   // 올라가도(computedAt DESC) 패널은 그 거래에 머문다
   // 응답과 실패 모두에 어느 거래의 것인지 붙인다. 다른 행을 고른 직후 이전 행의 응답·실패가
   // 남아 있어도, 고른 거래의 것일 때만 그린다
@@ -98,8 +79,9 @@ export function Results() {
     () => {
       if (!selectedId) return Promise.resolve(null);
       const id = selectedId;
-      return Promise.all([api.judgments.list({ transactionId: id }), api.transactions.get(id)]).
-      then(([page, transaction]) => ({ id, failed: false as const, judgment: page.items[0] ?? null, transaction })).
+      return api.judgments.
+      list({ transactionId: id }).
+      then((page) => ({ id, failed: false as const, judgment: page.items[0] ?? null })).
       catch(() => ({ id, failed: true as const }));
     },
     [selectedId]
@@ -140,37 +122,23 @@ export function Results() {
   const questionGroups = questionsQ.data?.page.totalElements ?? 0;
   const answeredGroups = answeredQ.data?.page.totalElements ?? 0;
 
-  const pending = (width: string) =>
-  <span className={`block h-4 ${width} animate-pulse rounded bg-line2`} />;
-
-  const missing = (judgment: Judgment) =>
-  fetched.has(judgment.transactionId) && fetched.get(judgment.transactionId) === null;
-
   const columns: Column<Judgment>[] = [
   {
     header: '승인일',
     width: 'w-[7.5rem]',
     hideBelow: 'sm',
-    cell: (row) => {
-      const transaction = transactions.get(row.transactionId);
-      if (!transaction) return missing(row) ? '—' : pending('w-20');
-      return (
-        <span className="whitespace-nowrap tabular-nums text-ink2">
-            {formatFullDate(transaction.approvedAt)}
-          </span>);
+    cell: (row) =>
+    <span className="whitespace-nowrap tabular-nums text-ink2">
+        {formatFullDate(row.transaction.approvedAt)}
+      </span>
 
-    }
   },
   {
     header: '가맹점',
     // 남는 폭을 가맹점이 갖고 넘치면 말줄임한다. 금액·판정은 좁은 화면에서도 보여야 한다
     width: 'w-full max-w-0',
     cell: (row) => {
-      const transaction = transactions.get(row.transactionId);
-      if (!transaction)
-      return missing(row) ?
-      <span className="text-small text-muted">거래 정보를 불러오지 못했습니다</span> :
-      pending('w-32');
+      const { transaction } = row;
       return (
         <span className="block min-w-0">
             <span className="flex items-center gap-1.5 truncate font-medium text-ink">
@@ -195,8 +163,7 @@ export function Results() {
     header: '금액',
     align: 'right',
     cell: (row) => {
-      const transaction = transactions.get(row.transactionId);
-      if (!transaction) return missing(row) ? '—' : pending('ml-auto w-20');
+      const { transaction } = row;
       // 「일부 인정」은 AVAILABLE + finalAmount < amount 다 (2.1).
       // 자산은 그해 넣을 수 있는 한도라 「최대」로 쓴다 (CONTEXT.md G4 화면 문구)
       const asset = row.attributes['자산'] === true;
@@ -386,7 +353,6 @@ export function Results() {
           <JudgmentDetailPanel
             key={selectedId}
             judgment={panelData.judgment}
-            transaction={panelData.transaction}
             focusKey={focusKey}
             onChanged={changed} /> :
 
