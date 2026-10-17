@@ -12,7 +12,7 @@ public record ContextResponse(
     UUID id,
     UUID userId,
     int version,
-    @Schema(example = "62010") String industryCode,
+    @Schema(example = "940909") String industryCode,
     long prevYearRevenue,
     LocalDate businessOpenDate,
     BookkeepingDuty bookkeepingDuty,

@@ -45,7 +45,7 @@ export const SHOWCASE_TRACES: ShowcaseTrace[] = [
       },
       {
         gate: 'G2',
-        result: '통상성 인정 (업종 프로파일 62010)'
+        result: '통상성 인정 (업종 프로파일 940909)'
       },
       {
         gate: 'G3',
