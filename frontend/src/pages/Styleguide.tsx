@@ -105,7 +105,7 @@ export function Styleguide() {
             {COLORS.map((color) =>
             <li key={color.name} className="rounded-xl border border-line p-3">
                 <div className={`h-12 rounded-lg border border-line2 ${color.cls}`} />
-                <p className="mt-2 text-small font-semibold text-ink">{color.name}</p>
+                <p className="mt-2 text-small font-bold text-ink">{color.name}</p>
                 <p className="font-mono text-caption tabular-nums text-muted">{color.hex}</p>
                 <p className="mt-1 text-caption text-muted">{color.use}</p>
               </li>
@@ -121,7 +121,7 @@ export function Styleguide() {
                   <p className="font-mono text-small text-ink">{t.token}</p>
                   <p className="font-mono text-caption tabular-nums text-muted">{t.spec}</p>
                 </div>
-                <p className={`${t.cls} font-semibold text-ink`}>
+                <p className={`${t.cls} font-bold text-ink`}>
                   이 카드값이 경비인지
                 </p>
                 <p className="text-caption text-muted">{t.use}</p>
@@ -181,15 +181,15 @@ export function Styleguide() {
         <Block title="Card" note="tone: surface(기본)·canvas(강조 배경)·ink(다크). padding: sm·md·lg.">
           <div className="grid gap-4 md:grid-cols-3">
             <Card>
-              <p className="text-body-lg font-semibold text-ink">surface · sm</p>
+              <p className="text-body-lg font-bold text-ink">surface · sm</p>
               <p className="mt-2 text-body text-ink2">목록 항목, 지출 카드</p>
             </Card>
             <Card tone="canvas" padding="md">
-              <p className="text-body-lg font-semibold text-ink">canvas · md</p>
+              <p className="text-body-lg font-bold text-ink">canvas · md</p>
               <p className="mt-2 text-body text-ink2">강조하고 싶은 큰 카드</p>
             </Card>
             <Card tone="ink" padding="md">
-              <p className="text-body-lg font-semibold">ink · md</p>
+              <p className="text-body-lg font-bold">ink · md</p>
               <p className="mt-2 text-body text-white/70">다크 패널, 라이브 미리보기</p>
             </Card>
           </div>
@@ -257,11 +257,11 @@ export function Styleguide() {
             { header: '승인일', width: 'w-[7.5rem]', cell: (row) => <span className="whitespace-nowrap tabular-nums text-ink2">{row.date}</span> },
             { header: '가맹점', cell: (row) =>
               <span className="block">
-                    <span className="block font-medium text-ink">{row.name}</span>
+                    <span className="block font-normal text-ink">{row.name}</span>
                     <span className="block text-small text-muted">{row.memo}</span>
                   </span> },
             { header: '메모', hideBelow: 'sm', width: 'w-28', cell: (row) => <span className="text-small text-muted">{row.memo}</span> },
-            { header: '금액', align: 'right', width: 'w-32', cell: (row) => <span className="font-semibold text-ink">{row.amount.toLocaleString('ko-KR')}원</span> }]
+            { header: '금액', align: 'right', width: 'w-32', cell: (row) => <span className="font-bold text-ink">{row.amount.toLocaleString('ko-KR')}원</span> }]
             }
             selectedKey={pickedRow ?? undefined}
             onRowClick={(row) => setPickedRow(row.id === pickedRow ? null : row.id)} />
@@ -271,7 +271,7 @@ export function Styleguide() {
             버튼은 함께 쓰지 않습니다.
           </p>
 
-          <p className="mt-4 text-small font-semibold text-ink">loading (첫 로딩 골격)</p>
+          <p className="mt-4 text-small font-bold text-ink">loading (첫 로딩 골격)</p>
           <Table
             caption="로딩 예시"
             loading

@@ -73,10 +73,10 @@ export function AgentPreview() {
               {formatDate(judgment.approvedAt)} · {judgment.merchantRaw}
             </p>
             <div className="mt-1 flex items-baseline justify-between gap-3">
-              <p className="text-body-lg font-semibold">
+              <p className="text-body-lg font-bold">
                 {judgment.merchantNorm}
               </p>
-              <p className="text-body-lg font-semibold tabular-nums">
+              <p className="text-body-lg font-bold tabular-nums">
                 {formatWon(judgment.amount)}
               </p>
             </div>
@@ -93,7 +93,7 @@ export function AgentPreview() {
                     shown ? 'opacity-100' : 'opacity-20'
                   }`}>
                   <span
-                    className={`mt-0.5 w-7 shrink-0 font-mono text-caption font-semibold tabular-nums ${
+                    className={`mt-0.5 w-7 shrink-0 font-mono text-caption font-bold tabular-nums ${
                       active ? 'text-accent-line' : 'text-white/45'
                     }`}>
                     {step.gate}

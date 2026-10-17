@@ -113,7 +113,7 @@ export function Landing() {
                 <Card key={item.kind} as="li" className="flex flex-col">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-body-lg font-semibold text-ink">
+                      <p className="text-body-lg font-bold text-ink">
                         {item.kind}
                       </p>
                       <p className="mt-1 text-small text-muted">{item.examples}</p>
@@ -166,7 +166,7 @@ export function Landing() {
               <p className="mt-5 max-w-xl text-body-lg text-ink2">
                 {SYSTEM_FEATURES[0].body}
               </p>
-              <p className="mt-8 border-l-2 border-accent pl-4 text-body-lg font-semibold text-ink">
+              <p className="mt-8 border-l-2 border-accent pl-4 text-body-lg font-bold text-ink">
                 {SYSTEM_FEATURES[0].caption}
               </p>
             </Card>
@@ -254,7 +254,7 @@ export function Landing() {
             </div>
 
             <Card tone="canvas" className="space-y-3">
-              <p className="text-small font-semibold text-muted">
+              <p className="text-small font-bold text-muted">
                 실제 판정 화면에 붙는 근거
               </p>
               <StatuteCitation statuteVersionId={1435} />
@@ -301,7 +301,7 @@ export function Landing() {
                 key={item.title}
                 className="flex flex-wrap items-baseline gap-x-6 gap-y-1 py-5">
 
-                  <dt className="w-48 shrink-0 text-lead font-semibold leading-normal text-ink">
+                  <dt className="w-48 shrink-0 text-lead font-bold leading-normal text-ink">
                     {item.title}
                   </dt>
                   <dd className="text-prose text-muted">{item.body}</dd>

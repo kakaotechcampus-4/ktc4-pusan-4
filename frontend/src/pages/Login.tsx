@@ -113,7 +113,7 @@ export function Login() {
           <button
             type="button"
             onClick={() => complete('kakao-user@kakao.com')}
-            className="mt-8 flex w-full items-center justify-center gap-2 rounded-xl bg-[#FEE500] px-4 py-3 text-[15px] font-semibold text-[#191600] transition-opacity duration-150 ease-snap hover:opacity-90">
+            className="mt-8 flex w-full items-center justify-center gap-2 rounded-xl bg-[#FEE500] px-4 py-3 text-[15px] font-bold text-[#191600] transition-opacity duration-150 ease-snap hover:opacity-90">
             
             <MessageCircleIcon className="h-4 w-4" aria-hidden="true" />
             카카오로 계속하기
@@ -130,7 +130,7 @@ export function Login() {
               <div>
                 <label
                   htmlFor="email"
-                  className="block text-[13px] font-medium text-ink2">
+                  className="block text-[13px] font-normal text-ink2">
                   
                   이메일
                 </label>
@@ -148,7 +148,7 @@ export function Login() {
               <div>
                 <label
                   htmlFor="password"
-                  className="block text-[13px] font-medium text-ink2">
+                  className="block text-[13px] font-normal text-ink2">
                   
                   비밀번호
                 </label>
@@ -173,7 +173,7 @@ export function Login() {
 
             <button
               type="submit"
-              className="mt-5 w-full rounded-xl bg-accent px-4 py-3 text-[15px] font-semibold text-white transition-colors duration-150 ease-snap hover:bg-accent-hover">
+              className="mt-5 w-full rounded-xl bg-accent px-4 py-3 text-[15px] font-bold text-white transition-colors duration-150 ease-snap hover:bg-accent-hover">
               
               로그인
             </button>
@@ -182,7 +182,7 @@ export function Login() {
           <button
             type="button"
             onClick={() => complete('demo@expense-verdict.kr')}
-            className="mt-3 w-full rounded-xl border border-line px-4 py-3 text-[14px] font-semibold text-ink transition-colors duration-150 ease-snap hover:bg-canvas">
+            className="mt-3 w-full rounded-xl border border-line px-4 py-3 text-[14px] font-bold text-ink transition-colors duration-150 ease-snap hover:bg-canvas">
             
             샘플 계정으로 둘러보기
           </button>

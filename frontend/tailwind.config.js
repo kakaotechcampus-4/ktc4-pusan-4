@@ -1,6 +1,9 @@
 /**
  * 디자인 토큰. 색·타이포·간격은 여기서만 정의하고 화면에서는 이름으로 쓴다.
  * 사용 규칙은 DESIGN.md 참고.
+ *
+ * 레퍼런스: kakaocorp.com/ir — 흰 바탕에 회색 패널, 괘선만 쓰는 표,
+ * 400/700 두 굵기, 그림자 없음, 강조색은 한 화면에 한 번.
  */
 export default {content: [
   './index.html',
@@ -18,53 +21,69 @@ export default {content: [
         body: ['14px', '24px'],
         prose: ['14px', '28px'],
         'body-lg': ['15px', '28px'],
-        lead: ['16px', '32px'],
-        h4: ['17px', '24px'],
+        lead: ['17px', '30px'],
+        h4: ['17px', '26px'],
         h3: ['22px', '30px'],
-        'h3-lg': ['26px', '34px'],
+        'h3-lg': ['26px', '36px'],
         h2: ['28px', '38px'],
         'h2-lg': ['36px', '48px'],
-        h1: ['38px', '46px'],
-        'h1-lg': ['52px', '64px'],
-        stat: ['34px', '34px'],
+        h1: ['38px', '48px'],
+        'h1-lg': ['52px', '66px'],
+        stat: ['34px', '36px'],
       },
       colors: {
-        canvas: '#F6F7F9',
-        surface: '#FFFFFF',
-        line: '#E4E7EC',
-        line2: '#F0F2F5',
-        ink: '#101418',
-        ink2: '#3A424D',
-        muted: '#6B7480',
+        /** 바탕은 흰색이고 패널이 회색이다 (기존과 반대) */
+        canvas: '#FFFFFF',
+        surface: '#F3F3F3',
+        /** 표처럼 패널 위에서 흰 바탕이 필요할 때 */
+        sheet: '#FFFFFF',
+        line: '#EEEEEE',
+        line2: '#F5F5F5',
+        /** 괘선 중 굵은 것 — 표 머리 위에 긋는다 */
+        rule: '#333333',
+        ink: '#000000',
+        ink2: '#333333',
+        muted: '#888888',
+        /** 주된 동작은 검정이다. 파랑은 문장 속 링크에만 쓴다 */
         accent: {
-          DEFAULT: '#1F4FD8',
-          hover: '#183FAE',
-          soft: '#EEF2FE',
-          line: '#C7D5F8',
+          DEFAULT: '#000000',
+          hover: '#333333',
+          soft: '#F3F3F3',
+          line: '#D9D9D9',
         },
+        link: '#0073FF',
+        /** 한 화면에 한 번만 쓰는 강조 블록 */
+        highlight: '#FAE100',
         ok: {
           DEFAULT: '#0B7A4B',
-          bg: '#E9F6EF',
-          line: '#B7E0CB',
+          bg: '#F0F8F4',
+          line: '#CCE6D9',
         },
         warn: {
           DEFAULT: '#8A5209',
-          bg: '#FDF4E3',
-          line: '#EBD3A3',
+          bg: '#FDF7EC',
+          line: '#EEDFC0',
         },
         deny: {
-          DEFAULT: '#B02318',
-          bg: '#FCEDEB',
-          line: '#F0C4BE',
+          DEFAULT: '#D5362B',
+          bg: '#FDF1F0',
+          line: '#F4CFCB',
         },
+      },
+      borderRadius: {
+        lg: '12px',
+        xl: '16px',
+        '2xl': '24px',
+        '3xl': '36px',
       },
       /** 페이지 컨테이너 폭 */
       maxWidth: {
-        page: '1180px',
+        page: '1400px',
       },
+      /** 그림자를 쓰지 않는다. 겹침은 괘선과 바탕색으로 가른다 */
       boxShadow: {
-        card: '0 1px 2px rgba(16, 20, 24, 0.04)',
-        panel: '0 8px 24px rgba(16, 20, 24, 0.08)',
+        card: 'none',
+        panel: 'none',
       },
       transitionTimingFunction: {
         snap: 'cubic-bezier(0.23, 1, 0.32, 1)',

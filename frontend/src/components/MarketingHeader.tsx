@@ -32,7 +32,7 @@ export function MarketingHeader() {
             <li key={item.href}>
                 <a
                 href={item.href}
-                className="text-body font-medium text-ink2 transition-colors duration-150 hover:text-ink">
+                className="text-body font-normal text-ink2 transition-colors duration-150 hover:text-ink">
                 
                   {item.label}
                 </a>
