@@ -1527,6 +1527,10 @@ true
 
 `latestOnly=true`는 현재 결과 호환 이름이다. 활성 Override가 최신 revision이 아니어도 현재 Judgment로 반환한다.
 
+조건은 모두 AND로 건다. `transactionId`·`batchId`·`year`·`runId`가 하나도 없으면 오류 없이 본인 전체의 현재 Judgment를 반환한다.
+
+다른 사용자의 `transactionId`·`batchId`·`runId`를 넘기면 404가 아니라 빈 목록이다.
+
 ### batchId / year
 
 ```
@@ -1537,7 +1541,7 @@ GET /api/v1/judgments?batchId=B1
 
 활성 JudgmentOverride가 있으면 해당 Override revision이 현재 Judgment다. 활성 Override가 없으면 latest non-override revision이 현재 Judgment다.
 
-사용자가 현재 `EXCLUDED`한 Transaction은 제외한다.
+사용자가 현재 `EXCLUDED`한 Transaction과 분류 확인이 끝나지 않은 Transaction은 제외한다(§5).
 
 ```
 GET /api/v1/judgments?year=2026
@@ -1553,6 +1557,10 @@ GET /api/v1/judgments?transactionId=T1&latestOnly=false
 
 해당 Transaction의 전체 revision 이력을 조회할 수 있다.
 
+`latestOnly=true`면 그 Transaction의 현재 Judgment다. 이때는 제외했거나 분류 확인 전인 Transaction이어도 현재 Judgment가 있으면 반환한다.
+
+`latestOnly=false`는 `transactionId` 없이도 쓸 수 있다. 그러면 다른 조건에 맞는 모든 revision을 반환한다.
+
 ### runId
 
 ```
@@ -1563,7 +1571,7 @@ R1이 직접 생성했던 Judgment만 반환한다.
 
 R1 이후 QuestionResponse나 Override로 생성된 revision은 포함하지 않는다.
 
-`runId`와 `latestOnly`는 함께 사용하지 않는다.
+`runId`와 `latestOnly`는 함께 사용하지 않는다. 함께 보내면 `latestOnly`는 무시한다.
 
 정렬:
 
@@ -1730,7 +1738,7 @@ GET /api/v1/judgments/summary?runId=R1
 | appliedRuleIds | 적용된 전체 RuleCard ID |
 | rulesCommitSha | 사용된 Rules revision |
 | userContextVersion | 판정에 사용된 Context 버전 |
-| explanation | RuleCard의 reason |
+| explanation | 판정 설명 문장. RuleCard에 설명 필드가 없어 지금은 늘 `null`이다 |
 | citations | 근거 법령 |
 
 ### Judgment `state` 제거

@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -13,6 +14,8 @@ import java.util.UUID;
 interface TransactionRecordRepository extends Repository<TransactionRecordEntity, UUID> {
 
     Optional<TransactionRecordEntity> findById(UUID transactionId);
+
+    List<TransactionRecordEntity> findByIdIn(Collection<UUID> transactionIds);
 
     // run 대상: effectiveStatus = JUDGEABLE 이고 classificationStatus = CLASSIFIED (api.md 3.6).
     // effectiveStatus 는 저장하지 않고 sourceStatus·userInclusion 으로 계산한다(api.md 2.3).

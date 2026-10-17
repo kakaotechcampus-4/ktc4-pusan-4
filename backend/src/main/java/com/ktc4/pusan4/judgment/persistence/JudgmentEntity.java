@@ -1,8 +1,15 @@
 package com.ktc4.pusan4.judgment.persistence;
 
+import com.ktc4.pusan4.judgment.domain.Gate;
 import com.ktc4.pusan4.judgment.domain.Judgment;
 import com.ktc4.pusan4.judgment.domain.JudgmentOrigin;
+import com.ktc4.pusan4.judgment.domain.JudgmentOriginType;
+import com.ktc4.pusan4.judgment.domain.JudgmentRevision;
+import com.ktc4.pusan4.judgment.domain.JudgmentRevision.CitedStatute;
+import com.ktc4.pusan4.judgment.domain.JudgmentRevision.JudgedTransaction;
+import com.ktc4.pusan4.judgment.domain.UnmatchedReason;
 import com.ktc4.pusan4.judgment.domain.UserFact;
+import com.ktc4.pusan4.judgment.domain.Verdict;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -10,6 +17,7 @@ import jakarta.persistence.Table;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -71,6 +79,13 @@ class JudgmentEntity {
     @Column(name = "input_facts", nullable = false, columnDefinition = "jsonb")
     private List<UserFact> inputFacts;
 
+    // 금액 계산(A6) 전이라 저장하지 않는다. 비어 있다.
+    @Column(name = "final_amount", insertable = false, updatable = false)
+    private Long finalAmount;
+
+    @Column(name = "computed_at", nullable = false, insertable = false, updatable = false)
+    private OffsetDateTime computedAt;
+
     // origin 은 FK 4개 중 정확히 하나만 채운다 (api.md §4, judgment_has_one_origin).
     @Column(name = "run_id")
     private UUID runId;
@@ -117,6 +132,37 @@ class JudgmentEntity {
             case CLASSIFICATION_REVIEW -> this.classificationReviewId = origin.id();
             case OVERRIDE -> this.judgmentOverrideId = origin.id();
         }
+    }
+
+    UUID id() {
+        return id;
+    }
+
+    UUID transactionId() {
+        return transactionId;
+    }
+
+    JudgmentRevision toDomain(JudgedTransaction transaction, List<CitedStatute> citations) {
+        return new JudgmentRevision(id, transactionId, transaction, revision, origin(),
+            Verdict.valueOf(verdict),
+            blockedAtGate == null ? null : Gate.valueOf(blockedAtGate),
+            outOfScope, account, finalAmount, inference,
+            unmatchedReason == null ? null : UnmatchedReason.valueOf(unmatchedReason),
+            attributes, ruleCardId, ruleCardVersion, appliedRuleIds, rulesCommitSha, userContextVersion,
+            computedAt, citations);
+    }
+
+    private JudgmentOrigin origin() {
+        if (runId != null) {
+            return new JudgmentOrigin(JudgmentOriginType.RUN, runId);
+        }
+        if (triggerUserFactId != null) {
+            return new JudgmentOrigin(JudgmentOriginType.USER_FACT, triggerUserFactId);
+        }
+        if (classificationReviewId != null) {
+            return new JudgmentOrigin(JudgmentOriginType.CLASSIFICATION_REVIEW, classificationReviewId);
+        }
+        return new JudgmentOrigin(JudgmentOriginType.OVERRIDE, judgmentOverrideId);
     }
 
     private static String first(List<String> values) {

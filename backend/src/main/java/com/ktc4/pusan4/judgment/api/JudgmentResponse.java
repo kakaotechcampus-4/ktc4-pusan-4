@@ -2,6 +2,8 @@ package com.ktc4.pusan4.judgment.api;
 
 import com.ktc4.pusan4.judgment.domain.Gate;
 import com.ktc4.pusan4.judgment.domain.JudgmentOrigin;
+import com.ktc4.pusan4.judgment.domain.JudgmentRevision;
+import com.ktc4.pusan4.judgment.domain.JudgmentRevision.JudgedTransaction;
 import com.ktc4.pusan4.judgment.domain.UnmatchedReason;
 import com.ktc4.pusan4.judgment.domain.Verdict;
 import com.ktc4.pusan4.shared.api.Coded;
@@ -38,4 +40,30 @@ public record JudgmentResponse(
     OffsetDateTime computedAt,
     List<CitationResponse> citations
 ) {
+
+    /** explanation 은 출처(RuleCard reason)가 아직 없어 비워 둔다. */
+    static JudgmentResponse from(JudgmentRevision judgment) {
+        JudgedTransaction transaction = judgment.transaction();
+        return new JudgmentResponse(judgment.id(), judgment.transactionId(),
+            new TransactionSummary(transaction.approvedAt(), transaction.merchantRaw(), transaction.merchantNorm(),
+                transaction.merchantCategory(), transaction.amount(), transaction.installmentMonths()),
+            judgment.revision(), judgment.origin(), verdict(judgment.verdict()), judgment.blockedAtGate(),
+            judgment.outOfScope(), judgment.account(), judgment.finalAmount(), judgment.inference(),
+            judgment.unmatchedReason(), judgment.attributes(), judgment.ruleCardId(), judgment.ruleCardVersion(),
+            judgment.appliedRuleIds(), judgment.rulesCommitSha(), judgment.userContextVersion(),
+            /* explanation */ null, judgment.computedAt(),
+            judgment.citations().stream()
+                .map(citation -> new CitationResponse(citation.statuteVersionId(), citation.statuteId()))
+                .toList());
+    }
+
+    /** 화면 문구는 api.md 2.1 을 따른다. */
+    static Coded<Verdict> verdict(Verdict verdict) {
+        String label = switch (verdict) {
+            case AVAILABLE -> "가능";
+            case UNAVAILABLE -> "불가";
+            case NEEDS_REVIEW -> "확인 필요";
+        };
+        return new Coded<>(verdict, label);
+    }
 }

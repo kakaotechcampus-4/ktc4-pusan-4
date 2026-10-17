@@ -1,5 +1,6 @@
 package com.ktc4.pusan4.judgment.persistence;
 
+import com.ktc4.pusan4.judgment.domain.JudgmentRevision.JudgedTransaction;
 import com.ktc4.pusan4.judgment.domain.TransactionInput;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -93,6 +94,10 @@ class TransactionRecordEntity {
     protected TransactionRecordEntity() {
     }
 
+    UUID id() {
+        return id;
+    }
+
     UUID userId() {
         return userId;
     }
@@ -111,6 +116,12 @@ class TransactionRecordEntity {
 
     String merchantCategory() {
         return merchantCategory;
+    }
+
+    JudgedTransaction toJudged() {
+        return new JudgedTransaction(
+            approvedAt, merchantRaw, merchantNorm, merchantCategory, amount, installmentMonths
+        );
     }
 
     TransactionInput toInput() {
