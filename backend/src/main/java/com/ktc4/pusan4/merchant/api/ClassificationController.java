@@ -1,7 +1,6 @@
 package com.ktc4.pusan4.merchant.api;
 
 import com.ktc4.pusan4.shared.api.ErrorResponse;
-import com.ktc4.pusan4.shared.api.MockResponse;
 import com.ktc4.pusan4.shared.api.PageResponse;
 import com.ktc4.pusan4.shared.auth.CurrentUser;
 import com.ktc4.pusan4.transaction.domain.ClassificationReviewGroup;
@@ -13,6 +12,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,11 +27,9 @@ import java.util.UUID;
 @RestController
 public class ClassificationController {
 
-    private final ClassificationMockData mockData;
     private final ClassificationReviewService reviewService;
 
-    public ClassificationController(ClassificationMockData mockData, ClassificationReviewService reviewService) {
-        this.mockData = mockData;
+    public ClassificationController(ClassificationReviewService reviewService) {
         this.reviewService = reviewService;
     }
 
@@ -64,9 +62,10 @@ public class ClassificationController {
             ClassificationUnresolved.from(result), PageResponse.of(result.page()).page());
     }
 
-    @MockResponse
     @Operation(summary = "미분류 거래 분류 응답",
-        description = "Review → RESOLVED, Transaction.merchantCategory 확정. 분류 응답은 UserFact 로 저장하지 않는다")
+        description = "Review → RESOLVED, Transaction.merchantCategory 확정, 답을 개인 가맹점 사전에 남긴다. "
+            + "분류 응답은 UserFact 로 저장하지 않는다. Batch 에 완료된 JudgmentRun 이 있으면 그 run 의 문진 버전으로 "
+            + "해결한 판정 대상 거래만 다시 판정한다(origin CLASSIFICATION_REVIEW)")
     @ApiResponse(responseCode = "404", description = "CLASSIFICATION_REVIEW_NOT_FOUND",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @ApiResponse(responseCode = "409", description = "CLASSIFICATION_ALREADY_RESOLVED",
@@ -75,7 +74,10 @@ public class ClassificationController {
         + "REVIEWS_FROM_DIFFERENT_BATCHES — reviewIds 가 서로 다른 배치에 걸쳐 있음",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @PostMapping("/classification-responses")
-    public ClassificationAnswerResponse answer(@RequestBody ClassificationAnswerRequest request) {
-        return mockData.answer();
+    public ClassificationAnswerResponse answer(
+        CurrentUser currentUser, @Valid @RequestBody ClassificationAnswerRequest request
+    ) {
+        return ClassificationAnswerResponse.from(
+            reviewService.answer(currentUser.id(), request.reviewIds(), request.merchantCategory()));
     }
 }

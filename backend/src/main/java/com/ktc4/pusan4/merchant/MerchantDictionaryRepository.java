@@ -3,6 +3,7 @@ package com.ktc4.pusan4.merchant;
 import jakarta.persistence.EntityManager;
 import org.springframework.stereotype.Repository;
 
+import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -39,6 +40,28 @@ public class MerchantDictionaryRepository {
             .getResultList()
             .stream()
             .findFirst();
+    }
+
+    /**
+     * 사용자의 분류 응답을 개인 사전에 남긴다 (api.md 3.5, docs/backend_api_plan.md B8). 같은 pattern 이 있으면 덮어쓴다.
+     * pattern 은 거래의 merchantNorm 이다. 분류기가 같은 값으로 사전을 찾는다({@code ClassificationResult}).
+     */
+    public void savePersonal(UUID userId, String merchantNorm, String merchantCategory, OffsetDateTime resolvedAt) {
+        entityManager.createNativeQuery("""
+                insert into merchant_dict (user_id, pattern, merchant_norm, merchant_category, source, resolved_at,
+                                           confidence)
+                values (:userId, :pattern, :pattern, :category, 'user', :resolvedAt, 1)
+                on conflict (user_id, pattern) where user_id is not null
+                do update set merchant_category = excluded.merchant_category,
+                              source = excluded.source,
+                              resolved_at = excluded.resolved_at,
+                              confidence = excluded.confidence
+                """)
+            .setParameter("userId", userId)
+            .setParameter("pattern", merchantNorm)
+            .setParameter("category", merchantCategory)
+            .setParameter("resolvedAt", resolvedAt)
+            .executeUpdate();
     }
 
     /**
