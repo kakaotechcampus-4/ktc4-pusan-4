@@ -20,7 +20,6 @@ import java.util.Map;
 import java.util.UUID;
 
 import static com.ktc4.pusan4.shared.api.MockFixtures.BATCH_ID;
-import static com.ktc4.pusan4.shared.api.MockFixtures.CONTEXT_ID;
 import static com.ktc4.pusan4.shared.api.MockFixtures.FACT_ID;
 import static com.ktc4.pusan4.shared.api.MockFixtures.JUDGMENT_ID;
 import static com.ktc4.pusan4.shared.api.MockFixtures.OVERRIDE_ID;
@@ -40,7 +39,6 @@ import static com.ktc4.pusan4.shared.api.MockFixtures.singlePage;
 public class JudgmentMockData {
 
     private static final int TOTAL_COUNT = 23;
-    private static final OffsetDateTime RUN_STARTED_AT = OffsetDateTime.parse("2026-09-12T14:01:00+09:00");
     private static final OffsetDateTime RUN_COMPLETED_AT = OffsetDateTime.parse("2026-09-12T14:05:00+09:00");
     private static final String RULES_COMMIT_SHA = "0000000000000000000000000000000000000000";
     private static final List<CitationResponse> CITATIONS = List.of(new CitationResponse(1418, "소득세법-27-1"));
@@ -50,21 +48,6 @@ public class JudgmentMockData {
     /** TransactionMockData 의 스타벅스 거래와 같은 값 */
     private static final TransactionSummary STARBUCKS = new TransactionSummary(LocalDate.parse("2026-01-12"),
         "스타벅스코리아 서면점", "스타벅스", "카페", 12_800L, 0);
-
-    public JudgmentRunCreatedResponse createRun() {
-        return new JudgmentRunCreatedResponse(RUN_ID, BATCH_ID, CONTEXT_ID, 1,
-            new Coded<>(JudgmentRunStatus.QUEUED, "대기"), TOTAL_COUNT);
-    }
-
-    public JudgmentRunResponse run() {
-        return new JudgmentRunResponse(RUN_ID, BATCH_ID, CONTEXT_ID, 1,
-            new Coded<>(JudgmentRunStatus.COMPLETED, "완료"), TOTAL_COUNT, TOTAL_COUNT, 0,
-            RUN_STARTED_AT, RUN_COMPLETED_AT);
-    }
-
-    public PageResponse<JudgmentRunFailureResponse> runFailures() {
-        return page(List.of());
-    }
 
     public PageResponse<JudgmentResponse> judgments() {
         return page(List.of(judgment()));

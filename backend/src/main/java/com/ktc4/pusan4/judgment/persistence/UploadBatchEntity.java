@@ -42,4 +42,8 @@ class UploadBatchEntity {
 
     protected UploadBatchEntity() {
     }
+
+    UUID userId() {
+        return userId;
+    }
 }

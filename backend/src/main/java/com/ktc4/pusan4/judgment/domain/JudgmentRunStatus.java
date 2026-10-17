@@ -1,4 +1,4 @@
-package com.ktc4.pusan4.judgment.api;
+package com.ktc4.pusan4.judgment.domain;
 
 /**
  * JudgmentRun 상태 (api.md 2.7). NEEDS_REVIEW 판정이 있어도 COMPLETED 다.
