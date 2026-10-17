@@ -1,5 +1,6 @@
 package com.ktc4.pusan4.judgment.api;
 
+import com.ktc4.pusan4.judgment.api.JudgmentSummaryResponse.Scope;
 import com.ktc4.pusan4.judgment.domain.Verdict;
 import com.ktc4.pusan4.judgment.persistence.JudgmentListQuery;
 import com.ktc4.pusan4.judgment.persistence.JudgmentQueryService;
@@ -62,23 +63,34 @@ public class JudgmentController {
         return PageResponse.of(queryService.list(currentUser.id(), query, page, size).map(JudgmentResponse::from));
     }
 
-    @MockResponse
-    @Operation(summary = "판정 결과 요약", description = "batchId, year, runId 중 정확히 하나를 사용한다")
+    @Operation(summary = "판정 결과 요약",
+        description = "batchId, year, runId 중 정확히 하나를 사용한다. batchId·year 는 현재 판정, runId 는 그 Run 이 만든 판정")
     @ApiResponse(responseCode = "400", description = "INVALID_SUMMARY_SCOPE — batchId, year, runId 가 0개거나 2개 이상",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @GetMapping("/summary")
     public JudgmentSummaryResponse summary(
+        CurrentUser currentUser,
         @RequestParam(required = false) UUID batchId,
         @RequestParam(required = false) Integer year,
         @RequestParam(required = false) UUID runId
     ) {
-        // 목 응답이어도 스코프 검사는 입력만으로 판단할 수 있어 지금 적용한다
         long scopes = Stream.of(batchId, year, runId).filter(Objects::nonNull).count();
         if (scopes != 1) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_SUMMARY_SCOPE",
                 "batchId, year, runId 중 정확히 하나를 지정해야 합니다.");
         }
-        return mockData.summary();
+        return JudgmentSummaryResponse.from(scope(batchId, year, runId),
+            queryService.summary(currentUser.id(), batchId, year, runId));
+    }
+
+    private static Scope scope(UUID batchId, Integer year, UUID runId) {
+        if (batchId != null) {
+            return new Scope("BATCH", batchId.toString());
+        }
+        if (year != null) {
+            return new Scope("YEAR", year.toString());
+        }
+        return new Scope("RUN", runId.toString());
     }
 
     @Operation(summary = "판정 상세", description = "현재 판정이 아닌 이전 revision 도 조회할 수 있다")

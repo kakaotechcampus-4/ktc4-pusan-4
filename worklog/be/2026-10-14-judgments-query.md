@@ -38,3 +38,35 @@
 
 - `frontend/src/api/http.ts` 의 `judgments.list` 가 `latestOnly` 를 보내지 않는다. 상세 패널의 이력 조회가 실제 서버에서는 현재 판정만 받는다. 프론트에서 고쳐야 한다.
 - 같은 날 be 기록(2026-10-14-statutes.md)은 다른 브랜치(feature/statutes)에 있어, 이어 쓰지 않고 새 파일로 남겼다.
+
+## 01:33 GET /judgments/summary 를 목에서 실제 집계로 바꾼다 (A3b)
+
+- 브랜치: feature/judgments-summary (base: feature/judgments-query)
+- 커밋: 0119a7e (1개)
+- 주요파일: JudgmentSummary.java, JudgmentSummaryTest.java, JudgmentQueryService.java, JudgmentSummaryResponse.java
+
+### 한 일
+
+- `JudgmentQueryService.summary` 가 A3a 의 `findPage` 를 페이지 없이(`Pageable.unpaged()`) 불러 집계한다. batchId·year 는 현재 판정, runId 는 그 Run 이 만든 판정이다.
+- 집계 규칙은 순수 도메인 `JudgmentSummary.of` 에 두었다.
+  - byVerdict 는 판정이 없어도 세 verdict 를 모두 0 으로 넣는다. finalAmount 가 비어 있으면 0 으로 센다.
+  - byAccount 는 AVAILABLE 이면서 계정이 있는 판정만 모은다. finalAmount 내림차순, 같으면 계정 이름순이다.
+- scope 는 요청 값으로 만든다(BATCH·YEAR·RUN). `INVALID_SUMMARY_SCOPE` 검사는 그대로다.
+- `JudgmentMockData.summary()` 를 지웠다.
+
+### 왜 이렇게 했나
+
+- 목록과 같은 쿼리를 쓰면 현재 판정 규칙(override 우선, 제외 거래 빼기)이 한 곳에만 있다. SQL 로 group by 하려면 같은 조건을 두 번 더 써야 한다.
+- byAccount 를 AVAILABLE 만으로 한 것은 프론트 목(`judgments.summary`)과 같다.
+- 금액이 같을 때 계정 이름순은 내 판단이다. 금액 계산(A6) 전이라 금액이 모두 0 이어서, 정하지 않으면 순서가 흔들린다.
+- 다른 사용자의 batch·run 은 404 가 아니라 빈 집계다. 프론트 목, A3a 목록과 같다.
+
+### 확인한 것
+
+- `JudgmentSummaryTest` 2개, 목 상태 뼈대에서 먼저 실패하는 것을 봤다.
+- `JudgmentQueryIntegrationTest` 에 batch·run 집계 1개. 목 상태에서 먼저 실패했고, 집계 대상을 모든 revision 으로 바꾸면 실패한다.
+- `gradlew -p backend check` 통과(test 290, integrationTest 77). PMD 19건 그대로.
+
+### 남은 것 · 아는 문제
+
+- 대상 판정을 모두 읽어 Java 에서 합친다. 연도 단위로 수천 건이면 느릴 수 있다. 실측하지 않았다.

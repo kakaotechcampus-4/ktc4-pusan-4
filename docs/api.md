@@ -1656,6 +1656,12 @@ GET /api/v1/judgments/summary?runId=R1
 }
 ```
 
+`byVerdict`는 세 verdict를 늘 담는다. 판정이 없는 verdict는 `count`·`finalAmount`가 0이다. `finalAmount`가 아직 없는 Judgment(금액 계산 전)는 0으로 더한다.
+
+`byAccount`는 `AVAILABLE`이면서 `account`가 있는 Judgment만 모은다. 정렬은 `finalAmount DESC`이고, 같으면 `account` 이름순이다.
+
+다른 사용자의 `batchId`·`runId`를 넘기면 404가 아니라 빈 집계(`totalCount` 0)다.
+
 ---
 
 ## `GET /api/v1/judgments/{judgmentId}`

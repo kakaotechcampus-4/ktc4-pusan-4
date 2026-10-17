@@ -209,6 +209,37 @@ class JudgmentQueryIntegrationTest {
             .andExpect(jsonPath("$.items").isEmpty());
     }
 
+    @Test
+    void summary_counts_current_judgments_of_batch_and_judgments_created_by_run() throws Exception {
+        // given: run 뒤에 다시 판정한 거래, run 뒤에 사용자가 제외한 거래
+        UUID rejudged = insertTransaction(batchId, "2025-10-08", "JUDGEABLE", "AUTO");
+        insertJudgment(rejudged, 1, "NEEDS_REVIEW", "run_id", runId, "2025-10-09T10:00:00+09:00");
+        UUID latest = insertJudgment(rejudged, 2, "AVAILABLE", "run_id", insertRun(batchId),
+            "2025-10-10T10:00:00+09:00");
+        jdbcTemplate.update("update judgment set account = '소모품비' where id = ?", latest);
+        UUID excludedLater = insertTransaction(batchId, "2025-10-08", "JUDGEABLE", "EXCLUDED");
+        insertJudgment(excludedLater, 1, "UNAVAILABLE", "run_id", runId, "2025-10-09T10:00:00+09:00");
+
+        // when / then: batch 는 현재 판정(제외 거래 빼고)만 센다
+        mockMvc.perform(get("/api/v1/judgments/summary").param("batchId", batchId.toString()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.scope.type").value("BATCH"))
+            .andExpect(jsonPath("$.scope.id").value(batchId.toString()))
+            .andExpect(jsonPath("$.totalCount").value(1))
+            .andExpect(jsonPath("$.byVerdict.AVAILABLE.count").value(1))
+            .andExpect(jsonPath("$.byVerdict.NEEDS_REVIEW.count").value(0))
+            .andExpect(jsonPath("$.byAccount[0].account").value("소모품비"));
+
+        // when / then: run 은 그 run 이 만든 판정을 그대로 센다
+        mockMvc.perform(get("/api/v1/judgments/summary").param("runId", runId.toString()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.scope.type").value("RUN"))
+            .andExpect(jsonPath("$.totalCount").value(2))
+            .andExpect(jsonPath("$.byVerdict.NEEDS_REVIEW.count").value(1))
+            .andExpect(jsonPath("$.byVerdict.UNAVAILABLE.count").value(1))
+            .andExpect(jsonPath("$.byAccount").isEmpty());
+    }
+
     private UUID insertUser() {
         UUID id = UUID.randomUUID();
         jdbcTemplate.update("insert into app_user(id, email) values (?, ?)", id, id + "@example.com");

@@ -7,6 +7,7 @@ import com.ktc4.pusan4.judgment.domain.JudgmentOriginType;
 import com.ktc4.pusan4.judgment.domain.JudgmentRevision;
 import com.ktc4.pusan4.judgment.domain.JudgmentRevision.CitedStatute;
 import com.ktc4.pusan4.judgment.domain.JudgmentRevision.JudgedTransaction;
+import com.ktc4.pusan4.judgment.domain.JudgmentSummary;
 import com.ktc4.pusan4.judgment.domain.UnmatchedReason;
 import com.ktc4.pusan4.judgment.domain.UserFact;
 import com.ktc4.pusan4.judgment.domain.Verdict;
@@ -150,6 +151,10 @@ class JudgmentEntity {
             unmatchedReason == null ? null : UnmatchedReason.valueOf(unmatchedReason),
             attributes, ruleCardId, ruleCardVersion, appliedRuleIds, rulesCommitSha, userContextVersion,
             computedAt, citations);
+    }
+
+    JudgmentSummary.Row toSummaryRow() {
+        return new JudgmentSummary.Row(Verdict.valueOf(verdict), account, finalAmount);
     }
 
     private JudgmentOrigin origin() {

@@ -1,8 +1,5 @@
 package com.ktc4.pusan4.judgment.api;
 
-import com.ktc4.pusan4.judgment.api.JudgmentSummaryResponse.AccountSummary;
-import com.ktc4.pusan4.judgment.api.JudgmentSummaryResponse.Scope;
-import com.ktc4.pusan4.judgment.api.JudgmentSummaryResponse.VerdictSummary;
 import com.ktc4.pusan4.judgment.domain.Gate;
 import com.ktc4.pusan4.judgment.domain.JudgmentOrigin;
 import com.ktc4.pusan4.judgment.domain.JudgmentOriginType;
@@ -13,7 +10,6 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -34,7 +30,6 @@ import static com.ktc4.pusan4.shared.api.MockFixtures.singlePage;
 @Component
 public class JudgmentMockData {
 
-    private static final int TOTAL_COUNT = 23;
     private static final String RULES_COMMIT_SHA = "0000000000000000000000000000000000000000";
     private static final List<CitationResponse> CITATIONS = List.of(new CitationResponse(1418, "소득세법-27-1"));
     private static final String PURPOSE_QUESTION = "이 가맹점에서 쓴 비용은 주로 어떤 목적이었나요?";
@@ -43,15 +38,6 @@ public class JudgmentMockData {
     /** TransactionMockData 의 스타벅스 거래와 같은 값 */
     private static final TransactionSummary STARBUCKS = new TransactionSummary(LocalDate.parse("2026-01-12"),
         "스타벅스코리아 서면점", "스타벅스", "카페", 12_800L, 0);
-
-    public JudgmentSummaryResponse summary() {
-        Map<Verdict, VerdictSummary> byVerdict = new EnumMap<>(Verdict.class);
-        byVerdict.put(Verdict.AVAILABLE, new VerdictSummary(11, 1_530_066L));
-        byVerdict.put(Verdict.UNAVAILABLE, new VerdictSummary(6, 0L));
-        byVerdict.put(Verdict.NEEDS_REVIEW, new VerdictSummary(6, 0L));
-        return new JudgmentSummaryResponse(new Scope("BATCH", BATCH_ID.toString()), TOTAL_COUNT, byVerdict,
-            List.of(new AccountSummary("지급수수료", 3, 178_800L)));
-    }
 
     /**
      * 스타벅스 거래 첫 판정(NEEDS_REVIEW)의 다음 revision. Override 는 verdict 만 바꾸고 나머지는 원본에서 이어받는다
