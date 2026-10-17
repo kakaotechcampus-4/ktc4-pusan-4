@@ -24,18 +24,26 @@ import {
 
 /** 토큰 값은 tailwind.config.js와 같아야 한다. 여기서는 보여주기용으로만 적는다. */
 const COLORS: { name: string; cls: string; hex: string; use: string }[] = [
-{ name: 'canvas', cls: 'bg-canvas', hex: '#F6F7F9', use: '페이지 바탕, 구분 섹션' },
-{ name: 'surface', cls: 'bg-surface', hex: '#FFFFFF', use: '카드, 헤더, 입력' },
-{ name: 'line', cls: 'bg-line', hex: '#E4E7EC', use: '테두리 기본' },
-{ name: 'line2', cls: 'bg-line2', hex: '#F0F2F5', use: '약한 구분선, 칩 배경' },
-{ name: 'ink', cls: 'bg-ink', hex: '#101418', use: '제목, 본문 강조, 다크 섹션' },
-{ name: 'ink2', cls: 'bg-ink2', hex: '#3A424D', use: '본문' },
-{ name: 'muted', cls: 'bg-muted', hex: '#6B7480', use: '보조 설명, 캡션' },
-{ name: 'accent', cls: 'bg-accent', hex: '#1F4FD8', use: 'CTA, 링크, 아이브로우' },
-{ name: 'accent-soft', cls: 'bg-accent-soft', hex: '#EEF2FE', use: 'soft 버튼 배경' },
-{ name: 'ok', cls: 'bg-ok', hex: '#0B7A4B', use: '가능' },
-{ name: 'warn', cls: 'bg-warn', hex: '#8A5209', use: '확인 필요' },
-{ name: 'deny', cls: 'bg-deny', hex: '#B02318', use: '불가' }];
+{ name: 'canvas', cls: 'bg-canvas', hex: '#FFFFFF', use: '페이지 바탕' },
+{ name: 'surface', cls: 'bg-surface', hex: '#F5F6F8', use: '패널, 카드' },
+{ name: 'surface2', cls: 'bg-surface2', hex: '#FFE600', use: '첫 화면 큰 판' },
+{ name: 'sheet', cls: 'bg-sheet', hex: '#FFFFFF', use: '패널 위 흰 바탕, 표' },
+{ name: 'line', cls: 'bg-line', hex: '#ECEEF1', use: '테두리 기본, 행 괘선' },
+{ name: 'line2', cls: 'bg-line2', hex: '#F5F6F8', use: '약한 구분선' },
+{ name: 'rule', cls: 'bg-rule', hex: '#1A1A1A', use: '표 머리 위 굵은 괘선' },
+{ name: 'ink', cls: 'bg-ink', hex: '#0A0A0A', use: '제목, 주된 동작, 어두운 판' },
+{ name: 'ink2', cls: 'bg-ink2', hex: '#2B2B2B', use: '본문' },
+{ name: 'muted', cls: 'bg-muted', hex: '#5D6670', use: '보조 설명, 캡션' },
+{ name: 'accent', cls: 'bg-accent', hex: '#0A0A0A', use: 'CTA, 지금 자리 알약' },
+{ name: 'accent-line', cls: 'bg-accent-line', hex: '#DDE1E6', use: '테두리 버튼, 패널 안 구분선' },
+{ name: 'link', cls: 'bg-link', hex: '#1A6DFF', use: '문장 속 링크' },
+{ name: 'highlight', cls: 'bg-highlight', hex: '#FFE600', use: '한 화면에 한 번 쓰는 강조' },
+{ name: 'ok', cls: 'bg-ok', hex: '#00703D', use: '가능 — 글자' },
+{ name: 'ok-bar', cls: 'bg-ok-bar', hex: '#12B76A', use: '가능 — 막대·점' },
+{ name: 'warn', cls: 'bg-warn', hex: '#955A00', use: '확인 필요 — 글자' },
+{ name: 'warn-bar', cls: 'bg-warn-bar', hex: '#F7A51B', use: '확인 필요 — 막대·점' },
+{ name: 'deny', cls: 'bg-deny', hex: '#C92A2A', use: '불가 — 글자' },
+{ name: 'deny-bar', cls: 'bg-deny-bar', hex: '#FF5A5A', use: '불가 — 막대·점' }];
 
 
 const TYPE: { token: string; cls: string; spec: string; use: string }[] = [

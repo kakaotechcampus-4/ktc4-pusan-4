@@ -279,7 +279,7 @@ export function Run() {
                     
                     <span className="flex h-5 w-5 shrink-0 items-center justify-center">
                       {gateDone ?
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-ok">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-ok-bar">
                           <CheckIcon
                           className="h-3 w-3 text-white"
                           strokeWidth={3}

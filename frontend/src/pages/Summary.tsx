@@ -174,9 +174,9 @@ export function Summary() {
   const total = summary?.totalCount ?? 0;
 
   const distribution = [
-  { label: '가능', value: counts.available, bar: 'bg-ok' },
-  { label: '확인 필요', value: counts.needsReview, bar: 'bg-warn' },
-  { label: '불가', value: counts.unavailable, bar: 'bg-deny' }];
+  { label: '가능', value: counts.available, bar: 'bg-ok-bar' },
+  { label: '확인 필요', value: counts.needsReview, bar: 'bg-warn-bar' },
+  { label: '불가', value: counts.unavailable, bar: 'bg-deny-bar' }];
 
 
   // 계정과목이 없는 인정 경비(예: 사용자가 가능으로 바꾼 거래)도 표에 남겨 합계가 맞게 한다
