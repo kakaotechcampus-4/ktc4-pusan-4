@@ -105,7 +105,7 @@ export const httpApi: Api = {
   },
 
   uploads: {
-    create: (body) => post('/upload-batches', body, crypto.randomUUID()),
+    create: (body, idempotencyKey) => post('/upload-batches', body, idempotencyKey),
     list: (query) => get('/upload-batches', page(query)),
     get: (batchId) => get(`/upload-batches/${batchId}`),
     remove: (batchId) => del(`/upload-batches/${batchId}`)

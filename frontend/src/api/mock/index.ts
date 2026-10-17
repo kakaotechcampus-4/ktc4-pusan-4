@@ -129,7 +129,9 @@ const store = {
   /** 다음 Run 에서 기술적으로 실패시킬 거래 수 (개발용) */
   failNext: 0,
   /** runId → 실패 목록 */
-  failures: new Map<string, JudgmentRunFailure[]>()
+  failures: new Map<string, JudgmentRunFailure[]>(),
+  /** 다음 업로드를 이 오류로 실패시킨다 (개발용) */
+  failUpload: null as ApiRequestError | null
 };
 
 const latestOf = (transactionId: string) =>
@@ -352,7 +354,13 @@ export const mockApi: Api = {
   },
 
   uploads: {
+    // 목업은 Idempotency-Key 재사용·중복 파일을 흉내 내지 않는다. 오류 화면은 failNextUpload 로 본다
     create: (body) => {
+      const failure = store.failUpload;
+      if (failure) {
+        store.failUpload = null;
+        return new Promise((_, reject) => window.setTimeout(() => reject(failure), LATENCY_MS));
+      }
       const batch: UploadBatch = {
         id: nextId('0199c8f2'),
         sourceType: body.sourceType,
@@ -365,7 +373,14 @@ export const mockApi: Api = {
         createdAt: now()
       };
       store.batches.unshift(batch);
-      return delay(batch);
+      // 201 응답은 다섯 필드뿐이다 (api.md 3.3)
+      return delay({
+        id: batch.id,
+        transactionCount: batch.transactionCount,
+        skippedDuplicateCount: batch.skippedDuplicateCount,
+        classificationPendingCount: batch.classificationPendingCount,
+        createdAt: batch.createdAt
+      });
     },
     list: (q) => delay(paginate(store.batches, q?.page, q?.size)),
     get: (id) => {
@@ -847,6 +862,18 @@ export const mockApi: Api = {
 export const mockControls = {
   failNextRun(count: number) {
     store.failNext = Math.max(0, count);
+  },
+  /**
+   * 다음 업로드 한 번을 이 오류로 실패시킨다. 콘솔에서:
+   *   (await import('/src/api/mock/index.ts')).mockControls.failNextUpload({ status: 0, code: 'NETWORK_ERROR' })
+   */
+  failNextUpload(error: {status: number;code: string;message?: string;traceId?: string;}) {
+    store.failUpload = new ApiRequestError(
+      error.status,
+      error.code,
+      error.message ?? `요청을 처리하지 못했습니다. (${error.status})`,
+      error.traceId
+    );
   }
 };
 

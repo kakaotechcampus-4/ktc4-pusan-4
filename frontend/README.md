@@ -14,6 +14,7 @@ npm run dev        # http://localhost:5173
 | `npm run dev` | 개발 서버 |
 | `npm run build` | 프로덕션 빌드 (`dist/`) |
 | `npm run lint` | ESLint |
+| `npm test` | 단위 테스트 (vitest) |
 
 타입 검사: `npx tsc --noEmit`
 
@@ -25,7 +26,8 @@ src/
   components/ui/   공용 부품 (Button, Card, Badge, SectionHeading, Container, Field·Input·Select, ChoiceGroup)
   components/      도메인 부품 (VerdictBadge, StatuteCitation, AgentPreview, AppShell …)
   pages/           라우트별 화면 (Landing, Login, Upload, Interview, …, Styleguide)
-  mock/            화면 전용 목업 (마케팅 카피, 히어로 트레이스, 업로드 샘플 파일)
+  parser/          카드내역 파서 — KB국민·IBK기업 승인내역 .xls 를 브라우저에서 읽어 업로드 요청으로 바꾼다
+  mock/            화면 전용 목업 (마케팅 카피, 히어로 트레이스)
   contexts/        세션 상태 (로그인, 현재 batch·context·run id)
   types/           도메인 타입 (API 명세와 1:1)
   utils/           포맷·판정 메타
@@ -58,5 +60,6 @@ await api.questions.respond({ questionIds, answer: { value } });
 
 - 랜딩 페이지는 디자인 시스템 부품으로 구성됨
 - 앱 화면은 `api` 목업으로 동작. 업로드 → 분류 확인 → 문진 → 판정 → 결과 → 되묻기 순
+- `/upload` 는 파일을 브라우저에서 읽고(`src/parser/`) `POST /upload-batches` 로 보낸다. 샘플 파일은 목업 모드에서만 보인다
 - `/preview` `/uploads` `/transactions` `/account` 는 라우트만 있는 빈 화면
 - 백엔드 연동 없음

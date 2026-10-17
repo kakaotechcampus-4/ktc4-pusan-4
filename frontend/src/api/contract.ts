@@ -27,6 +27,7 @@ import type {
   Statute,
   Transaction,
   UploadBatch,
+  UploadBatchCreated,
   UploadBatchRequest,
   User,
   Verdict } from
@@ -94,8 +95,11 @@ export interface Api {
   };
   /** 3.3 업로드 */
   uploads: {
-    /** Idempotency-Key 헤더는 구현이 붙인다 */
-    create(body: UploadBatchRequest): Promise<UploadBatch>;
+    /**
+     * idempotencyKey 는 Idempotency-Key 헤더로 간다 (1.6). 화면이 들고 있다가
+     * 응답을 못 받은 재시도에는 같은 키를 넘겨야 첫 응답이 다시 온다
+     */
+    create(body: UploadBatchRequest, idempotencyKey: string): Promise<UploadBatchCreated>;
     list(query?: PageQuery): Promise<Page<UploadBatch>>;
     get(batchId: string): Promise<UploadBatch>;
     /** 배치와 파생 데이터(거래·판정·질문)를 함께 지운다 */

@@ -7,7 +7,7 @@ import { Badge, Button, ChoiceGroup, Input } from '../ui';
 import { VerdictBadge } from '../VerdictBadge';
 import { StatuteCitation } from '../StatuteCitation';
 import { VERDICT_LABEL } from '../../utils/verdict';
-import { formatFullDate, formatWon, ro } from '../../utils/format';
+import { formatDateTime, formatFullDate, formatWon, ro } from '../../utils/format';
 
 /** 2.8 이 revision 이 생긴 직접 원인 */
 const ORIGIN_LABEL: Record<JudgmentOriginType, string> = {
@@ -141,6 +141,8 @@ export function JudgmentDetailPanel({
   const engine = overridden ?
   historyQ.data?.items.find((revision) => revision.origin.type !== 'OVERRIDE') :
   undefined;
+  // 설명·안내·막힌 게이트가 모두 없으면 「판정 이유」 칸을 통째로 뺀다. 근거는 바로 아래 조문 칸에 있다
+  const hasReason = Boolean(reviewState || overridden || judgment.explanation || judgment.blockedAtGate);
   const targets: Target[] = (['AVAILABLE', 'UNAVAILABLE'] as const).filter(
     (code) => code !== judgment.verdict.code
   );
@@ -239,6 +241,7 @@ export function JudgmentDetailPanel({
         </div>
       </dl>
 
+      {hasReason &&
       <section className="border-b border-line px-5 py-4">
         <h3 className="text-small font-semibold text-ink">판정 이유</h3>
         {reviewState &&
@@ -255,22 +258,25 @@ export function JudgmentDetailPanel({
           }
           </div>
         }
+        {/* 설명이 없으면 문장을 뺀다. 실서버는 아직 늘 null 이라(#132), 「설명이 없다」를 띄우면
+            모든 판정에 같은 문장이 붙는다 */}
+        {(overridden || judgment.explanation) &&
         <p className="mt-2 text-small leading-6 text-ink2">
           {overridden ?
           engine ?
           '직접 수정한 판정입니다. 규칙 엔진의 판정은 아래와 같고, 이력에도 그대로 남아 있습니다.' :
           '직접 수정한 판정입니다. 규칙 엔진이 낸 판정은 이력에 그대로 남아 있습니다.' :
-          judgment.explanation ??
-          '적용된 규칙 카드에 설명 문구가 없습니다. 근거 조문을 확인해 주세요.'}
+          judgment.explanation}
         </p>
+        }
         {engine &&
         <div className="mt-2 rounded-xl border border-line bg-canvas px-3.5 py-3 text-small text-ink2">
             <p className="flex items-center gap-2 text-caption text-muted">
               규칙 엔진의 판정 <VerdictBadge verdict={engine.verdict} />
             </p>
-            <p className="mt-1.5 leading-6">
-              {engine.explanation ?? '적용된 규칙 카드에 설명 문구가 없습니다.'}
-            </p>
+            {engine.explanation &&
+          <p className="mt-1.5 leading-6">{engine.explanation}</p>
+          }
           </div>
         }
         {judgment.blockedAtGate && !overridden &&
@@ -280,6 +286,7 @@ export function JudgmentDetailPanel({
           </p>
         }
       </section>
+      }
 
       <section className="border-b border-line px-5 py-4">
         {/* 수정한 판정은 규칙 엔진의 근거를 그대로 들고 있다. 수정의 근거로 읽히지 않게 한다 */}
@@ -350,7 +357,7 @@ export function JudgmentDetailPanel({
           }
           <div className="flex justify-between gap-2">
             <dt>판정 시각</dt>
-            <dd className="text-ink2">{judgment.computedAt.slice(0, 16).replace('T', ' ')}</dd>
+            <dd className="text-ink2">{formatDateTime(judgment.computedAt)}</dd>
           </div>
         </dl>
       </section>
@@ -446,7 +453,7 @@ export function JudgmentDetailPanel({
                 <span className="w-10 shrink-0">rev.{revision.revision}</span>
                 <VerdictBadge verdict={revision.verdict} />
                 <span className="text-ink2">{ORIGIN_LABEL[revision.origin.type]}</span>
-                <span>{revision.computedAt.slice(0, 16).replace('T', ' ')}</span>
+                <span>{formatDateTime(revision.computedAt)}</span>
                 {revision.id === judgment.id && <Badge tone="ink">현재</Badge>}
               </li>
           )}

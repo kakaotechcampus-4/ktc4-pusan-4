@@ -7,7 +7,6 @@ import React, {
   useState } from
 'react';
 import type { BusinessContext, BusinessContextRef } from '../types/domain';
-import type { ParsedBatch } from '../mock/sampleFiles';
 import { api, seedSession } from '../api';
 
 /** 업종은 IT(62010) 고정 */
@@ -29,9 +28,6 @@ interface SessionValue {
   email: string | null;
   signIn: (email: string) => void;
   signOut: () => void;
-  /** 브라우저 파싱 결과 (업로드 화면 → 확인 화면) */
-  batch: ParsedBatch | null;
-  setBatch: (batch: ParsedBatch | null) => void;
   /** 서버에 저장된 배치 id */
   batchId: string | null;
   setBatchId: (id: string | null) => void;
@@ -49,7 +45,6 @@ const SessionContext = createContext<SessionValue | null>(null);
 
 export function SessionProvider({ children }: {children: React.ReactNode;}) {
   const [email, setEmail] = useState<string | null>(null);
-  const [batch, setBatch] = useState<ParsedBatch | null>(null);
   const [batchId, setBatchId] = useState<string | null>(seedSession?.batchId ?? null);
   const [context, setContext] = useState<BusinessContext | null>(null);
   const [contextRef, setContextRef] = useState<BusinessContextRef | null>(seedSession?.contextRef ?? null);
@@ -84,7 +79,6 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
 
   const signOut = useCallback(() => {
     setEmail(null);
-    setBatch(null);
     setBatchId(seedSession?.batchId ?? null);
     setContext(null);
     setContextRef(seedSession?.contextRef ?? null);
@@ -97,8 +91,6 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
       email,
       signIn,
       signOut,
-      batch,
-      setBatch,
       batchId,
       setBatchId,
       context,
@@ -108,7 +100,7 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
       runId,
       setRunId
     }),
-    [email, signIn, signOut, batch, batchId, context, contextRef, runId]
+    [email, signIn, signOut, batchId, context, contextRef, runId]
   );
 
   return (

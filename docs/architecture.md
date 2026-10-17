@@ -94,7 +94,7 @@ flowchart TD
 flowchart LR
     CARD["카드사 (국민 / 기업)"]
     U["사용자"]
-    FILE["승인내역 파일 (xls / csv)"]
+    FILE["승인내역 파일 (.xls)"]
     BROWSER["브라우저 파서"]
     SERVER["백엔드"]
 

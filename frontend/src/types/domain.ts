@@ -150,6 +150,12 @@ export interface UploadBatch {
   createdAt: string;
 }
 
+/** POST /upload-batches 의 201 응답. 카드사·기간은 담기지 않으므로 화면은 보낸 요청에서 읽는다 */
+export type UploadBatchCreated = Pick<
+  UploadBatch,
+  'id' | 'transactionCount' | 'skippedDuplicateCount' | 'classificationPendingCount' | 'createdAt'>;
+
+
 // ── 3.4 거래 ────────────────────────────────────────
 
 export interface Transaction {
