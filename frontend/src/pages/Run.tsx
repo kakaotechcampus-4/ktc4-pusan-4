@@ -29,7 +29,7 @@ const UNKNOWN_FAILURE = { label: '실패', detail: '처리하지 못했습니다
 const GATES = [
 { id: 'G0', label: '형식 검증', detail: '승인내역 여부 · 필수 컬럼 · 중복 키' },
 { id: 'G1', label: '불산입 열거', detail: '소득세법 제33조 각 호 필터' },
-{ id: 'G2', label: '통상성', detail: '제27조 · 업종 프로파일 62010' },
+{ id: 'G2', label: '통상성', detail: '제27조 · 업종 프로파일 940909' },
 { id: 'G3', label: '속성 추출', detail: '자산 · 안분율 · 기간 · 한도버킷' },
 { id: 'G4', label: '금액 산정', detail: '안분 후 절사 · 상각범위액' },
 { id: 'G5', label: '한도 누적', detail: '접대비 · 기부금 버킷' },

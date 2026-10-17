@@ -74,7 +74,7 @@ class ApiResponseContractTest {
             OffsetDateTime.parse("2026-09-01T10:00:00+09:00")));
 
         BusinessContext context = new BusinessContext(UUID.fromString(ID),
-            TemporaryCurrentUserProvider.TEMPORARY_USER_ID, 1, "62010", 82_000_000L, LocalDate.parse("2024-03-15"),
+            TemporaryCurrentUserProvider.TEMPORARY_USER_ID, 1, "940909", 82_000_000L, LocalDate.parse("2024-03-15"),
             BookkeepingDuty.간편장부, false, 20, OffsetDateTime.parse("2026-09-01T10:05:00+09:00"));
         given(contextService.create(any(), any())).willReturn(context);
         given(contextService.current(any())).willReturn(context);
@@ -86,7 +86,7 @@ class ApiResponseContractTest {
             Arguments.of("GET", "/api/v1/users/me", null, 200),
             Arguments.of("DELETE", "/api/v1/users/me", null, 204),
             Arguments.of("POST", "/api/v1/users/me/contexts", """
-                {"industryCode": "62010", "prevYearRevenue": 82000000, "businessOpenDate": "2024-03-15",
+                {"industryCode": "940909", "prevYearRevenue": 82000000, "businessOpenDate": "2024-03-15",
                  "bookkeepingDuty": "간편장부", "hasEmployee": false, "homeOfficeRatio": 20}
                 """, 201),
             Arguments.of("GET", "/api/v1/users/me/contexts", null, 200),
