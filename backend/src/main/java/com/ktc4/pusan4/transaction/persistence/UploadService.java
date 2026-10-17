@@ -127,7 +127,7 @@ public class UploadService {
         List<NewTransaction> fresh = dropDuplicates(userId, input.transactions());
         int skipped = input.transactions().size() - fresh.size();
 
-        UploadBatchEntity batch = new UploadBatchEntity(uuidGenerator.generate(), userId, input, now);
+        UploadBatchEntity batch = new UploadBatchEntity(uuidGenerator.generate(), userId, input, skipped, now);
         entityManager.persist(batch);
 
         List<ClassificationResult> results = merchantClassifier.classifyAll(userId, fresh.stream()

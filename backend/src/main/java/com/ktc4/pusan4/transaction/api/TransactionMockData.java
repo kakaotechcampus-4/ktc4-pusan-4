@@ -5,7 +5,6 @@ import com.ktc4.pusan4.shared.api.PageResponse;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
 import java.util.List;
 
 import static com.ktc4.pusan4.shared.api.MockFixtures.BATCH_ID;
@@ -19,17 +18,7 @@ import static com.ktc4.pusan4.shared.api.MockFixtures.page;
 @Component
 public class TransactionMockData {
 
-    private static final OffsetDateTime UPLOADED_AT = OffsetDateTime.parse("2026-09-12T13:58:00+09:00");
     private static final Coded<SourceStatus> JUDGEABLE = new Coded<>(SourceStatus.JUDGEABLE, "판정대상");
-
-    public PageResponse<UploadBatchResponse> uploadBatches() {
-        return page(List.of(uploadBatch()));
-    }
-
-    public UploadBatchResponse uploadBatch() {
-        return new UploadBatchResponse(BATCH_ID, SourceType.승인내역, CardIssuer.국민,
-            LocalDate.parse("2026-01-01"), LocalDate.parse("2026-01-31"), 24, 0, 1, UPLOADED_AT);
-    }
 
     public PageResponse<TransactionResponse> transactions() {
         return page(List.of(transaction(), unclassifiedTransaction()));

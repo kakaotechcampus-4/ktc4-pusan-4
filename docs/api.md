@@ -808,8 +808,10 @@ size
 정렬:
 
 ```
-createdAt DESC
+createdAt DESC, id DESC
 ```
+
+`transactionCount`와 `classificationPendingCount`는 조회 시점 값이다. 사용자가 분류 확인에 답하면 `classificationPendingCount`가 줄어든다. `skippedDuplicateCount`는 업로드할 때 센 값이다.
 
 응답:
 

@@ -2,10 +2,12 @@ package com.ktc4.pusan4.transaction.api;
 
 import com.ktc4.pusan4.shared.api.ApiException;
 import com.ktc4.pusan4.shared.api.ErrorResponse;
-import com.ktc4.pusan4.shared.api.MockResponse;
 import com.ktc4.pusan4.shared.api.PageResponse;
 import com.ktc4.pusan4.shared.auth.CurrentUser;
+import com.ktc4.pusan4.transaction.persistence.UploadBatchService;
 import com.ktc4.pusan4.transaction.persistence.UploadService;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -34,12 +36,12 @@ public class UploadBatchController {
     // 컬럼 크기(V12 idempotency_key.idempotency_key)
     private static final int IDEMPOTENCY_KEY_MAX = 128;
 
-    private final TransactionMockData mockData;
     private final UploadService uploadService;
+    private final UploadBatchService batchService;
 
-    public UploadBatchController(TransactionMockData mockData, UploadService uploadService) {
-        this.mockData = mockData;
+    public UploadBatchController(UploadService uploadService, UploadBatchService batchService) {
         this.uploadService = uploadService;
+        this.batchService = batchService;
     }
 
     @Operation(summary = "카드내역 업로드",
@@ -72,34 +74,34 @@ public class UploadBatchController {
             uploadService.upload(currentUser.id(), idempotencyKey, UploadRequestValidator.validate(request)));
     }
 
-    @MockResponse
-    @Operation(summary = "업로드 배치 목록", description = "정렬: createdAt DESC")
+    @Operation(summary = "업로드 배치 목록",
+        description = "정렬: createdAt DESC, id DESC. transactionCount·classificationPendingCount 는 조회 시점 값이다")
     @GetMapping
     public PageResponse<UploadBatchResponse> list(
-        @RequestParam(defaultValue = "0") int page,
-        @RequestParam(defaultValue = "20") int size
+        CurrentUser currentUser,
+        @RequestParam(defaultValue = "0") @Min(0) int page,
+        @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size
     ) {
-        return mockData.uploadBatches();
+        return PageResponse.of(batchService.list(currentUser.id(), page, size).map(UploadBatchResponse::from));
     }
 
-    @MockResponse
     @Operation(summary = "배치 상세", description = "목록 items[] 와 같은 형태")
     @ApiResponse(responseCode = "404", description = "BATCH_NOT_FOUND",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @GetMapping("/{batchId}")
-    public UploadBatchResponse detail(@PathVariable UUID batchId) {
-        return mockData.uploadBatch();
+    public UploadBatchResponse detail(CurrentUser currentUser, @PathVariable UUID batchId) {
+        return UploadBatchResponse.from(batchService.get(currentUser.id(), batchId));
     }
 
-    @MockResponse
     @Operation(summary = "배치 및 종속 데이터 삭제",
         description = "Transaction, ClassificationReview, JudgmentRun, Judgment, Question, Batch 범위 UserFact, "
-            + "JudgmentOverride 를 함께 삭제한다. StatuteVersion 은 삭제하지 않는다")
+            + "JudgmentOverride 를 함께 삭제한다. StatuteVersion 은 삭제하지 않는다. "
+            + "이 batch 를 만든 Idempotency-Key 로 다시 보내면 410 IDEMPOTENCY_RESULT_DELETED 다")
     @ApiResponse(responseCode = "404", description = "BATCH_NOT_FOUND",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @DeleteMapping("/{batchId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable UUID batchId) {
-        // 목 응답: 지울 데이터가 없다
+    public void delete(CurrentUser currentUser, @PathVariable UUID batchId) {
+        batchService.delete(currentUser.id(), batchId);
     }
 }
