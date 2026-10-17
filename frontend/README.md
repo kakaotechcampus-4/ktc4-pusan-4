@@ -24,7 +24,7 @@ npm run dev        # http://localhost:5173
 src/
   api/             API 레이어 — contract.ts(명세 3.1~3.7 함수 시그니처), hooks.ts(useApi), mock/(목업 구현·데이터)
   components/ui/   공용 부품 (Button, Card, Badge, SectionHeading, Container, Field·Input·Select, ChoiceGroup)
-  components/      도메인 부품 (VerdictBadge, StatuteCitation, AgentPreview, AppShell …)
+  components/      도메인 부품 (VerdictBadge, StatuteCitation, OrbitStage, AppShell …)
   pages/           라우트별 화면 (Landing, Login, Upload, Interview, …, Styleguide)
   parser/          카드내역 파서 — KB국민·IBK기업 승인내역 .xls 를 브라우저에서 읽어 업로드 요청으로 바꾼다
   mock/            화면 전용 목업 (마케팅 카피, 히어로 트레이스)
