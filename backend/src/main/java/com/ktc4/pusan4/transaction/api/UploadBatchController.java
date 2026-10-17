@@ -4,6 +4,8 @@ import com.ktc4.pusan4.shared.api.ApiException;
 import com.ktc4.pusan4.shared.api.ErrorResponse;
 import com.ktc4.pusan4.shared.api.MockResponse;
 import com.ktc4.pusan4.shared.api.PageResponse;
+import com.ktc4.pusan4.shared.auth.CurrentUser;
+import com.ktc4.pusan4.transaction.persistence.UploadService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -29,13 +31,17 @@ import java.util.UUID;
 @RequestMapping("/upload-batches")
 public class UploadBatchController {
 
-    private final TransactionMockData mockData;
+    // 컬럼 크기(V12 idempotency_key.idempotency_key)
+    private static final int IDEMPOTENCY_KEY_MAX = 128;
 
-    public UploadBatchController(TransactionMockData mockData) {
+    private final TransactionMockData mockData;
+    private final UploadService uploadService;
+
+    public UploadBatchController(TransactionMockData mockData, UploadService uploadService) {
         this.mockData = mockData;
+        this.uploadService = uploadService;
     }
 
-    @MockResponse
     @Operation(summary = "카드내역 업로드",
         description = "naturalKey 중복 거래는 건너뛰고(skippedDuplicateCount), 분류 실패 거래는 미분류로 저장한다. "
             + "Idempotency-Key 동작은 api.md 1.6")
@@ -50,6 +56,7 @@ public class UploadBatchController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public UploadBatchCreatedResponse create(
+        CurrentUser currentUser,
         // 누락을 Spring 기본 처리(VALIDATION_ERROR)가 아니라 api.md 의 IDEMPOTENCY_KEY_REQUIRED 로 응답하려고 직접 검사한다
         @Parameter(required = true, description = "24시간 유효. 같은 키 + 같은 요청이면 최초 응답을 재사용한다")
         @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
@@ -58,7 +65,11 @@ public class UploadBatchController {
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "IDEMPOTENCY_KEY_REQUIRED", "Idempotency-Key 헤더가 필요합니다.");
         }
-        return mockData.createUploadBatch();
+        if (idempotencyKey.length() > IDEMPOTENCY_KEY_MAX) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Idempotency-Key 가 너무 깁니다.");
+        }
+        return UploadBatchCreatedResponse.from(
+            uploadService.upload(currentUser.id(), idempotencyKey, UploadRequestValidator.validate(request)));
     }
 
     @MockResponse

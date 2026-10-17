@@ -6,6 +6,8 @@ import com.ktc4.pusan4.merchant.api.ClassificationMockData;
 import com.ktc4.pusan4.shared.UuidV7Generator;
 import com.ktc4.pusan4.shared.auth.TemporaryCurrentUserProvider;
 import com.ktc4.pusan4.transaction.api.TransactionMockData;
+import com.ktc4.pusan4.transaction.domain.UploadResult;
+import com.ktc4.pusan4.transaction.persistence.UploadService;
 import com.ktc4.pusan4.user.domain.AppUser;
 import com.ktc4.pusan4.user.domain.BookkeepingDuty;
 import com.ktc4.pusan4.user.domain.BusinessContext;
@@ -67,6 +69,9 @@ class ApiResponseContractTest {
     @MockitoBean
     private BusinessContextService contextService;
 
+    @MockitoBean
+    private UploadService uploadService;
+
     @BeforeEach
     void stubServices() {
         given(userService.get(any())).willReturn(new AppUser(
@@ -79,6 +84,9 @@ class ApiResponseContractTest {
         given(contextService.create(any(), any())).willReturn(context);
         given(contextService.current(any())).willReturn(context);
         given(contextService.history(any())).willReturn(List.of(context));
+
+        given(uploadService.upload(any(), any(), any())).willReturn(new UploadResult(UUID.fromString(ID), 1, 0, 0,
+            OffsetDateTime.parse("2026-09-18T01:10:00+09:00")));
     }
 
     static Stream<Arguments> endpoints() {

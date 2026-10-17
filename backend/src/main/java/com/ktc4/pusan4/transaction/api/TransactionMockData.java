@@ -22,10 +22,6 @@ public class TransactionMockData {
     private static final OffsetDateTime UPLOADED_AT = OffsetDateTime.parse("2026-09-12T13:58:00+09:00");
     private static final Coded<SourceStatus> JUDGEABLE = new Coded<>(SourceStatus.JUDGEABLE, "판정대상");
 
-    public UploadBatchCreatedResponse createUploadBatch() {
-        return new UploadBatchCreatedResponse(BATCH_ID, 24, 0, 1, UPLOADED_AT);
-    }
-
     public PageResponse<UploadBatchResponse> uploadBatches() {
         return page(List.of(uploadBatch()));
     }
