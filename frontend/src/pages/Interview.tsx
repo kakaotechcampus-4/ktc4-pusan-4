@@ -28,7 +28,7 @@ const BOOKKEEPING: ChoiceOption<BookkeepingDuty>[] = [
 
 
 const cardClass = 'rounded-2xl border border-line bg-surface p-5';
-const labelClass = 'text-[14px] font-semibold text-ink';
+const labelClass = 'text-[14px] font-bold text-ink';
 const hintClass = 'mt-1 text-[13px] leading-6 text-muted';
 
 export function Interview() {
@@ -67,7 +67,7 @@ export function Interview() {
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
         <form onSubmit={(event) => void submit(event)}>
           <header>
-            <p className="text-[13px] font-semibold text-accent">1단계 · 인식</p>
+            <p className="text-[13px] font-bold text-accent">1단계 · 인식</p>
             <h1 className="mt-1.5 text-[28px] font-bold tracking-tight text-ink">
               사업자 문진
             </h1>
@@ -186,7 +186,7 @@ export function Interview() {
               <div className="mt-4 rounded-xl bg-canvas p-4">
                   <label
                   htmlFor="ratio"
-                  className="text-[13px] font-semibold text-ink">
+                  className="text-[13px] font-bold text-ink">
                   
                     자택에서 작업공간이 차지하는 면적 비율
                   </label>
@@ -203,7 +203,7 @@ export function Interview() {
                     }
                     className="h-1.5 flex-1 accent-accent" />
                   
-                    <span className="w-12 text-right text-[14px] font-semibold tabular-nums text-ink">
+                    <span className="w-12 text-right text-[14px] font-bold tabular-nums text-ink">
                       {form.homeOfficeRatio}%
                     </span>
                   </div>
@@ -215,7 +215,7 @@ export function Interview() {
           <div className="mt-6 flex items-center gap-3">
             <button
               type="submit"
-              className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors duration-150 ease-snap hover:bg-accent-hover">
+              className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-bold text-white transition-colors duration-150 ease-snap hover:bg-accent-hover">
               
               다음: 입력 확정
               <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
@@ -223,7 +223,7 @@ export function Interview() {
             <button
               type="button"
               onClick={() => navigate('/upload')}
-              className="text-[13px] font-medium text-muted transition-colors duration-150 hover:text-ink">
+              className="text-[13px] font-normal text-muted transition-colors duration-150 hover:text-ink">
               
               이전 단계
             </button>
@@ -243,7 +243,7 @@ export function Interview() {
           <div className="mt-4 rounded-2xl border border-line bg-surface p-5">
             <div className="flex items-center gap-2">
               <InfoIcon className="h-4 w-4 text-accent" aria-hidden="true" />
-              <h2 className="text-sm font-semibold text-ink">
+              <h2 className="text-sm font-bold text-ink">
                 이 답변이 바꾸는 것
               </h2>
             </div>

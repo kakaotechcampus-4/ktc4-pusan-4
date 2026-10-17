@@ -118,7 +118,7 @@ export function Summary() {
 
   const header =
   <header>
-      <p className="text-small font-semibold text-accent">4단계 · 반영</p>
+      <p className="text-small font-bold text-accent">4단계 · 반영</p>
       <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
         {period ? `${period} 요약` : '판정 요약'}
       </h1>
@@ -174,9 +174,9 @@ export function Summary() {
   const total = summary?.totalCount ?? 0;
 
   const distribution = [
-  { label: '가능', value: counts.available, bar: 'bg-ok' },
-  { label: '확인 필요', value: counts.needsReview, bar: 'bg-warn' },
-  { label: '불가', value: counts.unavailable, bar: 'bg-deny' }];
+  { label: '가능', value: counts.available, bar: 'bg-ok-bar' },
+  { label: '확인 필요', value: counts.needsReview, bar: 'bg-warn-bar' },
+  { label: '불가', value: counts.unavailable, bar: 'bg-deny-bar' }];
 
 
   // 계정과목이 없는 인정 경비(예: 사용자가 가능으로 바꾼 거래)도 표에 남겨 합계가 맞게 한다
@@ -198,7 +198,7 @@ export function Summary() {
   const accountColumns: Column<AccountRow>[] = [
   {
     header: '계정과목',
-    cell: (row) => <span className="font-medium text-ink">{row.account}</span>
+    cell: (row) => <span className="font-normal text-ink">{row.account}</span>
   },
   {
     header: '건수',
@@ -211,7 +211,7 @@ export function Summary() {
     align: 'right',
     width: 'w-36',
     cell: (row) =>
-    <span className="whitespace-nowrap font-semibold text-ink">
+    <span className="whitespace-nowrap font-bold text-ink">
           {formatWon(row.finalAmount)}
         </span>
 
@@ -271,7 +271,7 @@ export function Summary() {
         {/* count 는 질문 수, amount 는 그 질문이 걸린 거래 금액이다 (3.9). 거래 수로 쓰지 않는다 */}
         {unresolved && unresolved.count > 0 &&
         <p className="mt-4 rounded-xl border border-warn-line bg-warn-bg px-4 py-3 text-small text-ink2">
-            <strong className="font-semibold text-warn">
+            <strong className="font-bold text-warn">
               답하지 않은 질문 {formatNumber(unresolved.count)}건 · 관련 거래 {formatWon(unresolved.amount)}
             </strong>{' '}
             — 답하면 판정과 위 합계가 바뀔 수 있습니다. 직접 수정한 거래는 수정한 판정대로 위 합계에
@@ -288,7 +288,7 @@ export function Summary() {
             가맹점을 분류하지 못한 {formatNumber(unclassified)}건은 아직 판정하지 않았습니다.
             <Link
             to="/preview"
-            className="inline-flex items-center gap-1 font-semibold text-accent hover:underline">
+            className="inline-flex items-center gap-1 font-bold text-accent hover:underline">
 
               분류 확인하기
               <ArrowRightIcon className="h-3.5 w-3.5" aria-hidden="true" />
@@ -314,7 +314,7 @@ export function Summary() {
                 <span className={`h-2 w-2 rounded-full ${item.bar}`} aria-hidden="true" />
                 {item.label}
               </dt>
-              <dd className="mt-1 text-h4 font-semibold tabular-nums text-ink">
+              <dd className="mt-1 text-h4 font-bold tabular-nums text-ink">
                 {summary ?
               `${formatNumber(item.value)}건` :
               <span className="block h-6 w-12 animate-pulse rounded bg-line2" />}
@@ -325,7 +325,7 @@ export function Summary() {
       </section>
 
       <section className="mt-4">
-        <h2 className="text-body font-semibold text-ink">계정과목별 인정 경비</h2>
+        <h2 className="text-body font-bold text-ink">계정과목별 인정 경비</h2>
         <Table
           className="mt-3"
           caption="계정과목별 인정 경비"
@@ -343,7 +343,7 @@ export function Summary() {
       </section>
 
       <section className="mt-4 rounded-2xl border border-line bg-surface p-6">
-        <h2 className="text-body font-semibold text-ink">세무대리인에게 넘길 문장</h2>
+        <h2 className="text-body font-bold text-ink">세무대리인에게 넘길 문장</h2>
         <p className="mt-1.5 text-small text-muted">
           판정 결과와 문진 응답을 상담용 문장으로 정리했습니다. 확정하지 못한 것과 분류하지
           못한 것은 건수로 적고, 판정 대상에서 뺀 거래는 적지 않습니다.

@@ -24,27 +24,46 @@ import {
 
 /** 토큰 값은 tailwind.config.js와 같아야 한다. 여기서는 보여주기용으로만 적는다. */
 const COLORS: { name: string; cls: string; hex: string; use: string }[] = [
-{ name: 'canvas', cls: 'bg-canvas', hex: '#F6F7F9', use: '페이지 바탕, 구분 섹션' },
-{ name: 'surface', cls: 'bg-surface', hex: '#FFFFFF', use: '카드, 헤더, 입력' },
-{ name: 'line', cls: 'bg-line', hex: '#E4E7EC', use: '테두리 기본' },
-{ name: 'line2', cls: 'bg-line2', hex: '#F0F2F5', use: '약한 구분선, 칩 배경' },
-{ name: 'ink', cls: 'bg-ink', hex: '#101418', use: '제목, 본문 강조, 다크 섹션' },
-{ name: 'ink2', cls: 'bg-ink2', hex: '#3A424D', use: '본문' },
-{ name: 'muted', cls: 'bg-muted', hex: '#6B7480', use: '보조 설명, 캡션' },
-{ name: 'accent', cls: 'bg-accent', hex: '#1F4FD8', use: 'CTA, 링크, 아이브로우' },
-{ name: 'accent-soft', cls: 'bg-accent-soft', hex: '#EEF2FE', use: 'soft 버튼 배경' },
-{ name: 'ok', cls: 'bg-ok', hex: '#0B7A4B', use: '가능' },
-{ name: 'warn', cls: 'bg-warn', hex: '#8A5209', use: '확인 필요' },
-{ name: 'deny', cls: 'bg-deny', hex: '#B02318', use: '불가' }];
+{ name: 'canvas', cls: 'bg-canvas', hex: '#FFFFFF', use: '페이지 바탕' },
+{ name: 'surface', cls: 'bg-surface', hex: '#F5F6F8', use: '패널, 카드' },
+{ name: 'surface2', cls: 'bg-surface2', hex: '#FFE600', use: '첫 화면 큰 판' },
+{ name: 'sheet', cls: 'bg-sheet', hex: '#FFFFFF', use: '패널 위 흰 바탕, 표' },
+{ name: 'line', cls: 'bg-line', hex: '#ECEEF1', use: '테두리 기본, 행 괘선' },
+{ name: 'line2', cls: 'bg-line2', hex: '#F5F6F8', use: '약한 구분선' },
+{ name: 'rule', cls: 'bg-rule', hex: '#1A1A1A', use: '표 머리 위 굵은 괘선' },
+{ name: 'ink', cls: 'bg-ink', hex: '#0A0A0A', use: '제목, 주된 동작, 어두운 판' },
+{ name: 'ink2', cls: 'bg-ink2', hex: '#2B2B2B', use: '본문' },
+{ name: 'muted', cls: 'bg-muted', hex: '#5D6670', use: '보조 설명, 캡션' },
+{ name: 'accent', cls: 'bg-accent', hex: '#0A0A0A', use: 'CTA, 지금 자리 알약' },
+{ name: 'accent-line', cls: 'bg-accent-line', hex: '#DDE1E6', use: '테두리 버튼, 패널 안 구분선' },
+{ name: 'link', cls: 'bg-link', hex: '#1A6DFF', use: '문장 속 링크' },
+{ name: 'highlight', cls: 'bg-highlight', hex: '#FFE600', use: '한 화면에 한 번 쓰는 강조' },
+{ name: 'ok', cls: 'bg-ok', hex: '#00703D', use: '가능 — 글자' },
+{ name: 'ok-bg', cls: 'bg-ok-bg', hex: '#E6F8F0', use: '가능 — 박스 바탕' },
+{ name: 'ok-line', cls: 'bg-ok-line', hex: '#A8E6C9', use: '가능 — 박스 테두리' },
+{ name: 'ok-bar', cls: 'bg-ok-bar', hex: '#12B76A', use: '가능 — 막대·점' },
+{ name: 'warn', cls: 'bg-warn', hex: '#955A00', use: '확인 필요 — 글자' },
+{ name: 'warn-bg', cls: 'bg-warn-bg', hex: '#FFF6E0', use: '확인 필요 — 박스 바탕' },
+{ name: 'warn-line', cls: 'bg-warn-line', hex: '#FFD98A', use: '확인 필요 — 박스 테두리' },
+{ name: 'warn-bar', cls: 'bg-warn-bar', hex: '#F7A51B', use: '확인 필요 — 막대·점' },
+{ name: 'deny', cls: 'bg-deny', hex: '#C92A2A', use: '불가 — 글자' },
+{ name: 'deny-bg', cls: 'bg-deny-bg', hex: '#FFEDED', use: '불가 — 박스 바탕' },
+{ name: 'deny-line', cls: 'bg-deny-line', hex: '#FFC4C4', use: '불가 — 박스 테두리' },
+{ name: 'deny-bar', cls: 'bg-deny-bar', hex: '#FF5A5A', use: '불가 — 막대·점' }];
 
 
 const TYPE: { token: string; cls: string; spec: string; use: string }[] = [
-{ token: 'h1 / h1-lg', cls: 'text-h1 sm:text-h1-lg', spec: '38/46 → 52/64', use: '랜딩 히어로 제목' },
-{ token: 'h2 / h2-lg', cls: 'text-h2 sm:text-h2-lg', spec: '28/38 → 36/48', use: '섹션 제목, 앱 페이지 제목' },
-{ token: 'h3 / h3-lg', cls: 'text-h3 sm:text-h3-lg', spec: '22/30 → 26/34', use: '소섹션 제목, 큰 카드 제목' },
-{ token: 'h4', cls: 'text-h4', spec: '17/24', use: '카드 제목, 로고' },
-{ token: 'stat', cls: 'text-stat', spec: '34/34', use: '숫자 강조' },
-{ token: 'lead', cls: 'text-lead', spec: '16/32', use: '히어로 리드 문단' },
+{ token: 'ir-display', cls: 'text-ir-display font-normal tracking-ir', spec: '48/60, 굵기 400, 자간 -1px', use: '첫 화면 큰 판 제목' },
+{ token: 'ir-section', cls: 'text-ir-section font-normal tracking-ir', spec: '48/72, 굵기 400, 자간 -1px', use: '랜딩 섹션 제목' },
+{ token: 'ir-panel', cls: 'text-ir-panel tracking-ir-sm', spec: '30/45, 자간 -0.8px', use: '랜딩 패널·카드 제목, 큰 숫자' },
+{ token: 'ir-num', cls: 'text-ir-num tracking-ir-sm', spec: '26/39', use: '띠 카드 숫자' },
+{ token: 'ir-lead', cls: 'text-ir-lead font-normal tracking-ir-xs', spec: '22/33, 굵기 400', use: '큰 알약 글자' },
+{ token: 'h1 / h1-lg', cls: 'text-h1 sm:text-h1-lg', spec: '38/48 → 52/66', use: '앱 화면 큰 제목' },
+{ token: 'h2 / h2-lg', cls: 'text-h2 sm:text-h2-lg', spec: '28/38 → 36/48', use: '앱 페이지 제목, 좁은 화면 섹션 제목' },
+{ token: 'h3 / h3-lg', cls: 'text-h3 sm:text-h3-lg', spec: '22/30 → 26/36', use: '소섹션 제목, 큰 카드 제목' },
+{ token: 'h4', cls: 'text-h4', spec: '17/26', use: '카드 제목, 로고' },
+{ token: 'stat', cls: 'text-stat', spec: '34/36', use: '숫자 강조' },
+{ token: 'lead', cls: 'text-lead', spec: '17/30', use: '리드 문단' },
 { token: 'body-lg', cls: 'text-body-lg', spec: '15/28', use: '설명 문단, 라벨' },
 { token: 'prose', cls: 'text-prose', spec: '14/28', use: '마케팅 본문 (넉넉한 행간)' },
 { token: 'body', cls: 'text-body', spec: '14/24', use: '앱 UI 본문, 입력, 버튼' },
@@ -105,7 +124,7 @@ export function Styleguide() {
             {COLORS.map((color) =>
             <li key={color.name} className="rounded-xl border border-line p-3">
                 <div className={`h-12 rounded-lg border border-line2 ${color.cls}`} />
-                <p className="mt-2 text-small font-semibold text-ink">{color.name}</p>
+                <p className="mt-2 text-small font-bold text-ink">{color.name}</p>
                 <p className="font-mono text-caption tabular-nums text-muted">{color.hex}</p>
                 <p className="mt-1 text-caption text-muted">{color.use}</p>
               </li>
@@ -121,7 +140,7 @@ export function Styleguide() {
                   <p className="font-mono text-small text-ink">{t.token}</p>
                   <p className="font-mono text-caption tabular-nums text-muted">{t.spec}</p>
                 </div>
-                <p className={`${t.cls} font-semibold text-ink`}>
+                <p className={`${t.cls} font-bold text-ink`}>
                   이 카드값이 경비인지
                 </p>
                 <p className="text-caption text-muted">{t.use}</p>
@@ -181,15 +200,15 @@ export function Styleguide() {
         <Block title="Card" note="tone: surface(기본)·canvas(강조 배경)·ink(다크). padding: sm·md·lg.">
           <div className="grid gap-4 md:grid-cols-3">
             <Card>
-              <p className="text-body-lg font-semibold text-ink">surface · sm</p>
+              <p className="text-body-lg font-bold text-ink">surface · sm</p>
               <p className="mt-2 text-body text-ink2">목록 항목, 지출 카드</p>
             </Card>
             <Card tone="canvas" padding="md">
-              <p className="text-body-lg font-semibold text-ink">canvas · md</p>
+              <p className="text-body-lg font-bold text-ink">canvas · md</p>
               <p className="mt-2 text-body text-ink2">강조하고 싶은 큰 카드</p>
             </Card>
             <Card tone="ink" padding="md">
-              <p className="text-body-lg font-semibold">ink · md</p>
+              <p className="text-body-lg font-bold">ink · md</p>
               <p className="mt-2 text-body text-white/70">다크 패널, 라이브 미리보기</p>
             </Card>
           </div>
@@ -257,11 +276,11 @@ export function Styleguide() {
             { header: '승인일', width: 'w-[7.5rem]', cell: (row) => <span className="whitespace-nowrap tabular-nums text-ink2">{row.date}</span> },
             { header: '가맹점', cell: (row) =>
               <span className="block">
-                    <span className="block font-medium text-ink">{row.name}</span>
+                    <span className="block font-normal text-ink">{row.name}</span>
                     <span className="block text-small text-muted">{row.memo}</span>
                   </span> },
             { header: '메모', hideBelow: 'sm', width: 'w-28', cell: (row) => <span className="text-small text-muted">{row.memo}</span> },
-            { header: '금액', align: 'right', width: 'w-32', cell: (row) => <span className="font-semibold text-ink">{row.amount.toLocaleString('ko-KR')}원</span> }]
+            { header: '금액', align: 'right', width: 'w-32', cell: (row) => <span className="font-bold text-ink">{row.amount.toLocaleString('ko-KR')}원</span> }]
             }
             selectedKey={pickedRow ?? undefined}
             onRowClick={(row) => setPickedRow(row.id === pickedRow ? null : row.id)} />
@@ -271,7 +290,7 @@ export function Styleguide() {
             버튼은 함께 쓰지 않습니다.
           </p>
 
-          <p className="mt-4 text-small font-semibold text-ink">loading (첫 로딩 골격)</p>
+          <p className="mt-4 text-small font-bold text-ink">loading (첫 로딩 골격)</p>
           <Table
             caption="로딩 예시"
             loading

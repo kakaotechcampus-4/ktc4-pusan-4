@@ -63,7 +63,7 @@ export function Assistant() {
         ref={button}
         type="button"
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2 rounded-full bg-ink px-4 py-3 text-body font-semibold text-white shadow-panel transition-transform duration-150 ease-snap hover:-translate-y-0.5">
+        className="flex items-center gap-2 rounded-full bg-ink px-4 py-3 text-body font-bold text-white shadow-panel transition-transform duration-150 ease-snap hover:-translate-y-0.5">
 
         <MessageCircleIcon className="h-5 w-5" aria-hidden="true" />
         Really
@@ -103,7 +103,7 @@ function Panel({ onClose }: {onClose: () => void;}) {
       <button
       type="button"
       onClick={() => void showNext()}
-      className="rounded-full border border-line bg-surface px-3 py-1.5 text-caption font-semibold text-ink hover:bg-canvas">
+      className="rounded-full border border-line bg-surface px-3 py-1.5 text-caption font-bold text-ink hover:bg-canvas">
 
         다음에 할 일
       </button>
@@ -112,7 +112,7 @@ function Panel({ onClose }: {onClose: () => void;}) {
       key={topic.id}
       type="button"
       onClick={() => showHelp(topic.id)}
-      className="rounded-full border border-line bg-surface px-3 py-1.5 text-caption font-semibold text-ink hover:bg-canvas">
+      className="rounded-full border border-line bg-surface px-3 py-1.5 text-caption font-bold text-ink hover:bg-canvas">
 
           {topic.label}
         </button>
@@ -138,7 +138,7 @@ function Panel({ onClose }: {onClose: () => void;}) {
           type="button"
           aria-expanded={helpOpen}
           onClick={() => setHelpOpen((value) => !value)}
-          className="shrink-0 rounded-lg px-2 py-1 text-caption font-semibold text-ink2 hover:bg-canvas">
+          className="shrink-0 rounded-lg px-2 py-1 text-caption font-bold text-ink2 hover:bg-canvas">
 
           도움말
         </button>
@@ -214,7 +214,7 @@ function Message({ entry }: {entry: ChatEntry;}) {
         return (
           <div key={item.key} className="w-full rounded-2xl border border-line bg-surface p-3.5">
             <Badge>{PROPOSAL_LABEL[item.proposal.kind]}</Badge>
-            <p className="mt-2 text-small font-medium text-ink">{item.proposal.card}</p>
+            <p className="mt-2 text-small font-normal text-ink">{item.proposal.card}</p>
             {blocked ?
             <p className="mt-2 text-caption text-muted">{blocked}</p> :
 
