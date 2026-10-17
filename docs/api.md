@@ -739,6 +739,8 @@ classificationStatus = NEEDS_REVIEW
 
 로 저장하고 `ClassificationReview`를 생성한다.
 
+단, 판정에 들어가지 않는 거래(`sourceStatus = CANCELED_OFFSET` 또는 `EXCLUDED`)는 `미분류`여도 `ClassificationReview`를 만들지 않는다. 사용자가 `POST /transactions/{id}/include`로 포함시키는 시점에 `NEEDS_REVIEW`이면 그때 만든다.
+
 `미분류` 거래는 Rule Engine에 전달하지 않는다.
 
 ### 응답 `201`
@@ -758,6 +760,8 @@ classificationStatus = NEEDS_REVIEW
 `naturalKey` 중복은 Batch 전체 실패 사유가 아니다.
 
 중복 Transaction만 건너뛴다.
+
+같은 요청 안에서 `naturalKey`가 반복되어도 같은 규칙이다. 뒤의 것을 건너뛰고 `skippedDuplicateCount`에 센다.
 
 중복 범위는 사용자 단위다.
 
@@ -1075,6 +1079,8 @@ sourceStatus = CANCELED_OFFSET
 ```
 
 include/exclude 자체는 새 Judgment revision을 만들지 않는다.
+
+포함시킨 거래가 `classificationStatus = NEEDS_REVIEW`이고 `PENDING` `ClassificationReview`가 없으면 그때 만든다(업로드 시점에는 판정에 들어가지 않는 거래의 분류 검토를 만들지 않기 때문이다. 3.3 참고).
 
 필요한 경우 이후 `POST /judgment-runs`로 Batch를 다시 판정한다.
 

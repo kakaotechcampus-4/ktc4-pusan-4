@@ -1,6 +1,9 @@
 package com.ktc4.pusan4.judgment.persistence;
 
 import com.ktc4.pusan4.judgment.domain.TransactionInput;
+import com.ktc4.pusan4.transaction.api.ClassificationStatus;
+import com.ktc4.pusan4.transaction.api.UserInclusion;
+import com.ktc4.pusan4.transaction.domain.NewTransaction;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -15,10 +18,12 @@ import java.util.UUID;
  *
  * <p>상태 컬럼 3개는 api.md 의 enum 이름(code)을 문자열로 담는다. 허용값은 DB CHECK 가 지킨다.
  * effectiveStatus 는 저장하지 않고 sourceStatus·userInclusion 으로 계산한다(api.md 2.3).
+ *
+ * <p>업로드 서비스({@code transaction.persistence})가 만들기 때문에 public 이다.
  */
 @Entity
 @Table(name = "transaction")
-class TransactionRecordEntity {
+public class TransactionRecordEntity {
 
     @Id
     private UUID id;
@@ -87,10 +92,70 @@ class TransactionRecordEntity {
     @Column(name = "source_card")
     private String sourceCard;
 
-    @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
+    // 응답에 바로 쓰려고 코드가 채운다(DB 기본값 now() 는 SQL 로 넣는 테스트 픽스처용으로 남는다).
+    @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 
     protected TransactionRecordEntity() {
+    }
+
+    /**
+     * 업로드로 받은 거래 한 건. 분류 결과(merchantNorm·merchantCategory)는 분류기가 정한 값을 그대로 받는다.
+     * userInclusion 은 업로드 시점에는 항상 AUTO 다(api.md 2.3).
+     */
+    public TransactionRecordEntity(
+        UUID id,
+        UUID batchId,
+        UUID userId,
+        NewTransaction input,
+        String merchantNorm,
+        String merchantCategory,
+        ClassificationStatus classificationStatus,
+        OffsetDateTime createdAt
+    ) {
+        this.id = id;
+        this.batchId = batchId;
+        this.userId = userId;
+        this.approvedAt = input.approvedAt();
+        this.merchantRaw = input.merchantRaw();
+        this.merchantNorm = merchantNorm;
+        this.merchantCategory = merchantCategory;
+        this.amount = input.amount();
+        this.installmentMonths = input.installmentMonths();
+        this.naturalKey = input.naturalKey();
+        this.sourceStatus = input.status().name();
+        this.userInclusion = UserInclusion.AUTO.name();
+        this.classificationStatus = classificationStatus.name();
+        this.approvalNo = input.approvalNo();
+        this.bizNo = input.bizNo();
+        this.branch = input.branch();
+        this.branchRaw = input.branchRaw();
+        this.memo = input.memo();
+        this.aggregated = input.aggregated();
+        this.needsReview = input.needsReview();
+        this.reviewReason = input.reviewReason();
+        this.sourceCard = input.sourceCard();
+        this.createdAt = createdAt;
+    }
+
+    public UUID id() {
+        return id;
+    }
+
+    public String naturalKey() {
+        return naturalKey;
+    }
+
+    public String merchantNorm() {
+        return merchantNorm;
+    }
+
+    public String merchantCategory() {
+        return merchantCategory;
+    }
+
+    public String classificationStatus() {
+        return classificationStatus;
     }
 
     UUID userId() {
@@ -107,10 +172,6 @@ class TransactionRecordEntity {
 
     String merchantRaw() {
         return merchantRaw;
-    }
-
-    String merchantCategory() {
-        return merchantCategory;
     }
 
     TransactionInput toInput() {
