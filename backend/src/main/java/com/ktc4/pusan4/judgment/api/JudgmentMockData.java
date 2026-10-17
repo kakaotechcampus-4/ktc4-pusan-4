@@ -20,7 +20,7 @@ import static com.ktc4.pusan4.shared.api.MockFixtures.OVERRIDE_JUDGMENT_ID;
 import static com.ktc4.pusan4.shared.api.MockFixtures.TRANSACTION_ID;
 
 /**
- * 서비스 레이어가 붙기 전까지 판정 수정·질문 응답 API 가 반환하는 고정 응답.
+ * 서비스 레이어가 붙기 전까지 판정 수정·일괄 응답 API 가 반환하는 고정 응답.
  *
  * <p>스타벅스 거래 하나가 용도 질문을 기다리는(NEEDS_REVIEW) 장면을 보여 준다.
  */
@@ -65,10 +65,6 @@ public class JudgmentMockData {
             RULES_COMMIT_SHA,
             /* userContextVersion */ 1,
             explanation, computedAt, CITATIONS);
-    }
-
-    public QuestionAnswerResponse answer() {
-        return new QuestionAnswerResponse(1, FACT_ID, 1);
     }
 
     public BulkAnswerResponse bulkAnswer() {

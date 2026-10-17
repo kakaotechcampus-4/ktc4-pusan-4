@@ -104,3 +104,48 @@
 ### 남은 것 · 아는 문제
 
 - batch 하나의 질문이 수천 건이면 목록 전체를 읽는 비용이 커진다. 실측하지 않았다.
+
+## 02:45 POST /question-responses 를 목에서 답변·부분 재판정으로 바꾼다 (A4b)
+
+- 브랜치: feature/question-responses (base: feature/questions-query)
+- 커밋: 1c36e82 (1개)
+- 주요파일: QuestionAnswerService.java, QuestionQueueRepository.java, TransactionRecordRepository.java, QuestionAnswerIntegrationTest.java
+
+### 한 일
+
+- `QuestionAnswerService.answer` 가 한 트랜잭션에서 처리한다.
+  1. 검증: 404 `QUESTION_NOT_FOUND` → 422 `QUESTIONS_FROM_DIFFERENT_BATCHES` → 409 `QUESTION_GROUP_MISMATCH` → 409 `QUESTION_NOT_ANSWERABLE`(취소) → 422 `INVALID_ANSWER_VALUE`. 빈 `questionIds` 는 400 `VALIDATION_ERROR`.
+  2. `UserFactPersistenceService.save` 로 UserFact 새 version(사용자 락 먼저).
+  3. 같은 Batch·groupKey·factType 의 CANCELED 아닌 질문을 모두 `recordAnswer` 로 새 UserFact 에 묶는다. PENDING 은 ANSWERED, ANSWERED 는 fact 를 옮긴다(09-26 결정).
+  4. `JudgmentExecutor.rejudge` 를 origin USER_FACT 로 부른다. 질문 취소(7)·새 질문(8)은 executor 가 한다.
+- 재판정 대상 = 형제 질문의 거래 ∪ (가맹점 단위 질문이면) 같은 batch·가맹점 거래 중 지금 판정 대상이면서 판정한 적이 있는 거래. 거래 id 순으로 판정한다.
+- Context 는 형제 질문 판정의 `user_context_version` 중 가장 큰 값이다.
+- 요청에 `@NotEmpty`·`@NotBlank`·`@Valid` 를 붙였다. 목 `answer()` 를 지웠다.
+
+### 왜 이렇게 했나
+
+- 재판정 대상을 api.md 3.10 4단계("Fact 의 scope 가 영향을 주는 Transaction")보다 좁혔다(사용자 결정).
+  - run 과 같은 판정 대상 기준을 쓰고, 아직 run 이 돌지 않은 거래에 run 밖 첫 판정을 만들지 않는다.
+  - 제외했다가 다시 포함한 거래는 옛 답 기준 판정이 남는데, api.md §8.6 은 포함·배제 수정 뒤 새 run 을 돌리는 흐름이라 그 run 이 최신 UserFact 로 다시 판정한다. 미분류 거래는 분류 확정 때 B8 이 재판정한다.
+  - 09-26 기록에 "scope 거래 전체가 재판정" 이라는 표현이 있다. 형제 질문을 다룬 문맥이라 제외·미분류 거래는 다루지 않았다. PR 에 근거와 함께 적었다.
+  - api.md 문장은 고치지 않았다(사용자 결정).
+- 형제 질문의 거래는 판정 대상 조건 없이 늘 넣는다. 답이 바뀐 질문의 거래 판정만 옛 답으로 남지 않게 한다.
+- Context 버전이 그룹 안에서 갈리면 가장 큰 값을 쓴다(사용자 결정). 409 로 막으면 사용자가 답할 방법이 없다.
+- 거래 id 순 재판정: 같은 거래를 다루는 동시 응답이 거래 락을 같은 순서로 잡게 한다.
+- 검증을 `findRequested`(404) 와 `validateAnswerable` 로 나눴다. 한 메서드면 PMD CyclomaticComplexity(11) 가 하나 늘었다.
+
+### 확인한 것
+
+- `QuestionAnswerIntegrationTest` 5개, 실제 카드(통신 R-205 가맹점 단위, 카페 R-300, 생활용품 R-207 + 적격증빙 R-060)와 실제 엔진으로 판정한다.
+  - 첫 답변: 형제까지 ANSWERED, 판정한 가맹점 거래 3건 재판정, 판정 없는 거래는 그대로. 목 상태에서 먼저 실패했다.
+  - 정정: 두 질문이 version 2 를 가리키고 판정이 불가로 바뀐다.
+  - 제외·분류 풀린 가맹점 거래는 재판정하지 않고, Context 는 최신 버전을 쓴다.
+  - 생활용품에 「개인」으로 답하면 불가가 확정되고 같은 거래의 증빙 질문이 취소된다(10-07 기록이 A4b 에 남긴 요구).
+  - 잘못된 요청 6종은 UserFact 도 질문 상태도 바꾸지 않는다.
+- 형제 범위, 가맹점 거래 포함, 판정 이력·분류·제외 조건, Context max, batch·취소·선택지 검사, executor 의 이전 질문 취소를 각각 깨면 해당 테스트가 실패한다.
+- `gradlew -p backend check` 통과(test 294, integrationTest 85). PMD 19건 그대로.
+
+### 남은 것 · 아는 문제
+
+- 기존 `UserFactPersistenceService.answerQuestion`(질문 하나, PENDING 만)은 `JudgmentSchemaIntegrationTest` 가 써서 그대로 뒀다. 운영 코드에서는 쓰지 않는다.
+- B7 포함(include) API 는 재판정하지 않는다. 다시 포함한 거래는 새 run 전까지 옛 답 기준 판정이다(api.md §8.6 흐름).

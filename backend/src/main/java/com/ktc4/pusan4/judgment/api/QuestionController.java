@@ -4,6 +4,7 @@ import com.ktc4.pusan4.judgment.domain.PendingTotal;
 import com.ktc4.pusan4.judgment.domain.Question;
 import com.ktc4.pusan4.judgment.domain.QuestionGroup;
 import com.ktc4.pusan4.judgment.domain.QuestionStatus;
+import com.ktc4.pusan4.judgment.persistence.QuestionAnswerService;
 import com.ktc4.pusan4.judgment.persistence.QuestionQueryService;
 import com.ktc4.pusan4.shared.api.ErrorResponse;
 import com.ktc4.pusan4.shared.api.MockResponse;
@@ -14,6 +15,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import org.springframework.data.domain.Page;
@@ -34,10 +36,16 @@ public class QuestionController {
 
     private final JudgmentMockData mockData;
     private final QuestionQueryService queryService;
+    private final QuestionAnswerService answerService;
 
-    public QuestionController(JudgmentMockData mockData, QuestionQueryService queryService) {
+    public QuestionController(
+        JudgmentMockData mockData,
+        QuestionQueryService queryService,
+        QuestionAnswerService answerService
+    ) {
         this.mockData = mockData;
         this.queryService = queryService;
+        this.answerService = answerService;
     }
 
     @Operation(summary = "룰엔진 확인 질문 목록",
@@ -79,11 +87,11 @@ public class QuestionController {
         return new PageImpl<>(items.subList(from, to), PageRequest.of(page, size), items.size());
     }
 
-    @MockResponse
     @Operation(summary = "확인 질문 응답 및 부분 재판정",
         description = "PENDING 은 최초 답변, ANSWERED 는 정정(UserFact 새 version). 새 JudgmentRun 은 만들지 않는다. "
-            + "같은 Batch·groupKey·factType 의 다른 PENDING 질문도 같은 UserFact 로 함께 ANSWERED 처리하고 "
-            + "재판정 대상에 넣는다. answeredCount 는 함께 처리된 수까지 센다. 처리 순서는 api.md 3.10")
+            + "같은 Batch·groupKey·factType 의 CANCELED 가 아닌 질문을 모두 같은 UserFact 로 바꾸고 재판정 대상에 넣는다. "
+            + "가맹점 단위 질문이면 같은 Batch 의 그 가맹점 거래 중 판정 대상이면서 판정한 적이 있는 거래도 재판정한다. "
+            + "answeredCount 는 함께 처리된 수까지 센다. 처리 순서는 api.md 3.10")
     @ApiResponse(responseCode = "404", description = "QUESTION_NOT_FOUND",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @ApiResponse(responseCode = "409", description = "QUESTION_NOT_ANSWERABLE, QUESTION_GROUP_MISMATCH",
@@ -91,8 +99,10 @@ public class QuestionController {
     @ApiResponse(responseCode = "422", description = "INVALID_ANSWER_VALUE, QUESTIONS_FROM_DIFFERENT_BATCHES",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @PostMapping("/question-responses")
-    public QuestionAnswerResponse answer(@RequestBody QuestionAnswerRequest request) {
-        return mockData.answer();
+    public QuestionAnswerResponse answer(CurrentUser currentUser, @Valid @RequestBody QuestionAnswerRequest request) {
+        return QuestionAnswerResponse.from(
+            answerService.answer(currentUser.id(), request.questionIds(), request.answer().value())
+        );
     }
 
     @MockResponse

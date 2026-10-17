@@ -145,3 +145,19 @@
 ### 확인한 것
 
 - `gradlew -p backend check` 통과(test 288, integrationTest 71).
+
+## 19:23 develop merge 를 판정 스택 위쪽(#132~#135)으로 올린다
+
+- 브랜치: feature/judgments-query, feature/judgments-summary, feature/questions-query, feature/question-responses
+- 커밋: a779d20 (조문 보강 1개, 나머지는 merge)
+- 주요파일: ApiResponseContractTest.java, JudgmentMockData.java, QuestionAnswerIntegrationTest.java
+
+### 한 일
+
+- 브랜치마다 `ApiResponseContractTest` 충돌을 양쪽 모두 남겨 풀었다. 각 브랜치의 서비스 `@MockitoBean`·스텁과 #131 의 `StatuteService`.
+- `JudgmentMockData` 클래스 주석 충돌은 브랜치에 남은 목 메서드에 맞췄다. #134 는 "판정 수정·질문 응답", #135 는 "판정 수정·일괄 응답".
+- #135 의 `QuestionAnswerIntegrationTest` 가 넣는 조문에 `소득세법시행령-61-1-1` 을 더했다. #127·#128 과 같은 이유로 재판정이 실패했다.
+
+### 확인한 것
+
+- 브랜치마다 `gradlew -p backend check` 통과. #132 (test 288, integrationTest 79), #133 (290, 80), #134 (295, 84), #135 (295, 89).

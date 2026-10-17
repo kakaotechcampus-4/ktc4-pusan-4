@@ -33,6 +33,29 @@ interface TransactionRecordRepository extends Repository<TransactionRecordEntity
         """)
     List<UUID> findRunTargetIds(@Param("batchId") UUID batchId);
 
+    // 가맹점 단위 답(api.md 3.10)이 바꾸는 거래 중 다시 판정할 거래. 지금 판정 대상이면서(findRunTargetIds 와 같은 조건)
+    // 판정한 적이 있는 거래만 고른다. 분류 전·제외·아직 run 이 돌지 않은 거래에 run 밖 판정을 만들지 않는다.
+    @Query("""
+        select transaction.id
+        from TransactionRecordEntity transaction
+        where transaction.batchId = :batchId
+          and transaction.merchantNorm = :merchantNorm
+          and transaction.classificationStatus = 'CLASSIFIED'
+          and (
+            (transaction.sourceStatus = 'JUDGEABLE' and transaction.userInclusion <> 'EXCLUDED')
+            or (transaction.sourceStatus = 'EXCLUDED' and transaction.userInclusion = 'INCLUDED')
+          )
+          and exists (
+            select judgment.id
+            from JudgmentEntity judgment
+            where judgment.transactionId = transaction.id
+          )
+        """)
+    List<UUID> findJudgedTargetIdsByMerchant(
+        @Param("batchId") UUID batchId,
+        @Param("merchantNorm") String merchantNorm
+    );
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
         select transaction

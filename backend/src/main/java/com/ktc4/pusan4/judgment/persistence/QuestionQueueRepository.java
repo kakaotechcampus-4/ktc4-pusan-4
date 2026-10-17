@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -39,6 +40,42 @@ interface QuestionQueueRepository extends Repository<QuestionQueueEntity, UUID> 
     );
 
     record QuestionRow(QuestionQueueEntity question, UUID transactionId, UUID batchId) {
+    }
+
+    @Query("""
+        select new com.ktc4.pusan4.judgment.persistence.QuestionQueueRepository$AnswerTarget(
+            question, transaction.id, transaction.batchId, judgment.userContextVersion)
+        from QuestionQueueEntity question, JudgmentEntity judgment, TransactionRecordEntity transaction
+        where question.id in :questionIds
+          and question.judgmentId = judgment.id
+          and judgment.transactionId = transaction.id
+          and transaction.userId = :userId
+        """)
+    List<AnswerTarget> findAnswerTargets(
+        @Param("questionIds") Collection<UUID> questionIds,
+        @Param("userId") UUID userId
+    );
+
+    // 같은 답을 공유하는 질문 (api.md 3.10). 취소된 질문은 빠진다.
+    @Query("""
+        select new com.ktc4.pusan4.judgment.persistence.QuestionQueueRepository$AnswerTarget(
+            question, transaction.id, transaction.batchId, judgment.userContextVersion)
+        from QuestionQueueEntity question, JudgmentEntity judgment, TransactionRecordEntity transaction
+        where question.judgmentId = judgment.id
+          and judgment.transactionId = transaction.id
+          and transaction.batchId = :batchId
+          and question.groupKey = :groupKey
+          and question.factType = :factType
+          and question.status <> 'CANCELED'
+        """)
+    List<AnswerTarget> findSiblings(
+        @Param("batchId") UUID batchId,
+        @Param("groupKey") String groupKey,
+        @Param("factType") String factType
+    );
+
+    /** 답할 질문과, 그 질문이 생긴 판정의 거래·batch·Context 버전. */
+    record AnswerTarget(QuestionQueueEntity question, UUID transactionId, UUID batchId, int contextVersion) {
     }
 
     @Query("""

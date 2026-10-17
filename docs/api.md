@@ -2116,7 +2116,7 @@ merchant_norm
 1. Question 검증
 2. batch-scoped UserFact의 새 version 생성
 3. Question → ANSWERED
-4. 동일 Batch에서 Fact의 scope가 영향을 주는 Transaction 조회
+4. 재판정할 Transaction 조회 (아래)
 5. 해당 Transaction만 재판정
 6. 각 Transaction에 새 Judgment revision 저장
 7. 기존 PENDING Question 중 더 이상 필요 없는 Question → CANCELED
@@ -2126,6 +2126,13 @@ merchant_norm
 새로운 `JudgmentRun`은 생성하지 않는다.
 
 3·4단계의 대상은 요청에 적힌 `questionIds`만이 아니다. 같은 Batch·`groupKey`·`factType`에서 `CANCELED`가 아닌 다른 Question도 같은 UserFact로 함께 처리하고 재판정 대상에 넣는다. `PENDING`이면 `ANSWERED`로 바꾸고, 이미 `ANSWERED`이면 `answeredFactId`와 `answeredAt`을 새 UserFact 기준으로 바꾼다. `answeredCount`는 이렇게 함께 처리된 수까지 포함한다.
+
+4단계에서 재판정하는 Transaction:
+
+- 같은 그룹 Question이 걸린 Transaction. 조건 없이 늘 넣는다.
+- 가맹점 단위 Question(`groupKey`가 `merchant:`로 시작)이면, 같은 Batch에서 `merchantNorm`이 같은 Transaction 중 지금 판정 대상(§5)이면서 판정한 적이 있는 것.
+
+그 가맹점의 나머지 Transaction(제외, 분류 확인 전, 아직 판정하지 않은 것)은 Run 밖에서 첫 Judgment를 만들지 않도록 재판정하지 않는다. 제외했다가 다시 포함한 Transaction은 새 Run 전까지 이전 답 기준 Judgment가 남는다.
 
 응답:
 
@@ -2188,7 +2195,7 @@ value = 사업
 
 Question이 발생한 원래 Judgment의 `userContextVersion`을 사용한다.
 
-같은 grouped response에 포함되는 Question들은 동일 Batch와 동일 Context 기준이어야 한다.
+같은 Batch·`groupKey`·`factType` Question끼리 Context 버전이 다르면 가장 큰 버전을 쓴다.
 
 ### Judgment origin
 
@@ -2209,16 +2216,15 @@ T2 rev2 → F10
 T3 rev2 → F10
 ```
 
-에러:
+에러는 아래 순서로 검사해 처음 걸린 것을 반환한다.
 
 ```
-404 QUESTION_NOT_FOUND
-
-409 QUESTION_NOT_ANSWERABLE
-409 QUESTION_GROUP_MISMATCH
-
-422 INVALID_ANSWER_VALUE
+400 VALIDATION_ERROR                    questionIds가 비었거나 answer.value가 비었다
+404 QUESTION_NOT_FOUND                  없거나 다른 사용자의 Question이 있다
 422 QUESTIONS_FROM_DIFFERENT_BATCHES
+409 QUESTION_GROUP_MISMATCH             groupKey·factType이 다른 Question이 있다
+409 QUESTION_NOT_ANSWERABLE             CANCELED Question이 있다
+422 INVALID_ANSWER_VALUE                options에 없는 값이다
 ```
 
 ---
