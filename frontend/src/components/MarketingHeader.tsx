@@ -13,21 +13,23 @@ export function MarketingHeader() {
   const { isAuthenticated } = useSession();
 
   return (
-    <header className="sticky top-0 z-30 border-b border-line bg-surface/95 backdrop-blur">
-      <Container className="flex h-16 items-center gap-8">
-        <Link to="/" className="flex items-center gap-2" aria-label="경비판정 홈">
+    <header className="sticky top-0 z-30 bg-canvas/95 backdrop-blur">
+      <Container className="flex h-[72px] items-center gap-10">
+        <Link to="/" className="flex items-center gap-2.5" aria-label="경비판정 홈">
           <span aria-hidden="true" className="flex gap-[3px]">
             <span className="block h-5 w-[5px] rounded-sm bg-ink" />
             <span className="block h-5 w-[5px] rounded-sm bg-ink" />
-            <span className="block h-5 w-[5px] rounded-sm bg-accent" />
+            <span className="block h-5 w-[5px] rounded-sm bg-highlight" />
           </span>
           <span className="text-h4 font-bold tracking-tight text-ink">
             경비판정
           </span>
+          <span aria-hidden="true" className="h-3.5 w-px bg-accent-line" />
+          <span className="text-body text-ink2">판정 안내</span>
         </Link>
 
         <nav aria-label="주요 메뉴" className="hidden md:block">
-          <ul className="flex items-center gap-7">
+          <ul className="flex items-center gap-8">
             {NAV.map((item) =>
             <li key={item.href}>
                 <a
