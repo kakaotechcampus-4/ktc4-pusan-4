@@ -8,6 +8,9 @@ spring:
 app:
   auth:
     jwt-secret: ${APP_AUTH_JWT_SECRET:local-only-jwt-secret-not-for-production-0000}
+    demo-password: ${APP_AUTH_DEMO_PASSWORD:demo1234}
+    # 로컬은 http 라 Secure 쿠키를 브라우저가 저장하지 않는다
+    cookie-secure: ${APP_AUTH_COOKIE_SECURE:false}
 
 springdoc:
   api-docs:
