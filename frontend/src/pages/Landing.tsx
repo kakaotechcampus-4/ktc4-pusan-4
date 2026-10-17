@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRightIcon } from 'lucide-react';
 import { MarketingHeader } from '../components/MarketingHeader';
 import { MarketingFooter } from '../components/MarketingFooter';
+import { OrbitStage } from '../components/OrbitStage';
 import {
   FLOW_STEPS,
   HERO_SUMMARY,
@@ -104,19 +105,20 @@ export function Landing() {
         <section className={`${SHELL} pt-10`}>
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_206px]">
             <div className="relative">
-              <div className="relative flex min-h-[440px] flex-col justify-center overflow-hidden rounded-[20px] bg-highlight px-8 pb-28 pt-14 sm:px-16 lg:min-h-[621px] lg:pb-24 lg:pt-0">
-                <p className="text-body text-ink2">
-                  1인 IT 개발 사업자를 위한 경비 판정
-                </p>
-                <strong className="mt-6 block text-h2 font-normal leading-tight tracking-ir text-ink [word-break:keep-all] lg:text-ir-display">
-                  이 카드값이 경비인지,
-                  <br />
-                  조문까지 붙여 답합니다
-                </strong>
-                <p className="mt-7 max-w-lg text-body-lg text-ink2 [word-break:keep-all]">
-                  판정은 검수를 마친 규칙 카드가 내리고, AI 는 가맹점 이름을
-                  업종으로 분류하는 데까지만 씁니다.
-                </p>
+              <div className="relative min-h-[440px] overflow-hidden rounded-[20px] bg-surface2 lg:min-h-[621px]">
+                <OrbitStage />
+
+                {/* 글은 궤도 위에 올린다 */}
+                <div className="relative z-10 px-8 pt-12 sm:px-16 sm:pt-16">
+                  <p className="text-body text-ink2">
+                    1인 IT 개발 사업자를 위한 경비 판정
+                  </p>
+                  <strong className="mt-5 block text-h2 font-normal leading-tight tracking-ir text-ink [word-break:keep-all] lg:text-ir-display">
+                    이 카드값이 경비인지,
+                    <br />
+                    조문까지 붙여 답합니다
+                  </strong>
+                </div>
               </div>
 
               {/* 왼쪽 아래 모서리를 바탕색으로 베어 내고 그 자리에 링크를 둔다 */}

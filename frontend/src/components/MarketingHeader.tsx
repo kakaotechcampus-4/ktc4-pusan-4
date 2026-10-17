@@ -14,8 +14,8 @@ export function MarketingHeader() {
 
   return (
     <header className="sticky top-0 z-30 bg-canvas/95 backdrop-blur">
-      <Container className="flex h-[72px] items-center gap-10">
-        <Link to="/" className="flex items-center gap-2.5" aria-label="경비판정 홈">
+      <Container className="flex h-[72px] items-center gap-6 lg:gap-10">
+        <Link to="/" className="flex shrink-0 items-center gap-2.5 whitespace-nowrap" aria-label="경비판정 홈">
           <span aria-hidden="true" className="flex gap-[3px]">
             <span className="block h-5 w-[5px] rounded-sm bg-ink" />
             <span className="block h-5 w-[5px] rounded-sm bg-ink" />
@@ -24,8 +24,8 @@ export function MarketingHeader() {
           <span className="text-h4 font-bold tracking-tight text-ink">
             경비판정
           </span>
-          <span aria-hidden="true" className="h-3.5 w-px bg-accent-line" />
-          <span className="text-body text-ink2">판정 안내</span>
+          <span aria-hidden="true" className="hidden h-3.5 w-px bg-accent-line sm:block" />
+          <span className="hidden text-body text-ink2 sm:block">판정 안내</span>
         </Link>
 
         <nav aria-label="주요 메뉴" className="hidden md:block">
@@ -43,7 +43,7 @@ export function MarketingHeader() {
           </ul>
         </nav>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex shrink-0 items-center gap-2 whitespace-nowrap">
           {isAuthenticated ?
           <Button to="/upload" size="sm">
               내 판정으로

@@ -52,6 +52,8 @@ export default {content: [
         surface: '#F3F3F3',
         /** 표처럼 패널 위에서 흰 바탕이 필요할 때 */
         sheet: '#FFFFFF',
+        /** 패널보다 한 단계 짙은 바탕. 첫 화면 큰 판에만 쓴다 */
+        surface2: '#E4E4E4',
         line: '#EEEEEE',
         line2: '#F5F5F5',
         /** 괘선 중 굵은 것 — 표 머리 위에 긋는다 */
@@ -108,9 +110,22 @@ export default {content: [
           from: { opacity: '0', transform: 'translateY(8px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
+        /* 궤도를 도는 그림. 바깥 테가 돌면 그림은 반대로 돌아 똑바로 선다 */
+        orbit: {
+          from: { transform: 'rotate(0deg)' },
+          to: { transform: 'rotate(360deg)' },
+        },
+        'orbit-back': {
+          from: { transform: 'rotate(0deg)' },
+          to: { transform: 'rotate(-360deg)' },
+        },
       },
       animation: {
         rise: 'rise 0.32s cubic-bezier(0.23, 1, 0.32, 1) both',
+        orbit: 'orbit 52s linear infinite',
+        'orbit-back': 'orbit-back 52s linear infinite',
+        'orbit-slow': 'orbit-back 78s linear infinite',
+        'orbit-slow-back': 'orbit 78s linear infinite',
       },
     },
   },
