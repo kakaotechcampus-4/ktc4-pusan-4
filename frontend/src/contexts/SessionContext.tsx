@@ -9,9 +9,9 @@ import React, {
 import type { BusinessContext, BusinessContextRef, StoredBusinessContext, User } from '../types/domain';
 import { api, seedSession } from '../api';
 
-/** 업종은 IT(62010) 고정 */
+/** 업종은 프리랜서·인적용역(국세청 업종코드 940909) 고정 */
 export const DEFAULT_CONTEXT: BusinessContext = {
-  industryCode: '62010',
+  industryCode: '940909',
   prevYearRevenue: 83_000_000,
   businessOpenDate: '2024-03-01',
   bookkeepingDuty: '복식부기',

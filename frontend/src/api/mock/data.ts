@@ -794,7 +794,7 @@ export const JUDGMENTS: JudgmentSeed[] = [
     appliedRuleIds: ['R-209'],
     rulesCommitSha: '139f8189',
     userContextVersion: 4,
-    explanation: '소프트웨어 개발업(62010)에서 서비스 운영을 위한 클라우드 사용료는 사업 수행에 직접 대응하는 비용으로, 동일 업종에서 통상적으로 지출됩니다.',
+    explanation: '인적용역 사업자(940909)가 용역 수행에 쓰는 클라우드 사용료는 수입에 직접 대응하는 비용으로, 같은 업종에서 통상적으로 지출됩니다.',
     computedAt: '2026-09-12T14:05:00+09:00',
     citations: [
       {
@@ -1865,7 +1865,7 @@ export const RULE_CANDIDATES: RuleCandidate[] = [
 {
   id: 1,
   merchantCategory: '수리비',
-  industryCode: '62010',
+  industryCode: '940909',
   distinctUsers: 7,
   occurrenceCount: 23,
   suggestedDocs: [
@@ -1886,7 +1886,7 @@ export const RULE_CANDIDATES: RuleCandidate[] = [
   '# id 와 effective_period.start 는 승인 시점에 박는다(기본은 소급 적용 안 함).\n' +
   'id: TODO\nversion: 1\ngate: G3\npriority: 50\n' +
   'effective_period: { start: TODO, end: null }\n' +
-  'match:\n  category: [수리비]\n  industry: ["62010"]\n' +
+  'match:\n  category: [수리비]\n  industry: ["940909"]\n' +
   'verdict: 확인필요\n' +
   'citations:\n  - { id: 소득세법-27-1, verified: true }\n  - { id: 소득세법시행령-55-1-7, verified: true }\n' +
   'review: { by: 미검수, date: 2026-10-13 }\n',
@@ -1898,7 +1898,7 @@ export const RULE_CANDIDATES: RuleCandidate[] = [
 {
   id: 2,
   merchantCategory: '전문가수수료',
-  industryCode: '62010',
+  industryCode: '940909',
   distinctUsers: 5,
   occurrenceCount: 9,
   suggestedDocs: [
@@ -1913,7 +1913,7 @@ export const RULE_CANDIDATES: RuleCandidate[] = [
   '# 자동 생성 초안이다. 세무 검수 전이고 아직 카드가 아니다.\n' +
   'id: TODO\nversion: 1\ngate: G3\npriority: 50\n' +
   'effective_period: { start: TODO, end: null }\n' +
-  'match:\n  category: [전문가수수료]\n  industry: ["62010"]\n' +
+  'match:\n  category: [전문가수수료]\n  industry: ["940909"]\n' +
   'verdict: 가능\naccount: 지급수수료\n' +
   'citations:\n  - { id: 소득세법-27-1, verified: true }\n' +
   'review: { by: 미검수, date: 2026-10-13 }\n',
@@ -1925,7 +1925,7 @@ export const RULE_CANDIDATES: RuleCandidate[] = [
 {
   id: 3,
   merchantCategory: '미용',
-  industryCode: '62010',
+  industryCode: '940909',
   distinctUsers: 4,
   occurrenceCount: 11,
   suggestedDocs: [],
@@ -1939,7 +1939,7 @@ export const RULE_CANDIDATES: RuleCandidate[] = [
 {
   id: 4,
   merchantCategory: '여가',
-  industryCode: '62010',
+  industryCode: '940909',
   distinctUsers: 6,
   occurrenceCount: 14,
   suggestedDocs: [
@@ -1954,7 +1954,7 @@ export const RULE_CANDIDATES: RuleCandidate[] = [
   '# 자동 생성 초안이다. 세무 검수 전이고 아직 카드가 아니다.\n' +
   'id: TODO\nversion: 1\ngate: G2\npriority: 50\n' +
   'effective_period: { start: TODO, end: null }\n' +
-  'match:\n  category: [여가]\n  industry: ["62010"]\n' +
+  'match:\n  category: [여가]\n  industry: ["940909"]\n' +
   'verdict: 불가\n' +
   'citations:\n  - { id: 소득세법-33-1-13, verified: true }\n' +
   'review: { by: 미검수, date: 2026-10-06 }\n',

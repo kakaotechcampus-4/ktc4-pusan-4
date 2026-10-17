@@ -9,11 +9,11 @@ import { ChoiceGroup, type ChoiceOption } from '../components/ui';
 import { formatNumber } from '../utils/format';
 
 /**
- * 서비스는 IT 개발·프리랜서만 동작한다. 다른 직종은 보이되 선택되지 않는다 —
+ * 서비스는 프리랜서·인적용역(940909)만 동작한다. 다른 직종은 보이되 선택되지 않는다 —
  * 있지만 안 되는 선택지는 '준비 중'으로 표기한다 (DESIGN.md).
  */
 const INDUSTRIES: ChoiceOption<string>[] = [
-{ value: '62010', label: 'IT 개발 · 프리랜서', hint: '62010 컴퓨터 프로그래밍' },
+{ value: '940909', label: '프리랜서 · 인적용역', hint: '940909 기타자영업 (컴퓨터 프로그래머 등)' },
 { value: '73203', label: '디자이너', disabled: true },
 { value: '85699', label: '온라인 강사', disabled: true },
 { value: '59120', label: '영상 편집', disabled: true },
@@ -81,7 +81,7 @@ export function Interview() {
             <section className={cardClass}>
               <span className={labelClass}>1. 업종</span>
               <p className={hintClass}>
-                지금은 IT 개발·프리랜서만 판정합니다. 다른 직종은 규칙 카드가 준비되면
+                지금은 프리랜서·인적용역(940909)만 판정합니다. 다른 직종은 규칙 카드가 준비되면
                 열립니다.
               </p>
               <ChoiceGroup
