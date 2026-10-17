@@ -118,6 +118,13 @@ class TransactionRecordEntity {
         return merchantCategory;
     }
 
+    /** 지금 판정 대상인가. 조건은 TransactionRecordRepository.findRunTargetIds 와 같다(api.md 2.3, 3.6). */
+    boolean judgeable() {
+        return "CLASSIFIED".equals(classificationStatus)
+            && (("JUDGEABLE".equals(sourceStatus) && !"EXCLUDED".equals(userInclusion))
+                || ("EXCLUDED".equals(sourceStatus) && "INCLUDED".equals(userInclusion)));
+    }
+
     JudgedTransaction toJudged() {
         return new JudgedTransaction(
             approvedAt, merchantRaw, merchantNorm, merchantCategory, amount, installmentMonths
