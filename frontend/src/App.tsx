@@ -16,6 +16,7 @@ import { ClassificationPreview } from './pages/ClassificationPreview';
 import { Uploads } from './pages/Uploads';
 import { Transactions } from './pages/Transactions';
 import { Account } from './pages/Account';
+import { Admin } from './pages/Admin';
 
 /** 로그인 필요 라우트 */
 const PROTECTED: { path: string; element: React.ReactElement }[] = [
@@ -29,7 +30,8 @@ const PROTECTED: { path: string; element: React.ReactElement }[] = [
 { path: '/results', element: <Results /> },
 { path: '/questions', element: <Questions /> },
 { path: '/summary', element: <Summary /> },
-{ path: '/account', element: <Account /> }];
+{ path: '/account', element: <Account /> },
+{ path: '/admin', element: <Admin /> }];
 
 
 export function App() {

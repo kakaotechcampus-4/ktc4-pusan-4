@@ -22,6 +22,9 @@ const REFS = [
 { path: '/transactions', label: '거래' },
 { path: '/uploads', label: '업로드 이력' }];
 
+/** 관리자에게만 보인다 (M1) */
+const ADMIN_REF = { path: '/admin', label: '관리자' };
+
 /** 단계 표시에 포함되지 않지만 특정 단계에 속하는 화면 */
 const STEP_ALIAS: Record<string, number> = {
   '/confirm': 2,
@@ -40,7 +43,8 @@ interface AppShellProps {
 export function AppShell({ children, showSteps = true }: AppShellProps) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const { email, signOut } = useSession();
+  const { email, isAdmin, signOut } = useSession();
+  const refs = isAdmin ? [...REFS, ADMIN_REF] : REFS;
   const activeIndex = STEPS.findIndex((step) =>
   pathname.startsWith(step.path)
   );
@@ -117,7 +121,7 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
 
           <div className="flex min-w-0 items-center gap-3 text-small text-muted">
             <nav aria-label="자료" className="flex shrink-0 items-center gap-0.5">
-              {REFS.map((ref) => {
+              {refs.map((ref) => {
                 const active = pathname.startsWith(ref.path);
                 return (
                   <Link

@@ -10,7 +10,7 @@ const NAV = [
 
 
 export function MarketingHeader() {
-  const { isAuthenticated } = useSession();
+  const { status } = useSession();
 
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-surface/95 backdrop-blur">
@@ -41,8 +41,11 @@ export function MarketingHeader() {
           </ul>
         </nav>
 
+        {/* 로그인을 이어 가는 동안은 비워 둔다. 로그인 버튼이 잠깐 보였다 바뀌지 않게 */}
         <div className="ml-auto flex items-center gap-2">
-          {isAuthenticated ?
+          {status === 'restoring' ?
+          null :
+          status === 'signedIn' ?
           <Button to="/upload" size="sm">
               내 판정으로
             </Button> :
