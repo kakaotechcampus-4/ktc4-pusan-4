@@ -47,16 +47,26 @@ class JudgmentRunEntity {
     @Column(name = "completed_at")
     private OffsetDateTime completedAt;
 
+    @Column(name = "last_progress_at", nullable = false)
+    private OffsetDateTime lastProgressAt;
+
     protected JudgmentRunEntity() {
     }
 
-    JudgmentRunEntity(UUID id, UUID batchId, UUID contextId, int contextVersion, int totalCount) {
+    JudgmentRunEntity(
+        UUID id, UUID batchId, UUID contextId, int contextVersion, int totalCount, OffsetDateTime now
+    ) {
         this.id = id;
         this.batchId = batchId;
         this.contextId = contextId;
         this.contextVersion = contextVersion;
         this.totalCount = totalCount;
         this.status = JudgmentRunStatus.QUEUED;
+        this.lastProgressAt = now;
+    }
+
+    UUID id() {
+        return id;
     }
 
     UUID batchId() {
@@ -67,17 +77,34 @@ class JudgmentRunEntity {
         return contextId;
     }
 
+    boolean isQueued() {
+        return status == JudgmentRunStatus.QUEUED;
+    }
+
+    boolean isRunning() {
+        return status == JudgmentRunStatus.RUNNING;
+    }
+
     void start(OffsetDateTime now) {
         this.status = JudgmentRunStatus.RUNNING;
         this.startedAt = now;
+        this.lastProgressAt = now;
     }
 
-    void recordSuccess() {
+    void recordSuccess(OffsetDateTime now) {
         processedCount++;
+        lastProgressAt = now;
     }
 
-    void recordFailure() {
+    void recordFailure(OffsetDateTime now) {
         failedCount++;
+        lastProgressAt = now;
+    }
+
+    /** 서버가 내려가 멈춘 run 을 끝낸다. 남은 항목을 실패로 세고 complete 규칙을 따른다. */
+    void interrupt(int interruptedCount, OffsetDateTime now) {
+        failedCount += interruptedCount;
+        complete(now);
     }
 
     /** 모두 성공하면 COMPLETED, 모두 실패하면 FAILED, 섞이면 PARTIAL_FAILED (api.md 2.7). 대상 0건은 COMPLETED 다. */
