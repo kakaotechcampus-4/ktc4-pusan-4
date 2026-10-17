@@ -313,6 +313,37 @@ class JudgmentSchemaIntegrationTest {
     }
 
     @Test
+    void find_all_returns_personal_and_global_rows_but_not_other_users() {
+        UUID userId = UUID.randomUUID();
+        UUID otherId = UUID.randomUUID();
+        for (UUID id : List.of(userId, otherId)) {
+            jdbcTemplate.update("insert into app_user(id, email) values (?, ?)", id, id + "@example.com");
+        }
+        jdbcTemplate.update("""
+            insert into merchant_dict(user_id, pattern, merchant_norm, merchant_category, source, confidence)
+            values (null, '일괄조회-전역', '일괄조회-전역', '음식점', '수기', 1.0)
+            """);
+        jdbcTemplate.update("""
+            insert into merchant_dict(user_id, pattern, merchant_norm, merchant_category, source, confidence)
+            values (?, '일괄조회-개인', '일괄조회-개인', '사무용품', 'user', 1.0)
+            """, userId);
+        jdbcTemplate.update("""
+            insert into merchant_dict(user_id, pattern, merchant_norm, merchant_category, source, confidence)
+            values (?, '일괄조회-개인', '일괄조회-개인', '카페', 'user', 1.0)
+            """, otherId);
+
+        List<MerchantClassification> rows = merchantDictionaryRepository
+            .findAll(userId, List.of("일괄조회-전역", "일괄조회-개인", "일괄조회-없음"));
+
+        assertThat(rows)
+            .extracting(MerchantClassification::ownerId, MerchantClassification::pattern, MerchantClassification::category)
+            .containsExactlyInAnyOrder(
+                org.assertj.core.groups.Tuple.tuple(null, "일괄조회-전역", "음식점"),
+                org.assertj.core.groups.Tuple.tuple(userId, "일괄조회-개인", "사무용품"));
+        assertThat(merchantDictionaryRepository.findAll(userId, List.of())).isEmpty();
+    }
+
+    @Test
     void statute_versions_reject_content_updates() {
         Long statuteVersionId = jdbcTemplate.queryForObject("""
             insert into statute_version(

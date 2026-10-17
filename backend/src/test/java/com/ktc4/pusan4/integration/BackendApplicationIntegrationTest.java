@@ -1,5 +1,9 @@
 package com.ktc4.pusan4.integration;
 
+import com.ktc4.pusan4.merchant.classify.ClassificationInput;
+import com.ktc4.pusan4.merchant.classify.ClassificationResult;
+import com.ktc4.pusan4.merchant.classify.ClassificationStage;
+import com.ktc4.pusan4.merchant.classify.MerchantClassifier;
 import com.ktc4.pusan4.shared.auth.TemporaryCurrentUserProvider;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,6 +15,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -31,6 +37,9 @@ class BackendApplicationIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private MerchantClassifier merchantClassifier;
 
     @Test
     void health_endpoint_reports_application_up() throws Exception {
@@ -60,5 +69,17 @@ class BackendApplicationIntegrationTest {
             """, Boolean.class);
 
         assertThat(schemaHistoryExists).isTrue();
+    }
+
+    @Test
+    void merchant_classifier_loads_rules_on_startup() {
+        List<ClassificationResult> results = merchantClassifier.classifyAll(
+            TemporaryCurrentUserProvider.TEMPORARY_USER_ID,
+            List.of(new ClassificationInput("스타벅스코리아 서면점", ""), new ClassificationInput("KG이니시스-스마일카페", "")));
+
+        assertThat(results).extracting(ClassificationResult::stage, ClassificationResult::merchantCategory)
+            .containsExactly(
+                org.assertj.core.groups.Tuple.tuple(ClassificationStage.KEYWORD, "카페"),
+                org.assertj.core.groups.Tuple.tuple(ClassificationStage.PG, "PG_미상"));
     }
 }
