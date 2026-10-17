@@ -30,6 +30,21 @@ export default {content: [
         h1: ['38px', '48px'],
         'h1-lg': ['52px', '66px'],
         stat: ['34px', '36px'],
+        /* 레퍼런스에서 1440 폭으로 직접 잰 값 */
+        'ir-display': ['48px', '60px'],
+        'ir-section': ['48px', '72px'],
+        'ir-panel': ['30px', '45px'],
+        'ir-lead': ['22px', '33px'],
+        'ir-num': ['26px', '39px'],
+      },
+      letterSpacing: {
+        ir: '-1px',
+        'ir-sm': '-0.8px',
+        'ir-xs': '-0.6px',
+      },
+      spacing: {
+        /* 레퍼런스 본문 좌우 여백 */
+        gutter: '62px',
       },
       colors: {
         /** 바탕은 흰색이고 패널이 회색이다 (기존과 반대) */
@@ -78,7 +93,7 @@ export default {content: [
       },
       /** 페이지 컨테이너 폭 */
       maxWidth: {
-        page: '1400px',
+        page: '1440px',
       },
       /** 그림자를 쓰지 않는다. 겹침은 괘선과 바탕색으로 가른다 */
       boxShadow: {
