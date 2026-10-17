@@ -6,9 +6,8 @@ import { Button, Empty, Table, type Column } from '../components/ui';
 import { useSession } from '../contexts/SessionContext';
 import { api, useApi } from '../api';
 import type {
-  BusinessContext,
-  BusinessContextRef,
   JudgmentSummary,
+  StoredBusinessContext,
   UploadBatch,
   UnresolvedSummary } from
 '../types/domain';
@@ -34,7 +33,7 @@ period: string | null,
 summary: JudgmentSummary,
 unclassified: number,
 unresolved: UnresolvedSummary | undefined,
-context: (BusinessContext & BusinessContextRef) | null | undefined) =>
+context: StoredBusinessContext | null | undefined) =>
 {
   const { AVAILABLE, UNAVAILABLE, NEEDS_REVIEW } = summary.byVerdict;
   // 사용자가 직접 바꾼 판정도 섞여 있으므로 「규칙으로 판정했다」고 쓰지 않는다
@@ -53,7 +52,11 @@ context: (BusinessContext & BusinessContextRef) | null | undefined) =>
   lines.push(
     `현재 문진(v${context.version}) 응답: 업종코드 ${context.industryCode}, ${context.bookkeepingDuty} 대상, 직원 ${
     context.hasEmployee ? '있음' : '없음'}, 자택 작업공간 비율 ${
-    context.homeOfficeRatio ? `${context.homeOfficeRatio}%` : '해당 없음'}.`
+    context.homeOfficeRatio === null ?
+    '입력 안 함' :
+    context.homeOfficeRatio ?
+    `${context.homeOfficeRatio}%` :
+    '해당 없음'}.`
   );
   return lines.join(' ');
 };

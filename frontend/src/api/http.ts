@@ -164,10 +164,12 @@ export const httpApi: Api = {
       year: query?.year,
       transactionId: query?.transactionId,
       runId: query?.runId,
-      verdict: query?.verdict
+      verdict: query?.verdict,
+      latestOnly: query?.latestOnly
     }),
     get: (judgmentId) => get(`/judgments/${judgmentId}`),
-    override: (judgmentId, body) => post(`/judgments/${judgmentId}/override`, body),
+    override: (judgmentId, body, idempotencyKey) =>
+    post(`/judgments/${judgmentId}/override`, body, idempotencyKey),
     removeOverride: (overrideId) => del(`/judgment-overrides/${overrideId}`)
   },
 

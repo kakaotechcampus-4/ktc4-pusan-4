@@ -105,6 +105,14 @@ export interface BusinessContextRef {
   version: number;
 }
 
+/** 저장된 Context 한 버전 (contexts/current·list 응답) */
+export interface StoredBusinessContext extends Omit<BusinessContext, 'homeOfficeRatio'>, BusinessContextRef {
+  userId: string;
+  /** 미입력이면 null */
+  homeOfficeRatio: number | null;
+  createdAt: string;
+}
+
 // ── 3.3 업로드 ──────────────────────────────────────
 
 /** 프론트 파서가 생성해 보내는 거래 행. 서버가 재계산하지 않는다 */
@@ -173,6 +181,15 @@ export interface Transaction {
   effectiveStatus: Coded<EffectiveStatus>;
 }
 
+/** 다른 응답에 붙는 거래 요약. 판정 당시가 아니라 응답 시점의 값이다 (3.4 거래 요약) */
+export type TransactionSummary = Pick<
+  Transaction,
+  'approvedAt' | 'merchantRaw' | 'merchantNorm' | 'merchantCategory' | 'amount' | 'installmentMonths'>;
+
+
+/** include·exclude 응답. 거래 전체가 아니라 바뀐 상태만 온다 */
+export type TransactionInclusion = Pick<Transaction, 'id' | 'userInclusion' | 'effectiveStatus'>;
+
 // ── 3.5 가맹점 분류 확인 ────────────────────────────
 
 export interface ClassificationReview {
@@ -187,14 +204,10 @@ export interface ClassificationReview {
   resolvedAt: string | null;
 }
 
-/** 그룹에 묶인 Review 하나의 거래 요약. 필드 뜻은 GET /transactions 와 같다 */
-export interface ClassificationReviewTransaction {
+/** 그룹에 묶인 Review 하나의 거래 요약 */
+export interface ClassificationReviewTransaction extends TransactionSummary {
   reviewId: string;
   transactionId: string;
-  approvedAt: string;
-  merchantRaw: string;
-  amount: number;
-  installmentMonths: number;
 }
 
 export interface ClassificationReviewGroup {
@@ -272,6 +285,7 @@ export interface JudgmentOrigin {
 export interface Judgment {
   id: string;
   transactionId: string;
+  transaction: TransactionSummary;
   /** Transaction 재판정마다 증가 */
   revision: number;
   /** 이 revision 이 생성된 직접 원인 */
@@ -352,22 +366,39 @@ export interface Question {
   questionText: string;
   options: string[];
   status: Coded<QuestionStatus>;
-  /** 답한 UserFact. 답한 값 자체는 응답에 없다 */
   answeredFactId: string | null;
+  /** ANSWERED 가 아니면 null. 정정했으면 마지막 답 */
+  answer: { value: string } | null;
   createdAt: string;
   answeredAt: string | null;
+}
+
+/** 그룹에 묶인 Question 하나의 거래 요약 */
+export interface QuestionGroupTransaction extends TransactionSummary {
+  questionId: string;
+  transactionId: string;
+  /** 활성 Override 가 있으면 true. 답해도 현재 결과는 Override 그대로다 */
+  overridden: boolean;
 }
 
 export interface QuestionGroup {
   groupKey: string;
   /** 같은 groupKey 라도 factType 이 다르면 별도 그룹 */
   factType: string;
+  /** 그룹 안에서 모두 같다 */
+  status: Coded<QuestionStatus>;
   questionIds: string[];
-  /** 항상 questionIds.length 와 같다 */
+  /** 항상 questionIds.length · transactions.length 와 같다 */
   count: number;
   totalAmount: number;
   questionText: string;
   options: string[];
+  /** ANSWERED 면 그룹이 공유하는 답, 아니면 null */
+  answer: { value: string } | null;
+  /** PENDING 이고 소명 대기 거래의 질문이 하나도 없으면 true (3.11 대상) */
+  bulkAnswerable: boolean;
+  /** 잘라내지 않고 전부 온다. approvedAt ASC, transactionId ASC */
+  transactions: QuestionGroupTransaction[];
 }
 
 /** 페이지네이션과 무관한 미해소 집계. "확인 필요 24건 · 340,000원" 용 */
@@ -403,7 +434,10 @@ export interface BulkAnswerRequest {
 
 export interface BulkAnswerResult {
   answeredCount: number;
+  /** factType 이 달라 건너뛴 PENDING 수 */
   skippedCount: number;
+  /** factType 은 같지만 소명 대기라 건너뛴 PENDING 수 */
+  excludedCount: number;
   factIds: string[];
   rejudgedTransactionCount: number;
   unresolved: UnresolvedSummary;

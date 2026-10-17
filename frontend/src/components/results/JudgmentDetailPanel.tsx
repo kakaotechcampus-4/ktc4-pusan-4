@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRightIcon, TriangleAlertIcon } from 'lucide-react';
-import type { Judgment, JudgmentOriginType, Transaction } from '../../types/domain';
+import type { Judgment, JudgmentOriginType } from '../../types/domain';
 import { api, ApiRequestError, useApi } from '../../api';
 import { Badge, Button, ChoiceGroup, Input } from '../ui';
 import { VerdictBadge } from '../VerdictBadge';
@@ -53,9 +53,8 @@ const attributeValue = (value: unknown) =>
 value === true ? '예' : value === false ? '아니오' : String(value);
 
 interface JudgmentDetailPanelProps {
-  /** 거래의 현재 판정 */
+  /** 거래의 현재 판정. 거래 요약(judgment.transaction)도 여기서 읽는다 */
   judgment: Judgment;
-  transaction: Transaction;
   /** 사용자가 행을 고를 때마다 늘어난다. 바뀌면 제목으로 초점을 옮긴다(같은 행을 다시 골라도) */
   focusKey?: number;
   /** 수정·해제로 현재 판정이 바뀌었을 때 */
@@ -64,10 +63,10 @@ interface JudgmentDetailPanelProps {
 
 export function JudgmentDetailPanel({
   judgment,
-  transaction,
   focusKey = 0,
   onChanged
 }: JudgmentDetailPanelProps) {
+  const transaction = judgment.transaction;
   const [target, setTarget] = useState<Target | null>(null);
   const [preset, setPreset] = useState('');
   const [note, setNote] = useState('');
@@ -77,6 +76,11 @@ export function JudgmentDetailPanel({
   const title = useRef<HTMLHeadingElement>(null);
   const editHeading = useRef<HTMLHeadingElement>(null);
   const form = useRef<HTMLDivElement>(null);
+  /**
+   * 1.6 Idempotency-Key (#62). 응답을 못 받은 재시도에만 같은 키를 쓴다.
+   * 판정·바꿀 값·사유 중 하나라도 바뀌면 새 키다 — 같은 키에 다른 내용이면 409 IDEMPOTENCY_KEY_REUSED 다
+   */
+  const pendingKey = useRef<{ payload: string; key: string } | null>(null);
 
   // 현재 판정이 바뀌면 이력도 다시 읽는다
   const historyQ = useApi(
@@ -166,12 +170,25 @@ export function JudgmentDetailPanel({
     if (!target || !reason || busy) return;
     setBusy(true);
     setError(null);
+    const payload = JSON.stringify([judgment.id, target, reason]);
+    if (pendingKey.current?.payload !== payload)
+    pendingKey.current = { payload, key: crypto.randomUUID() };
     try {
-      await api.judgments.override(judgment.id, { toVerdict: target, reason });
+      await api.judgments.override(judgment.id, { toVerdict: target, reason }, pendingKey.current.key);
+      pendingKey.current = null;
       setDone(`${toLabel(target)} 바꿨습니다. 이전 판정은 이력에 남아 있습니다.`);
       close();
       onChanged();
     } catch (caught) {
+      // 409 는 그사이 현재 판정이 바뀌었거나 판정 대상에서 빠진 거래다 (#62). 다시 보내도 같으니
+      // 폼을 닫고 지금 판정을 다시 읽는다
+      if (caught instanceof ApiRequestError && caught.status === 409) {
+        pendingKey.current = null;
+        setError('판정이 그사이 바뀌었거나 판정 대상이 아니어서 바꾸지 못했습니다. 지금 판정을 다시 불러왔습니다.');
+        close();
+        onChanged();
+        return;
+      }
       setError(errorMessage(caught, '판정을 바꾸지 못했습니다. 잠시 후 다시 시도해 주세요.'));
     } finally {
       setBusy(false);
