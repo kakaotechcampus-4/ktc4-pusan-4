@@ -1,12 +1,13 @@
 package com.ktc4.pusan4.shared.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ktc4.pusan4.auth.TestAuthentication;
 import com.ktc4.pusan4.judgment.api.JudgmentMockData;
 import com.ktc4.pusan4.judgment.domain.StatuteVersion;
 import com.ktc4.pusan4.judgment.persistence.StatuteService;
 import com.ktc4.pusan4.merchant.api.ClassificationMockData;
 import com.ktc4.pusan4.shared.UuidV7Generator;
-import com.ktc4.pusan4.shared.auth.TemporaryCurrentUserProvider;
+import com.ktc4.pusan4.shared.auth.FixedUser;
 import com.ktc4.pusan4.transaction.api.TransactionMockData;
 import com.ktc4.pusan4.user.domain.AppUser;
 import com.ktc4.pusan4.user.domain.BookkeepingDuty;
@@ -51,7 +52,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 목 응답이 api.md 의 상태 코드를 지키는지 확인한다. 값은 보지 않는다 — 서비스로 바꿔도 깨지지 않아야 한다.
  */
 @WebMvcTest
-@Import({ApiExceptionHandler.class, UuidV7Generator.class, TemporaryCurrentUserProvider.class,
+@Import({ApiExceptionHandler.class, UuidV7Generator.class, TestAuthentication.class,
     TransactionMockData.class, ClassificationMockData.class, JudgmentMockData.class})
 class ApiResponseContractTest {
 
@@ -76,11 +77,11 @@ class ApiResponseContractTest {
     @BeforeEach
     void stubServices() {
         given(userService.get(any())).willReturn(new AppUser(
-            TemporaryCurrentUserProvider.TEMPORARY_USER_ID, "demo@example.com",
+            FixedUser.ID, "demo@example.com",
             OffsetDateTime.parse("2026-09-01T10:00:00+09:00")));
 
         BusinessContext context = new BusinessContext(UUID.fromString(ID),
-            TemporaryCurrentUserProvider.TEMPORARY_USER_ID, 1, "62010", 82_000_000L, LocalDate.parse("2024-03-15"),
+            FixedUser.ID, 1, "62010", 82_000_000L, LocalDate.parse("2024-03-15"),
             BookkeepingDuty.간편장부, false, 20, OffsetDateTime.parse("2026-09-01T10:05:00+09:00"));
         given(contextService.create(any(), any())).willReturn(context);
         given(contextService.current(any())).willReturn(context);
@@ -237,7 +238,7 @@ class ApiResponseContractTest {
         mockMvc.perform(get("/api/v1/users/me")).andExpect(status().isOk());
 
         // then: 요청 값이 아니라 CurrentUserProvider 가 정한 사용자로 조회한다
-        verify(userService).get(TemporaryCurrentUserProvider.TEMPORARY_USER_ID);
+        verify(userService).get(FixedUser.ID);
     }
 
     @Test

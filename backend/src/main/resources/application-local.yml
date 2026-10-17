@@ -4,6 +4,11 @@ spring:
     username: ${DB_USERNAME:ktc4}
     password: ${DB_PASSWORD:ktc4-local}
 
+# 로컬 전용 값. 운영에는 /etc/ktc4/production.env 로 따로 넣는다(docs/deployment.md).
+app:
+  auth:
+    jwt-secret: ${APP_AUTH_JWT_SECRET:local-only-jwt-secret-not-for-production-0000}
+
 springdoc:
   api-docs:
     enabled: true
