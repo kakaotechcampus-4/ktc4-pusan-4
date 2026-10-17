@@ -680,7 +680,7 @@ Context는 수정하지 않고 새 버전을 생성한다.
   "id": "0199d3a1-...",
   "userId": "0199c8f2-...",
   "version": 4,
-  "industryCode": "62010",
+  "industryCode": "940909",
   "prevYearRevenue": 48000000,
   "businessOpenDate": "2024-03-02",
   "bookkeepingDuty": "간편장부",
