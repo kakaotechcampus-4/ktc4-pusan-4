@@ -1904,6 +1904,10 @@ Question은 이후 revision에서도 추가될 수 있기 때문이다.
 createdAt ASC, id ASC
 ```
 
+지금 판정 대상이 아닌 Transaction의 Question은 목록과 미해소 집계에서 뺀다. 판정 대상 조건은 3.7 현재 결과와 같다(분류 완료이면서 §2.3 최종 판정 대상). 사용자가 제외한 거래는 결과·요약 화면에서 빠지므로, 질문 화면에 남으면 판정에 쓰지 않을 질문까지 답해야 미해소가 0이 된다. Question은 지우지 않으므로 거래를 다시 포함하면 그대로 돌아온다.
+
+3.7과 달리 `transactionId`를 지정해도 거른다. "판정 대상이 아닌 거래의 질문은 답할 대상이 아니다"를 예외 없이 한 규칙으로 둔다.
+
 ### grouped=false (기본)
 
 Question 개별 항목을 반환한다. `unresolved` 집계는 grouped 여부와 무관하게 항상 최상위에 포함한다(아래 "미해소 집계" 참고).
@@ -2026,6 +2030,14 @@ Question 개별 항목을 반환한다. `unresolved` 집계는 grouped 여부와
 `count`는 반드시 `questionIds.length`, `transactions.length`와 같다.
 
 `totalAmount`는 `transactions[].amount`의 합이다.
+
+그룹 정렬:
+
+```
+count DESC, totalAmount DESC, 그룹 첫 Question의 id ASC
+```
+
+첫 페이지에 효과가 큰 상호가 먼저 와야 해서 건수·금액 순으로 둔다(#54). 그룹 첫 Question은 아래 `transactions` 정렬의 첫 항목이다.
 
 | 필드 | 뜻 |
 | --- | --- |

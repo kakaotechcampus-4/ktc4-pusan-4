@@ -7,6 +7,8 @@ import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -22,6 +24,25 @@ interface JudgmentRepository extends Repository<JudgmentEntity, UUID> {
           and transaction.userId = :userId
         """)
     Optional<JudgmentEntity> findForUser(@Param("judgmentId") UUID judgmentId, @Param("userId") UUID userId);
+
+    // 거래마다 override 를 뺀 최신 자동 판정의 verdict. 소명 대기(api.md 3.11)를 가린다.
+    @Query("""
+        select new com.ktc4.pusan4.judgment.persistence.JudgmentRepository$AutomaticVerdict(
+            judgment.transactionId, judgment.verdict)
+        from JudgmentEntity judgment
+        where judgment.transactionId in :transactionIds
+          and judgment.judgmentOverrideId is null
+          and judgment.revision = (
+            select max(latest.revision)
+            from JudgmentEntity latest
+            where latest.transactionId = judgment.transactionId
+              and latest.judgmentOverrideId is null
+          )
+        """)
+    List<AutomaticVerdict> findLatestAutomaticVerdicts(@Param("transactionIds") Collection<UUID> transactionIds);
+
+    record AutomaticVerdict(UUID transactionId, String verdict) {
+    }
 
     // 판정 목록 (api.md 3.7). 비어 있지 않은 조건만 건다. 범위는 셋 중 하나다.
     //  - runId: 그 Run 이 직접 만든 판정. 이후 답변·수정으로 생긴 revision 은 빠진다.

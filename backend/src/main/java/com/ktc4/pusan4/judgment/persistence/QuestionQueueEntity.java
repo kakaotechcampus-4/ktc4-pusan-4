@@ -1,6 +1,9 @@
 package com.ktc4.pusan4.judgment.persistence;
 
+import com.ktc4.pusan4.judgment.domain.JudgmentRevision.JudgedTransaction;
+import com.ktc4.pusan4.judgment.domain.Question;
 import com.ktc4.pusan4.judgment.domain.QuestionSpec;
+import com.ktc4.pusan4.judgment.domain.QuestionStatus;
 import com.ktc4.pusan4.judgment.domain.UserFact;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -48,6 +51,9 @@ class QuestionQueueEntity {
     @Column(name = "answered_at")
     private OffsetDateTime answeredAt;
 
+    @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
+    private OffsetDateTime createdAt;
+
     protected QuestionQueueEntity() {
     }
 
@@ -60,6 +66,21 @@ class QuestionQueueEntity {
         this.factType = question.factType();
         this.options = question.options();
         this.status = "PENDING";
+    }
+
+    UUID answeredFactId() {
+        return answeredFactId;
+    }
+
+    boolean isPending() {
+        return "PENDING".equals(status);
+    }
+
+    Question toDomain(UUID batchId, UUID transactionId, String answer, JudgedTransaction transaction,
+        boolean overridden, boolean awaitingExplanation) {
+        return new Question(id, batchId, transactionId, groupKey, factType, questionText, options,
+            QuestionStatus.valueOf(status), answeredFactId, answer, createdAt, answeredAt, transaction, overridden,
+            awaitingExplanation);
     }
 
     void answer(UUID factId, UserFact fact, OffsetDateTime answeredAt) {

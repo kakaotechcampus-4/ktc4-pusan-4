@@ -1,5 +1,7 @@
 package com.ktc4.pusan4.judgment.api;
 
+import com.ktc4.pusan4.judgment.domain.Question;
+import com.ktc4.pusan4.judgment.domain.QuestionStatus;
 import com.ktc4.pusan4.shared.api.Coded;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -22,4 +24,24 @@ public record QuestionResponse(
     OffsetDateTime createdAt,
     OffsetDateTime answeredAt
 ) {
+
+    static QuestionResponse from(Question question) {
+        return new QuestionResponse(question.id(), question.batchId(), question.transactionId(), question.groupKey(),
+            question.factType(), question.questionText(), question.options(), status(question.status()),
+            question.answeredFactId(), answer(question.answer()), question.createdAt(), question.answeredAt());
+    }
+
+    /** 화면 문구는 api.md 2.5 를 따른다. */
+    static Coded<QuestionStatus> status(QuestionStatus status) {
+        String label = switch (status) {
+            case PENDING -> "대기";
+            case ANSWERED -> "응답";
+            case CANCELED -> "취소";
+        };
+        return new Coded<>(status, label);
+    }
+
+    static QuestionAnswer answer(String value) {
+        return value == null ? null : new QuestionAnswer(value);
+    }
 }

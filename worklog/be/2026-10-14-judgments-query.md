@@ -70,3 +70,37 @@
 ### 남은 것 · 아는 문제
 
 - 대상 판정을 모두 읽어 Java 에서 합친다. 연도 단위로 수천 건이면 느릴 수 있다. 실측하지 않았다.
+
+## 01:53 GET /questions 를 목에서 실제 조회로 바꾼다 (A4a)
+
+- 브랜치: feature/questions-query (base: feature/judgments-summary)
+- 커밋: adea050 (1개)
+- 주요파일: QuestionQueryService.java, QuestionGroup.java, PendingTotal.java, QuestionQueryIntegrationTest.java
+
+### 한 일
+
+- `QuestionQueryService.find` 가 본인 거래에 걸린 질문을 상태와 상관없이 `createdAt, id` 순으로 돌려준다. 질문 → 판정 → 거래로 소유자를 본다.
+  - 질문마다 거래 요약, 답한 값(UserFact value), 활성 override 여부, 소명 대기 여부를 한 번에 모아 읽어 붙인다.
+  - 소명 대기: override 를 뺀 최신 자동 판정이 UNAVAILABLE 이고 PENDING 질문이 남은 거래(api.md 3.11).
+- 묶기·집계는 순수 도메인이다.
+  - `QuestionGroup.group`: 같은 batch·groupKey·factType·status 로 묶는다. 그룹 순서는 첫 질문 순서, 그룹 안은 approvedAt·transactionId 순. bulkAnswerable 은 PENDING 이면서 소명 대기 질문이 없을 때만 true.
+  - `PendingTotal.of`: PENDING 질문 수, 거래 금액 합계(같은 거래는 한 번).
+- 컨트롤러는 목록 전체로 미해소 집계를 낸 뒤 status 를 거르고, 묶고, 페이지를 자른다.
+- `QuestionStatus` 를 `judgment.domain` 으로 옮겼다(#127 의 `JudgmentRunStatus` 와 같은 방식). 목 `questions()`·`questionGroups()` 를 지웠다.
+
+### 왜 이렇게 했나
+
+- 미해소 집계는 status·grouped·page 를 적용하기 전 목록으로 센다(api.md 3.9). 그룹 단위 페이지도 먼저 다 묶어야 해서 목록 전체를 읽고 Java 에서 자른다.
+- 그룹 순서(첫 질문 순서)는 내 판단이다. api.md 에 없다.
+- 사용자가 제외한 거래의 질문도 목록과 미해소 집계에 넣었다. api.md 에 빼라는 규칙이 없다.
+
+### 확인한 것
+
+- 단위 테스트 4개(`QuestionGroupTest` 3, `PendingTotalTest` 1), 빈 값 뼈대에서 먼저 실패하는 것을 봤다.
+- `QuestionQueryIntegrationTest` 3개(목록·답·미해소, 그룹, 다른 사용자), 목 상태에서 먼저 실패했다.
+- override 표시, 소명 대기(verdict 조건, 적용), 답 값, 소유자 조건, batch 조건을 각각 깨면 해당 테스트가 실패한다.
+- `gradlew -p backend check` 통과(test 294, integrationTest 80). PMD 19건 그대로.
+
+### 남은 것 · 아는 문제
+
+- batch 하나의 질문이 수천 건이면 목록 전체를 읽는 비용이 커진다. 실측하지 않았다.
