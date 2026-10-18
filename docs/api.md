@@ -96,6 +96,14 @@ Question
 ```
 /api/v1
 │
+├── auth/                               (Authorization 없이 부른다)
+│   ├── login/
+│   │   └── POST                        로그인
+│   ├── refresh/
+│   │   └── POST                        액세스 토큰 재발급
+│   └── logout/
+│       └── POST                        로그아웃
+│
 ├── users/
 │   └── me/
 │       ├── GET                         내 정보 조회
@@ -181,6 +189,61 @@ Question
 ```
 Authorization: Bearer {accessToken}
 ```
+
+`/auth/*` 를 뺀 모든 API 는 위 헤더가 있어야 한다. 없거나 토큰이 틀리거나 만료됐으면 `401 UNAUTHORIZED` 다.
+프론트는 이 401 을 받으면 `POST /auth/refresh` 로 한 번 재발급해 보고 같은 요청을 다시 보낸다.
+
+| 토큰 | 어디에 | 수명 | 모양 |
+| --- | --- | --- | --- |
+| 액세스 토큰 | 응답 본문 → 요청의 `Authorization` 헤더. 프론트는 메모리에만 둔다 | 15분 | JWT(HS256) |
+| 리프레시 토큰 | `Set-Cookie` → 브라우저가 `/auth/*` 요청에 실어 보낸다 | 14일 | 프론트는 값을 모른다 |
+
+리프레시 토큰 쿠키:
+
+```
+refresh_token={token}; Path=/api/v1/auth; Max-Age=1209600; HttpOnly; Secure; SameSite=Strict
+```
+
+- `Path=/api/v1/auth` 라 인증 API 에만 실린다.
+- `Domain` 은 붙이지 않는다. 배포는 Caddy 뒤 같은 오리진이다.
+- 로컬 프로필(http)에서만 `Secure` 를 뺀다.
+
+> 지금은 실제 계정이 없어 고정 사용자 `demo@example.com` 하나만 로그인한다. 비밀번호는 서버 설정(`APP_AUTH_DEMO_PASSWORD`)이다.
+> 리프레시 토큰은 서버에 저장하지 않아(서명만 확인) 로그아웃해도 이미 복사된 토큰은 만료까지 유효하다.
+> 실제 계정은 B9b, 리프레시 토큰 저장·폐기(Redis)는 B9c 에서 붙이며 아래 계약은 바뀌지 않는다.
+
+### `POST /api/v1/auth/login`
+
+```
+{
+  "email": "demo@example.com",
+  "password": "..."
+}
+```
+
+응답 `200` + 리프레시 토큰 `Set-Cookie`:
+
+```
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiJ9..."
+}
+```
+
+```
+401 INVALID_CREDENTIALS   이메일 또는 비밀번호가 틀림 (어느 쪽인지 구분하지 않는다)
+```
+
+### `POST /api/v1/auth/refresh`
+
+본문 없음. 쿠키의 리프레시 토큰으로 새 액세스 토큰과 새 리프레시 토큰(`Set-Cookie`)을 준다. 응답은 로그인과 같다.
+
+```
+401 INVALID_REFRESH_TOKEN   쿠키가 없거나, 틀리거나, 만료됨 → 로그인 화면으로
+```
+
+### `POST /api/v1/auth/logout`
+
+본문 없음. 응답 `204` + 리프레시 토큰 쿠키를 지우는 `Set-Cookie`(`Max-Age=0`). 쿠키가 없어도 `204` 다.
 
 ---
 

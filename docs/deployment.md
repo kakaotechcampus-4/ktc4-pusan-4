@@ -127,3 +127,11 @@ systemctl list-timers ktc4-corpus.timer
 - `/etc/ktc4/production.env`의 `HOLIDAY_API_KEY`에는 포털의 **Decoding** 키를 넣는다. Encoding 키를 넣으면 한 번 더 인코딩되어 `SERVICE_KEY_IS_NOT_REGISTERED_ERROR`가 난다.
 - 키가 없거나 호출이 실패하면 그 해는 기존 행을 그대로 둔다. 발표 전이라 빈 응답이 온 해도 마찬가지다. 판정은 표에 있는 값으로 계속 돈다.
 - 반영 결과는 백엔드 로그의 `년 공휴일 N건을 반영했다`로 확인한다.
+
+## 8. 로그인 (고정 사용자)
+
+실제 계정이 생기기 전까지는 고정 사용자 `demo@example.com` 하나만 로그인한다(api.md 1.1). 새 값을 넣은 뒤 백엔드를 다시 배포해야 반영된다.
+
+- `/etc/ktc4/production.env`의 `APP_AUTH_JWT_SECRET`에는 `openssl rand -hex 32`로 만든 값을 넣는다. 비우면 백엔드가 기동할 때마다 임시 키를 만들어, 재배포할 때마다 모든 로그인이 풀린다. 32바이트보다 짧으면 백엔드가 뜨지 않는다.
+- `APP_AUTH_DEMO_PASSWORD`에는 시연용 비밀번호를 넣는다. 비우면 아무도 로그인할 수 없다(로그인 API가 401 `INVALID_CREDENTIALS`).
+- 리프레시 토큰 쿠키는 `Secure`라 HTTPS(Caddy)로만 저장된다. 로컬 프로필은 http라 `Secure`를 끈다.
