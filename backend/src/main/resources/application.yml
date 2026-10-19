@@ -18,6 +18,11 @@ app:
   rules:
     dir: ../rules
     commit-sha: local
+  # 인증 (api.md 1.1). jwt-secret 이 비면 기동할 때마다 임시 키를 만든다(재기동하면 로그인이 풀린다).
+  # 넣는다면 32바이트 이상.
+  auth:
+    jwt-secret: ${APP_AUTH_JWT_SECRET:}
+    access-token-ttl: 15m
 
 management:
   endpoints:

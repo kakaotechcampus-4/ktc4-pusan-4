@@ -1,6 +1,6 @@
 package com.ktc4.pusan4.integration;
 
-import com.ktc4.pusan4.shared.auth.TemporaryCurrentUserProvider;
+import com.ktc4.pusan4.shared.auth.FixedUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -43,8 +43,8 @@ class BackendApplicationIntegrationTest {
     void users_me_returns_seeded_temporary_user() throws Exception {
         mockMvc.perform(get("/api/v1/users/me"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.id").value(TemporaryCurrentUserProvider.TEMPORARY_USER_ID.toString()))
-            .andExpect(jsonPath("$.email").value(TemporaryCurrentUserProvider.TEMPORARY_USER_EMAIL))
+            .andExpect(jsonPath("$.id").value(FixedUser.ID.toString()))
+            .andExpect(jsonPath("$.email").value(FixedUser.EMAIL))
             .andExpect(jsonPath("$.createdAt").exists());
     }
 
