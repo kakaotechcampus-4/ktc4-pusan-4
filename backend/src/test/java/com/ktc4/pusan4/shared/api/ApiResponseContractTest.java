@@ -5,8 +5,12 @@ import com.ktc4.pusan4.judgment.api.JudgmentMockData;
 import com.ktc4.pusan4.merchant.api.ClassificationMockData;
 import com.ktc4.pusan4.shared.UuidV7Generator;
 import com.ktc4.pusan4.shared.auth.TemporaryCurrentUserProvider;
+import com.ktc4.pusan4.transaction.api.CardIssuer;
+import com.ktc4.pusan4.transaction.api.SourceType;
 import com.ktc4.pusan4.transaction.api.TransactionMockData;
+import com.ktc4.pusan4.transaction.domain.UploadBatchSummary;
 import com.ktc4.pusan4.transaction.domain.UploadResult;
+import com.ktc4.pusan4.transaction.persistence.UploadBatchService;
 import com.ktc4.pusan4.transaction.persistence.UploadService;
 import com.ktc4.pusan4.user.domain.AppUser;
 import com.ktc4.pusan4.user.domain.BookkeepingDuty;
@@ -21,6 +25,8 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -38,6 +44,7 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -72,6 +79,9 @@ class ApiResponseContractTest {
     @MockitoBean
     private UploadService uploadService;
 
+    @MockitoBean
+    private UploadBatchService batchService;
+
     @BeforeEach
     void stubServices() {
         given(userService.get(any())).willReturn(new AppUser(
@@ -87,6 +97,13 @@ class ApiResponseContractTest {
 
         given(uploadService.upload(any(), any(), any())).willReturn(new UploadResult(UUID.fromString(ID), 1, 0, 0,
             OffsetDateTime.parse("2026-09-18T01:10:00+09:00")));
+
+        UploadBatchSummary batch = new UploadBatchSummary(UUID.fromString(ID), SourceType.승인내역, CardIssuer.국민,
+            LocalDate.parse("2026-01-01"), LocalDate.parse("2026-01-31"), 289, 3, 4,
+            OffsetDateTime.parse("2026-09-18T01:10:00+09:00"));
+        given(batchService.list(any(), anyInt(), anyInt()))
+            .willReturn(new PageImpl<>(List.of(batch), PageRequest.of(0, 20), 1));
+        given(batchService.get(any(), any())).willReturn(batch);
     }
 
     static Stream<Arguments> endpoints() {
