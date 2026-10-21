@@ -2,8 +2,10 @@ package com.ktc4.pusan4.judgment.persistence;
 
 import com.ktc4.pusan4.judgment.domain.TransactionInput;
 import com.ktc4.pusan4.transaction.api.ClassificationStatus;
+import com.ktc4.pusan4.transaction.api.SourceStatus;
 import com.ktc4.pusan4.transaction.api.UserInclusion;
 import com.ktc4.pusan4.transaction.domain.NewTransaction;
+import com.ktc4.pusan4.transaction.domain.TransactionDetail;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -158,7 +160,22 @@ public class TransactionRecordEntity {
         return classificationStatus;
     }
 
-    UUID userId() {
+    public SourceStatus sourceStatus() {
+        return SourceStatus.valueOf(sourceStatus);
+    }
+
+    /** 사용자의 포함·제외 (api.md 3.4). 판정 revision 은 만들지 않는다. 취소상계 검사는 부르는 쪽이 한다. */
+    public void changeInclusion(UserInclusion inclusion) {
+        this.userInclusion = inclusion.name();
+    }
+
+    public TransactionDetail toDetail() {
+        return new TransactionDetail(id, batchId, approvedAt, merchantRaw, merchantNorm, merchantCategory,
+            ClassificationStatus.valueOf(classificationStatus), amount, installmentMonths,
+            SourceStatus.valueOf(sourceStatus), UserInclusion.valueOf(userInclusion));
+    }
+
+    public UUID userId() {
         return userId;
     }
 

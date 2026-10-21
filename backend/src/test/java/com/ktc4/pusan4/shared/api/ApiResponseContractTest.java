@@ -6,10 +6,14 @@ import com.ktc4.pusan4.merchant.api.ClassificationMockData;
 import com.ktc4.pusan4.shared.UuidV7Generator;
 import com.ktc4.pusan4.shared.auth.TemporaryCurrentUserProvider;
 import com.ktc4.pusan4.transaction.api.CardIssuer;
+import com.ktc4.pusan4.transaction.api.ClassificationStatus;
+import com.ktc4.pusan4.transaction.api.SourceStatus;
 import com.ktc4.pusan4.transaction.api.SourceType;
-import com.ktc4.pusan4.transaction.api.TransactionMockData;
+import com.ktc4.pusan4.transaction.api.UserInclusion;
+import com.ktc4.pusan4.transaction.domain.TransactionDetail;
 import com.ktc4.pusan4.transaction.domain.UploadBatchSummary;
 import com.ktc4.pusan4.transaction.domain.UploadResult;
+import com.ktc4.pusan4.transaction.persistence.TransactionService;
 import com.ktc4.pusan4.transaction.persistence.UploadBatchService;
 import com.ktc4.pusan4.transaction.persistence.UploadService;
 import com.ktc4.pusan4.user.domain.AppUser;
@@ -58,7 +62,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @WebMvcTest
 @Import({ApiExceptionHandler.class, UuidV7Generator.class, TemporaryCurrentUserProvider.class,
-    TransactionMockData.class, ClassificationMockData.class, JudgmentMockData.class})
+    ClassificationMockData.class, JudgmentMockData.class})
 class ApiResponseContractTest {
 
     private static final String ID = "0199c8f2-0000-7000-8000-000000000001";
@@ -82,6 +86,9 @@ class ApiResponseContractTest {
     @MockitoBean
     private UploadBatchService batchService;
 
+    @MockitoBean
+    private TransactionService transactionService;
+
     @BeforeEach
     void stubServices() {
         given(userService.get(any())).willReturn(new AppUser(
@@ -104,6 +111,17 @@ class ApiResponseContractTest {
         given(batchService.list(any(), anyInt(), anyInt()))
             .willReturn(new PageImpl<>(List.of(batch), PageRequest.of(0, 20), 1));
         given(batchService.get(any(), any())).willReturn(batch);
+
+        TransactionDetail transaction = new TransactionDetail(UUID.fromString(ID), UUID.fromString(ID),
+            LocalDate.parse("2026-01-03"), "AWS APN1", "Amazon Web Services", "해외SaaS",
+            ClassificationStatus.CLASSIFIED, 137_000L, 0, SourceStatus.JUDGEABLE, UserInclusion.AUTO);
+        given(transactionService.list(any(), any(), anyInt(), anyInt()))
+            .willReturn(new PageImpl<>(List.of(transaction), PageRequest.of(0, 20), 1));
+        given(transactionService.get(any(), any())).willReturn(transaction);
+        given(transactionService.include(any(), any())).willReturn(transaction);
+        given(transactionService.exclude(any(), any())).willReturn(new TransactionDetail(UUID.fromString(ID),
+            UUID.fromString(ID), LocalDate.parse("2026-01-03"), "AWS APN1", "Amazon Web Services", "해외SaaS",
+            ClassificationStatus.CLASSIFIED, 137_000L, 0, SourceStatus.JUDGEABLE, UserInclusion.EXCLUDED));
     }
 
     static Stream<Arguments> endpoints() {
@@ -180,6 +198,9 @@ class ApiResponseContractTest {
         "prevYearRevenue", "businessOpenDate", "bookkeepingDuty", "hasEmployee", "homeOfficeRatio", "createdAt");
     private static final Set<String> UPLOAD_BATCH_KEYS = Set.of("id", "sourceType", "cardIssuer", "periodStart",
         "periodEnd", "transactionCount", "skippedDuplicateCount", "classificationPendingCount", "createdAt");
+    private static final Set<String> TRANSACTION_KEYS = Set.of("id", "batchId", "approvedAt", "merchantRaw",
+        "merchantNorm", "merchantCategory", "classificationStatus", "amount", "installmentMonths", "sourceStatus",
+        "userInclusion", "effectiveStatus");
     /** api.md 3.4 거래 요약. 거래를 함께 보여주는 응답은 이 필드를 모두 넣는다 */
     private static final Set<String> TRANSACTION_SUMMARY_KEYS = Set.of("approvedAt", "merchantRaw", "merchantNorm",
         "merchantCategory", "amount", "installmentMonths");
@@ -215,6 +236,8 @@ class ApiResponseContractTest {
             Arguments.of("/api/v1/users/me/contexts", "/0", CONTEXT_KEYS),
             Arguments.of("/api/v1/upload-batches", "/items/0", UPLOAD_BATCH_KEYS),
             Arguments.of("/api/v1/upload-batches/" + ID, "", UPLOAD_BATCH_KEYS),
+            Arguments.of("/api/v1/transactions", "/items/0", TRANSACTION_KEYS),
+            Arguments.of("/api/v1/transactions/" + ID, "", TRANSACTION_KEYS),
             Arguments.of("/api/v1/judgments?batchId=" + ID, "/items/0", JUDGMENT_KEYS),
             Arguments.of("/api/v1/judgments?batchId=" + ID, "/items/0/transaction", TRANSACTION_SUMMARY_KEYS),
             Arguments.of("/api/v1/judgments/" + ID, "", JUDGMENT_KEYS),
