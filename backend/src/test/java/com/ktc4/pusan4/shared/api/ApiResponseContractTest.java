@@ -3,6 +3,7 @@ package com.ktc4.pusan4.shared.api;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ktc4.pusan4.judgment.api.JudgmentMockData;
 import com.ktc4.pusan4.merchant.api.ClassificationMockData;
+import com.ktc4.pusan4.merchant.api.ClassificationReviewStatus;
 import com.ktc4.pusan4.shared.UuidV7Generator;
 import com.ktc4.pusan4.shared.auth.TemporaryCurrentUserProvider;
 import com.ktc4.pusan4.transaction.api.CardIssuer;
@@ -10,9 +11,13 @@ import com.ktc4.pusan4.transaction.api.ClassificationStatus;
 import com.ktc4.pusan4.transaction.api.SourceStatus;
 import com.ktc4.pusan4.transaction.api.SourceType;
 import com.ktc4.pusan4.transaction.api.UserInclusion;
+import com.ktc4.pusan4.transaction.domain.ClassificationReviewGroup;
+import com.ktc4.pusan4.transaction.domain.ClassificationReviewItem;
+import com.ktc4.pusan4.transaction.domain.ClassificationReviewResult;
 import com.ktc4.pusan4.transaction.domain.TransactionDetail;
 import com.ktc4.pusan4.transaction.domain.UploadBatchSummary;
 import com.ktc4.pusan4.transaction.domain.UploadResult;
+import com.ktc4.pusan4.transaction.persistence.ClassificationReviewService;
 import com.ktc4.pusan4.transaction.persistence.TransactionService;
 import com.ktc4.pusan4.transaction.persistence.UploadBatchService;
 import com.ktc4.pusan4.transaction.persistence.UploadService;
@@ -89,8 +94,20 @@ class ApiResponseContractTest {
     @MockitoBean
     private TransactionService transactionService;
 
+    @MockitoBean
+    private ClassificationReviewService reviewService;
+
     @BeforeEach
     void stubServices() {
+        ClassificationReviewItem review = new ClassificationReviewItem(UUID.fromString(ID), UUID.fromString(ID),
+            UUID.fromString(ID), ClassificationReviewStatus.PENDING, OffsetDateTime.parse("2026-09-18T01:10:00+09:00"),
+            null, LocalDate.parse("2026-01-03"), "XYZ PAYMENTS", "XYZ PAYMENTS", "미분류", 47_000L, 0);
+        given(reviewService.list(any(), any(), any(), anyInt(), anyInt())).willReturn(new ClassificationReviewResult<>(
+            new PageImpl<>(List.of(review), PageRequest.of(0, 20), 1), 1, 47_000L));
+        given(reviewService.groups(any(), any(), any(), anyInt(), anyInt())).willReturn(new ClassificationReviewResult<>(
+            new PageImpl<>(List.of(new ClassificationReviewGroup("merchant:XYZ PAYMENTS", "XYZ PAYMENTS",
+                List.of(review))), PageRequest.of(0, 20), 1), 1, 47_000L));
+
         given(userService.get(any())).willReturn(new AppUser(
             TemporaryCurrentUserProvider.TEMPORARY_USER_ID, "demo@example.com",
             OffsetDateTime.parse("2026-09-01T10:00:00+09:00")));
