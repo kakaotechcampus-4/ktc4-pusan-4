@@ -59,7 +59,7 @@ export function StatuteCitation({
   return (
     <p role="alert" className="rounded-xl border border-deny-line bg-deny-bg p-3.5 text-small text-deny">
         조문을 불러오지 못했습니다 (버전 #{statuteVersionId}).{' '}
-        <button type="button" onClick={reload} className="font-semibold underline">
+        <button type="button" onClick={reload} className="font-bold underline">
           다시 시도
         </button>
       </p>);
@@ -78,7 +78,7 @@ export function StatuteCitation({
 
       <header className="flex flex-wrap items-center gap-2">
         <Badge tone={binding ? 'ink' : 'neutral'}>{tier.label}</Badge>
-        <h4 className="text-small font-semibold text-ink">{statute.title}</h4>
+        <h4 className="text-small font-bold text-ink">{statute.title}</h4>
       </header>
 
       {showBody &&

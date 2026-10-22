@@ -184,7 +184,7 @@ export function Run() {
       <div className="mx-auto max-w-3xl">
         <header className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-small font-semibold text-accent">2단계 · 계획</p>
+            <p className="text-small font-bold text-accent">2단계 · 계획</p>
             <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
               {loadError && !run ?
               '판정 상태를 확인할 수 없습니다' :
@@ -237,7 +237,7 @@ export function Run() {
           <div className="flex items-end justify-between gap-4">
             <p className="text-stat font-bold leading-none tabular-nums text-ink">
               {formatNumber(processed)}
-              <span className="text-lead font-medium text-muted">
+              <span className="text-lead font-normal text-muted">
                 {' '}
                 / {formatNumber(total)}건
               </span>
@@ -280,7 +280,7 @@ export function Run() {
                     
                     <span className="flex h-5 w-5 shrink-0 items-center justify-center">
                       {gateDone ?
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-ok">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-ok-bar">
                           <CheckIcon
                           className="h-3 w-3 text-white"
                           strokeWidth={3}
@@ -296,11 +296,11 @@ export function Run() {
                       <span className="h-2 w-2 rounded-full bg-line" />
                       }
                     </span>
-                    <span className="w-8 shrink-0 text-caption font-semibold tabular-nums text-muted">
+                    <span className="w-8 shrink-0 text-caption font-bold tabular-nums text-muted">
                       {gate.id}
                     </span>
                     <span
-                      className={`text-body font-medium ${
+                      className={`text-body font-normal ${
                       gateDone || running ? 'text-ink' : 'text-muted'}`
                       }>
                       
@@ -322,7 +322,7 @@ export function Run() {
         </section>
 
         <Card as="section" padding="sm" className="mt-4">
-          <h2 className="text-body font-semibold text-ink">이 판정의 조건</h2>
+          <h2 className="text-body font-bold text-ink">이 판정의 조건</h2>
           <dl className="mt-3 grid gap-x-6 gap-y-2 text-small sm:grid-cols-2">
             <div className="flex justify-between gap-3">
               <dt className="text-muted">문진 버전</dt>
@@ -393,7 +393,7 @@ export function Run() {
                   className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-3.5 py-2.5">
                   
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-small font-medium text-ink">
+                      <span className="block truncate text-small font-normal text-ink">
                         {transaction?.merchantNorm ?? '거래 ' + failure.transactionId.slice(0, 8)}
                       </span>
                       <span className="block truncate text-caption text-muted">
@@ -452,7 +452,7 @@ export function Run() {
             <button
             type="button"
             onClick={() => navigate('/results')}
-            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-3 text-body-lg font-semibold text-white transition-colors duration-150 ease-snap hover:bg-accent-hover">
+            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-3 text-body-lg font-bold text-white transition-colors duration-150 ease-snap hover:bg-accent-hover">
             
               결과 보기
               <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />

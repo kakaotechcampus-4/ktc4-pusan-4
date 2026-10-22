@@ -67,14 +67,14 @@ export function ChoiceGroup<T extends string | boolean>({
             <span className="flex items-center justify-between gap-2">
               <span
                 className={cn(
-                  'block text-small font-semibold',
+                  'block text-small font-bold',
                   selected ? 'text-accent' : 'text-ink'
                 )}>
                 
                 {option.label}
               </span>
               {option.disabled &&
-              <span className="shrink-0 rounded-md bg-line2 px-1.5 py-0.5 text-caption font-medium text-muted">
+              <span className="shrink-0 rounded-md bg-line2 px-1.5 py-0.5 text-caption font-normal text-muted">
                   {option.disabledLabel ?? '준비 중'}
                 </span>
               }

@@ -237,7 +237,7 @@ export function JudgmentDetailPanel({
       <dl className="grid grid-cols-2 gap-px border-b border-line bg-line">
         <div className="bg-surface px-5 py-3">
           <dt className="text-caption text-muted">승인금액</dt>
-          <dd className="mt-0.5 text-body-lg font-semibold tabular-nums text-ink">
+          <dd className="mt-0.5 text-body-lg font-bold tabular-nums text-ink">
             {formatWon(transaction.amount)}
           </dd>
         </div>
@@ -247,7 +247,7 @@ export function JudgmentDetailPanel({
             {asset ? `${transaction.approvedAt.slice(0, 4)}년에 넣을 수 있는 금액` : '필요경비 산입액'}
           </dt>
           <dd
-            className={`mt-0.5 text-body-lg font-semibold tabular-nums ${
+            className={`mt-0.5 text-body-lg font-bold tabular-nums ${
             judgment.finalAmount ? 'text-ok' : 'text-muted'}`
             }>
 
@@ -260,14 +260,14 @@ export function JudgmentDetailPanel({
 
       {hasReason &&
       <section className="border-b border-line px-5 py-4">
-        <h3 className="text-small font-semibold text-ink">판정 이유</h3>
+        <h3 className="text-small font-bold text-ink">판정 이유</h3>
         {reviewState &&
         <div className="mt-2 rounded-xl border border-line bg-canvas px-3.5 py-3 text-small text-ink2">
             <p>{REVIEW_MESSAGE[reviewState]}</p>
             {(reviewState === 'QUESTION' || reviewState === 'PRESUMED') &&
           <Link
             to="/questions"
-            className="mt-1.5 inline-flex items-center gap-1 font-semibold text-accent hover:underline">
+            className="mt-1.5 inline-flex items-center gap-1 font-bold text-accent hover:underline">
 
                 질문에 답하기
                 <ArrowRightIcon className="h-3.5 w-3.5" aria-hidden="true" />
@@ -307,7 +307,7 @@ export function JudgmentDetailPanel({
 
       <section className="border-b border-line px-5 py-4">
         {/* 수정한 판정은 규칙 엔진의 근거를 그대로 들고 있다. 수정의 근거로 읽히지 않게 한다 */}
-        <h3 className="text-small font-semibold text-ink">
+        <h3 className="text-small font-bold text-ink">
           {overridden ? '규칙 엔진이 붙인 근거 조문' : '근거 조문'}
         </h3>
         {judgment.citations.length > 0 ?
@@ -327,7 +327,7 @@ export function JudgmentDetailPanel({
             aria-hidden="true" />
 
             <p className="text-small leading-6 text-ink2">
-              <strong className="font-semibold text-warn">근거 조문 없음.</strong>{' '}
+              <strong className="font-bold text-warn">근거 조문 없음.</strong>{' '}
               조문을 붙일 수 없어 가능·불가로 확정하지 않았습니다. 근거를 지어내지 않고 비워
               두었습니다.
             </p>
@@ -380,7 +380,7 @@ export function JudgmentDetailPanel({
       </section>
 
       <section className="border-b border-line px-5 py-4">
-        <h3 ref={editHeading} tabIndex={-1} className="text-small font-semibold text-ink outline-none">
+        <h3 ref={editHeading} tabIndex={-1} className="text-small font-bold text-ink outline-none">
           판정이 실제와 다르다면
         </h3>
         <p className="mt-1.5 text-caption text-muted">
@@ -413,7 +413,7 @@ export function JudgmentDetailPanel({
           </div> :
 
         <div ref={form} className="mt-3 space-y-3">
-            <p className="text-small font-semibold text-ink">
+            <p className="text-small font-bold text-ink">
               {toLabel(target)} 바꾸는 이유
             </p>
             <ChoiceGroup
@@ -455,7 +455,7 @@ export function JudgmentDetailPanel({
       </section>
 
       <section className="px-5 py-4">
-        <h3 className="text-small font-semibold text-ink">판정 이력</h3>
+        <h3 className="text-small font-bold text-ink">판정 이력</h3>
         {historyQ.error ?
         <p className="mt-2 text-caption text-muted">
             이력을 불러오지 못했습니다.{' '}
