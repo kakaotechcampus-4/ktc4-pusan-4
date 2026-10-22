@@ -73,6 +73,8 @@ export function Confirm() {
   {
     term: '자택 작업 비율',
     value:
+    context.homeOfficeRatio === null ?
+    '입력 안 함' :
     context.homeOfficeRatio > 0 ?
     `${context.homeOfficeRatio}%` :
     '해당 없음'

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 
 from langfuse import Langfuse
 from langfuse.openai import OpenAI
@@ -10,7 +11,26 @@ from pydantic import BaseModel
 
 from app.config import settings
 
-MODEL = "gpt-4o-mini"
+PII = [
+    (re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+"), "[이메일]"),
+    (re.compile(r"(?<!\d)01[016789]-?\d{3,4}-?\d{4}(?!\d)"), "[전화번호]"),
+    (re.compile(r"(?<!\d)\d{6}-?[1-4]\d{6}(?!\d)"), "[주민등록번호]"),
+    (re.compile(r"(?<!\d)\d{4}-?\d{4}-?\d{4}-?\d{4}(?!\d)"), "[카드번호]"),
+]
+
+
+def mask(data, **_):
+    """추적에 남기기 전에 개인정보를 가린다. 비서 대화에는 사용자가 무엇이든 칠 수 있다(agent-secretary.md C-12)."""
+    if isinstance(data, str):
+        for pattern, label in PII:
+            data = pattern.sub(label, data)
+        return data
+    if isinstance(data, dict):
+        return {k: mask(v) for k, v in data.items()}
+    if isinstance(data, list | tuple):
+        return [mask(v) for v in data]
+    return data
+
 
 # langfuse.openai 는 import 만으로 openai 를 전역 패치한다. 이 모듈을 import 한 프로세스는 임베딩도 기록된다.
 if not settings.langfuse_public_key:
@@ -20,6 +40,7 @@ Langfuse(
     secret_key=settings.langfuse_secret_key,
     base_url=settings.langfuse_base_url,
     tracing_enabled=bool(settings.langfuse_public_key),
+    mask=mask,
 )
 
 
@@ -37,12 +58,17 @@ def client() -> OpenAI:
 def structured[T: BaseModel](system: str, user: str, schema: type[T], api: OpenAI | None = None) -> T:
     """스키마를 강제해서 받는다. 파싱 실패를 호출부가 떠안지 않게 한다."""
     api = api or client()
+    effort = settings.agent_reasoning_effort
+    extra = {"reasoning_effort": effort} if effort else {}
+    # 추론을 켜면 temperature 는 기본값(1)만 받는다(gpt-6-luna 실측 400).
+    if effort in (None, "none"):
+        extra["temperature"] = 0
     res = api.chat.completions.parse(
-        model=MODEL,
-        temperature=0,
+        model=settings.agent_model,
         response_format=schema,
         messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
         name=schema.__name__,
+        **extra,
     )
     out = res.choices[0].message.parsed
     if out is None:

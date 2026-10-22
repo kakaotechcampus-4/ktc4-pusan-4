@@ -9,7 +9,7 @@
 # R-309(502)와 로드 충돌을 피해 priority 503 을 쓴다. keyword 는 숙박업 상호로 좁힌다.
 # fact_type '용도'/값(업무출장·개인)은 여비교통 R-208·평가셋 E-033 과 어휘를 맞춘다.
 id: R-310
-version: 1
+version: 2
 gate: G2
 priority: 503
 effective_period: { start: 2024-01-01, end: null }
@@ -20,6 +20,7 @@ verdict: 확인필요
 citations:
   - { id: 소득세법-27-1, verified: true }
   - { id: 소득세법-33-1-5, verified: true }
+  - { id: 소득세법시행령-61-1-1, verified: true }
 question:
   code: LODGING_PURPOSE
   text: "이 숙박은 업무 출장이었나요?"

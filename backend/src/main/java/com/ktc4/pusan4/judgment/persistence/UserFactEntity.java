@@ -21,6 +21,9 @@ class UserFactEntity {
     @Column(name = "user_id", nullable = false)
     private UUID userId;
 
+    @Column(name = "batch_id", nullable = false)
+    private UUID batchId;
+
     @Column(name = "scope_key", nullable = false)
     private String scopeKey;
 
@@ -37,13 +40,18 @@ class UserFactEntity {
     protected UserFactEntity() {
     }
 
-    UserFactEntity(UUID id, UUID userId, UserFact fact, int version) {
+    UserFactEntity(UUID id, UUID userId, UUID batchId, UserFact fact, int version) {
         this.id = id;
         this.userId = userId;
+        this.batchId = batchId;
         this.scopeKey = fact.scopeKey();
         this.factType = fact.factType();
         this.value = fact.value();
         this.version = version;
+    }
+
+    UUID id() {
+        return id;
     }
 
     UserFact toDomain() {

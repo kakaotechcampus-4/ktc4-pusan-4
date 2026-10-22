@@ -6,12 +6,18 @@ spring:
       ddl-auto: validate
     open-in-view: false
 
-# 공휴일 동기화 (공공데이터포털 「한국천문연구원_특일 정보」). 키가 비면 동기화를 건너뛰고 표에 있는 값만 쓴다.
-# 키는 포털의 Decoding 키다. 요청할 때 코드가 URL 인코딩한다.
 app:
+  # 공휴일 동기화 (공공데이터포털 「한국천문연구원_특일 정보」). 키가 비면 동기화를 건너뛰고 표에 있는 값만 쓴다.
+  # 키는 포털의 Decoding 키다. 요청할 때 코드가 URL 인코딩한다.
   holiday:
     base-url: https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService
     api-key: ${HOLIDAY_API_KEY:}
+  # 판정 규칙. 기본값은 backend/ 에서 bootRun·테스트를 돌릴 때 기준이다.
+  # 이미지는 APP_RULES_DIR(/app/rules)·APP_RULES_COMMIT_SHA(빌드 커밋)로 덮는다(deploy/backend.Dockerfile).
+  # commit-sha 는 judgment.rules_commit_sha 에 남아, 그 커밋을 checkout 해 판정 당시 rules/ 를 되찾는 데 쓴다.
+  rules:
+    dir: ../rules
+    commit-sha: local
 
 management:
   endpoints:

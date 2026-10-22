@@ -12,7 +12,7 @@
 #    여기서 §27①은 카테고리 전체의 근거가 아니라 '업무용'이라고 답한 건에만 걸리는
 #    선택지 근거다. 답하기 전에는 verdict 가 확인필요로 남는다.
 id: R-104
-version: 1
+version: 2
 gate: G2
 priority: 500
 effective_period: { start: 2024-01-01, end: null }
@@ -23,6 +23,7 @@ verdict: 확인필요
 citations:
   - { id: 소득세법-27-1, verified: true }
   - { id: 소득세법-33-1-5, verified: true }
+  - { id: 소득세법시행령-61-1-1, verified: true }
 question:
   code: SHOPPING_ITEM_PURPOSE
   text: "이 건에서 구매한 물품은 업무용인가요?"

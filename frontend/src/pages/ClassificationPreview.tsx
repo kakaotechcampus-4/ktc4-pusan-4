@@ -62,16 +62,26 @@ export function ClassificationPreview() {
   const [resolveError, setResolveError] = useState<string | null>(null);
 
   const resolve = async (groupKey: string, reviewIds: string[], category: string) => {
+    // 카드가 사라지는 동안 다시 누르면 자기 요청이 409(이미 분류)로 돌아온다
+    if (resolving[groupKey]) return;
     setResolving((prev) => ({ ...prev, [groupKey]: true }));
     setResolveError(null);
     try {
       await api.classificationReviews.respond({ reviewIds, merchantCategory: category });
     } catch (caught) {
+      // 409: 다른 탭·기기에서 이미 분류했다(CLASSIFICATION_ALREADY_RESOLVED). 남은 카드로 다시 읽는다
+      const resolvedElsewhere = caught instanceof ApiRequestError && caught.status === 409;
       setResolveError(
+        resolvedElsewhere ?
+        '이미 분류한 가맹점입니다. 목록을 다시 불러왔습니다.' :
         caught instanceof ApiRequestError ?
         caught.message :
         '업종을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.'
       );
+      if (resolvedElsewhere) {
+        groupsQ.reload();
+        batchQ.reload();
+      }
       setResolving((prev) => {
         const next = { ...prev };
         delete next[groupKey];
@@ -291,6 +301,7 @@ export function ClassificationPreview() {
                   key={category}
                   variant={index === 0 ? 'soft' : 'secondary'}
                   size="sm"
+                  disabled={resolving[group.groupKey]}
                   onClick={() =>
                   void resolve(group.groupKey, group.reviewIds, category)
                   }>
@@ -307,7 +318,9 @@ export function ClassificationPreview() {
                     <div className="w-44">
                       <Select
                     aria-label={`${title} 카테고리 직접 선택`}
-                    defaultValue=""
+                    // 고르면 바로 저장한다. 값을 붙잡아 두지 않아야 실패한 뒤 고른 값에 머물지 않는다
+                    value=""
+                    disabled={resolving[group.groupKey]}
                     onChange={(event) => {
                       if (!event.target.value) return;
                       void resolve(

@@ -17,7 +17,7 @@
 # priority 505: 주말에 R-301(500)을 이긴다. 로더 충돌 검사가 요일을 보지 않으므로 같은
 # priority 에 두면 차단 카드 충돌로 거부된다. fact_type·값은 R-301·평가셋과 같은 어휘다.
 id: R-311
-version: 2
+version: 3
 gate: G2
 priority: 505
 effective_period: { start: 2024-01-01, end: null }
@@ -28,6 +28,7 @@ match:
 verdict: 불가
 citations:
   - { id: 소득세법-33-1-5, verified: true }
+  - { id: 소득세법시행령-61-1-1, verified: true }
 question:
   code: WEEKEND_RESTAURANT_PURPOSE
   text: "주말·공휴일 식사라 개인 식사로 보고 제외했어요. 거래처 미팅이었다면 알려주세요."

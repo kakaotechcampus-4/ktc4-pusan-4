@@ -1,6 +1,9 @@
 package com.ktc4.pusan4.judgment.persistence;
 
+import com.ktc4.pusan4.judgment.domain.JudgmentRevision.JudgedTransaction;
+import com.ktc4.pusan4.judgment.domain.Question;
 import com.ktc4.pusan4.judgment.domain.QuestionSpec;
+import com.ktc4.pusan4.judgment.domain.QuestionStatus;
 import com.ktc4.pusan4.judgment.domain.UserFact;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -48,6 +51,9 @@ class QuestionQueueEntity {
     @Column(name = "answered_at")
     private OffsetDateTime answeredAt;
 
+    @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
+    private OffsetDateTime createdAt;
+
     protected QuestionQueueEntity() {
     }
 
@@ -60,6 +66,51 @@ class QuestionQueueEntity {
         this.factType = question.factType();
         this.options = question.options();
         this.status = "PENDING";
+    }
+
+    UUID answeredFactId() {
+        return answeredFactId;
+    }
+
+    String groupKey() {
+        return groupKey;
+    }
+
+    String factType() {
+        return factType;
+    }
+
+    boolean isCanceled() {
+        return "CANCELED".equals(status);
+    }
+
+    /** 선택지가 없는 질문은 어떤 값이든 받는다. */
+    boolean accepts(String value) {
+        return options.isEmpty() || options.contains(value);
+    }
+
+    /**
+     * 같은 Batch·groupKey·factType 의 응답을 이 질문에 적는다 (api.md 3.10). PENDING 이면 ANSWERED 로 바꾸고,
+     * 이미 답한 질문이면(정정) 새 UserFact 를 가리키게 한다. 이전 답은 UserFact 이전 version 에 남는다.
+     */
+    void recordAnswer(UUID factId, OffsetDateTime answeredAt) {
+        if (isCanceled()) {
+            throw new IllegalStateException("Question is canceled: " + id);
+        }
+        this.answeredFactId = factId;
+        this.answeredAt = answeredAt;
+        this.status = "ANSWERED";
+    }
+
+    boolean isPending() {
+        return "PENDING".equals(status);
+    }
+
+    Question toDomain(UUID batchId, UUID transactionId, String answer, JudgedTransaction transaction,
+        boolean overridden, boolean awaitingExplanation) {
+        return new Question(id, batchId, transactionId, groupKey, factType, questionText, options,
+            QuestionStatus.valueOf(status), answeredFactId, answer, createdAt, answeredAt, transaction, overridden,
+            awaitingExplanation);
     }
 
     void answer(UUID factId, UserFact fact, OffsetDateTime answeredAt) {

@@ -85,6 +85,17 @@ export interface User {
   id: string;
   email: string;
   createdAt: string;
+  /**
+   * 관리자 판별. api.md 에는 아직 없다 — 관리자 판별 방식은 10/26 에 정한다(backend_api_plan.md).
+   * 없으면 일반 사용자로 본다
+   */
+  role?: 'USER' | 'ADMIN';
+}
+
+/** 로그인 요청. 인증 계약은 아직 api.md 에 없다(#139) */
+export interface LoginRequest {
+  email: string;
+  password: string;
 }
 
 // ── 3.2 사업자 Context ──────────────────────────────
@@ -103,6 +114,14 @@ export interface BusinessContext {
 export interface BusinessContextRef {
   id: string;
   version: number;
+}
+
+/** 저장된 Context 한 버전 (contexts/current·list 응답) */
+export interface StoredBusinessContext extends Omit<BusinessContext, 'homeOfficeRatio'>, BusinessContextRef {
+  userId: string;
+  /** 미입력이면 null */
+  homeOfficeRatio: number | null;
+  createdAt: string;
 }
 
 // ── 3.3 업로드 ──────────────────────────────────────
@@ -150,6 +169,12 @@ export interface UploadBatch {
   createdAt: string;
 }
 
+/** POST /upload-batches 의 201 응답. 카드사·기간은 담기지 않으므로 화면은 보낸 요청에서 읽는다 */
+export type UploadBatchCreated = Pick<
+  UploadBatch,
+  'id' | 'transactionCount' | 'skippedDuplicateCount' | 'classificationPendingCount' | 'createdAt'>;
+
+
 // ── 3.4 거래 ────────────────────────────────────────
 
 export interface Transaction {
@@ -167,6 +192,15 @@ export interface Transaction {
   effectiveStatus: Coded<EffectiveStatus>;
 }
 
+/** 다른 응답에 붙는 거래 요약. 판정 당시가 아니라 응답 시점의 값이다 (3.4 거래 요약) */
+export type TransactionSummary = Pick<
+  Transaction,
+  'approvedAt' | 'merchantRaw' | 'merchantNorm' | 'merchantCategory' | 'amount' | 'installmentMonths'>;
+
+
+/** include·exclude 응답. 거래 전체가 아니라 바뀐 상태만 온다 */
+export type TransactionInclusion = Pick<Transaction, 'id' | 'userInclusion' | 'effectiveStatus'>;
+
 // ── 3.5 가맹점 분류 확인 ────────────────────────────
 
 export interface ClassificationReview {
@@ -181,14 +215,10 @@ export interface ClassificationReview {
   resolvedAt: string | null;
 }
 
-/** 그룹에 묶인 Review 하나의 거래 요약. 필드 뜻은 GET /transactions 와 같다 */
-export interface ClassificationReviewTransaction {
+/** 그룹에 묶인 Review 하나의 거래 요약 */
+export interface ClassificationReviewTransaction extends TransactionSummary {
   reviewId: string;
   transactionId: string;
-  approvedAt: string;
-  merchantRaw: string;
-  amount: number;
-  installmentMonths: number;
 }
 
 export interface ClassificationReviewGroup {
@@ -266,6 +296,7 @@ export interface JudgmentOrigin {
 export interface Judgment {
   id: string;
   transactionId: string;
+  transaction: TransactionSummary;
   /** Transaction 재판정마다 증가 */
   revision: number;
   /** 이 revision 이 생성된 직접 원인 */
@@ -346,22 +377,39 @@ export interface Question {
   questionText: string;
   options: string[];
   status: Coded<QuestionStatus>;
-  /** 답한 UserFact. 답한 값 자체는 응답에 없다 */
   answeredFactId: string | null;
+  /** ANSWERED 가 아니면 null. 정정했으면 마지막 답 */
+  answer: { value: string } | null;
   createdAt: string;
   answeredAt: string | null;
+}
+
+/** 그룹에 묶인 Question 하나의 거래 요약 */
+export interface QuestionGroupTransaction extends TransactionSummary {
+  questionId: string;
+  transactionId: string;
+  /** 활성 Override 가 있으면 true. 답해도 현재 결과는 Override 그대로다 */
+  overridden: boolean;
 }
 
 export interface QuestionGroup {
   groupKey: string;
   /** 같은 groupKey 라도 factType 이 다르면 별도 그룹 */
   factType: string;
+  /** 그룹 안에서 모두 같다 */
+  status: Coded<QuestionStatus>;
   questionIds: string[];
-  /** 항상 questionIds.length 와 같다 */
+  /** 항상 questionIds.length · transactions.length 와 같다 */
   count: number;
   totalAmount: number;
   questionText: string;
   options: string[];
+  /** ANSWERED 면 그룹이 공유하는 답, 아니면 null */
+  answer: { value: string } | null;
+  /** PENDING 이고 소명 대기 거래의 질문이 하나도 없으면 true (3.11 대상) */
+  bulkAnswerable: boolean;
+  /** 잘라내지 않고 전부 온다. approvedAt ASC, transactionId ASC */
+  transactions: QuestionGroupTransaction[];
 }
 
 /** 페이지네이션과 무관한 미해소 집계. "확인 필요 24건 · 340,000원" 용 */
@@ -378,9 +426,13 @@ export interface UnresolvedPage<T> extends Page<T> {
 /** 3.9 질문 목록. UnresolvedPage 와 같은 모양이다 */
 export type QuestionPage<T> = UnresolvedPage<T>;
 
+/** 답의 출처 (agent-secretary.md 10장 필드 추가). 사용자가 직접 고르면 보내지 않는다 */
+export type AnswerSource = 'ASSISTANT' | 'PREVIOUS_ANSWER';
+
 export interface QuestionResponseRequest {
   questionIds: string[];
   answer: { value: string };
+  source?: AnswerSource;
 }
 
 export interface QuestionResponseResult {
@@ -397,8 +449,127 @@ export interface BulkAnswerRequest {
 
 export interface BulkAnswerResult {
   answeredCount: number;
+  /** factType 이 달라 건너뛴 PENDING 수 */
   skippedCount: number;
+  /** factType 은 같지만 소명 대기라 건너뛴 PENDING 수 */
+  excludedCount: number;
   factIds: string[];
   rejudgedTransactionCount: number;
   unresolved: UnresolvedSummary;
+}
+
+// ── 관리자: 규칙 후보 (M1) ──────────────────────────
+// api.md 에 아직 없다. rule_candidate 테이블(V3)과 AI 파이프라인(ai/pipeline/candidates.py)이 쓰는 값을 따른다
+
+/** DB 의 대기·검토중·승인·기각·보류 */
+export type RuleCandidateStatus = 'PENDING' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED' | 'ON_HOLD';
+
+/** 초안이 인용한 근거 */
+export interface RuleCandidateDoc {
+  statuteId: string;
+  quote: string;
+  /** 인용이 나온 위계(법령·행정규칙·심판례해석·판례). 못 찾았으면 null */
+  tier: string | null;
+}
+
+/** 여러 사용자에게서 판정할 규칙이 없던 업종·카테고리 조합과 그 규칙 카드 초안 */
+export interface RuleCandidate {
+  id: number;
+  merchantCategory: string;
+  industryCode: string;
+  distinctUsers: number;
+  occurrenceCount: number;
+  suggestedDocs: RuleCandidateDoc[];
+  /** 인용이 나온 가장 위 위계 */
+  searchedTier: string | null;
+  /** 초안을 만들지 못했으면 null(보류) */
+  draftYaml: string | null;
+  status: Coded<RuleCandidateStatus>;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+}
+
+// ── 비서 Really (docs/agent-secretary.md 9·10장) ────
+// 중계·진행 상황·지난번 답·세무대리인 질문 API 는 아직 백엔드 일정에 없다.
+// 모양은 비서 도구 코드(ai/assistant/tools.py, ai/eval/assistant_fake.py)를 따른다 — 실제 모양이 있는 곳이 여기뿐이다
+
+export interface AssistantMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+/** 지금 화면과 보고 있는 대상. 없으면 null */
+export interface AssistantContext {
+  screen: string;
+  batchId: string | null;
+  transactionId: string | null;
+  year: number | null;
+}
+
+export interface AssistantChatRequest {
+  /** 1~1,000자 */
+  message: string;
+  /** 최근 20개 이하, 각 2,000자 이하. 서버는 저장하지 않는다 */
+  history: AssistantMessage[];
+  context: AssistantContext;
+  /** 영문·숫자·-·_, 64자 이하 */
+  sessionId: string;
+}
+
+/** 제안 카드. 프론트는 AI 가 준 경로를 부르지 않고 kind 로 API 를 고른다. card 는 한 줄 요약 */
+export type AssistantProposal = {card: string;} & (
+{kind: 'answer';questionIds: string[];value: string;source: AnswerSource;} |
+{kind: 'bulk_answer';batchId: string;factType: string;value: string;} |
+{kind: 'classification';reviewIds: string[];merchantCategory: string;} |
+{kind: 'override';judgmentId: string;toVerdict: Verdict;reason: string;} |
+{kind: 'navigation';route: string;} |
+{kind: 'handoff_note';text: string;transactionIds: string[];});
+
+
+export interface AssistantChatResponse {
+  answer: string;
+  proposals: AssistantProposal[];
+  traceId: string | null;
+}
+
+/** GET /progress?batchId. 비서 도구 get_status 가 읽는 필드 */
+export interface Progress {
+  batch: { label: string; transactionCount: number } | null;
+  /** 수입·이름·이메일은 담지 않는다 */
+  context: { version: number; bookkeeping: BookkeepingDuty; hasEmployee: boolean } | null;
+  classification: { pendingCount: number; pendingAmount: number };
+  run: { status: RunStatus } | null;
+  questions: { pendingCount: number; pendingAmount: number; fillableFromPrevious: number };
+  next: { step: string; route: string; label: string } | null;
+}
+
+/**
+ * GET /questions/suggestions 한 줄. 미답변 그룹마다 하나 (명세 3.1).
+ * A 이어받기(value·sourceLabel, 충돌이면 history), B 이력만(historyCounts), C 띄우지 않음(reason)
+ */
+export interface QuestionSuggestion {
+  groupKey: string;
+  factType: string;
+  tier: 'A' | 'B' | 'C';
+  value?: string | null;
+  sourceLabel?: string;
+  conflict?: boolean;
+  history?: { value: string; sourceLabel: string }[];
+  historyCounts?: Record<string, number>;
+  reason?: string;
+}
+
+/** 세무대리인에게 물을 질문. 사용자 소유이고 요약의 「세무대리인에게 넘길 문장」에 들어간다 */
+export interface HandoffNote {
+  id: string;
+  text: string;
+  transactionIds: string[];
+  createdAt: string;
+}
+
+export interface HandoffNoteRequest {
+  /** 300자 이하 */
+  text: string;
+  transactionIds: string[];
 }

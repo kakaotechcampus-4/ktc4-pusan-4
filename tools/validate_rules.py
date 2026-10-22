@@ -51,6 +51,8 @@ CATEGORIES_YAML = ROOT / "rules" / "categories.yaml"
 MERCHANT_SEED_CSV = ROOT / "seeds" / "merchant_seed.csv"
 RULECARD_DIRECTORY = ROOT / "rules" / "cards"
 RULECARD_GLOB = "R-*.yaml"
+VERDICTLESS_ALLOWLIST = ROOT / "tools" / "verdictless_allowlist.yaml"
+OPTION_VERDICTS = (None, "가능", "불가", "확인필요")
 
 # ---------------------------------------------------------------- category enum
 # 허용 어휘의 단일 원본은 rules/categories.yaml 이다. Java 로더도 같은 파일을 읽는다.
@@ -402,6 +404,9 @@ def check_rulecards(rep: Report):
         rep.info("SKIP - 룰카드 없음 (T6 미완)")
         return
     n0 = len(rep.errors)
+    allow = {(a.get("card"), a.get("option"))
+             for a in ((load_yaml(VERDICTLESS_ALLOWLIST) or {}).get("allow") or [])}
+    seen_verdictless = set()
     for f in files:
         card = load_yaml(f) or {}
         rid = card.get("id", f.name)
@@ -436,10 +441,22 @@ def check_rulecards(rep: Report):
             if verified is True and str(cid) == "TODO":
                 rep.error("%s: citation verified=true 인데 id 가 TODO" % rid)
 
-        for opt in ((card.get("ask") or {}).get("options") or []):
+        # 카드는 question 키를 쓴다. 예전엔 ask 를 읽어 이 검사가 한 번도 돌지 않았다.
+        for opt in ((card.get("question") or {}).get("options") or []):
             v = opt.get("verdict")
-            if v not in (None, "가능", "불가", "되묻기"):
-                rep.error("%s: ask.options verdict 값이 이상함: %r" % (rid, v))
+            if v not in OPTION_VERDICTS:
+                rep.error("%s: question.options verdict 값이 이상함: %r" % (rid, v))
+            # G2 에서 판정 없는 선택지는 답을 받아도 확인필요로 멈춘다(#65). 허용 목록에 있는 것만 둔다.
+            if gate == "G2" and v is None:
+                key = (rid, opt.get("value"))
+                seen_verdictless.add(key)
+                if key not in allow:
+                    rep.error("%s: 선택지 '%s' 에 verdict 가 없다 — 답해도 확인필요로 멈춘다(#65). "
+                              "판정을 붙이거나 %s 에 이유와 함께 적을 것"
+                              % (rid, opt.get("value"), VERDICTLESS_ALLOWLIST.name))
+    for card_id, option in sorted(allow - seen_verdictless, key=str):
+        rep.warn("%s: 허용 목록의 '%s' 는 더 이상 판정 없는 선택지가 아니다(판정이 생겼거나 선택지가 없어짐) — %s 에서 지울 것"
+                 % (card_id, option, VERDICTLESS_ALLOWLIST.name))
     if len(rep.errors) == n0:
         rep.info("룰카드 %d장 검사 통과" % len(files))
 

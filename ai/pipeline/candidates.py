@@ -90,6 +90,22 @@ def docs(ev: Evidence, by_tier: dict[str, list[Hit]]) -> list[dict]:
     ]
 
 
+def hold_reasons(conn: psycopg.Connection, ev: Evidence, by_tier: dict[str, list[Hit]]) -> list[str]:
+    """보류 사유. 하네스(eval.run_draft)도 이걸 써서 운영과 같은 보류를 잰다.
+
+    확인필요는 sufficient 로 보류하지 않는다. 모델은 확인필요를 내면 sufficient 도 false 로
+    적는 경향이 있고(프롬프트로 고쳐도 절반 남음), 묻기만 하는 카드라 근거가 한쪽뿐이어도 오탐이
+    없다. 인용이 하나도 없으면 결론과 상관없이 보류한다(docs/rag-eval.md §13).
+    """
+    gone = missing_statutes(conn, [r.statute_id for r in ev.refs])
+    short = not ev.refs or (not ev.sufficient and ev.direction != "확인필요")
+    return (
+        ["근거 부족"] * short
+        + ["하위 근거만으로 확정"] * needs_review(ev, by_tier)
+        + [f"현행에 없는 조문 {gone}"] * bool(gone)
+    )
+
+
 @observe()
 def propose(
     conn: psycopg.Connection, row: dict, meta: dict, as_of: date, today: date
@@ -115,12 +131,7 @@ def propose(
     except (ValueError, RuntimeError) as e:
         return out, f"에이전트 실패 — {e}"
 
-    gone = missing_statutes(conn, [r.statute_id for r in ev.refs])
-    hold = (
-        ["근거 부족"] * (not ev.sufficient)
-        + ["하위 근거만으로 확정"] * needs_review(ev, by_tier)
-        + [f"현행에 없는 조문 {gone}"] * bool(gone)
-    )
+    hold = hold_reasons(conn, ev, by_tier)
     out |= {
         "suggested_docs": Json(docs(ev, by_tier)),
         "searched_tier": top_tier(ev, by_tier),

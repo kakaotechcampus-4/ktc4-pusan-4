@@ -3,12 +3,23 @@ import type {
   Judgment,
   JudgmentRun,
   QuestionGroup,
+  RuleCandidate,
+  QuestionSuggestion,
   Transaction,
   UploadBatch,
   Verdict } from
 '../../types/domain';
 
 /** 백엔드 준비 전 목업. 모양은 API 명세 3.3~3.7 응답과 같다. */
+
+/** 응답 시점에 붙는 필드(거래 요약)는 목업이 읽을 때 채운다 */
+export type JudgmentSeed = Omit<Judgment, 'transaction'>;
+
+/** 상태·답·거래 줄은 목업이 지금 상태에서 계산한다 */
+export type QuestionGroupSeed = Pick<
+  QuestionGroup,
+  'groupKey' | 'factType' | 'questionIds' | 'count' | 'totalAmount' | 'questionText' | 'options'>;
+
 
 export const UPLOAD_BATCH: UploadBatch = {
   id: '0199c8f2-0000-7000-8000-000000000001',
@@ -757,7 +768,7 @@ export const TRANSACTIONS: Transaction[] = [
   }
 ];
 
-export const JUDGMENTS: Judgment[] = [
+export const JUDGMENTS: JudgmentSeed[] = [
   {
     id: '0199f1c3-0000-7000-8000-00000000001001',
     transactionId: '0199c8f2-0000-7000-8000-00000000001001',
@@ -1618,7 +1629,7 @@ export const JUDGMENTS: Judgment[] = [
  * count·totalAmount 는 목업이 거래에서 다시 센다. 미분류 거래는 엔진에 넘기지 않으므로
  * 질문이 없다 — 분류 확인(3.5)에서 묻는다.
  */
-export const QUESTION_GROUPS: QuestionGroup[] = [
+export const QUESTION_GROUPS: QuestionGroupSeed[] = [
   {
     // R-300_카페
     groupKey: 'transaction:0199c8f2-0000-7000-8000-00000000001005',
@@ -1845,4 +1856,137 @@ export const CLASSIFICATION_REVIEWS: ClassificationReview[] = [
   suggestedCategories: ['해외SaaS', '국내SW', '기타'],
   createdAt: '2026-09-12T13:58:15+09:00',
   resolvedAt: null
+}];
+
+/**
+ * 관리자 규칙 후보 (M1). 모양은 rule_candidate 테이블과 AI 파이프라인(ai/pipeline/candidates.py)을 따른다.
+ * 초안을 만들지 못한 후보는 근거·초안 없이 보류로 들어온다
+ */
+export const RULE_CANDIDATES: RuleCandidate[] = [
+{
+  id: 1,
+  merchantCategory: '수리비',
+  industryCode: '62010',
+  distinctUsers: 7,
+  occurrenceCount: 23,
+  suggestedDocs: [
+  {
+    statuteId: '소득세법-27-1',
+    quote: '사업소득금액을 계산할 때 필요경비에 산입할 금액은 해당 과세기간의 총수입금액에 대응하는 비용으로서',
+    tier: '법령'
+  },
+  {
+    statuteId: '소득세법시행령-55-1-7',
+    quote: '업무와 관련된 자산의 수선비',
+    tier: '법령'
+  }],
+
+  searchedTier: '법령',
+  draftYaml:
+  '# 자동 생성 초안이다. 세무 검수 전이고 아직 카드가 아니다.\n' +
+  '# id 와 effective_period.start 는 승인 시점에 박는다(기본은 소급 적용 안 함).\n' +
+  'id: TODO\nversion: 1\ngate: G3\npriority: 50\n' +
+  'effective_period: { start: TODO, end: null }\n' +
+  'match:\n  category: [수리비]\n  industry: ["62010"]\n' +
+  'verdict: 확인필요\n' +
+  'citations:\n  - { id: 소득세법-27-1, verified: true }\n  - { id: 소득세법시행령-55-1-7, verified: true }\n' +
+  'review: { by: 미검수, date: 2026-10-13 }\n',
+  status: { code: 'PENDING', label: '대기' },
+  reviewedBy: null,
+  reviewedAt: null,
+  createdAt: '2026-10-13T03:00:00+09:00'
+},
+{
+  id: 2,
+  merchantCategory: '전문가수수료',
+  industryCode: '62010',
+  distinctUsers: 5,
+  occurrenceCount: 9,
+  suggestedDocs: [
+  {
+    statuteId: '소득세법-27-1',
+    quote: '해당 과세기간의 총수입금액에 대응하는 비용으로서 일반적으로 용인되는 통상적인 것의 합계액으로 한다',
+    tier: '법령'
+  }],
+
+  searchedTier: '법령',
+  draftYaml:
+  '# 자동 생성 초안이다. 세무 검수 전이고 아직 카드가 아니다.\n' +
+  'id: TODO\nversion: 1\ngate: G3\npriority: 50\n' +
+  'effective_period: { start: TODO, end: null }\n' +
+  'match:\n  category: [전문가수수료]\n  industry: ["62010"]\n' +
+  'verdict: 가능\naccount: 지급수수료\n' +
+  'citations:\n  - { id: 소득세법-27-1, verified: true }\n' +
+  'review: { by: 미검수, date: 2026-10-13 }\n',
+  status: { code: 'PENDING', label: '대기' },
+  reviewedBy: null,
+  reviewedAt: null,
+  createdAt: '2026-10-13T03:00:00+09:00'
+},
+{
+  id: 3,
+  merchantCategory: '미용',
+  industryCode: '62010',
+  distinctUsers: 4,
+  occurrenceCount: 11,
+  suggestedDocs: [],
+  searchedTier: null,
+  draftYaml: null,
+  status: { code: 'ON_HOLD', label: '보류' },
+  reviewedBy: null,
+  reviewedAt: null,
+  createdAt: '2026-10-13T03:00:00+09:00'
+},
+{
+  id: 4,
+  merchantCategory: '여가',
+  industryCode: '62010',
+  distinctUsers: 6,
+  occurrenceCount: 14,
+  suggestedDocs: [
+  {
+    statuteId: '소득세법-33-1-13',
+    quote: '가사의 경비와 이에 관련되는 경비로서 대통령령으로 정하는 것',
+    tier: '법령'
+  }],
+
+  searchedTier: '법령',
+  draftYaml:
+  '# 자동 생성 초안이다. 세무 검수 전이고 아직 카드가 아니다.\n' +
+  'id: TODO\nversion: 1\ngate: G2\npriority: 50\n' +
+  'effective_period: { start: TODO, end: null }\n' +
+  'match:\n  category: [여가]\n  industry: ["62010"]\n' +
+  'verdict: 불가\n' +
+  'citations:\n  - { id: 소득세법-33-1-13, verified: true }\n' +
+  'review: { by: 미검수, date: 2026-10-06 }\n',
+  status: { code: 'APPROVED', label: '승인' },
+  reviewedBy: 'admin@example.com',
+  reviewedAt: '2026-10-08T15:20:00+09:00',
+  createdAt: '2026-10-06T03:00:00+09:00'
+}];
+
+/**
+ * 목업 전용: 다른 업로드에서 같은 질문에 한 답 (GET /questions/suggestions, agent-secretary.md 3.1).
+ * 고정비(통신·수도광열)는 A 이어받기, 건별 용도와 해외 SaaS 기간은 B 이력만, 소명 대기는 C 다
+ */
+export const QUESTION_SUGGESTIONS: QuestionSuggestion[] = [
+{ groupKey: 'merchant:SK텔레콤', factType: '전용여부', tier: 'A', value: '전용', sourceLabel: '2025년 12월 업로드(국민)' },
+{ groupKey: 'merchant:자택 관리비', factType: '공간전용여부', tier: 'A', value: '자택 겸용', sourceLabel: '2025년 12월 업로드(국민)' },
+{
+  groupKey: 'transaction:0199c8f2-0000-7000-8000-00000000001004',
+  factType: '기간',
+  tier: 'B',
+  historyCounts: { '연간 일시불': 1 }
+},
+{
+  groupKey: 'transaction:0199c8f2-0000-7000-8000-00000000001005',
+  factType: '용도',
+  tier: 'B',
+  historyCounts: { 업무미팅: 4, 개인: 1 }
+},
+{
+  groupKey: 'transaction:0199c8f2-0000-7000-8000-00000000001016',
+  factType: '용도',
+  tier: 'C',
+  reason: '소명 대기 질문은 건마다 답해야 합니다'
 }];

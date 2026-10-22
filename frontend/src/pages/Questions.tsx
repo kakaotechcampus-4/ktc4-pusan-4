@@ -5,7 +5,8 @@ import { AppShell } from '../components/AppShell';
 import { Badge, Button, ChoiceGroup, Empty, Pagination } from '../components/ui';
 import { useSession } from '../contexts/SessionContext';
 import { api, ApiRequestError, useApi } from '../api';
-import type { QuestionGroup, Transaction } from '../types/domain';
+import { previousAnswer } from '../components/assistant/logic';
+import type { AnswerSource, QuestionGroup } from '../types/domain';
 import { formatDate, formatNumber, formatWon, ro } from '../utils/format';
 
 /** F1-a. 한 번에 보여주는 질문 수(잠정). 다 답하면 다음 질문이 이어서 나온다 */
@@ -17,6 +18,9 @@ const SHOWN_TRANSACTIONS = 3;
 
 const errorMessage = (caught: unknown, fallback: string) =>
 caught instanceof ApiRequestError ? caught.message : fallback;
+
+/** 그룹 응답과 어긋난 질문을 보낸 경우다. 목록을 다시 읽으면 맞는 묶음으로 돌아온다 (3.10) */
+const MIXED_BATCHES = '다른 업로드의 질문이 섞여 함께 답할 수 없습니다. 목록을 다시 불러왔습니다.';
 
 const groupId = (group: QuestionGroup) => `${group.groupKey}|${group.factType}`;
 
@@ -34,10 +38,10 @@ export function Questions() {
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  /** 이번에 고른 답. 응답에 답한 값이 없어서 새로고침하면 사라진다 */
-  const [chosen, setChosen] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState<string | null>(null);
   const [bulkChoice, setBulkChoice] = useState<Record<string, string>>({});
+  /** 「지난번 답 한 번에 적용」에서 뺀 그룹 */
+  const [skipped, setSkipped] = useState<Record<string, boolean>>({});
   /** 건너뛴 질문이 앞자리를 막아도 뒤 질문에 닿을 수 있게 페이지를 넘긴다 */
   const [page, setPage] = useState(0);
   const noticeRef = useRef<HTMLParagraphElement>(null);
@@ -56,72 +60,11 @@ export function Questions() {
     Promise.resolve(null),
     [batchId]
   );
-  /**
-   * 그룹 응답에는 거래가 없다. 지금 보이는 카드의 질문(카드당 3개)만 골라 질문 → 거래를 찾고,
-   * 그 거래만 받는다. 판정이 확인 필요가 아니게 된 거래(사용자 수정)나 100건 너머의 질문도 빠지지 않는다.
-   */
-  const shownIds = (pendingQ.data?.items ?? []).flatMap((group) =>
-  group.questionIds.slice(0, SHOWN_TRANSACTIONS)
+  // 지난번 답 (FR-5, agent-secretary.md 3.1). 못 읽으면 지난번 답 없이 그대로 그린다
+  const suggestionsQ = useApi(
+    () => batchId ? api.questions.suggestions(batchId).catch(() => null) : Promise.resolve(null),
+    [batchId]
   );
-  const rowsQ = useApi(
-    async () => {
-      const need = new Set(shownIds);
-      const transactionIdOf = new Map<string, string>();
-      for (let next = 0; batchId && transactionIdOf.size < need.size; next++) {
-        const result = await api.questions.list({ batchId, status: 'PENDING', page: next, size: 100 });
-        result.items.forEach((question) => {
-          if (need.has(question.id)) transactionIdOf.set(question.id, question.transactionId);
-        });
-        if (!result.page.hasNext) break;
-      }
-      const ids = [...new Set(transactionIdOf.values())];
-      const [transactions, currents] = await Promise.all([
-      Promise.all(ids.map((id) => api.transactions.get(id).catch(() => null))),
-      // 지금 판정을 본다. 직접 수정한 거래는 답해도 현재 판정이 바뀌지 않고(3.8),
-      // 불가인데 질문이 남은 거래는 소명 대기라 일괄 답변에서 빼야 한다(rule-card-fields.md)
-      Promise.all(
-        ids.map((id) =>
-        api.judgments.
-        list({ transactionId: id }).
-        then((page) => page.items[0] ?? null).
-        // 못 읽은 판정은 「모름」으로 둔다. 모르면 소명 대기일 수 있으니 일괄 답변을 열지 않는다
-        catch(() => 'unknown' as const)
-        )
-      )]
-      );
-      const byId = new Map(
-        transactions.
-        filter((transaction): transaction is Transaction => transaction !== null).
-        map((transaction) => [transaction.id, transaction])
-      );
-      return {
-        transactions: new Map(
-          [...transactionIdOf].
-          map(([questionId, transactionId]) => [questionId, byId.get(transactionId)] as const).
-          filter((entry): entry is [string, Transaction] => entry[1] !== undefined)
-        ),
-        overridden: new Set(
-          ids.filter((_, index) => {
-            const current = currents[index];
-            return current !== 'unknown' && current?.origin.type === 'OVERRIDE';
-          })
-        ),
-        presumed: new Set(
-          ids.filter((_, index) => {
-            const current = currents[index];
-            return (
-              current === 'unknown' ||
-              current?.verdict.code === 'UNAVAILABLE' && current.origin.type !== 'OVERRIDE');
-
-          })
-        )
-      };
-    },
-    [batchId, shownIds.join()]
-  );
-  const transactionOfQuestion = rowsQ.data?.transactions ?? new Map<string, Transaction>();
-  const overridden = rowsQ.data?.overridden ?? new Set<string>();
-  const presumed = rowsQ.data?.presumed ?? new Set<string>();
   const errorRef = useRef<HTMLParagraphElement>(null);
   /** 지금 보이는 페이지. 다음 페이지를 받는 동안에는 이전 페이지 번호로 센다 */
   const shownPage = pendingQ.data?.page.number ?? 0;
@@ -154,7 +97,7 @@ export function Questions() {
     window.setTimeout(() => errorRef.current?.focus(), 0);
   };
 
-  const answer = async (group: QuestionGroup, value: string) => {
+  const answer = async (group: QuestionGroup, value: string, source?: AnswerSource) => {
     if (busy) return;
     const key = groupId(group);
     setBusy(key);
@@ -163,38 +106,41 @@ export function Questions() {
     try {
       const result = await api.questions.respond({
         questionIds: group.questionIds,
-        answer: { value }
+        answer: { value },
+        source
       });
-      setChosen((prev) => ({ ...prev, [key]: value }));
       setEditing(null);
       announce(
         `「${value}」${ro(value)} 답했습니다. 거래 ${formatNumber(result.rejudgedTransactionCount)}건을 다시 판정했고, 이전 판정은 이력에 남습니다.`
       );
       reload();
     } catch (caught) {
+      if (caught instanceof ApiRequestError && caught.code === 'QUESTIONS_FROM_DIFFERENT_BATCHES') {
+        fail(MIXED_BATCHES);
+        reload();
+        return;
+      }
       fail(errorMessage(caught, '답을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.'));
     } finally {
       setBusy(null);
     }
   };
 
-  const answerAll = async (factType: string, groups: QuestionGroup[], value: string | undefined) => {
+  const answerAll = async (factType: string, value: string | undefined) => {
     if (!batchId || !value || busy) return;
     setBusy(`bulk|${factType}`);
     setError(null);
     setNotice(null);
     try {
       const result = await api.questions.bulkAnswer({ batchId, factType, answer: { value } });
-      setChosen((prev) => ({
-        ...prev,
-        ...Object.fromEntries(groups.map((group) => [groupId(group), value]))
-      }));
+      // 건너뛴 것은 종류가 다른 질문(skipped)과 같은 종류의 소명 대기(excluded)다 (3.11)
+      const left = result.skippedCount + result.excludedCount;
       announce(
         `질문 ${formatNumber(result.answeredCount)}건에 「${value}」${ro(value)} 답하고 거래 ${formatNumber(
           result.rejudgedTransactionCount
         )}건을 다시 판정했습니다.${
-        result.skippedCount > 0 ?
-        ` 나머지 질문 ${formatNumber(result.skippedCount)}건은 그대로 남았습니다.` :
+        left > 0 ?
+        ` 나머지 질문 ${formatNumber(left)}건은 그대로 남았습니다.` :
         ''}`
       );
       reload();
@@ -203,6 +149,40 @@ export function Questions() {
     } finally {
       setBusy(null);
     }
+  };
+
+  const previousOf = (group: QuestionGroup) =>
+  previousAnswer(
+    group,
+    suggestionsQ.data?.items.find((item) => item.groupKey === group.groupKey && item.factType === group.factType)
+  );
+  /** 이 페이지에서 지난번 답으로 바로 채울 수 있는 그룹 (A 이어받기) */
+  const carryOver = pending.flatMap((group) => {
+    const previous = previousOf(group);
+    return previous?.kind === 'apply' ? [{ group, value: previous.value, text: previous.text }] : [];
+  });
+  const carryChosen = carryOver.filter(({ group }) => !skipped[groupId(group)]);
+
+  // 확인 목록에서 고른 것만 기존 응답 API 로 하나씩 보낸다. 한 번에 닫는 API 가 따로 없다 (3.1)
+  const applyCarryOver = async () => {
+    if (busy || carryChosen.length === 0) return;
+    setBusy('carry');
+    setError(null);
+    setNotice(null);
+    let saved = 0;
+    for (const { group, value } of carryChosen) {
+      try {
+        await api.questions.respond({ questionIds: group.questionIds, answer: { value }, source: 'PREVIOUS_ANSWER' });
+        saved += 1;
+      } catch {
+        // 남은 것도 보낸다. 몇 개를 못 했는지 알린다
+      }
+    }
+    setBusy(null);
+    const missed = carryChosen.length - saved;
+    if (missed > 0) fail(`지난번 답 ${formatNumber(missed)}개는 저장하지 못했습니다. 그 질문은 그대로 남아 있습니다.`);
+    if (saved > 0) announce(`지난번 답으로 질문 ${formatNumber(saved)}개에 답했습니다. 질문마다 다시 바꿀 수 있습니다.`);
+    reload();
   };
 
   // 남은 질문이 적을 때만 factType 별로 묶어 일괄 답변을 연다
@@ -216,23 +196,10 @@ export function Questions() {
   filter((target) => target.groups.length > 1 && target.options.length > 0) :
   [];
   // 소명 대기(불가인데 질문이 남음)가 섞인 종류는 한 번에 답하지 않는다. 같은 「용도」로 묶여
-  // 「전부 업무미팅」 한 번에 주말 불가 추정이 모두 풀린다 (rule-card-fields.md)
-  const hasPresumption = (group: QuestionGroup) =>
-  group.questionIds.some((id) => presumed.has(transactionOfQuestion.get(id)?.id ?? ''));
-  // 거래 줄(과 지금 판정)을 받기 전이나 받다가 실패하면 소명 대기를 모른다. 그동안은 열지 않는다
-  const presumptionKnown = Boolean(rowsQ.data) && !rowsQ.loading && !rowsQ.error;
-  const bulkTargets = presumptionKnown ?
-  bulkCandidates.filter((target) => !target.groups.some(hasPresumption)) :
-  [];
-  const heldBack = presumptionKnown ?
-  bulkCandidates.filter((target) => target.groups.some(hasPresumption)) :
-  [];
-
-  /** 카드 머리의 가맹점 이름과 아래 건별 줄 */
-  const transactionsOf = (group: QuestionGroup) =>
-  group.questionIds.
-  map((id) => transactionOfQuestion.get(id)).
-  filter((transaction): transaction is Transaction => transaction !== undefined);
+  // 「전부 업무미팅」 한 번에 주말 불가 추정이 모두 풀린다 (rule-card-fields.md).
+  // 서버가 그룹마다 bulkAnswerable 로 알려 준다 (3.9)
+  const bulkTargets = bulkCandidates.filter((target) => target.groups.every((group) => group.bulkAnswerable));
+  const heldBack = bulkCandidates.filter((target) => target.groups.some((group) => !group.bulkAnswerable));
 
   const header =
   <header className="flex flex-wrap items-end justify-between gap-4">
@@ -300,9 +267,9 @@ export function Questions() {
           </span>
           {unresolved &&
           <span className="text-muted">
-              확인 필요{' '}
+              질문이 걸린 금액{' '}
               <strong className={`font-semibold ${unresolved.count > 0 ? 'text-warn' : 'text-ink'}`}>
-                {formatNumber(unresolved.count)}건 · {formatWon(unresolved.amount)}
+                {formatWon(unresolved.amount)}
               </strong>
             </span>
           }
@@ -335,6 +302,50 @@ export function Questions() {
           </p>
         }
 
+        {carryOver.length >= 2 &&
+        <section className="mt-4 rounded-2xl border border-line bg-surface p-5">
+            <h2 className="text-body font-semibold text-ink">지난번 답 한 번에 적용</h2>
+            <p className="mt-1 text-small text-muted">
+              다른 업로드에서 같은 질문에 한 답입니다. 확인하고 고른 것만 적용합니다. 적용한 뒤에도 질문마다 바꿀 수
+              있습니다.
+            </p>
+            <ul className="mt-3 space-y-2">
+              {carryOver.map(({ group, text }) => {
+              const key = groupId(group);
+              return (
+                <li key={key}>
+                    <label className="flex items-start gap-2.5 text-small text-ink2">
+                      <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={!skipped[key]}
+                      disabled={busy !== null}
+                      onChange={(event) => setSkipped((prev) => ({ ...prev, [key]: !event.target.checked }))} />
+
+                      <span>
+                        <span className="font-medium text-ink">
+                          {group.transactions[0]?.merchantNorm} · {group.questionText}
+                        </span>
+                        <span className="block text-muted">{text}</span>
+                      </span>
+                    </label>
+                  </li>);
+
+            })}
+            </ul>
+            <div className="mt-4 flex justify-end">
+              <Button
+              variant="secondary"
+              size="sm"
+              disabled={busy !== null || carryChosen.length === 0}
+              onClick={() => void applyCarryOver()}>
+
+                {busy === 'carry' ? '적용하는 중…' : `${formatNumber(carryChosen.length)}개 적용`}
+              </Button>
+            </div>
+          </section>
+        }
+
         {/* 뒤 페이지가 비면 첫 페이지로 돌아가므로, 그 사이에 「다 답했다」를 띄우지 않는다 */}
         {!pendingQ.loading && pending.length === 0 && shownPage === 0 ?
         <Empty
@@ -355,7 +366,8 @@ export function Questions() {
             <AnimatePresence initial={false}>
               {pending.map((group, index) => {
               const key = groupId(group);
-              const rows = transactionsOf(group);
+              const rows = group.transactions;
+              const previous = previousOf(group);
               return (
                 <motion.li
                   key={key}
@@ -385,7 +397,7 @@ export function Questions() {
                           {rows.length > 0 &&
                         <ul className="mt-2 space-y-0.5 text-small tabular-nums text-muted">
                               {rows.slice(0, SHOWN_TRANSACTIONS).map((row) =>
-                          <li key={row.id} className="truncate">
+                          <li key={row.questionId} className="truncate">
                                   {formatDate(row.approvedAt)} · {row.merchantRaw} · {formatWon(row.amount)}
                                 </li>
                           )}
@@ -394,7 +406,7 @@ export function Questions() {
                           }
                             </ul>
                         }
-                          {rows.some((row) => overridden.has(row.id)) &&
+                          {rows.some((row) => row.overridden) &&
                         <p className="mt-2 text-small text-ink2">
                               위 거래 중 직접 수정한 판정을 쓰는 거래가 있습니다. 답하면 기록은 남지만 그
                               거래의 현재 판정은 수정한 값 그대로입니다.
@@ -406,10 +418,25 @@ export function Questions() {
                       <div className="px-5 py-4">
                         {/* 저장하는 동안은 다른 카드의 선택지도 막는다. 눌러도 아무 일 없는 버튼을 두지 않는다 */}
                         <fieldset disabled={busy !== null} className={busy !== null ? 'opacity-60' : ''}>
+                          {/* 지난번 답은 사실 그대로 적고, 이어받기(A)만 그 값으로 답할 수 있다. 이력(B)은 미리 고르지 않는다 */}
+                          {previous &&
+                        <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-small text-ink2">
+                              <p>{previous.text}</p>
+                              {previous.kind === 'apply' &&
+                          <Button
+                            size="sm"
+                            variant="soft"
+                            onClick={() => void answer(group, previous.value, 'PREVIOUS_ANSWER')}>
+
+                                  이 답으로
+                                </Button>
+                          }
+                            </div>
+                        }
                           <ChoiceGroup
                           name={group.questionText}
                           columns={group.options.length >= 3 ? 3 : 2}
-                          value={chosen[key] ?? ''}
+                          value={group.answer?.value ?? ''}
                           onChange={(value) => void answer(group, value)}
                           options={group.options.map((option) => ({ value: option, label: option }))} />
 
@@ -448,7 +475,7 @@ export function Questions() {
             {heldBack.length > 0 &&
           <p className="mt-2 text-small text-ink2">
                 {heldBack.map((target) => `「${target.factType}」`).join('·')} 질문에는 주말·공휴일처럼 추정으로
-                제외한 거래가 섞여 있거나 지금 판정을 확인하지 못해, 한 번에 답하지 않습니다. 하나씩 답해 주세요.
+                제외한 거래가 섞여 있어, 한 번에 답하지 않습니다. 하나씩 답해 주세요.
               </p>
           }
             <div className="mt-4 space-y-5">
@@ -481,7 +508,6 @@ export function Questions() {
                   onClick={() =>
                   void answerAll(
                     target.factType,
-                    target.groups,
                     target.options.length === 1 ? target.options[0] : bulkChoice[target.factType]
                   )
                   }>
@@ -522,13 +548,14 @@ export function Questions() {
               {answered.map((group) => {
               const key = groupId(group);
               const open = editing === key;
+              const value = group.answer?.value;
               return (
                 <li key={key} className="px-5 py-3.5">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <p className="text-small font-medium text-ink">{group.questionText}</p>
                         <p className="mt-0.5 text-caption tabular-nums text-muted">
-                          {chosen[key] ? `「${chosen[key]}」${ro(chosen[key])} 답함` : '답함'} ·{' '}
+                          {value ? `「${value}」${ro(value)} 답함` : '답함'} ·{' '}
                           {formatNumber(group.count)}건 · {formatWon(group.totalAmount)}
                         </p>
                       </div>
@@ -550,10 +577,10 @@ export function Questions() {
                         <ChoiceGroup
                       name={`${group.questionText} 답 바꾸기`}
                       columns={group.options.length >= 3 ? 3 : 2}
-                      value={chosen[key] ?? ''}
+                      value={value ?? ''}
                       // 이미 고른 답을 다시 누르면 정정하지 않는다. 같은 판정 이력만 늘어난다
-                      onChange={(value) => {
-                        if (value !== chosen[key]) void answer(group, value);
+                      onChange={(next) => {
+                        if (next !== value) void answer(group, next);
                       }}
                       options={group.options.map((option) => ({ value: option, label: option }))} />
 

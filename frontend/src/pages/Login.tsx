@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LockIcon, MessageCircleIcon } from 'lucide-react';
 import { useSession } from '../contexts/SessionContext';
+import { ApiRequestError, isMock, mockPassword } from '../api';
 
 interface LocationState {
   from?: string;
@@ -20,12 +21,29 @@ export function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const from = (location.state as LocationState | null)?.from ?? '/upload';
 
-  const complete = (nextEmail: string) => {
-    signIn(nextEmail);
-    navigate(from, { replace: true });
+  // 서버 문장은 그대로 띄우지 않는다. 상태 코드로 고른다
+  const complete = async (nextEmail: string, nextPassword: string) => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await signIn(nextEmail, nextPassword);
+      navigate(from, { replace: true });
+    } catch (caught) {
+      const status = caught instanceof ApiRequestError ? caught.status : -1;
+      setError(
+        status === 401 ?
+        '이메일 또는 비밀번호를 확인해 주세요.' :
+        status === 0 ?
+        '서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.' :
+        '로그인하지 못했습니다. 잠시 후 다시 시도해 주세요.'
+      );
+      setBusy(false);
+    }
   };
 
   const submit = (event: React.FormEvent) => {
@@ -38,8 +56,7 @@ export function Login() {
       setError('비밀번호는 6자 이상 입력해 주세요.');
       return;
     }
-    setError(null);
-    complete(email);
+    void complete(email, password);
   };
 
   return (
@@ -110,22 +127,28 @@ export function Login() {
             판정 이력과 저장된 답변은 계정에 묶여 관리됩니다.
           </p>
 
-          <button
-            type="button"
-            onClick={() => complete('kakao-user@kakao.com')}
-            className="mt-8 flex w-full items-center justify-center gap-2 rounded-xl bg-[#FEE500] px-4 py-3 text-[15px] font-semibold text-[#191600] transition-opacity duration-150 ease-snap hover:opacity-90">
-            
-            <MessageCircleIcon className="h-4 w-4" aria-hidden="true" />
-            카카오로 계속하기
-          </button>
+          {/* 인증 방식(카카오 OAuth 등)은 아직 정하지 않았다(backend_api_plan.md). 실서버에서는 쓸 수 없는 버튼을 두지 않는다 */}
+          {isMock &&
+          <>
+              <button
+              type="button"
+              disabled={busy}
+              onClick={() => void complete('kakao-user@kakao.com', mockPassword ?? '')}
+              className="mt-8 flex w-full items-center justify-center gap-2 rounded-xl bg-[#FEE500] px-4 py-3 text-[15px] font-semibold text-[#191600] transition-opacity duration-150 ease-snap hover:opacity-90">
 
-          <div className="my-6 flex items-center gap-3">
-            <span className="h-px flex-1 bg-line" />
-            <span className="text-[12px] text-muted">또는 이메일로 로그인</span>
-            <span className="h-px flex-1 bg-line" />
-          </div>
+                <MessageCircleIcon className="h-4 w-4" aria-hidden="true" />
+                카카오로 계속하기
+              </button>
 
-          <form onSubmit={submit} noValidate>
+              <div className="my-6 flex items-center gap-3">
+                <span className="h-px flex-1 bg-line" />
+                <span className="text-[12px] text-muted">또는 이메일로 로그인</span>
+                <span className="h-px flex-1 bg-line" />
+              </div>
+            </>
+          }
+
+          <form onSubmit={submit} noValidate className={isMock ? undefined : 'mt-8'}>
             <div className="space-y-3">
               <div>
                 <label
@@ -173,19 +196,29 @@ export function Login() {
 
             <button
               type="submit"
-              className="mt-5 w-full rounded-xl bg-accent px-4 py-3 text-[15px] font-semibold text-white transition-colors duration-150 ease-snap hover:bg-accent-hover">
-              
-              로그인
+              disabled={busy}
+              className="mt-5 w-full rounded-xl bg-accent px-4 py-3 text-[15px] font-semibold text-white transition-colors duration-150 ease-snap hover:bg-accent-hover disabled:opacity-60">
+
+              {busy ? '로그인 중…' : '로그인'}
             </button>
           </form>
 
+          {isMock &&
           <button
             type="button"
-            onClick={() => complete('demo@expense-verdict.kr')}
+            disabled={busy}
+            onClick={() => void complete('demo@expense-verdict.kr', mockPassword ?? '')}
             className="mt-3 w-full rounded-xl border border-line px-4 py-3 text-[14px] font-semibold text-ink transition-colors duration-150 ease-snap hover:bg-canvas">
-            
-            샘플 계정으로 둘러보기
-          </button>
+
+              샘플 계정으로 둘러보기
+            </button>
+          }
+
+          {isMock &&
+          <p className="mt-2 text-[12px] leading-6 text-muted">
+              목업 비밀번호는 {mockPassword} 입니다. admin@ 으로 시작하는 이메일은 관리자로 들어갑니다.
+            </p>
+          }
 
           <p className="mt-6 flex items-start gap-2 text-[12px] leading-6 text-muted">
             <LockIcon className="mt-1 h-3.5 w-3.5 shrink-0" aria-hidden="true" />

@@ -13,7 +13,7 @@ import {
   type Column } from
 '../components/ui';
 import type { UploadBatch } from '../types/domain';
-import { formatFullDate, formatNumber, formatPeriod } from '../utils/format';
+import { formatFullDate, formatNumber, formatPeriod, toKst } from '../utils/format';
 
 /**
  * 업로드 이력 (FR-24·25).
@@ -63,7 +63,7 @@ export function Uploads() {
     width: 'w-[7.5rem]',
     cell: (row) =>
     <span className="whitespace-nowrap tabular-nums text-ink2">
-          {formatFullDate(row.createdAt.slice(0, 10))}
+          {formatFullDate(toKst(row.createdAt).date)}
         </span>
 
   },

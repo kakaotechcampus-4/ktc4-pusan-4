@@ -38,6 +38,10 @@ export function Transactions() {
   const [page, setPage] = useState(0);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // 포함 API 는 다시 판정하지 않는다(#135). 제외는 현재 결과에서 바로 빠지지만, 다시 넣은 거래는
+  // 새 판정을 돌리기 전까지 판정이 없거나 옛 답으로 낸 판정이 남는다.
+  // 미분류 거래는 판정에 넘기지 않으므로 분류 확인이 먼저다. 다시 넣으면 서버가 분류 확인 항목을 만든다(#148)
+  const [rerunNeeded, setRerunNeeded] = useState<'run' | 'classify' | null>(null);
 
   const listQ = useApi(
     () =>
@@ -65,6 +69,10 @@ export function Transactions() {
     try {
       if (next === 'INCLUDED') await api.transactions.include(row.id);else
       await api.transactions.exclude(row.id);
+      if (next === 'INCLUDED')
+      setRerunNeeded((prev) =>
+      prev === 'classify' || row.classificationStatus.code !== 'CLASSIFIED' ? 'classify' : 'run'
+      );
       listQ.reload();
     } catch (caught) {
       setError(
@@ -197,6 +205,28 @@ export function Transactions() {
             )}
           </Select>
         </div>
+      </div>
+
+      {/* 비어 있어도 DOM 에 남아 있어야 바뀐 내용을 읽는다 */}
+      <div role="status">
+        {rerunNeeded &&
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn-line bg-warn-bg px-4 py-3">
+            <p className="text-small leading-6 text-ink2">
+              {rerunNeeded === 'classify' ?
+            '분류가 안 된 거래가 있습니다. 분류 확인을 마친 뒤 판정을 새로 실행해야 결과에 반영됩니다.' :
+            '다시 포함한 거래는 판정을 새로 실행해야 결과에 반영됩니다.'}
+            </p>
+            {rerunNeeded === 'classify' ?
+          <Button to="/preview" size="sm" variant="secondary">
+                분류 확인하기
+              </Button> :
+
+          <Button to="/confirm" size="sm" variant="secondary">
+                다시 판정하기
+              </Button>
+          }
+          </div>
+        }
       </div>
 
       {error &&

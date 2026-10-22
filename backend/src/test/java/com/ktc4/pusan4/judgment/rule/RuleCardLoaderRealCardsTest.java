@@ -209,7 +209,7 @@ class RuleCardLoaderRealCardsTest {
             assertThat(question.groupBy()).isEqualTo("merchant:NETFLIX.COM");
             assertThat(question.options()).containsExactly("업무 전용", "개인 전용", "업무·개인 혼용");
         });
-        assertThat(인용조문(judgment)).containsExactly("소득세법-27-1", "소득세법-33-1-5");
+        assertThat(인용조문(judgment)).containsExactly("소득세법-27-1", "소득세법-33-1-5", "소득세법시행령-61-1-1");
     }
 
     /** 되묻기 응답이 카드 기본 판정을 대체한다. */
@@ -378,7 +378,7 @@ class RuleCardLoaderRealCardsTest {
         Judgment judgment = JudgmentEngine.judge(토요일, 인적용역, List.of(용도(토요일, "개인")), load());
 
         assertThat(judgment.verdict()).isEqualTo(Verdict.UNAVAILABLE);
-        assertThat(인용조문(judgment)).containsExactly("소득세법-33-1-5");
+        assertThat(인용조문(judgment)).containsExactly("소득세법-33-1-5", "소득세법시행령-61-1-1");
     }
 
     /** 혼자 카페 작업은 업무비로 보기 어렵다. 주말에는 소명으로 인정하지 않는다. */
