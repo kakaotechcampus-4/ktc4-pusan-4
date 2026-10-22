@@ -36,3 +36,12 @@
 - `deploy/web.Dockerfile` 에 `ARG VITE_API` 를 추가했다. 기본값이 비어 있어 기존(목업) 빌드는 그대로이고, 데모 배포는 `--build-arg VITE_API=http` 로 빌드한다.
 - 첫 배포는 이 인자 없이 빌드해서 프런트가 서버를 부르지 않았다. 업로드 결과가 서버 DB 에 0건이었고, 번들에 `/api/v1` 참조가 없었다. 운영 AWS 도 같은 Dockerfile 이라 목업으로 돈다(`docs/deployment.md` 1절에 적힌 대로).
 - 이미지는 Windows worktree 대신 LF 로 받은 checkout 에서 다시 빌드한다. 컨테이너의 `rules/*.yaml` 이 CRLF 로 들어가 레포와 md5 가 달랐다.
+
+## 15:20 발표에서 여러 사람이 각자 쓰도록 이메일 자유 가입을 붙인다
+
+- 로그인은 고정 사용자 하나(`demo@example.com`)만 받았다. 모두 같은 사용자라, 두 번째 사람부터 같은 파일 업로드가 409(`DUPLICATE_FILE`)로 막히고, 개인 사전·답변·탈퇴가 서로에게 번졌다.
+- `FixedUserCredentialVerifier` 가 공용 비밀번호만 확인하고, 이메일은 `UserService.findOrCreateByEmail` 로 찾거나 만든다. 이메일은 소문자로 저장하고, `insert … on conflict (email) do nothing` 뒤 다시 읽어 동시 첫 로그인에도 한 행만 남는다.
+- 로그인 화면(실서버 모드)에 비밀번호와 "실제 이메일은 쓰지 마세요" 안내를 넣었다.
+- 업로드 중복 검사(파일 해시, 거래 natural_key)를 푸는 쪽은 택하지 않았다. 같은 사용자 안에서 거래가 여러 벌 생겨 연도 합산이 부풀고, 개인 사전 공유 문제는 남는다.
+- 확인: `gradlew -p backend check` 단위 361·통합 155 통과(새 통합 테스트 2개), frontend typecheck·vitest 158 통과.
+- 남은 것: 가입 횟수 제한이 없다. 이틀짜리 데모라 감수하고, 발표 뒤 VM 과 함께 지운다. develop 에는 넣지 않는다(실제 인증은 B9b).
