@@ -14,6 +14,7 @@ import com.ktc4.pusan4.judgment.domain.JudgmentRunFailure;
 import com.ktc4.pusan4.judgment.domain.JudgmentRunStatus;
 import com.ktc4.pusan4.judgment.domain.StatuteVersion;
 import com.ktc4.pusan4.judgment.domain.Verdict;
+import com.ktc4.pusan4.judgment.persistence.JudgmentOverrideService;
 import com.ktc4.pusan4.judgment.persistence.JudgmentQueryService;
 import com.ktc4.pusan4.judgment.persistence.JudgmentRunService;
 import com.ktc4.pusan4.judgment.persistence.QuestionAnswerResult;
@@ -96,6 +97,9 @@ class ApiResponseContractTest {
     private JudgmentQueryService judgmentQueryService;
 
     @MockitoBean
+    private JudgmentOverrideService overrideService;
+
+    @MockitoBean
     private QuestionQueryService questionQueryService;
 
     @MockitoBean
@@ -134,6 +138,7 @@ class ApiResponseContractTest {
             OffsetDateTime.parse("2026-09-12T14:05:00+09:00"),
             List.of(new JudgmentRevision.CitedStatute(1418, "소득세법-27-1")));
         given(judgmentQueryService.get(any(), any())).willReturn(judgment);
+        given(overrideService.override(any(), any(), any(), any())).willReturn(UUID.fromString(ID));
         given(judgmentQueryService.list(any(), any(), anyInt(), anyInt())).willReturn(new PageImpl<>(List.of(judgment)));
         given(judgmentQueryService.summary(any(), any(), any(), any())).willReturn(JudgmentSummary.of(List.of(
             new JudgmentSummary.Row(Verdict.AVAILABLE, "소모품비", 12_800L))));
