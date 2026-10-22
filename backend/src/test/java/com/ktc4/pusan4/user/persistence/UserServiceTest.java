@@ -16,7 +16,7 @@ import static org.mockito.Mockito.mock;
 class UserServiceTest {
 
     private final AppUserRepository repository = mock(AppUserRepository.class);
-    private final UserService userService = new UserService(repository);
+    private final UserService userService = new UserService(repository, UUID::randomUUID);
 
     @Test
     void returns_user_when_present() {

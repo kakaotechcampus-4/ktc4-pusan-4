@@ -220,6 +220,14 @@ export function Login() {
             </p>
           }
 
+          {/* demo/poc-gcp 전용: 백엔드가 아무 이메일이나 공용 비밀번호로 가입·로그인시킨다 */}
+          {!isMock &&
+          <p className="mt-3 text-[12px] leading-6 text-muted">
+              데모 서버입니다. 아무 이메일이나 입력하면 바로 가입·로그인됩니다. 비밀번호는 demo1234@ 입니다.
+              실제 이메일은 쓰지 마세요.
+            </p>
+          }
+
           <p className="mt-6 flex items-start gap-2 text-[12px] leading-6 text-muted">
             <LockIcon className="mt-1 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             로그인은 판정 이력 보관에만 사용합니다. 카드내역 원본은 계정에 저장되지

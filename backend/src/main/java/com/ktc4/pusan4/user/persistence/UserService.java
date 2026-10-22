@@ -1,20 +1,34 @@
 package com.ktc4.pusan4.user.persistence;
 
+import com.ktc4.pusan4.shared.UuidGenerator;
 import com.ktc4.pusan4.shared.api.ApiException;
 import com.ktc4.pusan4.user.domain.AppUser;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.util.UUID;
 
 @Service
 public class UserService {
 
     private final AppUserRepository userRepository;
+    private final UuidGenerator uuidGenerator;
 
-    public UserService(AppUserRepository userRepository) {
+    public UserService(AppUserRepository userRepository, UuidGenerator uuidGenerator) {
         this.userRepository = userRepository;
+        this.uuidGenerator = uuidGenerator;
+    }
+
+    /** 데모 로그인 전용. 이메일로 사용자를 찾고 없으면 만든다. 이메일은 소문자로 맞춘다. */
+    @Transactional
+    public UUID findOrCreateByEmail(String email) {
+        String normalized = email.trim().toLowerCase(Locale.ROOT);
+        userRepository.insertIfAbsent(uuidGenerator.generate(), normalized);
+        return userRepository.findByEmail(normalized)
+            .map(user -> user.toDomain().id())
+            .orElseThrow();
     }
 
     /**

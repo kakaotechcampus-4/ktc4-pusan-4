@@ -10,6 +10,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -46,6 +47,9 @@ class AuthIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -69,6 +73,42 @@ class AuthIntegrationTest {
         mockMvc.perform(get("/api/v1/users/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken(result)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.id").value(FixedUser.ID.toString()));
+    }
+
+    @Test
+    void new_email_with_demo_password_creates_user_and_logs_in() throws Exception {
+        // when: 처음 보는 이메일
+        MvcResult first = login("""
+            {"email": "Visitor1@Demo.test", "password": "test-password"}
+            """);
+
+        // then: 새 사용자가 생기고 이메일은 소문자로 저장된다
+        assertThat(first.getResponse().getStatus()).isEqualTo(200);
+        String id = objectMapper.readTree(mockMvc.perform(get("/api/v1/users/me")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken(first)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.email").value("visitor1@demo.test"))
+            .andReturn().getResponse().getContentAsString()).path("id").asText();
+        assertThat(id).isNotEqualTo(FixedUser.ID.toString());
+
+        // 같은 이메일(대소문자 무관)로 다시 들어오면 같은 사용자다
+        MvcResult again = login("""
+            {"email": "visitor1@demo.test", "password": "test-password"}
+            """);
+        mockMvc.perform(get("/api/v1/users/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken(again)))
+            .andExpect(jsonPath("$.id").value(id));
+    }
+
+    @Test
+    void new_email_with_wrong_password_creates_nothing() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"email": "visitor2@demo.test", "password": "wrong"}
+                    """))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"));
+
+        assertThat(userCount("visitor2@demo.test")).isZero();
     }
 
     @Test
@@ -158,6 +198,10 @@ class AuthIntegrationTest {
 
     private String accessToken(MvcResult result) throws Exception {
         return objectMapper.readTree(result.getResponse().getContentAsString()).path("accessToken").asText();
+    }
+
+    private int userCount(String email) {
+        return jdbcTemplate.queryForObject("select count(*) from app_user where email = ?", Integer.class, email);
     }
 
     private static Cookie refreshCookie(MvcResult result) {

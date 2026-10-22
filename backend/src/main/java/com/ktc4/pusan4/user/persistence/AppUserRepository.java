@@ -14,6 +14,14 @@ interface AppUserRepository extends Repository<AppUserEntity, UUID> {
 
     Optional<AppUserEntity> findById(UUID id);
 
+    Optional<AppUserEntity> findByEmail(String email);
+
+    /** 데모 가입. 같은 이메일로 동시에 처음 로그인해도 한 행만 남는다(email UNIQUE). */
+    @Modifying
+    @Query(value = "insert into app_user(id, email) values (:id, :email) on conflict (email) do nothing",
+        nativeQuery = true)
+    int insertIfAbsent(@Param("id") UUID id, @Param("email") String email);
+
     /** 사용자 단위로 직렬화해야 하는 쓰기(Context 버전 채번 등) 앞에서 잡는다. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""

@@ -1,6 +1,6 @@
 package com.ktc4.pusan4.auth;
 
-import com.ktc4.pusan4.shared.auth.FixedUser;
+import com.ktc4.pusan4.user.persistence.UserService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -10,25 +10,31 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * 고정 사용자({@link FixedUser}) 하나만 통과시킨다. 비밀번호는 설정(APP_AUTH_DEMO_PASSWORD)에서 받고,
- * 비어 있으면 아무도 로그인할 수 없다 — 설정을 빠뜨린 서버가 열리지 않게 닫힌 쪽으로 떨어뜨린다.
+ * 데모 로그인(demo/poc-gcp 전용). 비밀번호가 설정(APP_AUTH_DEMO_PASSWORD)과 같으면 어떤 이메일이든 통과시키고,
+ * 처음 보는 이메일이면 그 자리에서 사용자를 만든다. 발표에서 여러 사람이 서로의 데이터와 섞이지 않게 쓰기 위한 것이다.
+ * 비밀번호 설정이 비어 있으면 아무도 로그인할 수 없다 — 설정을 빠뜨린 서버가 열리지 않게 닫힌 쪽으로 떨어뜨린다.
  */
 @Component
 class FixedUserCredentialVerifier implements CredentialVerifier {
 
-    private final byte[] password;
+    /** app_user.email 의 길이 */
+    private static final int MAX_EMAIL_LENGTH = 320;
 
-    FixedUserCredentialVerifier(@Value("${app.auth.demo-password}") String password) {
+    private final byte[] password;
+    private final UserService users;
+
+    FixedUserCredentialVerifier(@Value("${app.auth.demo-password}") String password, UserService users) {
         this.password = password.getBytes(StandardCharsets.UTF_8);
+        this.users = users;
     }
 
     @Override
     public Optional<UUID> verify(String email, String password) {
-        if (this.password.length == 0 || !FixedUser.EMAIL.equalsIgnoreCase(email)) {
+        if (this.password.length == 0 || email.isBlank() || email.length() > MAX_EMAIL_LENGTH) {
             return Optional.empty();
         }
         // 길이·내용에 따라 걸리는 시간이 달라지지 않게 비교한다
         boolean matches = MessageDigest.isEqual(this.password, password.getBytes(StandardCharsets.UTF_8));
-        return matches ? Optional.of(FixedUser.ID) : Optional.empty();
+        return matches ? Optional.of(users.findOrCreateByEmail(email)) : Optional.empty();
     }
 }
