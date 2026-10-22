@@ -120,6 +120,28 @@ systemctl list-timers ktc4-corpus.timer
 
 실패하면 서비스가 failed로 남고 `journalctl`에 원인이 있다. 세 단계 모두 멱등이라 원인을 고친 뒤 `systemctl start ktc4-corpus.service`로 다시 돌리면 된다. 운영 postgres는 메모리 1GB라 결과는 행 수 수준의 가벼운 쿼리로만 확인한다.
 
+### 지난 시행판 채우기 (1회)
+
+주간 동기화는 현행판만 받는다. 처음 적재한 날 현행판의 시행일이 모든 조문의 `effective_from`이 되므로,
+그보다 이른 날짜의 거래(예: 2026-10-01 시행 시행령으로 적재한 DB에서 2026년 1월 거래)는 인용할 조문 판이 없어
+판정이 `RULE_PROCESSING_FAILED`로 실패한다. 이 기능이 들어간 커밋을 배포한 뒤, 현행 적재가 끝난 DB에 한 번 돌린다.
+이미지 태그는 `deploy/corpus-sync.sh`와 같은 방식으로 정한다.
+
+```bash
+sudo -i
+repo=/opt/ktc4/repo; sha=$(cat /opt/ktc4/current-sha)
+set -a; source /etc/ktc4/production.env; set +a
+export IMAGE_TAG=$sha POSTGRES_TAG=$(git -C "$repo" rev-parse "$sha:docker/postgres" | cut -c1-12)
+docker compose --env-file /etc/ktc4/production.env -f "$repo/deploy/compose.yaml" run --rm --no-deps -T ai \
+  python -m pipeline.law_sync --target law --law 001565 --law 003956 --history-since 2024-01-01 --dry-run
+# 행 수를 보고 --dry-run 을 빼서 다시 돌린다
+```
+
+- `--history-since` 날짜에 시행 중이던 판부터, DB에 이미 있는 가장 이른 판 직전까지를 닫힌 행(`is_superseded = true`)으로 넣는다. 현행 행은 건드리지 않는다.
+- 다시 돌려도 아무것도 넣지 않는다. 더 이른 날짜로 넓힐 때만 그 앞을 채운다.
+- 닫힌 행은 `reindex`가 색인하지 않으므로 RAG 검색 결과는 바뀌지 않는다.
+- `--law`를 빼면 `LAWS` 12개 전부다. 판정 카드가 인용하는 건 지금 소득세법과 시행령뿐이다.
+
 ## 7. 공휴일 동기화
 
 판정에 쓸 평일 공휴일(대체·임시공휴일 포함)을 `public_holiday` 표에 둔다. 판정은 API 를 직접 부르지 않고 이 표만 읽는다. 백엔드가 기동할 때와 매일 04:00 KST에 공공데이터포털 「한국천문연구원_특일 정보」(`getRestDeInfo`)에서 올해 앞뒤 1년씩 받아 연도별로 표를 교체한다.
