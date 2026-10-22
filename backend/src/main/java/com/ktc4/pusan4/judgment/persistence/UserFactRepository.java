@@ -4,6 +4,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -11,6 +12,8 @@ import java.util.UUID;
 interface UserFactRepository extends Repository<UserFactEntity, UUID> {
 
     UserFactEntity save(UserFactEntity fact);
+
+    List<UserFactEntity> findByIdIn(Collection<UUID> ids);
 
     Optional<UserFactEntity> findFirstByUserIdAndBatchIdAndScopeKeyAndFactTypeOrderByVersionDesc(
         UUID userId, UUID batchId, String scopeKey, String factType

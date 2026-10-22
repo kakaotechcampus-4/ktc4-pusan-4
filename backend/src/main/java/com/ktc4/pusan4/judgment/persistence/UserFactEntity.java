@@ -50,6 +50,10 @@ class UserFactEntity {
         this.version = version;
     }
 
+    UUID id() {
+        return id;
+    }
+
     UserFact toDomain() {
         return new UserFact(scopeKey, factType, value);
     }

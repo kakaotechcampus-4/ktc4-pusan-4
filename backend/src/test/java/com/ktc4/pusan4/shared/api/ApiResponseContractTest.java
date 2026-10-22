@@ -2,7 +2,24 @@ package com.ktc4.pusan4.shared.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ktc4.pusan4.judgment.api.JudgmentMockData;
+import com.ktc4.pusan4.judgment.domain.Gate;
+import com.ktc4.pusan4.judgment.domain.JudgmentOrigin;
+import com.ktc4.pusan4.judgment.domain.JudgmentOriginType;
+import com.ktc4.pusan4.judgment.domain.JudgmentRevision;
+import com.ktc4.pusan4.judgment.domain.JudgmentRun;
+import com.ktc4.pusan4.judgment.domain.JudgmentSummary;
+import com.ktc4.pusan4.judgment.domain.Question;
+import com.ktc4.pusan4.judgment.domain.QuestionStatus;
+import com.ktc4.pusan4.judgment.domain.JudgmentRunFailure;
+import com.ktc4.pusan4.judgment.domain.JudgmentRunStatus;
 import com.ktc4.pusan4.judgment.domain.StatuteVersion;
+import com.ktc4.pusan4.judgment.domain.Verdict;
+import com.ktc4.pusan4.judgment.persistence.JudgmentOverrideService;
+import com.ktc4.pusan4.judgment.persistence.JudgmentQueryService;
+import com.ktc4.pusan4.judgment.persistence.JudgmentRunService;
+import com.ktc4.pusan4.judgment.persistence.QuestionAnswerResult;
+import com.ktc4.pusan4.judgment.persistence.QuestionAnswerService;
+import com.ktc4.pusan4.judgment.persistence.QuestionQueryService;
 import com.ktc4.pusan4.judgment.persistence.StatuteService;
 import com.ktc4.pusan4.merchant.api.ClassificationMockData;
 import com.ktc4.pusan4.shared.UuidV7Generator;
@@ -21,6 +38,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -30,6 +48,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
@@ -38,6 +57,7 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
@@ -71,6 +91,21 @@ class ApiResponseContractTest {
     private BusinessContextService contextService;
 
     @MockitoBean
+    private JudgmentRunService runService;
+
+    @MockitoBean
+    private JudgmentQueryService judgmentQueryService;
+
+    @MockitoBean
+    private JudgmentOverrideService overrideService;
+
+    @MockitoBean
+    private QuestionQueryService questionQueryService;
+
+    @MockitoBean
+    private QuestionAnswerService questionAnswerService;
+
+    @MockitoBean
     private StatuteService statuteService;
 
     @BeforeEach
@@ -85,6 +120,35 @@ class ApiResponseContractTest {
         given(contextService.create(any(), any())).willReturn(context);
         given(contextService.current(any())).willReturn(context);
         given(contextService.history(any())).willReturn(List.of(context));
+
+        JudgmentRun run = new JudgmentRun(UUID.fromString(ID), UUID.fromString(ID), UUID.fromString(ID), 1,
+            JudgmentRunStatus.QUEUED, 23, 0, 0, null, null);
+        given(runService.create(any(), any(), any())).willReturn(run);
+        given(runService.get(any(), any())).willReturn(run);
+        given(runService.failures(any(), any(), anyInt(),
+            anyInt())).willReturn(new PageImpl<>(List.of(new JudgmentRunFailure(
+                UUID.fromString(ID), "RULE_PROCESSING_FAILED", "조문 없음",
+                OffsetDateTime.parse("2026-09-12T14:05:00+09:00")))));
+
+        JudgmentRevision judgment = new JudgmentRevision(UUID.fromString(ID), UUID.fromString(ID),
+            new JudgmentRevision.JudgedTransaction(LocalDate.parse("2026-01-12"), "스타벅스코리아 서면점", "스타벅스",
+                "카페", 12_800L, 0),
+            1, new JudgmentOrigin(JudgmentOriginType.RUN, UUID.fromString(ID)), Verdict.NEEDS_REVIEW, Gate.G2, false,
+            "소모품비", null, false, null, Map.of(), "R-300", 1, List.of("R-300"), "0".repeat(40), 1,
+            OffsetDateTime.parse("2026-09-12T14:05:00+09:00"),
+            List.of(new JudgmentRevision.CitedStatute(1418, "소득세법-27-1")));
+        given(judgmentQueryService.get(any(), any())).willReturn(judgment);
+        given(overrideService.override(any(), any(), any(), any())).willReturn(UUID.fromString(ID));
+        given(judgmentQueryService.list(any(), any(), anyInt(), anyInt())).willReturn(new PageImpl<>(List.of(judgment)));
+        given(judgmentQueryService.summary(any(), any(), any(), any())).willReturn(JudgmentSummary.of(List.of(
+            new JudgmentSummary.Row(Verdict.AVAILABLE, "소모품비", 12_800L))));
+
+        given(questionQueryService.find(any(), any(), any())).willReturn(List.of(new Question(UUID.fromString(ID),
+            UUID.fromString(ID), UUID.fromString(ID), "merchant:스타벅스", "용도", "용도가 무엇인가요?",
+            List.of("사업", "개인", "혼용"), QuestionStatus.PENDING, null, null,
+            OffsetDateTime.parse("2026-09-12T14:05:30+09:00"), null, judgment.transaction(), false, false)));
+        given(questionAnswerService.answer(any(), any(), any()))
+            .willReturn(new QuestionAnswerResult(1, UUID.fromString(ID), 1));
 
         given(statuteService.get(anyLong())).willReturn(new StatuteVersion(1523, "소득세법시행령-67-4",
             "소득세법 시행령 제67조 제4항", "시행령", LocalDate.parse("2026-01-01"), null, "https://www.law.go.kr/", "..."));

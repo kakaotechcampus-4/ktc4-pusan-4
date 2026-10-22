@@ -204,6 +204,19 @@ flowchart TD
 - `JudgmentSchemaIntegrationTest`: 테이블마다 행을 채운 뒤 batch 삭제와 탈퇴, 다른 batch를 잘못 가리키는 참조가 있을 때 삭제가 막히는지.
 - `JudgmentRunsMigrationUpgradeIntegrationTest`: 행이 있는 DB에 마이그레이션을 적용했을 때 기존 행이 보존·변환되는지.
 
+### 판정 실행(run)
+
+`POST /judgment-runs`는 202를 바로 돌려주고, 판정은 커밋 뒤 별도 스레드에서 돈다. 진행 상황은 `GET /judgment-runs/{id}` 폴링으로 본다(api.md 3.6).
+
+- **대상은 만들 때 고정한다.** 판정대상이면서 분류 완료인 거래를 `judgment_run_item`에 PENDING으로 넣는다. 그래서 실행 중에 사용자가 거래를 제외해도 `totalCount`와 처리 대상이 어긋나지 않는다.
+- **실행은 커밋 뒤에 시작한다**(`@TransactionalEventListener` + `@Async`). 커밋 전에 시작하면 다른 스레드가 아직 보이지 않는 run을 읽는다.
+- **거래마다 따로 커밋한다.** 판정 저장과 항목 SUCCEEDED는 한 트랜잭션이다. 판정이 실패하면 그 트랜잭션을 롤백하고, FAILED(`RULE_PROCESSING_FAILED`, 고정 문구)를 새 트랜잭션에 남긴다. 응답으로 나가는 값이라 예외 메시지는 로그에만 남긴다. 한 건의 기술적 실패가 다른 건을 막지 않는다.
+- 판정 결과(`NEEDS_REVIEW` 포함)는 실패가 아니다. 실패는 인용 조문의 `statute_version`이 없는 경우처럼 기술적인 것만 뜻한다.
+- **멈춘 run은 실패로 끝낸다.** 실행은 서버 메모리의 비동기 큐에서 돌아서, 서버가 내려가면 run이 QUEUED·RUNNING으로 남는다. run은 만들 때, 시작할 때, 거래 한 건을 처리할 때마다 `last_progress_at`을 갱신한다. 1분마다 진행이 5분 넘게 없는 run의 남은 항목을 `RUN_INTERRUPTED`로 실패 처리하고 run을 끝낸다. 이어서 돌리지 않으므로 사용자가 다시 실행한다.
+  - 서버 기동 시각이 아니라 진행 시각으로 판단하므로, 서버가 여러 대여도 다른 서버에서 돌고 있는 run은 끝내지 않는다.
+  - 실행기와 정리 작업은 run 행을 잠그고 상태를 확인한 뒤에 바꾼다. 정리 작업이 먼저 끝낸 run은 실행기가 늦게 와도 덮어쓰지 않는다.
+  - 기본 스레드 풀(8개)보다 많은 run이 동시에 몰려 QUEUED로 5분 넘게 기다리면, 실행 전에 끝날 수 있다.
+
 ### 관련 문서
 
 - [`CONTEXT.md`](../CONTEXT.md): 설계 논의·결정·대안 전체 (단일 원본)

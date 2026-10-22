@@ -1484,6 +1484,14 @@ FAILED
 
 `NEEDS_REVIEW`는 `SUCCEEDED`다.
 
+`errorCode`:
+
+| errorCode | 뜻 |
+| --- | --- |
+| `RULE_PROCESSING_FAILED` | 그 거래를 판정하다 기술적으로 실패했다. `message`는 고정 문구이고, 원인은 서버 로그에만 남긴다 |
+| `RUN_START_FAILED` | Run을 시작하지 못했다(Context를 읽지 못함 등). 대상 거래 전체가 이 코드로 끝난다. 다시 실행해야 한다 |
+| `RUN_INTERRUPTED` | 실행하던 서버가 내려가 Run이 멈췄다. 진행이 5분 넘게 없는 `QUEUED`·`RUNNING` Run의 남은 거래가 이 코드로 끝난다. Run은 이어 돌리지 않으므로 다시 실행해야 한다 |
+
 ---
 
 # 3.7 판정 결과
@@ -1525,6 +1533,10 @@ true
 
 `latestOnly=true`는 현재 결과 호환 이름이다. 활성 Override가 최신 revision이 아니어도 현재 Judgment로 반환한다.
 
+조건은 모두 AND로 건다. `transactionId`·`batchId`·`year`·`runId`가 하나도 없으면 오류 없이 본인 전체의 현재 Judgment를 반환한다.
+
+다른 사용자의 `transactionId`·`batchId`·`runId`를 넘기면 404가 아니라 빈 목록이다.
+
 ### batchId / year
 
 ```
@@ -1535,7 +1547,7 @@ GET /api/v1/judgments?batchId=B1
 
 활성 JudgmentOverride가 있으면 해당 Override revision이 현재 Judgment다. 활성 Override가 없으면 latest non-override revision이 현재 Judgment다.
 
-사용자가 현재 `EXCLUDED`한 Transaction은 제외한다.
+사용자가 현재 `EXCLUDED`한 Transaction과 분류 확인이 끝나지 않은 Transaction은 제외한다(§5).
 
 ```
 GET /api/v1/judgments?year=2026
@@ -1551,6 +1563,10 @@ GET /api/v1/judgments?transactionId=T1&latestOnly=false
 
 해당 Transaction의 전체 revision 이력을 조회할 수 있다.
 
+`latestOnly=true`면 그 Transaction의 현재 Judgment다. 이때는 제외했거나 분류 확인 전인 Transaction이어도 현재 Judgment가 있으면 반환한다.
+
+`latestOnly=false`는 `transactionId` 없이도 쓸 수 있다. 그러면 다른 조건에 맞는 모든 revision을 반환한다.
+
 ### runId
 
 ```
@@ -1561,7 +1577,7 @@ R1이 직접 생성했던 Judgment만 반환한다.
 
 R1 이후 QuestionResponse나 Override로 생성된 revision은 포함하지 않는다.
 
-`runId`와 `latestOnly`는 함께 사용하지 않는다.
+`runId`와 `latestOnly`는 함께 사용하지 않는다. 함께 보내면 `latestOnly`는 무시한다.
 
 정렬:
 
@@ -1646,6 +1662,12 @@ GET /api/v1/judgments/summary?runId=R1
 }
 ```
 
+`byVerdict`는 세 verdict를 늘 담는다. 판정이 없는 verdict는 `count`·`finalAmount`가 0이다. `finalAmount`가 아직 없는 Judgment(금액 계산 전)는 0으로 더한다.
+
+`byAccount`는 `AVAILABLE`이면서 `account`가 있는 Judgment만 모은다. 정렬은 `finalAmount DESC`이고, 같으면 `account` 이름순이다.
+
+다른 사용자의 `batchId`·`runId`를 넘기면 404가 아니라 빈 집계(`totalCount` 0)다.
+
 ---
 
 ## `GET /api/v1/judgments/{judgmentId}`
@@ -1728,7 +1750,7 @@ GET /api/v1/judgments/summary?runId=R1
 | appliedRuleIds | 적용된 전체 RuleCard ID |
 | rulesCommitSha | 사용된 Rules revision |
 | userContextVersion | 판정에 사용된 Context 버전 |
-| explanation | RuleCard의 reason |
+| explanation | 판정 설명 문장. RuleCard에 설명 필드가 없어 지금은 늘 `null`이다 |
 | citations | 근거 법령 |
 
 ### Judgment `state` 제거
@@ -1822,6 +1844,23 @@ JudgmentOverride 생성
 }
 ```
 
+새 revision은 수정한 판정에서 `verdict`만 바꾸고 나머지(계정과목, 룰카드, 속성, 인용)는 이어받는다. `outOfScope`는 확인 필요에만 붙으므로 `false`가 된다. 질문은 새로 만들지 않는다. 금액은 아직 계산하지 않아 `null`이다.
+
+에러:
+
+```
+400 VALIDATION_ERROR
+404 JUDGMENT_NOT_FOUND
+409 CONFLICT
+422 UNPROCESSABLE_ENTITY
+```
+
+- `toVerdict`가 없거나 enum 밖이면 `400 VALIDATION_ERROR`.
+- 판정이 없거나 다른 사용자의 판정이면 `404 JUDGMENT_NOT_FOUND`.
+- 거래의 현재 판정(§5)이 아니거나, 거래가 지금 판정 대상(`effectiveStatus = JUDGEABLE` 이고 분류 완료)이 아니면 `409 CONFLICT`.
+- `toVerdict = NEEDS_REVIEW`면 `422 UNPROCESSABLE_ENTITY`. 답할 질문이 없는 확인 필요가 되기 때문이다.
+- 현재와 같은 verdict로 수정하는 것은 허용한다. Idempotency-Key는 받지 않는다.
+
 `JudgmentOverride`는 다음 정보를 보존한다.
 
 ```
@@ -1887,6 +1926,10 @@ Question은 이후 revision에서도 추가될 수 있기 때문이다.
 ```
 createdAt ASC, id ASC
 ```
+
+지금 판정 대상이 아닌 Transaction의 Question은 목록과 미해소 집계에서 뺀다. 판정 대상 조건은 3.7 현재 결과와 같다(분류 완료이면서 §2.3 최종 판정 대상). 사용자가 제외한 거래는 결과·요약 화면에서 빠지므로, 질문 화면에 남으면 판정에 쓰지 않을 질문까지 답해야 미해소가 0이 된다. Question은 지우지 않으므로 거래를 다시 포함하면 그대로 돌아온다.
+
+3.7과 달리 `transactionId`를 지정해도 거른다. "판정 대상이 아닌 거래의 질문은 답할 대상이 아니다"를 예외 없이 한 규칙으로 둔다.
 
 ### grouped=false (기본)
 
@@ -2011,6 +2054,14 @@ Question 개별 항목을 반환한다. `unresolved` 집계는 grouped 여부와
 
 `totalAmount`는 `transactions[].amount`의 합이다.
 
+그룹 정렬:
+
+```
+count DESC, totalAmount DESC, 그룹 첫 Question의 id ASC
+```
+
+첫 페이지에 효과가 큰 상호가 먼저 와야 해서 건수·금액 순으로 둔다(#54). 그룹 첫 Question은 아래 `transactions` 정렬의 첫 항목이다.
+
 | 필드 | 뜻 |
 | --- | --- |
 | status | 그룹 안 Question의 상태. 그룹 안에서 모두 같다 |
@@ -2088,7 +2139,7 @@ merchant_norm
 1. Question 검증
 2. batch-scoped UserFact의 새 version 생성
 3. Question → ANSWERED
-4. 동일 Batch에서 Fact의 scope가 영향을 주는 Transaction 조회
+4. 재판정할 Transaction 조회 (아래)
 5. 해당 Transaction만 재판정
 6. 각 Transaction에 새 Judgment revision 저장
 7. 기존 PENDING Question 중 더 이상 필요 없는 Question → CANCELED
@@ -2098,6 +2149,13 @@ merchant_norm
 새로운 `JudgmentRun`은 생성하지 않는다.
 
 3·4단계의 대상은 요청에 적힌 `questionIds`만이 아니다. 같은 Batch·`groupKey`·`factType`에서 `CANCELED`가 아닌 다른 Question도 같은 UserFact로 함께 처리하고 재판정 대상에 넣는다. `PENDING`이면 `ANSWERED`로 바꾸고, 이미 `ANSWERED`이면 `answeredFactId`와 `answeredAt`을 새 UserFact 기준으로 바꾼다. `answeredCount`는 이렇게 함께 처리된 수까지 포함한다.
+
+4단계에서 재판정하는 Transaction:
+
+- 같은 그룹 Question이 걸린 Transaction. 조건 없이 늘 넣는다.
+- 가맹점 단위 Question(`groupKey`가 `merchant:`로 시작)이면, 같은 Batch에서 `merchantNorm`이 같은 Transaction 중 지금 판정 대상(§5)이면서 판정한 적이 있는 것.
+
+그 가맹점의 나머지 Transaction(제외, 분류 확인 전, 아직 판정하지 않은 것)은 Run 밖에서 첫 Judgment를 만들지 않도록 재판정하지 않는다. 제외했다가 다시 포함한 Transaction은 새 Run 전까지 이전 답 기준 Judgment가 남는다.
 
 응답:
 
@@ -2160,7 +2218,7 @@ value = 사업
 
 Question이 발생한 원래 Judgment의 `userContextVersion`을 사용한다.
 
-같은 grouped response에 포함되는 Question들은 동일 Batch와 동일 Context 기준이어야 한다.
+같은 Batch·`groupKey`·`factType` Question끼리 Context 버전이 다르면 가장 큰 버전을 쓴다.
 
 ### Judgment origin
 
@@ -2181,16 +2239,15 @@ T2 rev2 → F10
 T3 rev2 → F10
 ```
 
-에러:
+에러는 아래 순서로 검사해 처음 걸린 것을 반환한다.
 
 ```
-404 QUESTION_NOT_FOUND
-
-409 QUESTION_NOT_ANSWERABLE
-409 QUESTION_GROUP_MISMATCH
-
-422 INVALID_ANSWER_VALUE
+400 VALIDATION_ERROR                    questionIds가 비었거나 answer.value가 비었다
+404 QUESTION_NOT_FOUND                  없거나 다른 사용자의 Question이 있다
 422 QUESTIONS_FROM_DIFFERENT_BATCHES
+409 QUESTION_GROUP_MISMATCH             groupKey·factType이 다른 Question이 있다
+409 QUESTION_NOT_ANSWERABLE             CANCELED Question이 있다
+422 INVALID_ANSWER_VALUE                options에 없는 값이다
 ```
 
 ---

@@ -203,3 +203,53 @@
 
 - `bootJar` 로 만든 jar 를 backend/ 에서 빈 Postgres 에 붙여 띄웠다. 기동했다.
 - `test`·`integrationTest` 전부 통과.
+
+## 04:40 judgment-runs API 를 실제 비동기 실행으로 바꾼다 (A2b, feature/judgment-runs)
+
+- 브랜치: feature/judgment-runs (base: feature/judgment-executor. A2h 는 들어 있지 않다)
+- 커밋: ea077ba (1개)
+- 주요파일: JudgmentRunService.java, JudgmentRunner.java, JudgmentRunController.java, JudgmentRunIntegrationTest.java
+
+### 한 일
+
+- `POST /judgment-runs`
+  - batch 가 그 사용자 것이 아니면 404 `BATCH_NOT_FOUND`, Context 가 아니면 404 `CONTEXT_NOT_FOUND` 다(`BusinessContextService.find` 추가).
+  - 대상을 `judgment_run_item` PENDING 으로 고정하고 run 을 QUEUED 로 저장한다. 202 다.
+  - 대상 조건(`TransactionRecordRepository.findRunTargetIds`): CLASSIFIED 이면서, 사용자가 제외하지 않은 JUDGEABLE 이거나 사용자가 포함한 EXCLUDED. CANCELED_OFFSET 은 늘 빠진다.
+- 실행: `JudgmentRunCreated` 이벤트를 `@TransactionalEventListener` + `@Async`(`AsyncConfiguration`, Boot 기본 실행기)로 받아 `JudgmentRunner` 가 돈다.
+  1. `start`: RUNNING 으로 바꾸고 Context 를 읽는다.
+  2. 거래마다 `judgeItem`(판정 저장 + 항목 SUCCEEDED + processed++)을 한 트랜잭션으로 처리한다.
+  3. 예외가 나면 `recordFailure`(FAILED, `RULE_PROCESSING_FAILED`, 예외 메시지, failed++)를 새 트랜잭션에 남긴다.
+  4. `complete` 로 끝낸다. 실패 0 이면 COMPLETED, 성공 0 이면 FAILED, 섞이면 PARTIAL_FAILED. 대상 0건은 COMPLETED 다.
+  5. `start` 가 실패하면 `fail` 로 FAILED 가 된다.
+- `GET /judgment-runs/{id}`, `/failures`(page 0 이상, size 1~100, `processed_at, transaction_id` 순)는 소유자가 아니면 404 `JUDGMENT_RUN_NOT_FOUND` 다.
+- 목 교체: `@MockResponse` 를 지우고 `JudgmentMockData` 의 run 메서드 3개를 지웠다. 계약 테스트는 `@MockitoBean JudgmentRunService` 로 대신한다.
+- 그 밖: `JudgmentRunStatus` 를 `judgment.domain` 으로 옮겼다. 도메인 record `JudgmentRun`·`JudgmentRunFailure`, `PageResponse.of(Page)`, `UploadBatchRepository`, 요청 `@NotNull` 을 추가했다.
+- docs/architecture.md 에 "판정 실행(run)" 절을 넣었다.
+
+### 왜 이렇게 했나
+
+- 대상을 만들 때 고정한 건 실행 중 제외·분류 변경으로 `totalCount` 와 처리 대상이 어긋나지 않게 하려는 것이다(A1a 의 PENDING 설계를 그대로 썼다).
+- 커밋 뒤에 실행해야 다른 스레드가 run 과 항목을 읽을 수 있다.
+- 판정 저장과 항목 성공을 한 트랜잭션에 묶었다. 판정만 저장되고 항목이 PENDING 으로 남는 경우를 막는다. 실패 기록은 롤백 뒤 새 트랜잭션이어야 남는다.
+- 상태 라벨(대기, 실행 중, 완료, 부분 실패, 전체 실패)은 API 레이어(`JudgmentRunResponse.status`)에서 붙인다. 도메인 enum 은 화면 문구를 모른다(`Coded` 주석).
+- A1a 스키마는 바꿀 곳이 없었다. run 의 모든 컬럼, `processed_at`(failedAt), PENDING 을 그대로 썼다. `judgment_override.transaction_id` 는 A5 에서 검증된다.
+
+### 확인한 것
+
+- `test`·`integrationTest` 전부 통과(230개, A2h 테스트 제외).
+- `JudgmentRunIntegrationTest`(실제 카드)
+  - 거래 7건(대상 3) → totalCount 3, PARTIAL_FAILED(성공 2·실패 1), failures 에 도서 거래와 "소득세법-27-1".
+  - 성공만이면 COMPLETED, 대상 0건이면 COMPLETED, 실패만이면 FAILED.
+  - 남의 batch·Context·run 은 404 다.
+- jar 를 띄워 curl 로 확인했다.
+  - Context 생성 → run 생성 202(QUEUED, totalCount 2, 미분류 제외) → 폴링하면 PARTIAL_FAILED.
+  - failures 페이지에 도서 거래가 있다.
+  - size=0 이면 400, contextId 가 없으면 400 `VALIDATION_ERROR`, 없는 run 이면 404.
+
+### 남은 것 · 아는 문제
+
+- 실행 중에 서버가 내려가면 run 이 RUNNING 으로 남는다. 이어 돌리는 장치는 없다(버퍼 주간).
+- 같은 batch 에 run 이 동시에 둘 돌 수 있다. revision 채번은 거래 락으로 직렬화되어 깨지지 않지만, 막을지는 api.md 에 없다.
+- 항목 `saveAll` 은 id 를 직접 정하므로 건마다 select 후 insert 다. 거래 수백 건이면 생성 응답이 느려질 수 있다. 실측하지 않았다.
+- 시각은 UTC(`Clock.systemUTC`)로 직렬화된다(`...Z`). api.md 예시는 +09:00 이다. 다른 API 와 함께 정할 문제라 그대로 뒀다.

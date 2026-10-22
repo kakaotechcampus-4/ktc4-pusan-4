@@ -1,5 +1,6 @@
 package com.ktc4.pusan4.judgment.persistence;
 
+import com.ktc4.pusan4.judgment.domain.JudgmentRevision.JudgedTransaction;
 import com.ktc4.pusan4.judgment.domain.TransactionInput;
 import com.ktc4.pusan4.transaction.api.ClassificationStatus;
 import com.ktc4.pusan4.transaction.api.UserInclusion;
@@ -172,6 +173,19 @@ public class TransactionRecordEntity {
 
     String merchantRaw() {
         return merchantRaw;
+    }
+
+    /** 지금 판정 대상인가. 조건은 TransactionRecordRepository.findRunTargetIds 와 같다(api.md 2.3, 3.6). */
+    boolean judgeable() {
+        return "CLASSIFIED".equals(classificationStatus)
+            && (("JUDGEABLE".equals(sourceStatus) && !"EXCLUDED".equals(userInclusion))
+                || ("EXCLUDED".equals(sourceStatus) && "INCLUDED".equals(userInclusion)));
+    }
+
+    JudgedTransaction toJudged() {
+        return new JudgedTransaction(
+            approvedAt, merchantRaw, merchantNorm, merchantCategory, amount, installmentMonths
+        );
     }
 
     TransactionInput toInput() {

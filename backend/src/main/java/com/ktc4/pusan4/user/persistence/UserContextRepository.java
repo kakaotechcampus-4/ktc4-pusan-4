@@ -12,6 +12,8 @@ interface UserContextRepository extends Repository<UserContextEntity, UUID> {
 
     UserContextEntity save(UserContextEntity entity);
 
+    Optional<UserContextEntity> findById(UUID id);
+
     Optional<UserContextEntity> findFirstByUserIdOrderByVersionDesc(UUID userId);
 
     Optional<UserContextEntity> findByUserIdAndVersion(UUID userId, int version);
