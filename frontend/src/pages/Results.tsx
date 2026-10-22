@@ -144,7 +144,7 @@ export function Results() {
       const { transaction } = row;
       return (
         <span className="block min-w-0">
-            <span className="flex items-center gap-1.5 truncate font-medium text-ink">
+            <span className="flex items-center gap-1.5 truncate font-normal text-ink">
               {/* 고른 행은 옅은 바탕만으로는 잘 안 보여 점을 붙인다 */}
               {row.transactionId === selectedId &&
           <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-accent" />
@@ -176,7 +176,7 @@ export function Results() {
       (asset || row.finalAmount !== transaction.amount);
       return (
         <span className="block">
-            <span className="whitespace-nowrap font-semibold text-ink">{formatWon(transaction.amount)}</span>
+            <span className="whitespace-nowrap font-bold text-ink">{formatWon(transaction.amount)}</span>
             {partial && row.finalAmount !== null &&
           <span className="block whitespace-nowrap text-caption text-ok">
                 {asset ? '최대' : '산입'} {formatWon(row.finalAmount)}
@@ -207,14 +207,14 @@ export function Results() {
   const header =
   <header className="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <p className="text-small font-semibold text-accent">4단계 · 반영</p>
+        <p className="text-small font-bold text-accent">4단계 · 반영</p>
         <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">판정 결과</h1>
         {summary &&
       <p className="mt-2 text-body tabular-nums text-muted">
             {batchQ.data &&
         `${formatPeriod(batchQ.data.periodStart, batchQ.data.periodEnd)} · `}
             {formatNumber(summary.totalCount)}건 · 인정 경비{' '}
-            <strong className="font-semibold text-ink">
+            <strong className="font-bold text-ink">
               {formatWon(summary.byVerdict.AVAILABLE.finalAmount)}
             </strong>
           </p>
@@ -310,7 +310,7 @@ export function Results() {
 
           <CircleHelpIcon className="h-5 w-5 shrink-0 text-warn" aria-hidden="true" />
           <span className="min-w-0 flex-1">
-            <span className="block text-body font-semibold tabular-nums text-ink">
+            <span className="block text-body font-bold tabular-nums text-ink">
               {/* count 는 「확인 필요」 판정 수가 아니라 PENDING 질문 수다(3.9). 한 거래에 질문이 여럿이고, 불가에도 소명 질문이 남는다 */}
               답할 질문 {formatNumber(unresolved.count)}개 · {formatWon(unresolved.amount)}
             </span>
@@ -365,7 +365,7 @@ export function Results() {
           panelData?.failed ?
           <div role="alert" className="rounded-2xl border border-deny-line bg-deny-bg p-5 text-body text-deny">
                 이 거래의 판정을 불러오지 못했습니다.{' '}
-                <button type="button" onClick={panelQ.reload} className="font-semibold underline">
+                <button type="button" onClick={panelQ.reload} className="font-bold underline">
                   다시 시도
                 </button>
               </div> :

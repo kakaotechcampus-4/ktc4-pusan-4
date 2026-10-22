@@ -1,331 +1,302 @@
+import React from 'react';
+import { Link } from 'react-router-dom';
 import { ArrowRightIcon } from 'lucide-react';
 import { MarketingHeader } from '../components/MarketingHeader';
 import { MarketingFooter } from '../components/MarketingFooter';
-import { StatuteCitation } from '../components/StatuteCitation';
-import { HeroStage } from '../components/HeroStage';
+import { OrbitStage } from '../components/OrbitStage';
 import {
-  Badge,
-  Button,
-  Card,
-  Container,
-  SectionHeading,
-  type BadgeTone } from
-'../components/ui';
-import {
-  DEV_EXPENSES,
   FLOW_STEPS,
+  HERO_SUMMARY,
   NOT_DOING,
   STATS,
   SYSTEM_FEATURES } from
 '../mock/marketing';
 
-const EXPENSE_TONE: Record<
-  (typeof DEV_EXPENSES)[number]['verdict'],
-  { label: string; tone: BadgeTone }> =
-{
-  ok: { label: '가능', tone: 'ok' },
-  ask: { label: '확인 필요', tone: 'warn' },
-  deny: { label: '불가', tone: 'deny' }
-};
+const won = (value: number) => value.toLocaleString('ko-KR');
 
-const VERDICTS = [
+/** 본문 폭과 좌우 여백. 레퍼런스는 1440 폭에서 좌우 62px 를 띄운다 */
+const SHELL = 'mx-auto w-full max-w-page px-6 lg:px-gutter';
+
+/** 검정 동그라미에 흰 화살표. 레퍼런스가 모든 「바로가기」에 쓰는 표시 */
+function ArrowDot({ size = 'md' }: {size?: 'sm' | 'md';}) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`inline-flex shrink-0 items-center justify-center rounded-full bg-ink text-white ${
+      size === 'sm' ? 'h-5 w-5' : 'h-8 w-8'}`
+      }>
+
+      <ArrowRightIcon className={size === 'sm' ? 'h-3 w-3' : 'h-4 w-4'} />
+    </span>);
+
+}
+
+/**
+ * 섹션 제목. 레퍼런스는 글자 앞에 48×48 그림을 두고 글자는 48px 굵기 400 이다.
+ * 그림은 카카오 자산이라 가져오지 않고, 같은 자리에 우리 로고 막대를 둔다.
+ */
+function IrHeading({ children }: {children: React.ReactNode;}) {
+  return (
+    <h2 className="flex items-center gap-4 text-h2 font-normal tracking-ir text-ink lg:text-ir-section">
+      <span
+        aria-hidden="true"
+        className="flex h-12 w-12 shrink-0 items-center justify-center gap-[3px] rounded-xl bg-surface">
+
+        <span className="block h-5 w-[5px] rounded-sm bg-ink" />
+        <span className="block h-5 w-[5px] rounded-sm bg-ink" />
+        <span className="block h-5 w-[5px] rounded-sm bg-highlight" />
+      </span>
+      {children}
+    </h2>);
+
+}
+
+/** 패널 제목 아래 「항목 — 바로가기」 한 줄 */
+function BoardRow({ to, label }: {to: string; label: string;}) {
+  return (
+    <li className="border-t border-accent-line first:border-t-0">
+      <Link
+        to={to}
+        className="flex items-center justify-between gap-3 py-4 text-body text-ink2 transition-colors hover:text-ink">
+
+        <span>{label}</span>
+        <span className="flex items-center gap-1.5 text-small text-muted">
+          바로가기
+          <ArrowDot size="sm" />
+        </span>
+      </Link>
+    </li>);
+
+}
+
+const BOARDS = [
 {
-  symbol: '✓',
-  label: '가능',
-  body: '근거 조문이 붙은 건만 여기로 옵니다. 산입 금액과 준비할 증빙을 함께 적어둡니다.'
+  title: '카드내역',
+  rows: [
+  { to: '/upload', label: '카드내역 올리기' },
+  { to: '/uploads', label: '업로드 이력' }]
+
 },
 {
-  symbol: '?',
-  label: '확인 필요',
-  body: '전문가끼리도 갈리는 건, 목적·비율·기간이 확인되지 않은 건은 단정하지 않고 여기 남깁니다.'
+  title: '판정',
+  rows: [
+  { to: '/results', label: '판정 결과' },
+  { to: '/questions', label: '되묻기' }]
+
 },
 {
-  symbol: '✕',
-  label: '불가',
-  body: '법에 열거된 불산입 항목과 업종 통상성이 부정되는 건. 왜 안 되는지 조문으로 답합니다.'
+  title: '자료',
+  rows: [
+  { to: '/transactions', label: '거래 목록' },
+  { to: '/summary', label: '세무사 전달 요약' }]
+
 }];
 
 
-const EVIDENCE_POINTS = [
-'조문마다 시행일과 버전 번호를 함께 인쇄합니다',
-'판정 시점에 읽은 버전을 고정해 과거 결과가 바뀌지 않습니다',
-'존재하지 않는 조문 ID는 저장 전에 걸러냅니다'];
-
-
 export function Landing() {
+  const [ok, ask] = HERO_SUMMARY.distribution;
+
   return (
-    <div className="flex min-h-full w-full flex-col bg-surface">
+    <div className="min-h-full bg-canvas">
       <MarketingHeader />
 
-      <main className="flex-1">
-        {/* 히어로 */}
-        <Container as="section" className="pb-16 pt-20 sm:pt-28">
-          <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_420px]">
-            <div>
-              <SectionHeading
-                as="h1"
-                size="lg"
-                eyebrow="1인 IT 개발 사업자를 위한 경비 판정"
-                title={
-                <>
+      <main>
+        {/* 큰 패널 + 오른쪽 세로 띠 (레퍼런스 section_visual: 1094 / 206, 사이 16) */}
+        <section className={`${SHELL} pt-10`}>
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_206px]">
+            <div className="relative">
+              <div className="relative min-h-[440px] overflow-hidden rounded-[20px] bg-surface2 lg:min-h-[621px]">
+                <OrbitStage />
+
+                {/* 글은 궤도 위에 올린다 */}
+                <div className="relative z-10 px-8 pt-12 sm:px-16 sm:pt-16">
+                  <p className="text-body text-ink2">
+                    1인 IT 개발 사업자를 위한 경비 판정
+                  </p>
+                  <strong className="mt-5 block text-h2 font-normal leading-tight tracking-ir text-ink [word-break:keep-all] lg:text-ir-display">
                     이 카드값이 경비인지,
                     <br />
                     조문까지 붙여 답합니다
-                  </>
-                } />
+                  </strong>
+                </div>
+              </div>
 
-              <p className="mt-6 max-w-xl text-lead text-ink2">
-                혼자 개발하는 사업자의 카드내역 수백 건을 건별로 판정합니다.
-                클라우드·구독·장비처럼 개발자에게 반복되는 지출을 기준으로 규칙을
-                짰고, 결과마다 어떤 조문의 어떤 버전을 읽었는지 함께 보여드립니다.
-              </p>
-              <div className="mt-9 flex flex-wrap items-center gap-4">
-                <Button to="/login" size="lg">
+              {/* 왼쪽 아래 모서리를 바탕색으로 베어 내고 그 자리에 링크를 둔다 */}
+              <div className="absolute bottom-0 left-0 flex h-[72px] items-center rounded-tr-[20px] bg-canvas pr-7 pt-2">
+                <Link
+                  to="/login"
+                  className="flex items-center gap-3 text-ir-lead font-normal tracking-ir-xs text-ink">
+
                   무료로 판정해보기
-                </Button>
-                <Button href="#system" variant="ghost" size="inline">
-                  판정 방식 보기
-                  <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
-                </Button>
+                  <ArrowDot />
+                </Link>
               </div>
             </div>
 
-            <figure className="justify-self-center lg:justify-self-end">
-              <HeroStage />
-              <figcaption className="mt-4 text-center text-small text-muted">
-                실제 규칙 카드 순서 그대로 · 샘플 3건 순환
-              </figcaption>
-            </figure>
-          </div>
-        </Container>
+            {/* 첫 장은 검정에 큰 숫자, 아래로 회색 (레퍼런스 wrap_banner) */}
+            <div className="flex flex-col gap-2">
+              <div className="rounded-2xl bg-ink2 p-5 text-white">
+                <p className="text-caption text-white/60">이번 달 인정 경비</p>
+                <p className="mt-2 whitespace-nowrap text-ir-num font-bold tracking-ir-sm tabular-nums">
+                  {won(HERO_SUMMARY.availableAmount)}
+                  <span className="ml-0.5 text-body font-normal">원</span>
+                </p>
+                <p className="mt-2 text-caption text-white/60 tabular-nums">
+                  {HERO_SUMMARY.total}건 중 {ok.count}건 가능
+                </p>
+              </div>
 
-        {/* 개발자 지출 */}
-        <Container className="pb-20">
-          <SectionHeading
-            size="sm"
-            title="개발자 카드에 찍히는 지출만 깊게 봅니다"
-            description="업종을 컴퓨터 프로그래밍 서비스업 하나로 좁힌 대신, AWS 청구서부터 코워킹 데스크까지 개발자 지출 하나하나에 규칙 카드를 붙였습니다." />
+              <div className="rounded-2xl bg-surface p-5">
+                <p className="text-caption text-muted">판정 분포</p>
+                <ul className="mt-4 space-y-3">
+                  {HERO_SUMMARY.distribution.map((item) =>
+                  <li key={item.label}>
+                      <div className="flex items-baseline justify-between text-small">
+                        <span className="text-ink2">{item.label}</span>
+                        <span className="font-bold tabular-nums text-ink">
+                          {item.count}건
+                        </span>
+                      </div>
+                      <div className="mt-1.5 h-1 w-full rounded-full bg-accent-line">
+                        <div
+                        className={`h-1 rounded-full ${item.bar}`}
+                        style={{
+                          width: `${Math.round(item.count / HERO_SUMMARY.total * 100)}%`
+                        }} />
 
-          <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {DEV_EXPENSES.map((item) => {
-              const tone = EXPENSE_TONE[item.verdict];
-              return (
-                <Card key={item.kind} as="li" className="flex flex-col">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-body-lg font-semibold text-ink">
-                        {item.kind}
-                      </p>
-                      <p className="mt-1 text-small text-muted">{item.examples}</p>
-                    </div>
-                    <Badge tone={tone.tone} className="shrink-0">
-                      {tone.label}
-                    </Badge>
-                  </div>
-                  <p className="mt-5 text-body text-ink2">{item.point}</p>
-                </Card>);
+                      </div>
+                    </li>
+                  )}
+                </ul>
+              </div>
 
-            })}
-          </ul>
-        </Container>
-
-        {/* 숫자 */}
-        <section id="evidence" className="border-y border-line bg-canvas">
-          <Container className="py-14">
-            <dl className="grid grid-cols-2 gap-8 md:grid-cols-4">
-              {STATS.map((stat) =>
-              <div key={stat.label}>
-                  <dd className="text-stat font-bold tabular-nums text-ink">
-                    {stat.value}
-                  </dd>
-                  <dt className="mt-2 text-small text-muted">{stat.label}</dt>
-                </div>
-              )}
-            </dl>
-          </Container>
-        </section>
-
-        {/* 판정 방식 */}
-        <Container id="system" className="py-24">
-          <SectionHeading
-            className="max-w-2xl"
-            title={
-            <>
-                결과보다 먼저,
-                <br />
-                그 결과가 나온 경로를 보여드립니다
-              </>
-            } />
-
-
-          <div className="mt-12 grid gap-5 lg:grid-cols-3">
-            <Card as="article" tone="canvas" padding="lg" className="lg:col-span-2">
-              <h3 className="whitespace-pre-line text-h3 font-bold tracking-tight text-ink sm:text-h3-lg">
-                {SYSTEM_FEATURES[0].title}
-              </h3>
-              <p className="mt-5 max-w-xl text-body-lg text-ink2">
-                {SYSTEM_FEATURES[0].body}
-              </p>
-              <p className="mt-8 border-l-2 border-accent pl-4 text-body-lg font-semibold text-ink">
-                {SYSTEM_FEATURES[0].caption}
-              </p>
-            </Card>
-
-            <div className="grid gap-5">
-              {SYSTEM_FEATURES.slice(1).map((feature) =>
-              <Card key={feature.title} as="article" padding="md">
-                  <h3 className="whitespace-pre-line text-h4 font-bold text-ink">
-                    {feature.title}
-                  </h3>
-                  <p className="mt-3 text-prose text-muted">{feature.body}</p>
-                </Card>
-              )}
+              <div className="flex-1 rounded-2xl bg-surface p-5">
+                <p className="text-caption text-muted">지금 할 일</p>
+                <p className="mt-2 text-h4 font-bold tracking-ir-sm text-ink">
+                  확인 필요 {ask.count}건
+                </p>
+                <p className="mt-2 text-small leading-6 text-ink2 [word-break:keep-all]">
+                  같은 사유끼리 묶어 두었습니다. 답하면 그 자리에서 다시
+                  판정합니다.
+                </p>
+              </div>
             </div>
           </div>
-        </Container>
+        </section>
 
-        {/* 3분류 */}
-        <section className="relative overflow-hidden bg-ink">
-          <img
-            src="/agent-flow.webp"
-            alt=""
-            aria-hidden="true"
-            className="pointer-events-none absolute right-0 top-0 hidden h-[420px] w-[58%] object-cover object-right opacity-90 [mask-image:linear-gradient(to_right,transparent,black_30%,black_80%,transparent),linear-gradient(to_bottom,black_70%,transparent)] [mask-composite:intersect] lg:block" />
+        {/* 주요현황 — 회색 패널(428×241) 3장 + 카드(428×360) 3장 + 알약 */}
+        <section id="flow" className={`${SHELL} pt-28`}>
+          <IrHeading>경비판정 주요현황</IrHeading>
 
-          <Container className="relative py-24">
-            <SectionHeading
-              inverse
-              className="max-w-2xl"
-              eyebrow="3분류 판정"
-              title={
-              <>
-                  최악의 결과가 「틀린 답」이 아니라
-                  <br />
-                  「질문 하나 더」가 되도록
-                </>
-              } />
+          <div className="mt-10 grid gap-4 md:grid-cols-3">
+            {BOARDS.map((board) =>
+            <div
+              key={board.title}
+              className="flex min-h-[241px] flex-col rounded-2xl bg-surface px-8 py-8">
 
-            <ul className="mt-12 grid gap-px overflow-hidden rounded-2xl bg-white/15 md:grid-cols-3">
-              {VERDICTS.map((verdict) =>
-              <li key={verdict.label} className="bg-ink p-8">
-                  <Badge tone="inverse" size="md" symbol={verdict.symbol}>
-                    {verdict.label}
-                  </Badge>
-                  <p className="mt-5 text-prose text-white/70">{verdict.body}</p>
+                <strong className="text-h3 font-bold tracking-ir-sm text-ink lg:text-ir-panel">
+                  {board.title}
+                </strong>
+                <ul className="mt-5">
+                  {board.rows.map((row) =>
+                <BoardRow key={row.to} to={row.to} label={row.label} />
+                )}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          <ul className="mt-4 grid gap-4 md:grid-cols-3">
+            {FLOW_STEPS.slice(0, 3).map((step) =>
+            <li key={step.step}>
+                <div className="flex h-full min-h-[360px] flex-col rounded-2xl bg-surface px-8 py-8">
+                  <span className="inline-flex w-fit items-center rounded-full bg-canvas px-3.5 py-1.5 text-caption text-ink2">
+                    {step.step}단계
+                  </span>
+                  <strong className="mt-auto block text-h3 font-bold leading-tight tracking-ir-sm text-ink [word-break:keep-all] lg:text-ir-panel">
+                    {step.title}
+                  </strong>
+                  <p className="mt-5 text-body leading-6 text-ink2 [word-break:keep-all]">
+                    {step.body}
+                  </p>
+                </div>
+              </li>
+            )}
+          </ul>
+
+          <div className="mt-10 flex justify-center">
+            <Link
+              to="/login"
+              className="inline-flex h-[79px] items-center gap-4 rounded-full bg-surface px-10 text-ir-lead font-normal tracking-ir-xs text-ink transition-colors hover:bg-accent-line">
+
+              판정 흐름 전체보기
+              <ArrowDot />
+            </Link>
+          </div>
+        </section>
+
+        {/* 숫자 줄 — 위아래 괘선만 */}
+        <section id="evidence" className="mt-28 border-y border-line">
+          <dl className={`${SHELL} grid grid-cols-2 gap-10 py-16 md:grid-cols-4`}>
+            {STATS.map((stat) =>
+            <div key={stat.label}>
+                <dt className="sr-only">{stat.label}</dt>
+                <dd>
+                  <p className="text-h3 font-bold tracking-ir tabular-nums text-ink lg:text-ir-panel">
+                    {stat.value}
+                  </p>
+                  <p className="mt-2.5 text-small text-muted">{stat.label}</p>
+                </dd>
+              </div>
+            )}
+          </dl>
+        </section>
+
+        {/* 지키는 것 — 회색 패널 3장 */}
+        <section id="system" className={`${SHELL} pt-28`}>
+          <IrHeading>경비판정이 지키는 것</IrHeading>
+
+          <ul className="mt-10 grid gap-4 md:grid-cols-3">
+            {SYSTEM_FEATURES.map((feature) =>
+            <li
+              key={feature.title}
+              className="flex min-h-[360px] flex-col rounded-2xl bg-surface px-8 py-8">
+
+                <strong className="block whitespace-pre-line text-h3 font-bold leading-tight tracking-ir-sm text-ink [word-break:keep-all] lg:text-ir-panel">
+                  {feature.title}
+                </strong>
+                <p className="mt-6 flex-1 text-body leading-6 text-ink2 [word-break:keep-all]">
+                  {feature.body}
+                </p>
+                {feature.caption &&
+              <p className="mt-6 border-t border-accent-line pt-5 text-small text-muted">
+                    {feature.caption}
+                  </p>
+              }
+              </li>
+            )}
+          </ul>
+        </section>
+
+        {/* 하지 않는 일 — 검정 패널 */}
+        <section id="scope" className={`${SHELL} pb-28 pt-28`}>
+          <div className="rounded-2xl bg-ink px-8 py-14 text-white sm:px-16">
+            <h2 className="text-h2 font-normal tracking-ir lg:text-ir-section">
+              하지 않는 일
+            </h2>
+            <ul className="mt-12 grid gap-10 md:grid-cols-3">
+              {NOT_DOING.map((item) =>
+              <li key={item.title} className="border-t border-white/20 pt-6">
+                  <strong className="block text-h3 font-bold tracking-ir-sm lg:text-ir-panel">
+                    {item.title}
+                  </strong>
+                  <p className="mt-4 text-body leading-6 text-white/60 [word-break:keep-all]">
+                    {item.body}
+                  </p>
                 </li>
               )}
             </ul>
-            <p className="mt-8 max-w-3xl text-prose text-white/50">
-              조문을 붙일 수 없는 건은 가능·불가로 저장되지 않습니다. 근거가 0건이면
-              저장 자체가 거부되고, 「확인 필요」로만 남습니다.
-            </p>
-          </Container>
-        </section>
-
-        {/* 근거 표기 */}
-        <Container className="py-24">
-          <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
-            <div>
-              <SectionHeading
-                title={
-                <>
-                    근거와 참고 해석기준을
-                    <br />
-                    섞지 않습니다
-                  </>
-                } />
-
-              <p className="mt-6 max-w-lg text-body-lg text-ink2">
-                법률·시행령은 판정의 근거로, 기본통칙·심판례·판례는 참고 해석기준으로
-                구분해 표기합니다. 하위 근거 하나로 상위 조문을 뒤집는 판정이 나오지
-                않도록 탐색 순서를 코드로 강제합니다.
-              </p>
-              <ul className="mt-8 space-y-3 text-prose text-ink2">
-                {EVIDENCE_POINTS.map((point) =>
-                <li key={point} className="flex gap-3">
-                    <span
-                    aria-hidden="true"
-                    className="mt-3 h-1 w-1 shrink-0 rounded-full bg-accent" />
-
-                    {point}
-                  </li>
-                )}
-              </ul>
-            </div>
-
-            <Card tone="canvas" className="space-y-3">
-              <p className="text-small font-semibold text-muted">
-                실제 판정 화면에 붙는 근거
-              </p>
-              <StatuteCitation statuteVersionId={1435} />
-              <StatuteCitation statuteVersionId={2071} />
-            </Card>
           </div>
-        </Container>
-
-        {/* 흐름 */}
-        <section id="flow" className="border-y border-line bg-canvas">
-          <Container className="py-24">
-            <SectionHeading title="네 단계로 끝납니다" />
-            <ol className="mt-12 grid gap-8 md:grid-cols-2 lg:grid-cols-4">
-              {FLOW_STEPS.map((item) =>
-              <li key={item.step} className="border-t-2 border-ink pt-5">
-                  <p className="text-small font-bold tabular-nums text-accent">
-                    {item.step}
-                  </p>
-                  <h3 className="mt-2.5 text-h4 font-bold text-ink">
-                    {item.title}
-                  </h3>
-                  <p className="mt-2.5 text-prose text-muted">{item.body}</p>
-                </li>
-              )}
-            </ol>
-          </Container>
-        </section>
-
-        {/* 하지 않는 일 */}
-        <Container id="scope" className="py-24">
-          <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-            <SectionHeading
-              title={
-              <>
-                  하지 않는 일도
-                  <br />
-                  먼저 알려드립니다
-                </>
-              } />
-
-            <dl className="divide-y divide-line border-y border-line">
-              {NOT_DOING.map((item) =>
-              <div
-                key={item.title}
-                className="flex flex-wrap items-baseline gap-x-6 gap-y-1 py-5">
-
-                  <dt className="w-48 shrink-0 text-lead font-semibold leading-normal text-ink">
-                    {item.title}
-                  </dt>
-                  <dd className="text-prose text-muted">{item.body}</dd>
-                </div>
-              )}
-            </dl>
-          </div>
-        </Container>
-
-        {/* CTA */}
-        <section className="border-t border-line bg-canvas">
-          <Container className="flex flex-wrap items-center justify-between gap-6 py-16">
-            <div>
-              <h2 className="text-h3-lg font-bold tracking-tight text-ink sm:text-h2">
-                1월 카드내역부터 시작해보세요
-              </h2>
-              <p className="mt-3 text-body-lg text-muted">
-                로그인 후 파일 하나만 올리면 됩니다. 원본은 서버로 올라가지 않습니다.
-              </p>
-            </div>
-            <Button to="/login" size="lg">
-              로그인하고 시작하기
-            </Button>
-          </Container>
         </section>
       </main>
 
