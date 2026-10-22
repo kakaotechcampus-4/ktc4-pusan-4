@@ -10,9 +10,7 @@ import com.ktc4.pusan4.transaction.api.UserInclusion;
 import com.ktc4.pusan4.transaction.domain.TransactionDetail;
 import com.ktc4.pusan4.transaction.domain.TransactionFilter;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.Query;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -22,9 +20,6 @@ import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -35,41 +30,9 @@ public class TransactionService {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
-    // effectiveStatus(api.md 2.3) 를 sourceStatus·userInclusion 으로 푼 조건. TransactionDetail.effectiveStatus 와 같다.
-    private static final Map<SourceStatus, String> EFFECTIVE_STATUS = Map.of(
-        SourceStatus.JUDGEABLE, """
-            ((t.source_status = 'JUDGEABLE' and t.user_inclusion <> 'EXCLUDED')
-              or (t.source_status = 'EXCLUDED' and t.user_inclusion = 'INCLUDED'))""",
-        SourceStatus.EXCLUDED, """
-            ((t.source_status = 'JUDGEABLE' and t.user_inclusion = 'EXCLUDED')
-              or (t.source_status = 'EXCLUDED' and t.user_inclusion <> 'INCLUDED'))""",
-        SourceStatus.CANCELED_OFFSET, "t.source_status = 'CANCELED_OFFSET'"
-    );
-
-    // 현재 판정(api.md §5): 활성 override 가 있으면 그 override revision, 없으면 override 가 아닌 최신 revision.
-    // GET /judgments 의 현재 판정(JudgmentRepository.findPage, #132)과 같은 규칙이다.
-    private static final String CURRENT_VERDICT = """
-        exists (
-          select 1 from judgment j
-          where j.transaction_id = t.id
-            and j.verdict = :verdict
-            and (
-              j.judgment_override_id = (
-                select o.id from judgment_override o where o.transaction_id = t.id and o.active
-              )
-              or (
-                not exists (select 1 from judgment_override o where o.transaction_id = t.id and o.active)
-                and j.judgment_override_id is null
-                and j.revision = (
-                  select max(l.revision) from judgment l
-                  where l.transaction_id = t.id and l.judgment_override_id is null
-                )
-              )
-            )
-        )""";
-
     private final EntityManager entityManager;
     private final TransactionRecordRepository transactionRepository;
+    private final TransactionQueryRepository queryRepository;
     private final ClassificationReviewRepository reviewRepository;
     private final UuidGenerator uuidGenerator;
     private final Clock clock;
@@ -77,66 +40,24 @@ public class TransactionService {
     public TransactionService(
         EntityManager entityManager,
         TransactionRecordRepository transactionRepository,
+        TransactionQueryRepository queryRepository,
         ClassificationReviewRepository reviewRepository,
         UuidGenerator uuidGenerator,
         Clock clock
     ) {
         this.entityManager = entityManager;
         this.transactionRepository = transactionRepository;
+        this.queryRepository = queryRepository;
         this.reviewRepository = reviewRepository;
         this.uuidGenerator = uuidGenerator;
         this.clock = clock;
     }
 
-    /**
-     * 정렬: approvedAt DESC, id DESC. 조건이 여섯 개이고 대부분 비어서 오므로, 주어진 조건만 붙인 SQL 을 만든다.
-     * "값이 null 이면 무시" 를 SQL 안에 쓰면 Postgres 가 null 파라미터의 타입을 정하지 못하는 경우가 있다(#132 의 42P18).
-     */
+    /** 정렬: approvedAt DESC, id DESC. 조건은 TransactionQueryRepository 가 SQL 로 만든다. */
     @Transactional(readOnly = true)
     public Page<TransactionDetail> list(UUID userId, TransactionFilter filter, int page, int size) {
-        Map<String, Object> params = new LinkedHashMap<>();
-        StringBuilder where = new StringBuilder("where t.user_id = :userId");
-        params.put("userId", userId);
-        if (filter.batchId() != null) {
-            where.append(" and t.batch_id = :batchId");
-            params.put("batchId", filter.batchId());
-        }
-        if (filter.year() != null) {
-            where.append(" and extract(year from t.approved_at) = :year");
-            params.put("year", filter.year());
-        }
-        if (filter.month() != null) {
-            where.append(" and extract(month from t.approved_at) = :month");
-            params.put("month", filter.month());
-        }
-        if (filter.status() != null) {
-            where.append(" and ").append(EFFECTIVE_STATUS.get(filter.status()));
-        }
-        if (filter.classificationStatus() != null) {
-            where.append(" and t.classification_status = :classificationStatus");
-            params.put("classificationStatus", filter.classificationStatus().name());
-        }
-        if (filter.verdict() != null) {
-            where.append(" and ").append(CURRENT_VERDICT);
-            params.put("verdict", filter.verdict().name());
-        }
-
-        Query count = entityManager.createNativeQuery("select count(*) from transaction t " + where);
-        Query rows = entityManager.createNativeQuery(
-            "select t.* from transaction t " + where + " order by t.approved_at desc, t.id desc",
-            TransactionRecordEntity.class);
-        params.forEach((name, value) -> {
-            count.setParameter(name, value);
-            rows.setParameter(name, value);
-        });
-        long total = ((Number) count.getSingleResult()).longValue();
-        rows.setFirstResult(page * size);
-        rows.setMaxResults(size);
-
-        @SuppressWarnings("unchecked")
-        List<TransactionRecordEntity> found = rows.getResultList();
-        return new PageImpl<>(found.stream().map(TransactionRecordEntity::toDetail).toList(),
-            PageRequest.of(page, size), total);
+        return queryRepository.findPage(userId, filter, PageRequest.of(page, size))
+            .map(TransactionRecordEntity::toDetail);
     }
 
     @Transactional(readOnly = true)

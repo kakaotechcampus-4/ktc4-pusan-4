@@ -22,6 +22,8 @@ interface UploadBatchCountRepository extends Repository<ClassificationReviewEnti
         """)
     List<BatchCount> countTransactions(@Param("batchIds") Collection<UUID> batchIds);
 
+    // 판정 대상(effectiveStatus = JUDGEABLE) 거래의 검토만 센다. 제외해도 검토는 남아 다시 포함하면 돌아온다.
+    // 검토는 미분류 거래에만 붙으므로 분류 완료 조건은 넣지 않는다. 같은 조건을 #162 에서 한 곳으로 모은다.
     @Query("""
         select new com.ktc4.pusan4.transaction.persistence.UploadBatchCountRepository$BatchCount(
             transaction.batchId, count(review))
@@ -29,6 +31,10 @@ interface UploadBatchCountRepository extends Repository<ClassificationReviewEnti
         where review.transactionId = transaction.id
           and transaction.batchId in :batchIds
           and review.status = 'PENDING'
+          and (
+            (transaction.sourceStatus = 'JUDGEABLE' and transaction.userInclusion <> 'EXCLUDED')
+            or (transaction.sourceStatus = 'EXCLUDED' and transaction.userInclusion = 'INCLUDED')
+          )
         group by transaction.batchId
         """)
     List<BatchCount> countPendingReviews(@Param("batchIds") Collection<UUID> batchIds);

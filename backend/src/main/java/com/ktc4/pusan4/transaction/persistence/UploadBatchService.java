@@ -25,10 +25,16 @@ public class UploadBatchService {
 
     private final UploadBatchRepository batchRepository;
     private final UploadBatchCountRepository countRepository;
+    private final UserWriteLock userWriteLock;
 
-    public UploadBatchService(UploadBatchRepository batchRepository, UploadBatchCountRepository countRepository) {
+    public UploadBatchService(
+        UploadBatchRepository batchRepository,
+        UploadBatchCountRepository countRepository,
+        UserWriteLock userWriteLock
+    ) {
         this.batchRepository = batchRepository;
         this.countRepository = countRepository;
+        this.userWriteLock = userWriteLock;
     }
 
     @Transactional(readOnly = true)
@@ -45,9 +51,13 @@ public class UploadBatchService {
         return summarize(List.of(batch)).getFirst();
     }
 
-    /** batch 와 그 업로드에서 파생된 데이터를 지운다(api.md 3.3, §6). 지우는 일은 DB 의 CASCADE 가 한다. */
+    /**
+     * batch 와 그 업로드에서 파생된 데이터를 지운다(api.md 3.3, §6). 지우는 일은 DB 의 CASCADE 가 한다.
+     * 업로드와 같은 사용자 잠금을 먼저 잡는다. 탈퇴는 app_user 행 DELETE 가 같은 행 잠금을 기다려서 따로 잡지 않는다.
+     */
     @Transactional
     public void delete(UUID userId, UUID batchId) {
+        userWriteLock.lock(userId);
         if (batchRepository.deleteOwned(batchId, userId) == 0) {
             throw batchNotFound();
         }

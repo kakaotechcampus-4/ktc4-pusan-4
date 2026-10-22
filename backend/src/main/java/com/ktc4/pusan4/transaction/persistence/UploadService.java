@@ -61,6 +61,7 @@ public class UploadService {
     private final ObjectMapper objectMapper;
     private final UuidGenerator uuidGenerator;
     private final Clock clock;
+    private final UserWriteLock userWriteLock;
 
     public UploadService(
         EntityManager entityManager,
@@ -70,7 +71,8 @@ public class UploadService {
         MerchantClassifier merchantClassifier,
         ObjectMapper objectMapper,
         UuidGenerator uuidGenerator,
-        Clock clock
+        Clock clock,
+        UserWriteLock userWriteLock
     ) {
         this.entityManager = entityManager;
         this.batchRepository = batchRepository;
@@ -80,6 +82,7 @@ public class UploadService {
         this.objectMapper = objectMapper;
         this.uuidGenerator = uuidGenerator;
         this.clock = clock;
+        this.userWriteLock = userWriteLock;
     }
 
     /**
@@ -87,7 +90,7 @@ public class UploadService {
      */
     @Transactional
     public UploadResult upload(UUID userId, String idempotencyKey, NewUploadBatch input) {
-        lockUser(userId);
+        userWriteLock.lock(userId);
         // DB(timestamptz)가 마이크로초까지라 맞춰 자른다. 그래야 재전송 응답의 createdAt 이 최초 응답과 글자까지 같다.
         OffsetDateTime now = OffsetDateTime.now(clock.withZone(KST)).truncatedTo(ChronoUnit.MICROS);
         String requestHash = hash(input);
@@ -151,20 +154,6 @@ public class UploadService {
         }
 
         return new UploadResult(batch.id(), fresh.size(), skipped, pending, now);
-    }
-
-    /**
-     * 같은 사용자의 업로드를 한 줄로 세운다. 잠그지 않으면 두 업로드가 같은 fileHash·naturalKey 를
-     * 동시에 "없음"으로 보고 둘 다 INSERT 해 UNIQUE 위반이 500 으로 나간다.
-     * 사용자가 없으면(탈퇴 직후 남은 토큰 등) UserService 와 같이 401 이다.
-     */
-    private void lockUser(UUID userId) {
-        List<?> rows = entityManager.createNativeQuery("select id from app_user where id = :userId for update")
-            .setParameter("userId", userId)
-            .getResultList();
-        if (rows.isEmpty()) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "사용자를 찾을 수 없습니다.");
-        }
     }
 
     /**

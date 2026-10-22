@@ -94,6 +94,21 @@ class UploadBatchIntegrationTest {
     }
 
     @Test
+    void classification_pending_count_skips_excluded_transactions() {
+        // given: 미분류 거래 2건이라 검토도 2건
+        UUID userId = newUser();
+        UploadResult result = upload(userId, "hash-excluded", tx("k-1", "성진이네 본점"), tx("k-2", "성진이네 본점"));
+        assertThat(batchService.get(userId, result.id()).classificationPendingCount()).isEqualTo(2);
+
+        // when: 한 건을 판정에서 제외한다(B7 exclude 를 SQL 로 흉내 낸다). 검토는 지우지 않는다
+        jdbcTemplate.update("update transaction set user_inclusion = 'EXCLUDED' where batch_id = ? and natural_key = 'k-1'",
+            result.id());
+
+        // then
+        assertThat(batchService.get(userId, result.id()).classificationPendingCount()).isEqualTo(1);
+    }
+
+    @Test
     void other_users_batch_is_not_found() {
         UUID owner = newUser();
         UUID batchId = upload(owner, "hash-other", tx("k-1", "스타벅스코리아 서면점")).id();

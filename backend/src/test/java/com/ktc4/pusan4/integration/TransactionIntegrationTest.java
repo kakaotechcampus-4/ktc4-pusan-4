@@ -111,7 +111,9 @@ class TransactionIntegrationTest {
         UUID batchId = upload(userId, "hash-verdict",
             tx("k-1", "2026-01-03", "스타벅스코리아 서면점", SourceStatus.JUDGEABLE),
             tx("k-2", "2026-01-04", "스타벅스코리아 남포점", SourceStatus.JUDGEABLE),
-            tx("k-3", "2026-01-05", "스타벅스코리아 광안점", SourceStatus.JUDGEABLE));
+            tx("k-3", "2026-01-05", "스타벅스코리아 광안점", SourceStatus.JUDGEABLE),
+            tx("k-4", "2026-01-06", "스타벅스코리아 해운대점", SourceStatus.JUDGEABLE),
+            tx("k-5", "2026-01-07", "성진이네 본점", SourceStatus.JUDGEABLE));
         UUID runId = newRun(userId, batchId);
         // k-1: 확인 필요 → 답변 후 가능. 최신 자동 판정이 현재다
         judgment(idOf(userId, "k-1"), 1, "NEEDS_REVIEW", "run_id", runId);
@@ -125,6 +127,11 @@ class TransactionIntegrationTest {
             """, overrideId, idOf(userId, "k-2"), source);
         judgment(idOf(userId, "k-2"), 2, "UNAVAILABLE", "judgment_override_id", overrideId);
         // k-3: 판정이 없다
+        // k-4: 가능으로 판정한 뒤 사용자가 판정 대상에서 제외했다. 판정은 남지만 현재 결과(§5)에서는 빠진다
+        judgment(idOf(userId, "k-4"), 1, "AVAILABLE", "run_id", runId);
+        transactionService.exclude(userId, idOf(userId, "k-4"));
+        // k-5: 미분류 거래다. 판정 행이 있어도 현재 결과에서는 빠진다
+        judgment(idOf(userId, "k-5"), 1, "AVAILABLE", "run_id", runId);
 
         // then
         assertThat(keys(userId, new TransactionFilter(null, null, null, null, null, Verdict.AVAILABLE)))

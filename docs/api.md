@@ -811,7 +811,7 @@ size
 createdAt DESC, id DESC
 ```
 
-`transactionCount`와 `classificationPendingCount`는 조회 시점 값이다. 사용자가 분류 확인에 답하면 `classificationPendingCount`가 줄어든다. `skippedDuplicateCount`는 업로드할 때 센 값이다.
+`transactionCount`와 `classificationPendingCount`는 조회 시점 값이다. `classificationPendingCount`는 지금 판정 대상(effectiveStatus = JUDGEABLE)인 거래의 PENDING 분류 검토 수다. 사용자가 분류 확인에 답하거나 거래를 제외하면 줄고, 다시 포함하면 돌아온다. `skippedDuplicateCount`는 업로드할 때 센 값이다.
 
 응답:
 
@@ -918,9 +918,9 @@ size
 
 `status`는 `effectiveStatus` 기준이다.
 
-`verdict`는 거래의 현재 판정(§5) 기준이다. 판정이 없는 거래는 빠진다.
+`verdict`는 §5의 현재 결과 기준이다. 거래마다 현재 판정(활성 Override 우선, 없으면 Override가 아닌 최신 revision)을 고르고, 지금 판정 대상이 아닌 거래(사용자가 제외한 거래, 미분류 거래)는 뺀다. 판정이 없는 거래도 빠진다. 그래서 `verdict`로 거른 건수는 같은 범위의 판정 요약(3.7) 건수와 같다.
 
-`month`는 1~12다. `year` 없이 주면 모든 해의 그 달이다.
+`month`는 1~12다. `year` 없이 주면 모든 해의 그 달이다. `year`가 있으면 승인일 범위(그 해 또는 그 달의 첫날 이상, 다음 해 또는 다음 달 첫날 미만)로 건다.
 
 조건은 모두 AND로 건다.
 

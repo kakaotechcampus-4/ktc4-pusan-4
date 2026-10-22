@@ -11,7 +11,7 @@ import java.util.UUID;
  *
  * @param month   승인일의 월(1~12). year 없이 주면 모든 해의 그 달이다(프론트 목과 같다)
  * @param status  effectiveStatus 기준
- * @param verdict 거래의 현재 판정(api.md §5) 기준. 판정이 없는 거래는 빠진다
+ * @param verdict 현재 결과(api.md §5) 기준. 판정 대상이 아닌 거래(제외·미분류)와 판정이 없는 거래는 빠진다
  */
 public record TransactionFilter(
     UUID batchId,
