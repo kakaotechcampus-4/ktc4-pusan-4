@@ -3,6 +3,10 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:${DB_PORT:15432}/${DB_NAME:ktc4}}
     username: ${DB_USERNAME:ktc4}
     password: ${DB_PASSWORD:ktc4-local}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:16379}
 
 springdoc:
   api-docs:
