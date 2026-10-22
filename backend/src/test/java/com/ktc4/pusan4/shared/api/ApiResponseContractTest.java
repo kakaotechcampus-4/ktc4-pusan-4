@@ -21,10 +21,25 @@ import com.ktc4.pusan4.judgment.persistence.QuestionAnswerResult;
 import com.ktc4.pusan4.judgment.persistence.QuestionAnswerService;
 import com.ktc4.pusan4.judgment.persistence.QuestionQueryService;
 import com.ktc4.pusan4.judgment.persistence.StatuteService;
-import com.ktc4.pusan4.merchant.api.ClassificationMockData;
+import com.ktc4.pusan4.merchant.api.ClassificationReviewStatus;
 import com.ktc4.pusan4.shared.UuidV7Generator;
 import com.ktc4.pusan4.shared.auth.TemporaryCurrentUserProvider;
-import com.ktc4.pusan4.transaction.api.TransactionMockData;
+import com.ktc4.pusan4.transaction.api.CardIssuer;
+import com.ktc4.pusan4.transaction.api.ClassificationStatus;
+import com.ktc4.pusan4.transaction.api.SourceStatus;
+import com.ktc4.pusan4.transaction.api.SourceType;
+import com.ktc4.pusan4.transaction.api.UserInclusion;
+import com.ktc4.pusan4.transaction.domain.ClassificationAnswer;
+import com.ktc4.pusan4.transaction.domain.ClassificationReviewGroup;
+import com.ktc4.pusan4.transaction.domain.ClassificationReviewItem;
+import com.ktc4.pusan4.transaction.domain.ClassificationReviewResult;
+import com.ktc4.pusan4.transaction.domain.TransactionDetail;
+import com.ktc4.pusan4.transaction.domain.UploadBatchSummary;
+import com.ktc4.pusan4.transaction.domain.UploadResult;
+import com.ktc4.pusan4.transaction.persistence.ClassificationReviewService;
+import com.ktc4.pusan4.transaction.persistence.TransactionService;
+import com.ktc4.pusan4.transaction.persistence.UploadBatchService;
+import com.ktc4.pusan4.transaction.persistence.UploadService;
 import com.ktc4.pusan4.user.domain.AppUser;
 import com.ktc4.pusan4.user.domain.BookkeepingDuty;
 import com.ktc4.pusan4.user.domain.BusinessContext;
@@ -39,6 +54,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -72,7 +88,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @WebMvcTest
 @Import({ApiExceptionHandler.class, UuidV7Generator.class, TemporaryCurrentUserProvider.class,
-    TransactionMockData.class, ClassificationMockData.class, JudgmentMockData.class})
+    JudgmentMockData.class})
 class ApiResponseContractTest {
 
     private static final String ID = "0199c8f2-0000-7000-8000-000000000001";
@@ -108,8 +124,30 @@ class ApiResponseContractTest {
     @MockitoBean
     private StatuteService statuteService;
 
+    @MockitoBean
+    private UploadService uploadService;
+
+    @MockitoBean
+    private UploadBatchService batchService;
+
+    @MockitoBean
+    private TransactionService transactionService;
+
+    @MockitoBean
+    private ClassificationReviewService reviewService;
+
     @BeforeEach
     void stubServices() {
+        ClassificationReviewItem review = new ClassificationReviewItem(UUID.fromString(ID), UUID.fromString(ID),
+            UUID.fromString(ID), ClassificationReviewStatus.PENDING, OffsetDateTime.parse("2026-09-18T01:10:00+09:00"),
+            null, LocalDate.parse("2026-01-03"), "XYZ PAYMENTS", "XYZ PAYMENTS", "미분류", 47_000L, 0);
+        given(reviewService.list(any(), any(), any(), anyInt(), anyInt())).willReturn(new ClassificationReviewResult<>(
+            new PageImpl<>(List.of(review), PageRequest.of(0, 20), 1), 1, 47_000L));
+        given(reviewService.groups(any(), any(), any(), anyInt(), anyInt())).willReturn(new ClassificationReviewResult<>(
+            new PageImpl<>(List.of(new ClassificationReviewGroup("merchant:XYZ PAYMENTS", "XYZ PAYMENTS",
+                List.of(review))), PageRequest.of(0, 20), 1), 1, 47_000L));
+        given(reviewService.answer(any(), any(), any())).willReturn(new ClassificationAnswer(1, "해외SaaS", 1));
+
         given(userService.get(any())).willReturn(new AppUser(
             TemporaryCurrentUserProvider.TEMPORARY_USER_ID, "demo@example.com",
             OffsetDateTime.parse("2026-09-01T10:00:00+09:00")));
@@ -152,6 +190,27 @@ class ApiResponseContractTest {
 
         given(statuteService.get(anyLong())).willReturn(new StatuteVersion(1523, "소득세법시행령-67-4",
             "소득세법 시행령 제67조 제4항", "시행령", LocalDate.parse("2026-01-01"), null, "https://www.law.go.kr/", "..."));
+
+        given(uploadService.upload(any(), any(), any())).willReturn(new UploadResult(UUID.fromString(ID), 1, 0, 0,
+            OffsetDateTime.parse("2026-09-18T01:10:00+09:00")));
+
+        UploadBatchSummary batch = new UploadBatchSummary(UUID.fromString(ID), SourceType.승인내역, CardIssuer.국민,
+            LocalDate.parse("2026-01-01"), LocalDate.parse("2026-01-31"), 289, 3, 4,
+            OffsetDateTime.parse("2026-09-18T01:10:00+09:00"));
+        given(batchService.list(any(), anyInt(), anyInt()))
+            .willReturn(new PageImpl<>(List.of(batch), PageRequest.of(0, 20), 1));
+        given(batchService.get(any(), any())).willReturn(batch);
+
+        TransactionDetail transaction = new TransactionDetail(UUID.fromString(ID), UUID.fromString(ID),
+            LocalDate.parse("2026-01-03"), "AWS APN1", "Amazon Web Services", "해외SaaS",
+            ClassificationStatus.CLASSIFIED, 137_000L, 0, SourceStatus.JUDGEABLE, UserInclusion.AUTO);
+        given(transactionService.list(any(), any(), anyInt(), anyInt()))
+            .willReturn(new PageImpl<>(List.of(transaction), PageRequest.of(0, 20), 1));
+        given(transactionService.get(any(), any())).willReturn(transaction);
+        given(transactionService.include(any(), any())).willReturn(transaction);
+        given(transactionService.exclude(any(), any())).willReturn(new TransactionDetail(UUID.fromString(ID),
+            UUID.fromString(ID), LocalDate.parse("2026-01-03"), "AWS APN1", "Amazon Web Services", "해외SaaS",
+            ClassificationStatus.CLASSIFIED, 137_000L, 0, SourceStatus.JUDGEABLE, UserInclusion.EXCLUDED));
     }
 
     static Stream<Arguments> endpoints() {
@@ -228,6 +287,9 @@ class ApiResponseContractTest {
         "prevYearRevenue", "businessOpenDate", "bookkeepingDuty", "hasEmployee", "homeOfficeRatio", "createdAt");
     private static final Set<String> UPLOAD_BATCH_KEYS = Set.of("id", "sourceType", "cardIssuer", "periodStart",
         "periodEnd", "transactionCount", "skippedDuplicateCount", "classificationPendingCount", "createdAt");
+    private static final Set<String> TRANSACTION_KEYS = Set.of("id", "batchId", "approvedAt", "merchantRaw",
+        "merchantNorm", "merchantCategory", "classificationStatus", "amount", "installmentMonths", "sourceStatus",
+        "userInclusion", "effectiveStatus");
     /** api.md 3.4 거래 요약. 거래를 함께 보여주는 응답은 이 필드를 모두 넣는다 */
     private static final Set<String> TRANSACTION_SUMMARY_KEYS = Set.of("approvedAt", "merchantRaw", "merchantNorm",
         "merchantCategory", "amount", "installmentMonths");
@@ -263,6 +325,8 @@ class ApiResponseContractTest {
             Arguments.of("/api/v1/users/me/contexts", "/0", CONTEXT_KEYS),
             Arguments.of("/api/v1/upload-batches", "/items/0", UPLOAD_BATCH_KEYS),
             Arguments.of("/api/v1/upload-batches/" + ID, "", UPLOAD_BATCH_KEYS),
+            Arguments.of("/api/v1/transactions", "/items/0", TRANSACTION_KEYS),
+            Arguments.of("/api/v1/transactions/" + ID, "", TRANSACTION_KEYS),
             Arguments.of("/api/v1/judgments?batchId=" + ID, "/items/0", JUDGMENT_KEYS),
             Arguments.of("/api/v1/judgments?batchId=" + ID, "/items/0/transaction", TRANSACTION_SUMMARY_KEYS),
             Arguments.of("/api/v1/judgments/" + ID, "", JUDGMENT_KEYS),

@@ -808,8 +808,10 @@ size
 정렬:
 
 ```
-createdAt DESC
+createdAt DESC, id DESC
 ```
+
+`transactionCount`와 `classificationPendingCount`는 조회 시점 값이다. 사용자가 분류 확인에 답하면 `classificationPendingCount`가 줄어든다. `skippedDuplicateCount`는 업로드할 때 센 값이다.
 
 응답:
 
@@ -915,6 +917,12 @@ size
 ```
 
 `status`는 `effectiveStatus` 기준이다.
+
+`verdict`는 거래의 현재 판정(§5) 기준이다. 판정이 없는 거래는 빠진다.
+
+`month`는 1~12다. `year` 없이 주면 모든 해의 그 달이다.
+
+조건은 모두 AND로 건다.
 
 응답:
 
