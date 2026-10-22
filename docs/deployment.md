@@ -126,4 +126,5 @@ systemctl list-timers ktc4-corpus.timer
 
 - `/etc/ktc4/production.env`의 `HOLIDAY_API_KEY`에는 포털의 **Decoding** 키를 넣는다. Encoding 키를 넣으면 한 번 더 인코딩되어 `SERVICE_KEY_IS_NOT_REGISTERED_ERROR`가 난다.
 - 키가 없거나 호출이 실패하면 그 해는 기존 행을 그대로 둔다. 발표 전이라 빈 응답이 온 해도 마찬가지다. 판정은 표에 있는 값으로 계속 돈다.
+- 호출이 실패했거나 빈 응답이 왔는데 표에 그 해 행이 하나도 없으면 `backend/src/main/resources/holiday/seed/{연도}.json`(2025~2027)으로 채운다. 이 파일은 같은 API 응답을 그대로 저장한 것이라 API 로 받을 때와 같은 규칙으로 읽는다. 이미 행이 있는 해는 시드가 덮지 않고, 다음에 API 로 받으면 시드 행도 API 응답으로 교체된다. 키가 없을 때는 시드도 넣지 않는다. 동기화 범위(올해 앞뒤 1년)가 2027년을 넘기 전에 다음 해 응답을 받아 `seed/{연도}.json` 으로 저장한다.
 - 반영 결과는 백엔드 로그의 `년 공휴일 N건을 반영했다`로 확인한다.
