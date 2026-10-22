@@ -30,3 +30,9 @@
 
 - 각 원 PR 은 그대로다. 이 브랜치의 충돌 해결은 PR 들이 develop 에 머지될 때 다시 해야 한다(계획 문서 "머지할 때 주의할 점").
 - GCP(ktc4-pusan-4) 데모 인스턴스에 배포한다. 운영 AWS 와 별개이며 발표 뒤 정리한다.
+
+## 14:10 웹 이미지가 목업 모드로 빌드되던 것을 고친다
+
+- `deploy/web.Dockerfile` 에 `ARG VITE_API` 를 추가했다. 기본값이 비어 있어 기존(목업) 빌드는 그대로이고, 데모 배포는 `--build-arg VITE_API=http` 로 빌드한다.
+- 첫 배포는 이 인자 없이 빌드해서 프런트가 서버를 부르지 않았다. 업로드 결과가 서버 DB 에 0건이었고, 번들에 `/api/v1` 참조가 없었다. 운영 AWS 도 같은 Dockerfile 이라 목업으로 돈다(`docs/deployment.md` 1절에 적힌 대로).
+- 이미지는 Windows worktree 대신 LF 로 받은 checkout 에서 다시 빌드한다. 컨테이너의 `rules/*.yaml` 이 CRLF 로 들어가 레포와 md5 가 달랐다.
