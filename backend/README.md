@@ -80,7 +80,26 @@ bash ./backend/gradlew -p backend bootRun --args='--spring.profiles.active=local
 
 서비스는 userId를 요청 본문이나 경로에서 받지 않습니다. 컨트롤러 메서드에 `CurrentUser` 인자를 두면 `CurrentUserArgumentResolver`가 채우고, 서비스에는 `currentUser.id()`를 넘깁니다(`UserController.me` 참고). 스웨거에는 노출되지 않습니다.
 
-인증 도입 전에는 `TemporaryCurrentUserProvider`가 요청과 상관없이 고정 사용자(`MockFixtures.USER_ID`와 같은 id)를 돌려주고, `TemporaryUserSeeder`가 기동할 때 그 사용자 행을 만듭니다. 인증 도입(B9b) 때는 `CurrentUserProvider` 구현체만 Bearer 토큰 검증으로 바꾸고 두 임시 클래스를 지웁니다.
+`CurrentUserProvider` 구현체는 `auth.BearerCurrentUserProvider`이고, `Authorization: Bearer {accessToken}`의 사용자를 돌려줍니다. `/api/v1/auth/**`를 뺀 모든 API는 `CurrentUserWebConfig`의 인터셉터가 이를 확인해, 토큰이 없으면 `CurrentUser` 인자가 없는 API(목 응답 등)도 401 `UNAUTHORIZED`입니다. 계약은 `docs/api.md` 1.1에 있습니다.
+
+### 인증 (`auth`)
+
+지금은 고정 사용자(`FixedUser`, `MockFixtures.USER_ID`와 같은 id) 하나만 로그인합니다. `TemporaryUserSeeder`가 기동할 때 그 사용자 행을 만듭니다. 로컬 프로필의 비밀번호는 `demo1234`입니다(`application-local.yml`, 운영은 `docs/deployment.md` 8절).
+
+| 구성요소 | 지금 | 바꿀 때 |
+| --- | --- | --- |
+| `AccessTokens` | JWT 발급·검증(15분) | 그대로 |
+| `RefreshTokenStore` | `StatelessRefreshTokenStore` — 서명만 확인, 저장 없음. `revoke`·`revokeAll`은 아무것도 하지 않는다 | B9c: Redis 구현으로 빈만 교체(교체·폐기·탈퇴 시 전체 폐기) |
+| `CredentialVerifier` | `FixedUserCredentialVerifier` — `FixedUser` + `APP_AUTH_DEMO_PASSWORD` | B9b: 실제 계정·카카오 구현으로 교체, `FixedUser`·`TemporaryUserSeeder` 삭제 |
+
+`AuthService`와 `AuthController`는 위 인터페이스만 보므로 교체해도 바뀌지 않습니다.
+
+### 테스트에서 인증
+
+자동 구성 MockMvc(`@AutoConfigureMockMvc`, `@WebMvcTest`)의 요청에는 고정 사용자의 액세스 토큰이 기본으로 실립니다(`DefaultBearerTokenContextCustomizerFactory`, `src/test/resources/META-INF/spring.factories`로 모든 테스트 컨텍스트에 붙음). 그래서 API를 부르는 테스트는 `Authorization`을 넣지 않아도 됩니다. 직접 넣으면 그 값을 씁니다.
+
+- `@WebMvcTest`는 인증 빈이 올라오지 않으므로 `@Import(TestAuthentication.class)`를 붙입니다(`ApiResponseContractTest` 참고).
+- 인증 실패를 보는 테스트는 기본 토큰이 없는 MockMvc를 `MockMvcBuilders.webAppContextSetup`으로 직접 만듭니다(`AuthIntegrationTest` 참고).
 
 목을 서비스로 바꾼 API는 `ApiResponseContractTest`에서 서비스를 `@MockitoBean`으로 대신해 DB 없이 계약만 봅니다.
 
