@@ -24,7 +24,8 @@ app:
   auth:
     jwt-secret: ${APP_AUTH_JWT_SECRET:}
     demo-password: ${APP_AUTH_DEMO_PASSWORD:}
-    access-token-ttl: 15m
+    # demo/poc-gcp 전용: 발표 슬라이드 iframe 안에서는 refresh 쿠키(SameSite=Strict)가 안 붙어 연장이 안 된다. api.md 는 15분
+    access-token-ttl: 1h
     refresh-token-ttl: 14d
     cookie-secure: ${APP_AUTH_COOKIE_SECURE:true}
 
