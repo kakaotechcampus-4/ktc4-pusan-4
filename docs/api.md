@@ -1489,7 +1489,7 @@ FAILED
 | errorCode | 뜻 |
 | --- | --- |
 | `RULE_PROCESSING_FAILED` | 그 거래를 판정하다 기술적으로 실패했다. `message`는 고정 문구이고, 원인은 서버 로그에만 남긴다 |
-| `RUN_START_FAILED` | Run을 시작하지 못했다(Context를 읽지 못함 등). 대상 거래 전체가 이 코드로 끝난다. 다시 실행해야 한다 |
+| `RUN_START_FAILED` | Run을 시작하지 못했다(Context를 읽지 못함, 판정 대기열이 가득 참 등). 대상 거래 전체가 이 코드로 끝난다. 다시 실행해야 한다 |
 | `RUN_INTERRUPTED` | 실행하던 서버가 내려가 Run이 멈췄다. 진행이 5분 넘게 없는 `QUEUED`·`RUNNING` Run의 남은 거래가 이 코드로 끝난다. Run은 이어 돌리지 않으므로 다시 실행해야 한다 |
 
 ---

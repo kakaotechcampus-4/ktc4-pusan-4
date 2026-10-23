@@ -13,6 +13,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
@@ -152,8 +153,12 @@ public class JudgmentRunService {
         }
     }
 
-    /** run 을 시작하지 못했다. 남은 PENDING 항목은 RUN_START_FAILED 실패가 되어 실패 목록에 보인다. */
-    @Transactional
+    /**
+     * run 을 시작하지 못했다(Context 를 읽지 못함, 판정 대기열이 가득 참 등). 남은 PENDING 항목은 RUN_START_FAILED 실패가 되어 실패 목록에 보인다.
+     * 대기열이 찬 경우는 run 을 만든 트랜잭션의 커밋 뒤(AFTER_COMMIT)에 불린다. 그때 REQUIRED 로 들어가면 이미 끝난
+     * 트랜잭션에 참여해 바꾼 내용이 커밋되지 않으므로 새 트랜잭션을 연다.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     void fail(UUID runId) {
         JudgmentRunEntity run = lock(runId);
         if (run.isQueued() || run.isRunning()) {

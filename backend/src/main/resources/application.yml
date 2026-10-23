@@ -18,6 +18,17 @@ app:
   rules:
     dir: ../rules
     commit-sha: local
+  # 판정 run 실행 풀 (JudgmentRunExecutorConfiguration). 운영(EC2 t3.medium, 2 vCPU 를 DB·AI 와 함께 씀) 값이다.
+  # 로컬 개발 값은 application-local.yml 에 따로 둔다.
+  # - workers: 동시에 도는 run 수. 하나가 DB 커넥션(Hikari 기본 10개)을 하나 쓴다.
+  #   백엔드·DB 에 CPU 를 1개씩만 준 측정에서 처리량이 1개 157, 2개 254(1.6배), 4개 265건/초(1.7배)였다.
+  #   4개는 처리량이 늘지 않고 진행률 GET 이 최대 175ms 로 느려져 2개로 둔다.
+  # - queue-capacity: 기다릴 수 있는 run 수. 멈춘 run 정리(진행 없음 5분)는 QUEUED 도 끝내므로,
+  #   queue-capacity × run 하나 시간 / workers 가 5분보다 짧아야 한다. 워커 하나가 초당 약 127건이라 1,200건 run 이
+  #   약 9.4초이고 상한은 약 64다. EBS·CPU 크레딧은 측정에 없어 50 으로 둔다.
+  judgment-run:
+    workers: 2
+    queue-capacity: 50
 
 management:
   endpoints:
