@@ -26,9 +26,14 @@ app:
   # - queue-capacity: 기다릴 수 있는 run 수. 멈춘 run 정리(진행 없음 5분)는 QUEUED 도 끝내므로,
   #   queue-capacity × run 하나 시간 / workers 가 5분보다 짧아야 한다. 워커 하나가 초당 약 127건이라 1,200건 run 이
   #   약 9.4초이고 상한은 약 64다. EBS·CPU 크레딧은 측정에 없어 50 으로 둔다.
+  # - await-termination: 서버가 종료될 때(배포) 돌던 run 과 대기열의 run 을 기다리는 최대 시간.
+  #   이 설정이 없으면 Spring 종료 단계 제한(30s)이 지나자 run 이 도는 중에 DB 커넥션 풀을 닫았다(CPU 1개씩, 6,000건 run).
+  #   같은 조건에서 3,000건 run 이 약 28초, 6,000건이 약 47초라 60s 로 둔다.
+  #   deploy/compose.yaml 의 stop_grace_period 는 이것보다 길어야 한다.
   judgment-run:
     workers: 2
     queue-capacity: 50
+    await-termination: 60s
 
 management:
   endpoints:
