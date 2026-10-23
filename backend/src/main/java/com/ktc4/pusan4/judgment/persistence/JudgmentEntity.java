@@ -25,7 +25,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "judgment")
-class JudgmentEntity {
+class JudgmentEntity extends AssignedIdEntity<UUID> {
 
     @Id
     private UUID id;
@@ -136,6 +136,11 @@ class JudgmentEntity {
     }
 
     UUID id() {
+        return id;
+    }
+
+    @Override
+    public UUID getId() {
         return id;
     }
 

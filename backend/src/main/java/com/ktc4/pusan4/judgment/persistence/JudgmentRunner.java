@@ -55,7 +55,7 @@ class JudgmentRunner {
         JudgmentRunService.RunStart start = started.get();
         for (UUID transactionId : start.transactionIds()) {
             try {
-                if (!runService.judgeItem(runId, transactionId, start.context())) {
+                if (!runService.judgeItem(runId, transactionId, start.context(), start.references())) {
                     log.warn("판정 실행 {} 이 중단으로 끝나 남은 거래를 판정하지 않는다", runId);
                     return;
                 }
