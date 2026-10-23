@@ -13,12 +13,28 @@ const PRINCIPLES = [
 '근거를 못 붙이면 가능·불가로 저장하지 않습니다',
 '카드내역 원본은 서버로 올라가지 않습니다'];
 
+const DEMO_EMAIL_KEY = 'demo-email';
+
+// demo/poc-gcp 전용: 여러 사람이 같은 이메일로 한 계정에 섞이지 않게 브라우저마다 이메일을 하나 만들어 둔다
+function demoEmail(): string {
+  try {
+    const saved = localStorage.getItem(DEMO_EMAIL_KEY);
+    if (saved) return saved;
+    const created = `demo-${crypto.randomUUID()}@demo.test`;
+    localStorage.setItem(DEMO_EMAIL_KEY, created);
+    return created;
+  } catch {
+    // 저장소를 못 쓰는 브라우저는 이번 화면에서만 쓴다
+    return `demo-${crypto.randomUUID()}@demo.test`;
+  }
+}
+
 
 export function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const { signIn } = useSession();
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(() => isMock ? '' : demoEmail());
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -223,8 +239,8 @@ export function Login() {
           {/* demo/poc-gcp 전용: 백엔드가 아무 이메일이나 공용 비밀번호로 가입·로그인시킨다 */}
           {!isMock &&
           <p className="mt-3 text-[12px] leading-6 text-muted">
-              데모 서버입니다. 아무 이메일이나 입력하면 바로 가입·로그인됩니다. 비밀번호는 demo1234@ 입니다.
-              실제 이메일은 쓰지 마세요.
+              데모 서버입니다. 이메일은 이 브라우저용으로 만들어 두었으니 비밀번호 demo1234@ 만 입력하세요.
+              같은 브라우저로 다시 오면 같은 계정입니다. 이메일을 바꾼다면 실제 이메일은 쓰지 마세요.
             </p>
           }
 
