@@ -4,7 +4,7 @@
 # R-302 는 R-301 과 계약이 같다. 회의 결정(2026-09)의 카테고리(카페·음식점·여비교통)에는 없지만
 # 식대로 보고 유지한다(사용자 확인 2026-09-30).
 id: R-313
-version: 2
+version: 3
 gate: G2
 priority: 505
 effective_period: { start: 2024-01-01, end: null }
@@ -15,6 +15,7 @@ match:
 verdict: 불가
 citations:
   - { id: 소득세법-33-1-5, verified: true }
+  - { id: 소득세법시행령-61-1-1, verified: true }
 question:
   code: WEEKEND_DELIVERY_PURPOSE
   text: "주말·공휴일 배달 음식이라 개인 식사로 보고 제외했어요. 거래처 미팅이었다면 알려주세요."

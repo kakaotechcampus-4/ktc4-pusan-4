@@ -77,6 +77,7 @@ public final class JudgmentEngine {
         String answeredAccount = null;
         boolean answeredAccountConflict = false;
         boolean confirmedUnavailable = false;
+        Gate blockedAtGate = null;
 
         // 승자(G2)와 속성 관문(G3~G6) 카드를 한 파이프라인으로 동일하게 처리한다.
         // 되묻기는 어느 관문에 있든 user_fact로 해소된다.
@@ -128,6 +129,11 @@ public final class JudgmentEngine {
             appliedRuleVersions.add(rule.version());
             // 답에 근거가 따로 있으면 카드 근거 대신 싣는다(업무미팅 §35① / 개인 §33①5 처럼 답마다 근거가 다름).
             citations.addAll(answeredCitations.isEmpty() ? rule.citations() : answeredCitations);
+            // G2 는 차단형이다: 승자가 불가를 확정하면 속성 관문(G3~G6)으로 넘어가지 않는다.
+            if (rule == winner && confirmedUnavailable) {
+                blockedAtGate = Gate.G2;
+                break;
+            }
         }
 
         // 이미 불가로 확정된 거래는 되묻지 않는다: 미해소 질문을 버려 되묻기 예산 낭비를 막는다.
@@ -147,7 +153,7 @@ public final class JudgmentEngine {
             ? null
             : answeredAccount == null ? defaultAccount : answeredAccount;
         return new Judgment(
-            verdict, null, false, null, outOfScope, account, appliedRuleIds, appliedRuleVersions,
+            verdict, blockedAtGate, false, null, outOfScope, account, appliedRuleIds, appliedRuleVersions,
             List.copyOf(citations), attributes, questions
         );
     }

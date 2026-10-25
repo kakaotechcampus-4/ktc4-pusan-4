@@ -1,5 +1,8 @@
 package com.ktc4.pusan4.judgment.api;
 
+import com.ktc4.pusan4.judgment.domain.Question;
+import com.ktc4.pusan4.judgment.domain.QuestionGroup;
+import com.ktc4.pusan4.judgment.domain.QuestionStatus;
 import com.ktc4.pusan4.shared.api.Coded;
 import com.ktc4.pusan4.transaction.api.MerchantCategories;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -29,6 +32,14 @@ public record QuestionGroupResponse(
     List<QuestionTransaction> transactions
 ) {
 
+    static QuestionGroupResponse from(QuestionGroup group) {
+        Question first = group.questions().getFirst();
+        return new QuestionGroupResponse(group.groupKey(), group.factType(), QuestionResponse.status(group.status()),
+            group.questionIds(), group.count(), group.totalAmount(), first.questionText(), first.options(),
+            QuestionResponse.answer(group.answer()), group.bulkAnswerable(),
+            group.questions().stream().map(QuestionTransaction::from).toList());
+    }
+
     @Schema(description = "Question 과 그 거래 요약. 거래 요약 필드는 api.md 3.4 와 같다")
     public record QuestionTransaction(
         UUID questionId,
@@ -42,5 +53,12 @@ public record QuestionGroupResponse(
         @Schema(description = "그 거래에 활성 Override 가 있으면 true. 답해도 현재 결과는 Override 판정 그대로다")
         boolean overridden
     ) {
+
+        static QuestionTransaction from(Question question) {
+            return new QuestionTransaction(question.id(), question.transactionId(),
+                question.transaction().approvedAt(), question.transaction().merchantRaw(),
+                question.transaction().merchantNorm(), question.transaction().merchantCategory(),
+                question.transaction().amount(), question.transaction().installmentMonths(), question.overridden());
+        }
     }
 }

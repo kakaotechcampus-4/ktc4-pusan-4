@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { CheckIcon } from 'lucide-react';
+import { CheckIcon, UserIcon } from 'lucide-react';
 import { DisclaimerBar } from './DisclaimerBar';
 
 import { useSession } from '../contexts/SessionContext';
@@ -22,6 +22,9 @@ const REFS = [
 { path: '/transactions', label: '거래' },
 { path: '/uploads', label: '업로드 이력' }];
 
+/** 관리자에게만 보인다 (M1) */
+const ADMIN_REF = { path: '/admin', label: '관리자' };
+
 /** 단계 표시에 포함되지 않지만 특정 단계에 속하는 화면 */
 const STEP_ALIAS: Record<string, number> = {
   '/confirm': 2,
@@ -40,7 +43,8 @@ interface AppShellProps {
 export function AppShell({ children, showSteps = true }: AppShellProps) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const { email, signOut } = useSession();
+  const { email, isAdmin, signOut } = useSession();
+  const refs = isAdmin ? [...REFS, ADMIN_REF] : REFS;
   const activeIndex = STEPS.findIndex((step) =>
   pathname.startsWith(step.path)
   );
@@ -52,8 +56,12 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
   return (
     <div className="flex min-h-full w-full flex-col bg-canvas">
       <header className="sticky top-0 z-30 border-b border-line bg-surface/90 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-[1240px] items-center justify-between px-6">
-          <Link to="/" className="flex items-center gap-2" aria-label="경비판정 홈">
+        {/*
+          한 줄을 넘기면 한글이 음절 단위로 꺾인다. 줄바꿈을 막고, 폭이 모자라면 덜 중요한 것부터 접는다:
+          xl 미만 — 지금 단계가 아닌 단계 이름 · lg 미만 — 귀속 연도, 이메일(아이콘으로) · md 미만 — 단계 표시
+        */}
+        <div className="mx-auto flex h-14 max-w-[1240px] items-center justify-between gap-3 whitespace-nowrap px-6">
+          <Link to="/" className="flex shrink-0 items-center gap-2" aria-label="경비판정 홈">
             <span aria-hidden="true" className="flex gap-[3px]">
               <span className="block h-[18px] w-[4px] rounded-sm bg-ink" />
               <span className="block h-[18px] w-[4px] rounded-sm bg-ink" />
@@ -65,7 +73,7 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
           </Link>
 
           {showSteps && currentIndex >= 0 &&
-          <nav aria-label="진행 단계" className="hidden md:block">
+          <nav aria-label="진행 단계" className="hidden shrink-0 md:block">
               <ol className="flex items-center gap-1">
                 {STEPS.map((step, index) => {
                 const done = index < currentIndex;
@@ -80,6 +88,7 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
                     }
                       <span
                       aria-current={active ? 'step' : undefined}
+                      title={active ? undefined : step.label}
                       className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-small ${
                       active ?
                       'bg-accent-soft font-semibold text-accent' :
@@ -98,7 +107,10 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
                             {index + 1}
                           </span>
                       }
-                        {step.label}
+                        {active ?
+                      step.label :
+                      <span className="sr-only xl:not-sr-only">{step.label}</span>
+                      }
                       </span>
                     </li>);
 
@@ -107,9 +119,9 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
             </nav>
           }
 
-          <div className="flex items-center gap-3 text-small text-muted">
-            <nav aria-label="자료" className="flex items-center gap-0.5">
-              {REFS.map((ref) => {
+          <div className="flex min-w-0 items-center gap-3 text-small text-muted">
+            <nav aria-label="자료" className="flex shrink-0 items-center gap-0.5">
+              {refs.map((ref) => {
                 const active = pathname.startsWith(ref.path);
                 return (
                   <Link
@@ -125,21 +137,43 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
 
               })}
             </nav>
-            <span className="hidden h-4 w-px bg-line sm:inline" />
-            <span className="hidden tabular-nums sm:inline">
+            <span className="hidden h-4 w-px bg-line lg:inline" />
+            <span className="hidden tabular-nums lg:inline">
               귀속 2026년
             </span>
             <span className="hidden h-4 w-px bg-line sm:inline" />
-            <span className="hidden max-w-[160px] truncate sm:inline">
+            <Link
+              to="/account"
+              aria-current={pathname.startsWith('/account') ? 'page' : undefined}
+              className={`hidden min-w-0 max-w-[160px] truncate rounded-lg px-2 py-1.5 transition-colors duration-150 ease-snap lg:inline ${
+              pathname.startsWith('/account') ?
+              'bg-canvas text-ink' :
+              'hover:bg-canvas hover:text-ink'}`
+              }>
+
               {email}
-            </span>
+            </Link>
+            {/* 이메일을 줄인 폭에서도 내 정보로 갈 수 있게 한다 */}
+            <Link
+              to="/account"
+              aria-current={pathname.startsWith('/account') ? 'page' : undefined}
+              aria-label={`내 정보 (${email ?? ''})`}
+              title={email ?? undefined}
+              className={`hidden shrink-0 rounded-lg p-1.5 transition-colors duration-150 ease-snap sm:inline-flex lg:hidden ${
+              pathname.startsWith('/account') ?
+              'bg-canvas text-ink' :
+              'hover:bg-canvas hover:text-ink'}`
+              }>
+
+              <UserIcon className="h-4 w-4" aria-hidden="true" />
+            </Link>
             <button
               type="button"
               onClick={() => {
                 signOut();
                 navigate('/');
               }}
-              className="rounded-lg border border-line px-2.5 py-1.5 text-caption font-semibold text-ink transition-colors duration-150 ease-snap hover:bg-canvas">
+              className="shrink-0 rounded-lg border border-line px-2.5 py-1.5 text-caption font-semibold text-ink transition-colors duration-150 ease-snap hover:bg-canvas">
               
               로그아웃
             </button>

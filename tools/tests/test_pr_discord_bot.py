@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from tools.pr_discord_bot import (
+    build_assigned_message,
     build_new_issue_message,
     build_new_pr_message,
     build_reminder_message,
@@ -51,8 +52,8 @@ def test_mention_falls_back_to_github_login_when_unmapped():
     assert mention("RainDrop3", {}) == "@RainDrop3"
 
 
-def test_framed_puts_title_and_body_between_dividers():
-    assert framed("새 PR", "본문").split("\n") == ["-" * 51, "[새 PR]", "본문", "-" * 51]
+def test_framed_puts_title_on_top_and_divider_below():
+    assert framed("새 PR", "본문").split("\n") == ["[새 PR]", "본문", "-" * 51]
 
 
 def test_new_pr_message_shows_pr_link_branches_and_reviewer_mentions():
@@ -212,7 +213,7 @@ def test_reminder_message_mentions_waiting_reviewers_on_authors_pr():
 def test_follow_up_reminder_adds_twelve_hours_and_two_bangs_each_side(nth, first_line):
     message = build_reminder_message(make_pr(), ["cho104"], {}, nth)
 
-    assert message.split("\n")[2] == first_line
+    assert message.split("\n")[1] == first_line
 
 
 HALF_DAY = timedelta(hours=12)
@@ -344,13 +345,15 @@ def test_authors_own_comment_notifies_mentioned_teammates():
     )
 
 
-def make_issue(author="cho104", body=None):
+def make_issue(author="cho104", body=None, assignees=()):
     return {
         "number": 101,
         "title": "카드 분류 오류",
         "html_url": "https://github.com/o/r/issues/101",
         "body": body,
         "user": {"login": author},
+        "assignees": [{"login": login} for login in assignees],
+        "created_at": "2026-09-22T05:54:32Z",
     }
 
 
@@ -386,6 +389,16 @@ def test_new_issue_message_lists_body_mentions_except_author():
     assert message == framed("새 Issue", f"{ISSUE_LINK}\ncho104\nmention: <@111> <@333>")
 
 
+def test_new_issue_message_lists_assignees_before_mentions():
+    message = build_new_issue_message(
+        make_issue(assignees=("yuyeol3", "outsider"), body="@Jaeseong22 확인 부탁"), TEAM
+    )
+
+    assert message == framed(
+        "새 Issue", f"{ISSUE_LINK}\ncho104\nAssignees: <@111> @outsider\nmention: <@333>"
+    )
+
+
 def test_new_issue_message_has_no_mention_line_without_tags():
     assert build_new_issue_message(make_issue(), TEAM) == framed(
         "새 Issue", f"{ISSUE_LINK}\ncho104"
@@ -394,6 +407,55 @@ def test_new_issue_message_has_no_mention_line_without_tags():
 
 def test_new_issue_from_outsider_is_skipped():
     assert build_new_issue_message(make_issue(author="outsider"), TEAM) is None
+
+
+def test_assigned_message_mentions_teammate_assigned_after_issue_opened():
+    message = build_assigned_message(make_issue(), "Jaeseong22", "cho104", LATE, TEAM)
+
+    assert message == framed(
+        "담당자 지정", f"<@333>\nIssue {ISSUE_LINK}의 담당자로 지정됐습니다."
+    )
+
+
+@pytest.mark.parametrize(
+    ("login", "assigner", "assigned_at"),
+    [
+        ("Jaeseong22", "cho104", PR_CREATED + timedelta(seconds=2)),
+        ("cho104", "cho104", LATE),
+        ("mentor", "cho104", LATE),
+    ],
+    ids=["assigned-with-issue", "self-assigned", "not-teammate"],
+)
+def test_assigned_message_is_skipped(login, assigner, assigned_at):
+    assert build_assigned_message(make_issue(), login, assigner, assigned_at, TEAM) is None
+
+
+def assigned(login, at):
+    return {"event": "assigned", "created_at": at.isoformat(), "assignee": {"login": login}}
+
+
+@pytest.mark.parametrize(
+    ("events", "expected"),
+    [
+        ([assigned("Jaeseong22", PR_CREATED + timedelta(seconds=1))], False),
+        ([assigned("cho104", LATE), assigned("Jaeseong22", LATE)], True),
+    ],
+    ids=["assigned-with-issue", "assigned-later"],
+)
+def test_assigned_event_uses_assignment_time_from_issue_events(
+    monkeypatch, events, expected
+):
+    monkeypatch.setattr("tools.pr_discord_bot.github_get_all", lambda url, token: events)
+    event = {
+        "action": "assigned",
+        "issue": make_issue(assignees=("Jaeseong22",)),
+        "assignee": {"login": "Jaeseong22"},
+        "sender": {"login": "cho104"},
+    }
+
+    content = collect_notification(event, "o/r", "token", TEAM, LATE + DAY, 0)
+
+    assert (content is not None) is expected
 
 
 def test_issue_comment_notifies_issue_author():

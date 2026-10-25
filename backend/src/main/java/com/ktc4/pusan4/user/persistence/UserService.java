@@ -25,6 +25,10 @@ public class UserService {
     public AppUser get(UUID userId) {
         return userRepository.findById(userId)
             .map(AppUserEntity::toDomain)
-            .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "사용자를 찾을 수 없습니다."));
+            .orElseThrow(UserService::userNotFound);
+    }
+
+    static ApiException userNotFound() {
+        return new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "사용자를 찾을 수 없습니다.");
     }
 }

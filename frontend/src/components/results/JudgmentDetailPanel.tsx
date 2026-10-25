@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRightIcon, TriangleAlertIcon } from 'lucide-react';
-import type { Judgment, JudgmentOriginType, Transaction } from '../../types/domain';
+import type { Judgment, JudgmentOriginType } from '../../types/domain';
 import { api, ApiRequestError, useApi } from '../../api';
 import { Badge, Button, ChoiceGroup, Input } from '../ui';
 import { VerdictBadge } from '../VerdictBadge';
 import { StatuteCitation } from '../StatuteCitation';
 import { VERDICT_LABEL } from '../../utils/verdict';
-import { formatFullDate, formatWon, ro } from '../../utils/format';
+import { formatDateTime, formatFullDate, formatWon, ro } from '../../utils/format';
 
 /** 2.8 이 revision 이 생긴 직접 원인 */
 const ORIGIN_LABEL: Record<JudgmentOriginType, string> = {
@@ -53,9 +53,8 @@ const attributeValue = (value: unknown) =>
 value === true ? '예' : value === false ? '아니오' : String(value);
 
 interface JudgmentDetailPanelProps {
-  /** 거래의 현재 판정 */
+  /** 거래의 현재 판정. 거래 요약(judgment.transaction)도 여기서 읽는다 */
   judgment: Judgment;
-  transaction: Transaction;
   /** 사용자가 행을 고를 때마다 늘어난다. 바뀌면 제목으로 초점을 옮긴다(같은 행을 다시 골라도) */
   focusKey?: number;
   /** 수정·해제로 현재 판정이 바뀌었을 때 */
@@ -64,10 +63,10 @@ interface JudgmentDetailPanelProps {
 
 export function JudgmentDetailPanel({
   judgment,
-  transaction,
   focusKey = 0,
   onChanged
 }: JudgmentDetailPanelProps) {
+  const transaction = judgment.transaction;
   const [target, setTarget] = useState<Target | null>(null);
   const [preset, setPreset] = useState('');
   const [note, setNote] = useState('');
@@ -77,6 +76,11 @@ export function JudgmentDetailPanel({
   const title = useRef<HTMLHeadingElement>(null);
   const editHeading = useRef<HTMLHeadingElement>(null);
   const form = useRef<HTMLDivElement>(null);
+  /**
+   * 1.6 Idempotency-Key (#62). 응답을 못 받은 재시도에만 같은 키를 쓴다.
+   * 판정·바꿀 값·사유 중 하나라도 바뀌면 새 키다 — 같은 키에 다른 내용이면 409 IDEMPOTENCY_KEY_REUSED 다
+   */
+  const pendingKey = useRef<{ payload: string; key: string } | null>(null);
 
   // 현재 판정이 바뀌면 이력도 다시 읽는다
   const historyQ = useApi(
@@ -141,6 +145,8 @@ export function JudgmentDetailPanel({
   const engine = overridden ?
   historyQ.data?.items.find((revision) => revision.origin.type !== 'OVERRIDE') :
   undefined;
+  // 설명·안내·막힌 게이트가 모두 없으면 「판정 이유」 칸을 통째로 뺀다. 근거는 바로 아래 조문 칸에 있다
+  const hasReason = Boolean(reviewState || overridden || judgment.explanation || judgment.blockedAtGate);
   const targets: Target[] = (['AVAILABLE', 'UNAVAILABLE'] as const).filter(
     (code) => code !== judgment.verdict.code
   );
@@ -164,12 +170,25 @@ export function JudgmentDetailPanel({
     if (!target || !reason || busy) return;
     setBusy(true);
     setError(null);
+    const payload = JSON.stringify([judgment.id, target, reason]);
+    if (pendingKey.current?.payload !== payload)
+    pendingKey.current = { payload, key: crypto.randomUUID() };
     try {
-      await api.judgments.override(judgment.id, { toVerdict: target, reason });
+      await api.judgments.override(judgment.id, { toVerdict: target, reason }, pendingKey.current.key);
+      pendingKey.current = null;
       setDone(`${toLabel(target)} 바꿨습니다. 이전 판정은 이력에 남아 있습니다.`);
       close();
       onChanged();
     } catch (caught) {
+      // 409 는 그사이 현재 판정이 바뀌었거나 판정 대상에서 빠진 거래다 (#62). 다시 보내도 같으니
+      // 폼을 닫고 지금 판정을 다시 읽는다
+      if (caught instanceof ApiRequestError && caught.status === 409) {
+        pendingKey.current = null;
+        setError('판정이 그사이 바뀌었거나 판정 대상이 아니어서 바꾸지 못했습니다. 지금 판정을 다시 불러왔습니다.');
+        close();
+        onChanged();
+        return;
+      }
       setError(errorMessage(caught, '판정을 바꾸지 못했습니다. 잠시 후 다시 시도해 주세요.'));
     } finally {
       setBusy(false);
@@ -239,6 +258,7 @@ export function JudgmentDetailPanel({
         </div>
       </dl>
 
+      {hasReason &&
       <section className="border-b border-line px-5 py-4">
         <h3 className="text-small font-semibold text-ink">판정 이유</h3>
         {reviewState &&
@@ -255,22 +275,25 @@ export function JudgmentDetailPanel({
           }
           </div>
         }
+        {/* 설명이 없으면 문장을 뺀다. 실서버는 아직 늘 null 이라(#132), 「설명이 없다」를 띄우면
+            모든 판정에 같은 문장이 붙는다 */}
+        {(overridden || judgment.explanation) &&
         <p className="mt-2 text-small leading-6 text-ink2">
           {overridden ?
           engine ?
           '직접 수정한 판정입니다. 규칙 엔진의 판정은 아래와 같고, 이력에도 그대로 남아 있습니다.' :
           '직접 수정한 판정입니다. 규칙 엔진이 낸 판정은 이력에 그대로 남아 있습니다.' :
-          judgment.explanation ??
-          '적용된 규칙 카드에 설명 문구가 없습니다. 근거 조문을 확인해 주세요.'}
+          judgment.explanation}
         </p>
+        }
         {engine &&
         <div className="mt-2 rounded-xl border border-line bg-canvas px-3.5 py-3 text-small text-ink2">
             <p className="flex items-center gap-2 text-caption text-muted">
               규칙 엔진의 판정 <VerdictBadge verdict={engine.verdict} />
             </p>
-            <p className="mt-1.5 leading-6">
-              {engine.explanation ?? '적용된 규칙 카드에 설명 문구가 없습니다.'}
-            </p>
+            {engine.explanation &&
+          <p className="mt-1.5 leading-6">{engine.explanation}</p>
+          }
           </div>
         }
         {judgment.blockedAtGate && !overridden &&
@@ -280,6 +303,7 @@ export function JudgmentDetailPanel({
           </p>
         }
       </section>
+      }
 
       <section className="border-b border-line px-5 py-4">
         {/* 수정한 판정은 규칙 엔진의 근거를 그대로 들고 있다. 수정의 근거로 읽히지 않게 한다 */}
@@ -350,7 +374,7 @@ export function JudgmentDetailPanel({
           }
           <div className="flex justify-between gap-2">
             <dt>판정 시각</dt>
-            <dd className="text-ink2">{judgment.computedAt.slice(0, 16).replace('T', ' ')}</dd>
+            <dd className="text-ink2">{formatDateTime(judgment.computedAt)}</dd>
           </div>
         </dl>
       </section>
@@ -446,7 +470,7 @@ export function JudgmentDetailPanel({
                 <span className="w-10 shrink-0">rev.{revision.revision}</span>
                 <VerdictBadge verdict={revision.verdict} />
                 <span className="text-ink2">{ORIGIN_LABEL[revision.origin.type]}</span>
-                <span>{revision.computedAt.slice(0, 16).replace('T', ' ')}</span>
+                <span>{formatDateTime(revision.computedAt)}</span>
                 {revision.id === judgment.id && <Badge tone="ink">현재</Badge>}
               </li>
           )}

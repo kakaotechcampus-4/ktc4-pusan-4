@@ -17,6 +17,36 @@ export const formatFullDate = (iso: string): string => {
 export const formatPeriod = (start: string, end: string): string =>
 `${formatFullDate(start)} – ${formatFullDate(end)}`;
 
+const KST = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Seoul',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23'
+});
+
+/**
+ * 시각(1.2)을 KST 날짜(`YYYY-MM-DD`)와 `HH:mm` 으로 나눈다. 문자열을 잘라 쓰면 offset 을 무시해,
+ * 서버가 `Z` 로 주면 9시간 이르게 보이고 자정 근처는 날짜가 하루 어긋난다.
+ * 소수 초는 밀리초까지만 남긴다. 서버는 마이크로초까지 주는데, 그보다 긴 소수를 못 읽는 브라우저가 있다
+ */
+export const toKst = (iso: string): { date: string; time: string } => {
+  const parts = Object.fromEntries(
+    KST.formatToParts(new Date(iso.replace(/(\.\d{3})\d+/, '$1'))).map(({ type, value }) => [type, value])
+  );
+  return {
+    date: `${parts.year}-${parts.month}-${parts.day}`,
+    time: `${parts.hour}:${parts.minute}`
+  };
+};
+
+export const formatDateTime = (iso: string): string => {
+  const { date, time } = toKst(iso);
+  return `${date} ${time}`;
+};
+
 /** 숫자는 읽는 소리로 정한다. 영·삼·육은 받침이 있고, 일·칠·팔은 ㄹ 받침이라 「로」 */
 const DIGIT_RO: Record<string, '로' | '으로'> = {
   '0': '으로', '1': '로', '2': '로', '3': '으로', '4': '로',
