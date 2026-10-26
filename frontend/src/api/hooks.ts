@@ -8,6 +8,15 @@ interface AsyncState<T> {
   reload: () => void;
 }
 
+/** 떠 있는 모든 useApi 의 reload */
+const reloaders = new Set<() => void>();
+
+/**
+ * 화면 밖에서 데이터를 바꿨을 때(비서 패널의 [적용]) 지금 떠 있는 화면이 모두 다시 읽게 한다.
+ * 다시 읽는 동안에도 이전 data 를 그대로 들고 있어 화면이 비지 않는다
+ */
+export const invalidateAll = () => reloaders.forEach((reload) => reload());
+
 /**
  * api.* 호출을 화면에서 쓰기 위한 최소 훅. 캐시·중복 제거는 하지 않는다.
  * deps 가 바뀌면 다시 요청한다.
@@ -44,6 +53,13 @@ deps: React.DependencyList = [])
   }, [...deps, tick]);
 
   const reload = useCallback(() => setTick((n) => n + 1), []);
+
+  useEffect(() => {
+    reloaders.add(reload);
+    return () => {
+      reloaders.delete(reload);
+    };
+  }, [reload]);
 
   return { data, loading, error, reload };
 }

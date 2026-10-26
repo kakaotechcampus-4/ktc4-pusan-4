@@ -9,12 +9,24 @@ import {
 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { useSession } from '../contexts/SessionContext';
+import { useAssistant } from '../components/assistant/context';
 import { api, ApiRequestError } from '../api';
 import type { JudgmentRun, JudgmentRunFailure, Transaction } from '../types/domain';
 import { Badge, Button, Card } from '../components/ui';
 import { formatWon } from '../utils/format';
-import { formatNumber } from '../utils/format';
+import { formatNumber, toKst } from '../utils/format';
 import { VERDICT_LABEL, VERDICT_META } from '../utils/verdict';
+
+/**
+ * 실패 사유는 errorCode 로 고른다(api.md 3.6). message 는 서버가 예외 문장을 그대로 담기도 해서(#127)
+ * 화면에 내지 않는다. 모르는 코드는 일반 문구로 보인다
+ */
+const FAILURE_TEXT: Record<string, { label: string; detail: string }> = {
+  RULE_PROCESSING_FAILED: { label: '처리 오류', detail: '판정 규칙을 적용하다 오류가 났습니다.' },
+  RUN_START_FAILED: { label: '시작 실패', detail: '판정을 시작하지 못했습니다. 다시 실행해 주세요.' },
+  RUN_INTERRUPTED: { label: '중단됨', detail: '판정하던 서버가 멈춰 끝까지 처리하지 못했습니다.' }
+};
+const UNKNOWN_FAILURE = { label: '실패', detail: '처리하지 못했습니다.' };
 
 const GATES = [
 { id: 'G0', label: '형식 검증', detail: '승인내역 여부 · 필수 컬럼 · 중복 키' },
@@ -31,9 +43,11 @@ const GATES = [
 export function Run() {
   const navigate = useNavigate();
   const { runId, batchId, contextRef, setRunId } = useSession();
+  const { showNudge } = useAssistant();
   const [run, setRun] = useState<JudgmentRun | null>(null);
   const [counts, setCounts] = useState({ available: 0, needsReview: 0, unavailable: 0 });
-  const [failures, setFailures] = useState<JudgmentRunFailure[]>([]);
+  /** null 은 아직 받지 않음. 빈 배열은 받았는데 비어 있음(run 시작 실패 등, #127) */
+  const [failures, setFailures] = useState<JudgmentRunFailure[] | null>(null);
   const [failedTx, setFailedTx] = useState<Map<string, Transaction>>(new Map());
   const [retrying, setRetrying] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -88,6 +102,22 @@ export function Run() {
         if (!finished) return;
 
         stop();
+        // FR-3: 지난번 답으로 채울 수 있는 질문이 있으면 이 실행에 한 번 알린다. 못 읽으면 알리지 않는다
+        if (next.status.code !== 'FAILED')
+        void api.progress.
+        get(next.batchId).
+        then(({ questions }) => {
+          if (questions.fillableFromPrevious > 0)
+          showNudge(
+            {
+              text: `지난번 답으로 채울 수 있는 질문이 ${formatNumber(questions.fillableFromPrevious)}개 있습니다. 질문 화면에서 확인하고 적용합니다.`,
+              route: '/questions',
+              actionLabel: '질문 보기'
+            },
+            `run:${id}`
+          );
+        }).
+        catch(() => undefined);
         void api.judgments.
         summary({ runId: id }).
         then((summary) =>
@@ -116,7 +146,7 @@ export function Run() {
     poll();
     timer.current = window.setInterval(poll, 1000);
     return stop;
-  }, [runId]);
+  }, [runId, showNudge]);
 
   // runId 도 없고 만들 재료(batchId·문진)도 없으면 영원히 "판정하고 있습니다"로 남는다
   const waiting = !runId && (!batchId || !contextRef);
@@ -135,7 +165,7 @@ export function Run() {
     setLoadError(null);
     try {
       const created = await api.runs.create({ batchId: run.batchId, contextId: run.contextId });
-      setFailures([]);
+      setFailures(null);
       setRun(null);
       setRunId(created.id);
     } catch {
@@ -154,7 +184,7 @@ export function Run() {
       <div className="mx-auto max-w-3xl">
         <header className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-small font-semibold text-accent">2단계 · 계획</p>
+            <p className="text-small font-bold text-accent">2단계 · 계획</p>
             <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
               {loadError && !run ?
               '판정 상태를 확인할 수 없습니다' :
@@ -207,7 +237,7 @@ export function Run() {
           <div className="flex items-end justify-between gap-4">
             <p className="text-stat font-bold leading-none tabular-nums text-ink">
               {formatNumber(processed)}
-              <span className="text-lead font-medium text-muted">
+              <span className="text-lead font-normal text-muted">
                 {' '}
                 / {formatNumber(total)}건
               </span>
@@ -250,7 +280,7 @@ export function Run() {
                     
                     <span className="flex h-5 w-5 shrink-0 items-center justify-center">
                       {gateDone ?
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-ok">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-ok-bar">
                           <CheckIcon
                           className="h-3 w-3 text-white"
                           strokeWidth={3}
@@ -266,11 +296,11 @@ export function Run() {
                       <span className="h-2 w-2 rounded-full bg-line" />
                       }
                     </span>
-                    <span className="w-8 shrink-0 text-caption font-semibold tabular-nums text-muted">
+                    <span className="w-8 shrink-0 text-caption font-bold tabular-nums text-muted">
                       {gate.id}
                     </span>
                     <span
-                      className={`text-body font-medium ${
+                      className={`text-body font-normal ${
                       gateDone || running ? 'text-ink' : 'text-muted'}`
                       }>
                       
@@ -292,7 +322,7 @@ export function Run() {
         </section>
 
         <Card as="section" padding="sm" className="mt-4">
-          <h2 className="text-body font-semibold text-ink">이 판정의 조건</h2>
+          <h2 className="text-body font-bold text-ink">이 판정의 조건</h2>
           <dl className="mt-3 grid gap-x-6 gap-y-2 text-small sm:grid-cols-2">
             <div className="flex justify-between gap-3">
               <dt className="text-muted">문진 버전</dt>
@@ -305,7 +335,7 @@ export function Run() {
             <div className="flex justify-between gap-3">
               <dt className="text-muted">시작</dt>
               <dd className="tabular-nums text-ink2">
-                {run?.startedAt ? run.startedAt.slice(11, 16) : '—'}
+                {run?.startedAt ? toKst(run.startedAt).time : '—'}
               </dd>
             </div>
             <div className="flex justify-between gap-3">
@@ -321,7 +351,7 @@ export function Run() {
           </p>
         </Card>
 
-        {done && (failures.length > 0 || failed) &&
+        {done && (failed || (run?.failedCount ?? 0) > 0) &&
         <Card as="section" padding="md" className="mt-4 border-l-[3px] border-l-deny">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -331,8 +361,8 @@ export function Run() {
                   '판정을 실행하지 못했습니다'}
                 </h2>
                 <p className="mt-1.5 max-w-xl text-small leading-6 text-muted">
-                  판정 규칙을 실행하다 오류가 났습니다. 「확인 필요」와는 다른
-                  기술적 실패라 결과가 아직 없습니다.
+                  판정하다 기술적인 오류가 났습니다. 「확인 필요」와 달리 결과가 아직
+                  없습니다. 다시 판정하면 새로 실행합니다.
                   {run && run.failedCount > 0 &&
                   ` 나머지 ${formatNumber(run.processedCount)}건은 정상 판정됐습니다.`}
                 </p>
@@ -347,20 +377,27 @@ export function Run() {
               </Button>
             </div>
 
+            {failures && failures.length === 0 &&
+            <p className="mt-4 rounded-xl border border-line2 bg-canvas px-3.5 py-2.5 text-small text-muted">
+                어떤 거래에서 실패했는지 받지 못했습니다. 다시 판정해 주세요.
+              </p>
+            }
+            {failures && failures.length > 0 &&
             <ul className="mt-4 divide-y divide-line2 rounded-xl border border-line2 bg-canvas">
               {failures.slice(0, 5).map((failure) => {
               const transaction = failedTx.get(failure.transactionId);
+              const text = FAILURE_TEXT[failure.errorCode] ?? UNKNOWN_FAILURE;
               return (
                 <li
                   key={failure.transactionId}
                   className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-3.5 py-2.5">
                   
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-small font-medium text-ink">
+                      <span className="block truncate text-small font-normal text-ink">
                         {transaction?.merchantNorm ?? '거래 ' + failure.transactionId.slice(0, 8)}
                       </span>
                       <span className="block truncate text-caption text-muted">
-                        {failure.message}
+                        {text.detail}
                       </span>
                     </span>
                     {transaction &&
@@ -369,7 +406,7 @@ export function Run() {
                       </span>
                   }
                     <Badge tone="deny" className="shrink-0">
-                      {failure.errorCode}
+                      {text.label}
                     </Badge>
                   </li>);
 
@@ -380,6 +417,7 @@ export function Run() {
                 </li>
             }
             </ul>
+            }
           </Card>
         }
 
@@ -414,7 +452,7 @@ export function Run() {
             <button
             type="button"
             onClick={() => navigate('/results')}
-            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-3 text-body-lg font-semibold text-white transition-colors duration-150 ease-snap hover:bg-accent-hover">
+            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-3 text-body-lg font-bold text-white transition-colors duration-150 ease-snap hover:bg-accent-hover">
             
               결과 보기
               <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />

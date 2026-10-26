@@ -13,8 +13,9 @@ import {
   type Column } from
 '../components/ui';
 import { useSession } from '../contexts/SessionContext';
+import { useAssistantSubject } from '../components/assistant/context';
 import { api, useApi } from '../api';
-import type { Judgment, Transaction, Verdict } from '../types/domain';
+import type { Judgment, Verdict } from '../types/domain';
 import { formatFullDate, formatNumber, formatPeriod, formatWon } from '../utils/format';
 
 type Filter = 'ALL' | Verdict;
@@ -32,6 +33,8 @@ export function Results() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   /** 사용자가 고를 때마다 늘린다. 패널은 이 값이 바뀌면 제목으로 초점을 옮긴다. 처음 자동 선택은 0 이라 초점을 뺏지 않는다 */
   const [focusKey, setFocusKey] = useState(0);
+  // 「이거 왜 불가야?」의 「이거」 (FR-2)
+  useAssistantSubject(selectedId);
 
   const batchQ = useApi(
     () => batchId ? api.uploads.get(batchId) : Promise.resolve(null),
@@ -71,26 +74,7 @@ export function Results() {
 
   const judgments: Judgment[] = judgmentsQ.data?.items ?? [];
 
-  // 판정 응답에는 거래 정보가 없어 지금 페이지의 거래만 따로 받는다 (최대 20건).
-  // [id, 거래 | null] 로 받아, 아직 안 온 것(대기)과 못 받은 것(null)을 구분한다
-  const transactionsQ = useApi(
-    () =>
-    Promise.all(
-      judgments.map((judgment) =>
-      api.transactions.
-      get(judgment.transactionId).
-      catch(() => null).
-      then((transaction) => [judgment.transactionId, transaction] as const)
-      )
-    ),
-    [judgments.map((judgment) => judgment.transactionId).join()]
-  );
-  const fetched = new Map<string, Transaction | null>(transactionsQ.data ?? []);
-  const transactions = new Map(
-    [...fetched].filter((entry): entry is [string, Transaction] => entry[1] !== null)
-  );
-
-  // 패널은 고른 거래의 현재 판정과 거래를 따로 읽는다. 수정하면 그 행이 목록 맨 위로
+  // 패널은 고른 거래의 현재 판정을 따로 읽는다(거래 요약이 함께 온다). 수정하면 그 행이 목록 맨 위로
   // 올라가도(computedAt DESC) 패널은 그 거래에 머문다
   // 응답과 실패 모두에 어느 거래의 것인지 붙인다. 다른 행을 고른 직후 이전 행의 응답·실패가
   // 남아 있어도, 고른 거래의 것일 때만 그린다
@@ -98,8 +82,9 @@ export function Results() {
     () => {
       if (!selectedId) return Promise.resolve(null);
       const id = selectedId;
-      return Promise.all([api.judgments.list({ transactionId: id }), api.transactions.get(id)]).
-      then(([page, transaction]) => ({ id, failed: false as const, judgment: page.items[0] ?? null, transaction })).
+      return api.judgments.
+      list({ transactionId: id }).
+      then((page) => ({ id, failed: false as const, judgment: page.items[0] ?? null })).
       catch(() => ({ id, failed: true as const }));
     },
     [selectedId]
@@ -140,40 +125,26 @@ export function Results() {
   const questionGroups = questionsQ.data?.page.totalElements ?? 0;
   const answeredGroups = answeredQ.data?.page.totalElements ?? 0;
 
-  const pending = (width: string) =>
-  <span className={`block h-4 ${width} animate-pulse rounded bg-line2`} />;
-
-  const missing = (judgment: Judgment) =>
-  fetched.has(judgment.transactionId) && fetched.get(judgment.transactionId) === null;
-
   const columns: Column<Judgment>[] = [
   {
     header: '승인일',
     width: 'w-[7.5rem]',
     hideBelow: 'sm',
-    cell: (row) => {
-      const transaction = transactions.get(row.transactionId);
-      if (!transaction) return missing(row) ? '—' : pending('w-20');
-      return (
-        <span className="whitespace-nowrap tabular-nums text-ink2">
-            {formatFullDate(transaction.approvedAt)}
-          </span>);
+    cell: (row) =>
+    <span className="whitespace-nowrap tabular-nums text-ink2">
+        {formatFullDate(row.transaction.approvedAt)}
+      </span>
 
-    }
   },
   {
     header: '가맹점',
     // 남는 폭을 가맹점이 갖고 넘치면 말줄임한다. 금액·판정은 좁은 화면에서도 보여야 한다
     width: 'w-full max-w-0',
     cell: (row) => {
-      const transaction = transactions.get(row.transactionId);
-      if (!transaction)
-      return missing(row) ?
-      <span className="text-small text-muted">거래 정보를 불러오지 못했습니다</span> :
-      pending('w-32');
+      const { transaction } = row;
       return (
         <span className="block min-w-0">
-            <span className="flex items-center gap-1.5 truncate font-medium text-ink">
+            <span className="flex items-center gap-1.5 truncate font-normal text-ink">
               {/* 고른 행은 옅은 바탕만으로는 잘 안 보여 점을 붙인다 */}
               {row.transactionId === selectedId &&
           <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-accent" />
@@ -195,8 +166,7 @@ export function Results() {
     header: '금액',
     align: 'right',
     cell: (row) => {
-      const transaction = transactions.get(row.transactionId);
-      if (!transaction) return missing(row) ? '—' : pending('ml-auto w-20');
+      const { transaction } = row;
       // 「일부 인정」은 AVAILABLE + finalAmount < amount 다 (2.1).
       // 자산은 그해 넣을 수 있는 한도라 「최대」로 쓴다 (CONTEXT.md G4 화면 문구)
       const asset = row.attributes['자산'] === true;
@@ -206,7 +176,7 @@ export function Results() {
       (asset || row.finalAmount !== transaction.amount);
       return (
         <span className="block">
-            <span className="whitespace-nowrap font-semibold text-ink">{formatWon(transaction.amount)}</span>
+            <span className="whitespace-nowrap font-bold text-ink">{formatWon(transaction.amount)}</span>
             {partial && row.finalAmount !== null &&
           <span className="block whitespace-nowrap text-caption text-ok">
                 {asset ? '최대' : '산입'} {formatWon(row.finalAmount)}
@@ -237,14 +207,14 @@ export function Results() {
   const header =
   <header className="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <p className="text-small font-semibold text-accent">4단계 · 반영</p>
+        <p className="text-small font-bold text-accent">4단계 · 반영</p>
         <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">판정 결과</h1>
         {summary &&
       <p className="mt-2 text-body tabular-nums text-muted">
             {batchQ.data &&
         `${formatPeriod(batchQ.data.periodStart, batchQ.data.periodEnd)} · `}
             {formatNumber(summary.totalCount)}건 · 인정 경비{' '}
-            <strong className="font-semibold text-ink">
+            <strong className="font-bold text-ink">
               {formatWon(summary.byVerdict.AVAILABLE.finalAmount)}
             </strong>
           </p>
@@ -340,11 +310,13 @@ export function Results() {
 
           <CircleHelpIcon className="h-5 w-5 shrink-0 text-warn" aria-hidden="true" />
           <span className="min-w-0 flex-1">
-            <span className="block text-body font-semibold tabular-nums text-ink">
-              확인 필요 {formatNumber(unresolved.count)}건 · {formatWon(unresolved.amount)}
+            <span className="block text-body font-bold tabular-nums text-ink">
+              {/* count 는 「확인 필요」 판정 수가 아니라 PENDING 질문 수다(3.9). 한 거래에 질문이 여럿이고, 불가에도 소명 질문이 남는다 */}
+              답할 질문 {formatNumber(unresolved.count)}개 · {formatWon(unresolved.amount)}
             </span>
             <span className="mt-0.5 block text-small text-ink2">
-              같은 사유끼리 묶은 질문 {formatNumber(questionGroups)}개가 남았습니다. 답하면 묶인
+              {/* questionGroups 는 그룹 수다. 「질문 N개」로 또 적으면 위 질문 수와 다른 수가 같은 말로 읽힌다 */}
+              같은 사유끼리 {formatNumber(questionGroups)}묶음으로 모았습니다. 답하면 묶인
               거래를 바로 다시 판정합니다.
             </span>
           </span>
@@ -386,7 +358,6 @@ export function Results() {
           <JudgmentDetailPanel
             key={selectedId}
             judgment={panelData.judgment}
-            transaction={panelData.transaction}
             focusKey={focusKey}
             onChanged={changed} /> :
 
@@ -394,7 +365,7 @@ export function Results() {
           panelData?.failed ?
           <div role="alert" className="rounded-2xl border border-deny-line bg-deny-bg p-5 text-body text-deny">
                 이 거래의 판정을 불러오지 못했습니다.{' '}
-                <button type="button" onClick={panelQ.reload} className="font-semibold underline">
+                <button type="button" onClick={panelQ.reload} className="font-bold underline">
                   다시 시도
                 </button>
               </div> :

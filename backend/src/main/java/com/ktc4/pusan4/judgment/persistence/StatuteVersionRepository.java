@@ -6,8 +6,11 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 interface StatuteVersionRepository extends Repository<StatuteVersionEntity, Long> {
+
+    Optional<StatuteVersionEntity> findById(Long id);
 
     @Query("""
         select statute.id

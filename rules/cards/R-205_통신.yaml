@@ -20,7 +20,7 @@
 # 근거는 답마다 다르다: 가능 선택지는 §27① 을 선택지에 싣고, 카드 citations 에는 불가 근거만 둔다
 # (선택지 citations 가 카드 것을 대신한다, PR #68). 카드에 둘 다 두면 개인 답에도 §27① 이 붙는다.
 id: R-205
-version: 2
+version: 3
 gate: G2
 priority: 500
 effective_period: { start: 2024-01-01, end: null }
@@ -30,6 +30,7 @@ match:
 verdict: 확인필요
 citations:
   - { id: 소득세법-33-1-5, verified: true }
+  - { id: 소득세법시행령-61-1-1, verified: true }
 question:
   code: TELECOM_DEDICATION
   text: "이 회선은 업무 전용인가요?"

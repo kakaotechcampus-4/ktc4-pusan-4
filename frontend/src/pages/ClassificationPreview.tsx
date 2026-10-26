@@ -62,16 +62,26 @@ export function ClassificationPreview() {
   const [resolveError, setResolveError] = useState<string | null>(null);
 
   const resolve = async (groupKey: string, reviewIds: string[], category: string) => {
+    // 카드가 사라지는 동안 다시 누르면 자기 요청이 409(이미 분류)로 돌아온다
+    if (resolving[groupKey]) return;
     setResolving((prev) => ({ ...prev, [groupKey]: true }));
     setResolveError(null);
     try {
       await api.classificationReviews.respond({ reviewIds, merchantCategory: category });
     } catch (caught) {
+      // 409: 다른 탭·기기에서 이미 분류했다(CLASSIFICATION_ALREADY_RESOLVED). 남은 카드로 다시 읽는다
+      const resolvedElsewhere = caught instanceof ApiRequestError && caught.status === 409;
       setResolveError(
+        resolvedElsewhere ?
+        '이미 분류한 가맹점입니다. 목록을 다시 불러왔습니다.' :
         caught instanceof ApiRequestError ?
         caught.message :
         '업종을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.'
       );
+      if (resolvedElsewhere) {
+        groupsQ.reload();
+        batchQ.reload();
+      }
       setResolving((prev) => {
         const next = { ...prev };
         delete next[groupKey];
@@ -95,7 +105,7 @@ export function ClassificationPreview() {
     <AppShell>
       <div className="mx-auto max-w-3xl">
         <header>
-          <p className="text-small font-semibold text-accent">2단계 · 분류 확인</p>
+          <p className="text-small font-bold text-accent">2단계 · 분류 확인</p>
           <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
             {loadError ?
             '분류 결과를 불러오지 못했습니다' :
@@ -164,7 +174,7 @@ export function ClassificationPreview() {
               <p className="text-small text-muted">분류를 마친 거래</p>
               <p className="mt-1 text-stat font-bold tabular-nums text-ink">
                 {formatNumber(classified)}
-                <span className="ml-1 text-h4 font-semibold text-muted">
+                <span className="ml-1 text-h4 font-bold text-muted">
                   / {formatNumber(total)}건
                 </span>
               </p>
@@ -241,7 +251,7 @@ export function ClassificationPreview() {
               }>
 
                   <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                    <p className="text-body-lg font-semibold text-ink">
+                    <p className="text-body-lg font-bold text-ink">
                       {title}
                     </p>
                     <p className="text-small tabular-nums text-muted">
@@ -270,7 +280,7 @@ export function ClassificationPreview() {
                           {row.installmentMonths > 0 &&
                     `${row.merchantRaw === title ? '' : ' · '}${row.installmentMonths}개월 할부`}
                         </span>
-                        <span className="shrink-0 text-small font-semibold tabular-nums text-ink">
+                        <span className="shrink-0 text-small font-bold tabular-nums text-ink">
                           {formatWon(row.amount)}
                         </span>
                       </li>
@@ -282,7 +292,7 @@ export function ClassificationPreview() {
                 }
                   </ul>
 
-                  <p className="mt-5 text-body font-semibold text-ink">
+                  <p className="mt-5 text-body font-bold text-ink">
                     이 {formatNumber(group.count)}건은 어떤 지출인가요?
                   </p>
                   <div className="mt-2.5 flex flex-wrap items-center gap-2">
@@ -291,6 +301,7 @@ export function ClassificationPreview() {
                   key={category}
                   variant={index === 0 ? 'soft' : 'secondary'}
                   size="sm"
+                  disabled={resolving[group.groupKey]}
                   onClick={() =>
                   void resolve(group.groupKey, group.reviewIds, category)
                   }>
@@ -307,7 +318,9 @@ export function ClassificationPreview() {
                     <div className="w-44">
                       <Select
                     aria-label={`${title} 카테고리 직접 선택`}
-                    defaultValue=""
+                    // 고르면 바로 저장한다. 값을 붙잡아 두지 않아야 실패한 뒤 고른 값에 머물지 않는다
+                    value=""
+                    disabled={resolving[group.groupKey]}
                     onChange={(event) => {
                       if (!event.target.value) return;
                       void resolve(
@@ -338,7 +351,7 @@ export function ClassificationPreview() {
         <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-line pt-6">
             <p className="max-w-md text-small leading-6 text-muted">
               지금 넘어가면 확인하지 않은{' '}
-              <strong className="font-semibold text-ink">
+              <strong className="font-bold text-ink">
                 {formatNumber(pendingCount)}건
               </strong>
               은 판정에서 빠집니다. 나중에 이 화면에서 다시 확인할 수 있습니다.

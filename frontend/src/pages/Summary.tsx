@@ -6,9 +6,8 @@ import { Button, Empty, Table, type Column } from '../components/ui';
 import { useSession } from '../contexts/SessionContext';
 import { api, useApi } from '../api';
 import type {
-  BusinessContext,
-  BusinessContextRef,
   JudgmentSummary,
+  StoredBusinessContext,
   UploadBatch,
   UnresolvedSummary } from
 '../types/domain';
@@ -34,7 +33,7 @@ period: string | null,
 summary: JudgmentSummary,
 unclassified: number,
 unresolved: UnresolvedSummary | undefined,
-context: (BusinessContext & BusinessContextRef) | null | undefined) =>
+context: StoredBusinessContext | null | undefined) =>
 {
   const { AVAILABLE, UNAVAILABLE, NEEDS_REVIEW } = summary.byVerdict;
   // 사용자가 직접 바꾼 판정도 섞여 있으므로 「규칙으로 판정했다」고 쓰지 않는다
@@ -53,7 +52,11 @@ context: (BusinessContext & BusinessContextRef) | null | undefined) =>
   lines.push(
     `현재 문진(v${context.version}) 응답: 업종코드 ${context.industryCode}, ${context.bookkeepingDuty} 대상, 직원 ${
     context.hasEmployee ? '있음' : '없음'}, 자택 작업공간 비율 ${
-    context.homeOfficeRatio ? `${context.homeOfficeRatio}%` : '해당 없음'}.`
+    context.homeOfficeRatio === null ?
+    '입력 안 함' :
+    context.homeOfficeRatio ?
+    `${context.homeOfficeRatio}%` :
+    '해당 없음'}.`
   );
   return lines.join(' ');
 };
@@ -90,6 +93,8 @@ export function Summary() {
     [batchId]
   );
   const contextQ = useApi(() => api.contexts.current(), []);
+  // 비서로 넣어 둔 세무대리인 질문 (FR-16). 사용자 단위로 모은다
+  const notesQ = useApi(() => api.handoffNotes.list(), []);
   // 아직 분류하지 못해 판정하지 않은 거래 수. 배치의 분류 대기 수는 분류 확인 뒤 바로 줄지 않을 수 있어 거래에서 센다
   const unclassifiedQ = useApi(
     () =>
@@ -113,7 +118,7 @@ export function Summary() {
 
   const header =
   <header>
-      <p className="text-small font-semibold text-accent">4단계 · 반영</p>
+      <p className="text-small font-bold text-accent">4단계 · 반영</p>
       <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
         {period ? `${period} 요약` : '판정 요약'}
       </h1>
@@ -169,9 +174,9 @@ export function Summary() {
   const total = summary?.totalCount ?? 0;
 
   const distribution = [
-  { label: '가능', value: counts.available, bar: 'bg-ok' },
-  { label: '확인 필요', value: counts.needsReview, bar: 'bg-warn' },
-  { label: '불가', value: counts.unavailable, bar: 'bg-deny' }];
+  { label: '가능', value: counts.available, bar: 'bg-ok-bar' },
+  { label: '확인 필요', value: counts.needsReview, bar: 'bg-warn-bar' },
+  { label: '불가', value: counts.unavailable, bar: 'bg-deny-bar' }];
 
 
   // 계정과목이 없는 인정 경비(예: 사용자가 가능으로 바꾼 거래)도 표에 남겨 합계가 맞게 한다
@@ -193,7 +198,7 @@ export function Summary() {
   const accountColumns: Column<AccountRow>[] = [
   {
     header: '계정과목',
-    cell: (row) => <span className="font-medium text-ink">{row.account}</span>
+    cell: (row) => <span className="font-normal text-ink">{row.account}</span>
   },
   {
     header: '건수',
@@ -206,7 +211,7 @@ export function Summary() {
     align: 'right',
     width: 'w-36',
     cell: (row) =>
-    <span className="whitespace-nowrap font-semibold text-ink">
+    <span className="whitespace-nowrap font-bold text-ink">
           {formatWon(row.finalAmount)}
         </span>
 
@@ -216,17 +221,21 @@ export function Summary() {
 
   const answeredGroups = answeredQ.data?.page.totalElements ?? 0;
   // 문장에 들어갈 건수를 아직 다 읽지 못했으면 복사하지 않는다. 빠진 채로 넘기면 「남은 것 없음」으로 읽힌다
-  const settling = batchQ.loading || questionsQ.loading || unclassifiedQ.loading || contextQ.loading;
+  const settling = batchQ.loading || questionsQ.loading || unclassifiedQ.loading || contextQ.loading || notesQ.loading;
   const omitted = [
   batchQ.error && '기간',
   questionsQ.error && '답하지 않은 질문',
   unclassifiedQ.error && '분류하지 못한 거래 수',
-  contextQ.error && '문진 응답'].
+  contextQ.error && '문진 응답',
+  notesQ.error && '따로 물을 질문'].
   filter(Boolean);
+  const notes = notesQ.data ?? [];
+  const notesText =
+  notes.length > 0 ? ` 따로 여쭐 것: ${notes.map((note, index) => `${index + 1}) ${note.text}`).join(' ')}` : '';
   const unclassified = unclassifiedQ.data?.page.totalElements ?? 0;
   // 못 읽은 항목은 화면에만 알리지 않고, 붙여 넣은 문장에도 남긴다
   const text = summary ?
-  `${handoffText(period, summary, unclassified, unresolved, contextQ.data)}${
+  `${handoffText(period, summary, unclassified, unresolved, contextQ.data)}${notesText}${
   omitted.length > 0 ? ` (불러오지 못해 빠진 항목: ${omitted.join(', ')})` : ''}` :
   '';
 
@@ -262,7 +271,7 @@ export function Summary() {
         {/* count 는 질문 수, amount 는 그 질문이 걸린 거래 금액이다 (3.9). 거래 수로 쓰지 않는다 */}
         {unresolved && unresolved.count > 0 &&
         <p className="mt-4 rounded-xl border border-warn-line bg-warn-bg px-4 py-3 text-small text-ink2">
-            <strong className="font-semibold text-warn">
+            <strong className="font-bold text-warn">
               답하지 않은 질문 {formatNumber(unresolved.count)}건 · 관련 거래 {formatWon(unresolved.amount)}
             </strong>{' '}
             — 답하면 판정과 위 합계가 바뀔 수 있습니다. 직접 수정한 거래는 수정한 판정대로 위 합계에
@@ -279,7 +288,7 @@ export function Summary() {
             가맹점을 분류하지 못한 {formatNumber(unclassified)}건은 아직 판정하지 않았습니다.
             <Link
             to="/preview"
-            className="inline-flex items-center gap-1 font-semibold text-accent hover:underline">
+            className="inline-flex items-center gap-1 font-bold text-accent hover:underline">
 
               분류 확인하기
               <ArrowRightIcon className="h-3.5 w-3.5" aria-hidden="true" />
@@ -305,7 +314,7 @@ export function Summary() {
                 <span className={`h-2 w-2 rounded-full ${item.bar}`} aria-hidden="true" />
                 {item.label}
               </dt>
-              <dd className="mt-1 text-h4 font-semibold tabular-nums text-ink">
+              <dd className="mt-1 text-h4 font-bold tabular-nums text-ink">
                 {summary ?
               `${formatNumber(item.value)}건` :
               <span className="block h-6 w-12 animate-pulse rounded bg-line2" />}
@@ -316,7 +325,7 @@ export function Summary() {
       </section>
 
       <section className="mt-4">
-        <h2 className="text-body font-semibold text-ink">계정과목별 인정 경비</h2>
+        <h2 className="text-body font-bold text-ink">계정과목별 인정 경비</h2>
         <Table
           className="mt-3"
           caption="계정과목별 인정 경비"
@@ -334,7 +343,7 @@ export function Summary() {
       </section>
 
       <section className="mt-4 rounded-2xl border border-line bg-surface p-6">
-        <h2 className="text-body font-semibold text-ink">세무대리인에게 넘길 문장</h2>
+        <h2 className="text-body font-bold text-ink">세무대리인에게 넘길 문장</h2>
         <p className="mt-1.5 text-small text-muted">
           판정 결과와 문진 응답을 상담용 문장으로 정리했습니다. 확정하지 못한 것과 분류하지
           못한 것은 건수로 적고, 판정 대상에서 뺀 거래는 적지 않습니다.

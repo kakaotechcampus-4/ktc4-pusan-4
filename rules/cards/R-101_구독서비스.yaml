@@ -17,7 +17,7 @@
 #
 # 혼용은 확정하지 않는다. 안분은 판정이 아니라 G3 의 금액 산정이고 B 담당이다.
 id: R-101
-version: 1
+version: 2
 gate: G2
 priority: 500
 effective_period: { start: 2024-01-01, end: null }
@@ -28,6 +28,7 @@ verdict: 확인필요
 citations:
   - { id: 소득세법-27-1, verified: true }
   - { id: 소득세법-33-1-5, verified: true }
+  - { id: 소득세법시행령-61-1-1, verified: true }
 question:
   code: SUBSCRIPTION_DEDICATION
   text: "이 구독은 업무 전용인가요?"

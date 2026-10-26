@@ -38,6 +38,10 @@ export function Transactions() {
   const [page, setPage] = useState(0);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // 포함 API 는 다시 판정하지 않는다(#135). 제외는 현재 결과에서 바로 빠지지만, 다시 넣은 거래는
+  // 새 판정을 돌리기 전까지 판정이 없거나 옛 답으로 낸 판정이 남는다.
+  // 미분류 거래는 판정에 넘기지 않으므로 분류 확인이 먼저다. 다시 넣으면 서버가 분류 확인 항목을 만든다(#148)
+  const [rerunNeeded, setRerunNeeded] = useState<'run' | 'classify' | null>(null);
 
   const listQ = useApi(
     () =>
@@ -65,6 +69,10 @@ export function Transactions() {
     try {
       if (next === 'INCLUDED') await api.transactions.include(row.id);else
       await api.transactions.exclude(row.id);
+      if (next === 'INCLUDED')
+      setRerunNeeded((prev) =>
+      prev === 'classify' || row.classificationStatus.code !== 'CLASSIFIED' ? 'classify' : 'run'
+      );
       listQ.reload();
     } catch (caught) {
       setError(
@@ -91,7 +99,7 @@ export function Transactions() {
     header: '가맹점',
     cell: (row) =>
     <span className="block min-w-0">
-          <span className="block truncate font-medium text-ink">{row.merchantNorm}</span>
+          <span className="block truncate font-normal text-ink">{row.merchantNorm}</span>
           <span className="block truncate text-small text-muted">{row.merchantRaw}</span>
           {/* 분류 열은 좁은 화면에서 숨기므로, 그 정보를 여기로 옮긴다 */}
           <span className="mt-1 block md:hidden">
@@ -118,7 +126,7 @@ export function Transactions() {
     width: 'w-32',
     cell: (row) =>
     <span className="block">
-          <span className="font-semibold text-ink">{formatWon(row.amount)}</span>
+          <span className="font-bold text-ink">{formatWon(row.amount)}</span>
           {row.installmentMonths > 0 &&
       <span className="block text-caption text-muted">
               {row.installmentMonths}개월 할부
@@ -159,7 +167,7 @@ export function Transactions() {
     <AppShell>
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-small font-semibold text-accent">거래</p>
+          <p className="text-small font-bold text-accent">거래</p>
           <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
             올린 카드내역
           </h1>
@@ -197,6 +205,28 @@ export function Transactions() {
             )}
           </Select>
         </div>
+      </div>
+
+      {/* 비어 있어도 DOM 에 남아 있어야 바뀐 내용을 읽는다 */}
+      <div role="status">
+        {rerunNeeded &&
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn-line bg-warn-bg px-4 py-3">
+            <p className="text-small leading-6 text-ink2">
+              {rerunNeeded === 'classify' ?
+            '분류가 안 된 거래가 있습니다. 분류 확인을 마친 뒤 판정을 새로 실행해야 결과에 반영됩니다.' :
+            '다시 포함한 거래는 판정을 새로 실행해야 결과에 반영됩니다.'}
+            </p>
+            {rerunNeeded === 'classify' ?
+          <Button to="/preview" size="sm" variant="secondary">
+                분류 확인하기
+              </Button> :
+
+          <Button to="/confirm" size="sm" variant="secondary">
+                다시 판정하기
+              </Button>
+          }
+          </div>
+        }
       </div>
 
       {error &&

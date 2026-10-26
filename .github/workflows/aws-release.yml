@@ -58,6 +58,8 @@ jobs:
         working-directory: frontend
       - run: npm run build
         working-directory: frontend
+      - run: npm test
+        working-directory: frontend
       - run: npm run lint
         working-directory: frontend
       - name: Validate production Compose
@@ -95,7 +97,7 @@ jobs:
           repository_name=${ECR_REPOSITORY#*/}
           aws ecr describe-repositories --repository-names "$repository_name" >/dev/null
           if ! aws ecr describe-images --repository-name "$repository_name" --image-ids "imageTag=backend-$GITHUB_SHA" >/dev/null 2>&1; then
-            docker buildx build --push -f deploy/backend.Dockerfile -t "$ECR_REPOSITORY:backend-$GITHUB_SHA" .
+            docker buildx build --push -f deploy/backend.Dockerfile --build-arg RULES_COMMIT_SHA="$GITHUB_SHA" -t "$ECR_REPOSITORY:backend-$GITHUB_SHA" .
           fi
           if ! aws ecr describe-images --repository-name "$repository_name" --image-ids "imageTag=ai-$GITHUB_SHA" >/dev/null 2>&1; then
             docker buildx build --push -f ai/Dockerfile -t "$ECR_REPOSITORY:ai-$GITHUB_SHA" ai

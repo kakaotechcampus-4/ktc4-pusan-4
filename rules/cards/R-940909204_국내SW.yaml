@@ -2,7 +2,7 @@
 # 원본: rules/templates/R-204_국내SW.yaml + profiles/940909.yaml
 # 다시 만들기: ./backend/gradlew -p backend generateRuleCards
 id: R-940909204
-version: 102
+version: 202
 gate: G2
 priority: 500
 effective_period:
@@ -11,7 +11,6 @@ effective_period:
 match:
   category:
   - 국내SW
-  amount_max: 99999
   industry:
   - "940909"
 verdict: 가능

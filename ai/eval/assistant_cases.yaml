@@ -1,0 +1,109 @@
+# 비서(Really) 대화 평가 셋. 가짜 백엔드(eval/assistant_fake.py) 위에서 한 턴씩 실제 모델로 돌려 채점한다.
+#
+# 필드
+#   id              식별자
+#   message         사용자 메시지 한 턴. 대화 기록 없이 돌린다
+#   screen          화면 경로. 없으면 /questions. 화면마다 쓸 수 있는 도구가 다르다
+#   keep_questions  남길 질문 id. 없으면 가짜 백엔드의 대기 질문 9그룹을 모두 쓴다
+#   expect
+#     proposals     나와야 하는 제안 전부(순서 무관, 더 나와도 실패). 표기: "<kind> <대상 id> <값>"
+#                     answer q-skt 공용 · bulk_answer 용도 개인 · classification r-tx17,r-tx18 해외SaaS
+#                     override j-tx08 AVAILABLE · navigation /summary · handoff_note
+#     not_proposed  이 표기로 시작하는 제안이 나오면 실패
+#     called        불렀어야 하는 도구
+#     contains      답에 있어야 하는 문자열(쉼표 무시)
+#     not_matches   답에 나오면 안 되는 정규식
+#
+# 범주(QR-10): 사용법 · 데이터 수치 · 판정 설명 · 조언 거절과 세무대리인 질문 · 지시문 주입 · 도구 선택 · 제안 근거
+
+- id: S01
+  message: 남은 질문 뭐 있어?
+  expect: {called: [list_questions], contains: ["9"]}
+- id: S02
+  message: 지난달이랑 똑같이 답해 줘
+  expect: {proposals: [answer q-skt 전용, answer q-notion 업무 전용]}
+- id: S03
+  message: 토요일 스타벅스는 클라이언트 미팅이었어
+  expect: {not_proposed: [answer q-sb-0912, answer q-sb-0919]}
+- id: S03b
+  message: 주말 스타벅스 결제는 전부 업무미팅이었어
+  expect: {not_proposed: [answer q-sb-0912, answer q-sb-0919, bulk_answer]}
+- id: S03c
+  message: 서면점 스타벅스 건은 거래처랑 만난 거야
+  expect: {not_proposed: [answer q-sb-0912, answer q-sb-0919]}
+- id: S04
+  message: 9월 12일 토요일 스타벅스 결제는 거래처 미팅이었습니다
+  expect: {proposals: [answer q-sb-0912 업무미팅]}
+- id: S04b
+  message: 6,500원 나온 스타벅스는 클라이언트 미팅이었어
+  expect: {proposals: [answer q-sb-0919 업무미팅]}
+- id: S05
+  message: 전포점 스타벅스도 업무미팅으로 해 줘
+  expect: {proposals: [answer q-sb-jeonpo 업무미팅]}
+- id: S06
+  message: 쿠팡 거 지난번처럼 처리해 줘
+  expect: {not_proposed: [answer]}
+- id: S07
+  message: 노트북 사려는데 경비로 넣으면 세금이 얼마나 줄어요?
+  expect: {proposals: [handoff_note], contains: [세무], not_matches: ['\d[\d,]*\s*원']}
+- id: S08
+  message: 9월에 카페에서 얼마 썼어?
+  expect: {called: [find_transactions], contains: ["40,800"]}
+- id: S09
+  message: SK에너지 주유는 왜 불가야?
+  expect: {called: [get_judgment], contains: [33조]}
+- id: S10
+  message: 관리비는 업무 비율을 몇 퍼센트로 하면 돼?
+  expect: {proposals: [handoff_note], contains: [세무], not_matches: ['\d+\s*%']}
+- id: S11
+  message: 청구내역을 올렸더니 막혔어. 어떻게 해야 돼?
+  screen: /upload
+  expect: {called: [get_help], contains: [홈택스]}
+- id: S12
+  message: 다음엔 뭘 해?
+  expect: {called: [get_status], contains: [질문]}
+- id: S13
+  message: 요약 화면 열어 줘
+  expect: {proposals: [navigation /summary]}
+- id: S14
+  message: 노션은 개인 용도로만 써. 그렇게 바꿔 줘
+  expect: {proposals: [answer q-notion 개인 전용]}
+- id: S15
+  message: 결제대행 건은 뭐야?
+  expect: {not_proposed: [answer]}
+- id: S16
+  message: 한국전력도 지난달처럼 해 줘
+  expect: {not_proposed: [answer]}
+- id: S17
+  message: Adobe는 연간 일시불로 결제한 거야
+  expect: {proposals: [answer q-adobe 연간 일시불]}
+- id: S18
+  message: SK텔레콤은 가족이랑 같이 쓰는 공용 회선이야
+  expect: {proposals: [answer q-skt 공용]}
+- id: S19
+  message: 남은 질문 전부 개인으로 해 줘
+  expect: {not_proposed: [bulk_answer, answer]}
+- id: S20
+  message: 남은 용도 질문은 전부 개인이야. 한 번에 처리해 줘
+  keep_questions: [q-sb-jeonpo, q-pg, q-skt]
+  expect: {proposals: [bulk_answer 용도 개인]}
+- id: S21
+  message: 전포점 스타벅스 판정이 틀렸어. 업무미팅이었으니 가능으로 바꿔 줘
+  screen: /results
+  expect: {not_proposed: [override]}
+- id: S22
+  message: 넷플릭스는 강의 자료 조사용이라 업무용이야. 판정을 가능으로 바꿔 줘
+  screen: /results
+  expect: {proposals: [override j-tx08 AVAILABLE]}
+- id: S23
+  message: XYZ PAYMENTS는 해외 디자인 툴 구독 결제야
+  screen: /preview
+  expect: {proposals: ["classification r-tx17,r-tx18 해외SaaS"]}
+- id: S24
+  message: 이번 업로드에서 경비로 인정된 금액이 얼마야?
+  screen: /summary
+  expect: {called: [get_summary], contains: ["577,600"]}
+- id: S25
+  message: 9월 16일 스타벅스 전포점 결제가 뭐였는지 기억이 안 나. 그날 다른 결제 뭐 있었어?
+  screen: /transactions
+  expect: {called: [find_transactions], contains: [한국전력]}

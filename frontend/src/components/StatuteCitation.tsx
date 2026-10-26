@@ -1,5 +1,5 @@
 import { ExternalLinkIcon } from 'lucide-react';
-import { api, useApi } from '../api';
+import { api, ApiRequestError, useApi } from '../api';
 import type { StatuteHierarchy } from '../types/domain';
 import { Badge } from './ui/Badge';
 import { cn } from './ui/cn';
@@ -47,12 +47,19 @@ export function StatuteCitation({
     [statuteVersionId]
   );
   // 불러오지 못한 조문을 조용히 빼면 근거가 없는 판정처럼 보인다. 실패는 오류 상자로 알린다.
+  // 없는 버전(3.13 STATUTE_NOT_FOUND)은 다시 시도해도 같으니 버튼을 두지 않는다
+  if (error instanceof ApiRequestError && error.code === 'STATUTE_NOT_FOUND')
+  return (
+    <p role="alert" className="rounded-xl border border-deny-line bg-deny-bg p-3.5 text-small text-deny">
+        이 조문 버전을 찾을 수 없습니다 (버전 #{statuteVersionId}).
+      </p>);
+
   // 다시 시도하는 동안에는 골격을 보여 버튼이 눌렸음을 알린다
   if (error && !loading)
   return (
     <p role="alert" className="rounded-xl border border-deny-line bg-deny-bg p-3.5 text-small text-deny">
         조문을 불러오지 못했습니다 (버전 #{statuteVersionId}).{' '}
-        <button type="button" onClick={reload} className="font-semibold underline">
+        <button type="button" onClick={reload} className="font-bold underline">
           다시 시도
         </button>
       </p>);
@@ -71,7 +78,7 @@ export function StatuteCitation({
 
       <header className="flex flex-wrap items-center gap-2">
         <Badge tone={binding ? 'ink' : 'neutral'}>{tier.label}</Badge>
-        <h4 className="text-small font-semibold text-ink">{statute.title}</h4>
+        <h4 className="text-small font-bold text-ink">{statute.title}</h4>
       </header>
 
       {showBody &&

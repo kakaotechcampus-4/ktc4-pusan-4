@@ -45,9 +45,9 @@ export const HERO_SUMMARY = {
   total: 292,
   availableAmount: 21_483_000,
   distribution: [
-  { label: '가능', count: 168, bar: 'bg-ok' },
-  { label: '확인 필요', count: 71, bar: 'bg-warn' },
-  { label: '불가', count: 53, bar: 'bg-deny' }]
+  { label: '가능', count: 168, bar: 'bg-ok-bar' },
+  { label: '확인 필요', count: 71, bar: 'bg-warn-bar' },
+  { label: '불가', count: 53, bar: 'bg-deny-bar' }]
 
 };
 

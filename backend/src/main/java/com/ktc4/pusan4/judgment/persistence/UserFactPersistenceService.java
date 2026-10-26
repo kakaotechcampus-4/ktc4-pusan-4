@@ -32,28 +32,32 @@ public class UserFactPersistenceService {
         this.clock = clock;
     }
 
+    // UserFact 는 batch 범위다. 다른 batch 의 같은 scope 답은 버전도 따로 매기고 읽지도 않는다 (api.md §3.10).
     @Transactional
-    public UUID save(UUID userId, UserFact fact) {
+    public UUID save(UUID userId, UUID batchId, UserFact fact) {
         UUID factId = uuidGenerator.generate();
         userFactRepository.save(new UserFactEntity(
             factId,
             userId,
+            batchId,
             fact,
-            nextVersion(userId, fact.scopeKey(), fact.factType())
+            nextVersion(userId, batchId, fact.scopeKey(), fact.factType())
         ));
         return factId;
     }
 
     @Transactional(readOnly = true)
-    public Optional<UserFact> findLatest(UUID userId, String scopeKey, String factType) {
+    public Optional<UserFact> findLatest(UUID userId, UUID batchId, String scopeKey, String factType) {
         return userFactRepository
-            .findFirstByUserIdAndScopeKeyAndFactTypeOrderByVersionDesc(userId, scopeKey, factType)
+            .findFirstByUserIdAndBatchIdAndScopeKeyAndFactTypeOrderByVersionDesc(
+                userId, batchId, scopeKey, factType
+            )
             .map(UserFactEntity::toDomain);
     }
 
     @Transactional(readOnly = true)
-    public List<UserFact> findAllLatest(UUID userId) {
-        return userFactRepository.findAllLatest(userId).stream()
+    public List<UserFact> findAllLatest(UUID userId, UUID batchId) {
+        return userFactRepository.findAllLatest(userId, batchId).stream()
             .map(UserFactEntity::toDomain)
             .toList();
     }
@@ -62,12 +66,14 @@ public class UserFactPersistenceService {
     public UUID answerQuestion(UUID questionId, UUID userId, UserFact answer) {
         QuestionQueueEntity question = questionRepository.findForUser(questionId, userId)
             .orElseThrow(NoResultException::new);
+        UUID batchId = questionRepository.findBatchId(questionId);
         UUID factId = uuidGenerator.generate();
         userFactRepository.save(new UserFactEntity(
             factId,
             userId,
+            batchId,
             answer,
-            nextVersion(userId, answer.scopeKey(), answer.factType())
+            nextVersion(userId, batchId, answer.scopeKey(), answer.factType())
         ));
         question.answer(factId, answer, OffsetDateTime.now(clock));
         return factId;
@@ -77,8 +83,8 @@ public class UserFactPersistenceService {
     // 반드시 user 락을 먼저 잡는다(데드락 방지). 특히 answerQuestion 이 여기서 user 락을
     // 잡은 뒤 재판정으로 이어지면 JudgmentService.nextRevision 이 transaction 락을 잡으므로,
     // 그 반대 순서(transaction → user)로 잡는 경로를 새로 만들지 말 것.
-    private int nextVersion(UUID userId, String scopeKey, String factType) {
+    private int nextVersion(UUID userId, UUID batchId, String scopeKey, String factType) {
         userFactRepository.lockUser(userId).orElseThrow(NoResultException::new);
-        return userFactRepository.findNextVersion(userId, scopeKey, factType);
+        return userFactRepository.findNextVersion(userId, batchId, scopeKey, factType);
     }
 }

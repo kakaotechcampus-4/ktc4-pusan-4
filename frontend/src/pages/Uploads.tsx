@@ -13,7 +13,7 @@ import {
   type Column } from
 '../components/ui';
 import type { UploadBatch } from '../types/domain';
-import { formatFullDate, formatNumber, formatPeriod } from '../utils/format';
+import { formatFullDate, formatNumber, formatPeriod, toKst } from '../utils/format';
 
 /**
  * 업로드 이력 (FR-24·25).
@@ -63,7 +63,7 @@ export function Uploads() {
     width: 'w-[7.5rem]',
     cell: (row) =>
     <span className="whitespace-nowrap tabular-nums text-ink2">
-          {formatFullDate(row.createdAt.slice(0, 10))}
+          {formatFullDate(toKst(row.createdAt).date)}
         </span>
 
   },
@@ -71,7 +71,7 @@ export function Uploads() {
     header: '카드사 · 기간',
     cell: (row) =>
     <span className="block min-w-0">
-          <span className="block font-medium text-ink">
+          <span className="block font-normal text-ink">
             {row.cardIssuer}카드 · {row.sourceType}
           </span>
           <span className="block truncate text-small tabular-nums text-muted">
@@ -94,7 +94,7 @@ export function Uploads() {
     width: 'w-36',
     cell: (row) =>
     <span className="block">
-          <span className="font-semibold tabular-nums text-ink">
+          <span className="font-bold tabular-nums text-ink">
             {formatNumber(row.transactionCount)}건
           </span>
           {row.skippedDuplicateCount > 0 &&
@@ -153,7 +153,7 @@ export function Uploads() {
   return (
     <AppShell>
       <header>
-        <p className="text-small font-semibold text-accent">업로드 이력</p>
+        <p className="text-small font-bold text-accent">업로드 이력</p>
         <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
           지금까지 올린 파일
         </h1>

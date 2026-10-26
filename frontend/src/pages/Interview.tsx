@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRightIcon, InfoIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { DEFAULT_CONTEXT, useSession } from '../contexts/SessionContext';
-import { api } from '../api';
-import type { BookkeepingDuty, BusinessContext } from '../types/domain';
+import { api, ApiRequestError } from '../api';
+import type { BookkeepingDuty, BusinessContext, StoredBusinessContext } from '../types/domain';
 import { ChoiceGroup, type ChoiceOption } from '../components/ui';
 import { formatNumber } from '../utils/format';
 
@@ -27,19 +27,50 @@ const BOOKKEEPING: ChoiceOption<BookkeepingDuty>[] = [
 { value: '추계', label: '추계', hint: '서비스 대상 밖 (참고용)' }];
 
 
+/**
+ * 저장된 문진으로 폼을 채운다. 보낼 필드만 골라 담는다(서버가 붙인 id·version 은 보내지 않는다).
+ * 지금 고를 수 없는 업종은 기본값으로 둔다 — 업종 코드가 바뀌기 전 문진을 다시 보내지 않게 한다.
+ * 자택 비율이 미입력(null)이면 새 폼과 같은 값으로 시작한다
+ */
+const formFrom = (saved: BusinessContext | StoredBusinessContext | null): BusinessContext =>
+saved ?
+{
+  industryCode: INDUSTRIES.some((option) => !option.disabled && option.value === saved.industryCode) ?
+  saved.industryCode :
+  DEFAULT_CONTEXT.industryCode,
+  prevYearRevenue: saved.prevYearRevenue,
+  businessOpenDate: saved.businessOpenDate,
+  bookkeepingDuty: saved.bookkeepingDuty,
+  hasEmployee: saved.hasEmployee,
+  homeOfficeRatio: saved.homeOfficeRatio ?? DEFAULT_CONTEXT.homeOfficeRatio
+} :
+DEFAULT_CONTEXT;
+
 const cardClass = 'rounded-2xl border border-line bg-surface p-5';
-const labelClass = 'text-[14px] font-semibold text-ink';
+const labelClass = 'text-[14px] font-bold text-ink';
 const hintClass = 'mt-1 text-[13px] leading-6 text-muted';
 
 export function Interview() {
   const navigate = useNavigate();
-  const { setContext, setContextRef } = useSession();
-  const [form, setForm] = useState<BusinessContext>(DEFAULT_CONTEXT);
+  const { context, setContext, setContextRef } = useSession();
+  const [form, setForm] = useState<BusinessContext>(() => formFrom(context));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  /** 한 번이라도 고쳤으면 늦게 온 저장 문진으로 덮지 않는다 */
+  const edited = useRef(false);
+
+  // 새로고침 직후에는 저장된 문진(3.2)이 화면보다 늦게 온다
+  useEffect(() => {
+    if (!edited.current) setForm(formFrom(context));
+  }, [context]);
 
   const update = <K extends keyof BusinessContext,>(
   key: K,
   value: BusinessContext[K]) =>
-  setForm((prev) => ({ ...prev, [key]: value }));
+  {
+    edited.current = true;
+    setForm((prev) => ({ ...prev, [key]: value }));
+  };
 
   const bookkeeping =
   form.prevYearRevenue >= 75_000_000 ? '복식부기 의무자' : '간편장부 대상자';
@@ -56,10 +87,23 @@ export function Interview() {
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    const ref = await api.contexts.create(form);
-    setContext(form);
-    setContextRef(ref);
-    navigate('/confirm');
+    // 두 번 누르면 같은 문진이 버전 두 개로 저장된다
+    if (saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const ref = await api.contexts.create(form);
+      setContext(form);
+      setContextRef(ref);
+      navigate('/confirm');
+    } catch (caught) {
+      setError(
+        caught instanceof ApiRequestError ?
+        caught.message :
+        '문진을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.'
+      );
+      setSaving(false);
+    }
   };
 
   return (
@@ -67,7 +111,7 @@ export function Interview() {
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
         <form onSubmit={(event) => void submit(event)}>
           <header>
-            <p className="text-[13px] font-semibold text-accent">1단계 · 인식</p>
+            <p className="text-[13px] font-bold text-accent">1단계 · 인식</p>
             <h1 className="mt-1.5 text-[28px] font-bold tracking-tight text-ink">
               사업자 문진
             </h1>
@@ -104,7 +148,6 @@ export function Interview() {
                   id="revenue"
                   type="number"
                   min={0}
-                  step={1_000_000}
                   value={form.prevYearRevenue}
                   onChange={(event) =>
                   update('prevYearRevenue', Number(event.target.value))
@@ -186,7 +229,7 @@ export function Interview() {
               <div className="mt-4 rounded-xl bg-canvas p-4">
                   <label
                   htmlFor="ratio"
-                  className="text-[13px] font-semibold text-ink">
+                  className="text-[13px] font-bold text-ink">
                   
                     자택에서 작업공간이 차지하는 면적 비율
                   </label>
@@ -203,7 +246,7 @@ export function Interview() {
                     }
                     className="h-1.5 flex-1 accent-accent" />
                   
-                    <span className="w-12 text-right text-[14px] font-semibold tabular-nums text-ink">
+                    <span className="w-12 text-right text-[14px] font-bold tabular-nums text-ink">
                       {form.homeOfficeRatio}%
                     </span>
                   </div>
@@ -212,18 +255,28 @@ export function Interview() {
             </section>
           </div>
 
+          {error &&
+          <p
+            role="alert"
+            className="mt-6 rounded-xl border border-deny-line bg-deny-bg px-4 py-3 text-small leading-6 text-deny">
+
+              {error}
+            </p>
+          }
+
           <div className="mt-6 flex items-center gap-3">
             <button
               type="submit"
-              className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors duration-150 ease-snap hover:bg-accent-hover">
-              
-              다음: 입력 확정
+              disabled={saving}
+              className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-bold text-white transition-colors duration-150 ease-snap hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line disabled:text-muted">
+
+              {saving ? '저장하는 중…' : '다음: 입력 확정'}
               <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
             </button>
             <button
               type="button"
               onClick={() => navigate('/upload')}
-              className="text-[13px] font-medium text-muted transition-colors duration-150 hover:text-ink">
+              className="text-[13px] font-normal text-muted transition-colors duration-150 hover:text-ink">
               
               이전 단계
             </button>
@@ -243,7 +296,7 @@ export function Interview() {
           <div className="mt-4 rounded-2xl border border-line bg-surface p-5">
             <div className="flex items-center gap-2">
               <InfoIcon className="h-4 w-4 text-accent" aria-hidden="true" />
-              <h2 className="text-sm font-semibold text-ink">
+              <h2 className="text-sm font-bold text-ink">
                 이 답변이 바꾸는 것
               </h2>
             </div>

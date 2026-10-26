@@ -73,6 +73,8 @@ export function Confirm() {
   {
     term: '자택 작업 비율',
     value:
+    context.homeOfficeRatio === null ?
+    '입력 안 함' :
     context.homeOfficeRatio > 0 ?
     `${context.homeOfficeRatio}%` :
     '해당 없음'
@@ -84,7 +86,7 @@ export function Confirm() {
     <AppShell>
       <div className="mx-auto max-w-3xl">
         <header>
-          <p className="text-small font-semibold text-accent">사람 게이트 ①</p>
+          <p className="text-small font-bold text-accent">사람 게이트 ①</p>
           <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
             이 입력으로 판정합니다
           </h1>
@@ -95,7 +97,7 @@ export function Confirm() {
         </header>
 
         <section className="mt-6 overflow-hidden rounded-2xl border border-line bg-surface">
-          <h2 className="border-b border-line px-5 py-3.5 text-body font-semibold text-ink">
+          <h2 className="border-b border-line px-5 py-3.5 text-body font-bold text-ink">
             카드내역
           </h2>
           <dl className="divide-y divide-line2">
@@ -111,14 +113,14 @@ export function Confirm() {
                 <dt className="w-36 shrink-0 text-small text-muted">
                   {row.term}
                 </dt>
-                <dd className="text-small font-medium text-ink">{row.value}</dd>
+                <dd className="text-small font-normal text-ink">{row.value}</dd>
               </div>
             )}
           </dl>
           <div className="border-t border-line bg-canvas px-5 py-3">
             <Link
               to="/upload"
-              className="text-small font-semibold text-accent transition-colors duration-150 hover:text-accent-hover">
+              className="text-small font-bold text-accent transition-colors duration-150 hover:text-accent-hover">
               
               카드내역 다시 올리기
             </Link>
@@ -126,7 +128,7 @@ export function Confirm() {
         </section>
 
         <section className="mt-4 overflow-hidden rounded-2xl border border-line bg-surface">
-          <h2 className="border-b border-line px-5 py-3.5 text-body font-semibold text-ink">
+          <h2 className="border-b border-line px-5 py-3.5 text-body font-bold text-ink">
             사업자 문진{contextRef && ` · 버전 ${contextRef.version}`}
           </h2>
           <dl className="divide-y divide-line2">
@@ -140,7 +142,7 @@ export function Confirm() {
                 <dt className="w-36 shrink-0 text-small text-muted">
                   {row.term}
                 </dt>
-                <dd className="text-small font-medium tabular-nums text-ink">
+                <dd className="text-small font-normal tabular-nums text-ink">
                   {row.value}
                 </dd>
               </div>
@@ -149,7 +151,7 @@ export function Confirm() {
           <div className="border-t border-line bg-canvas px-5 py-3">
             <Link
               to="/interview"
-              className="text-small font-semibold text-accent transition-colors duration-150 hover:text-accent-hover">
+              className="text-small font-bold text-accent transition-colors duration-150 hover:text-accent-hover">
               
               문진 수정하기
             </Link>
@@ -163,7 +165,7 @@ export function Confirm() {
               aria-hidden="true" />
             
             <div>
-              <h2 className="text-body font-semibold text-ink">
+              <h2 className="text-body font-bold text-ink">
                 되돌릴 수 없는 동작은 없습니다
               </h2>
               <p className="mt-1.5 text-small leading-6 text-muted">
@@ -207,7 +209,7 @@ export function Confirm() {
               {missing}{' '}
               <Link
                 to={!batchId ? '/upload' : '/interview'}
-                className="font-semibold underline">
+                className="font-bold underline">
 
                 {!batchId ? '카드내역 올리기' : '문진 하러 가기'}
               </Link>
@@ -227,7 +229,7 @@ export function Confirm() {
             type="button"
             disabled={!agreed || starting || missing !== null}
             onClick={() => void start()}
-            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-3 text-body-lg font-semibold text-white transition-colors duration-150 ease-snap hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line disabled:text-muted">
+            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-3 text-body-lg font-bold text-white transition-colors duration-150 ease-snap hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line disabled:text-muted">
             
             <PlayIcon className="h-4 w-4" aria-hidden="true" />
             {starting ? '판정을 시작하는 중…' : '판정 시작'}

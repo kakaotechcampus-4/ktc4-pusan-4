@@ -6,6 +6,8 @@ name: PR Discord notify
 #   - 리뷰 · PR/Issue 댓글                  : 작성자를 멘션. 작성자 본인 글은 태그한 팀원이 있을 때만 그 팀원을 멘션
 #     (리뷰는 pr-review-reminder.yml 의 relay run 이 끝나면 workflow_run 으로 받는다. fork PR 도 secret 을 쓰려는 것)
 #   - issues opened                         : 팀원이 연 Issue 만 새 Issue 알림
+#   - issues assigned                       : 나중에 지정된 담당자(팀원)를 멘션. 스스로 맡은 건 알리지 않는다
+#     (Issue 를 만들며 지정한 담당자는 새 Issue 알림의 Assignees: 줄로 나간다)
 #   새 PR · 새 Issue 알림은 본문에서 태그된 팀원을 mention: 줄에 붙인다.
 # 로직은 tools/pr_discord_bot.py (pr-review-reminder.yml 과 공유).
 #
@@ -32,7 +34,7 @@ on:
     types: [opened, reopened, ready_for_review, review_requested]
     branches-ignore: [main]
   issues:
-    types: [opened]
+    types: [opened, assigned]
   issue_comment:
     types: [created]
   workflow_run:
@@ -42,7 +44,7 @@ on:
 permissions:
   contents: read
   pull-requests: read
-  issues: read  # 리뷰 요청 시각(issue events) 조회
+  issues: read  # 리뷰 요청 · 담당자 지정 시각(issue events) 조회
 
 jobs:
   notify:
