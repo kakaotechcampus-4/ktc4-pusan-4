@@ -28,3 +28,7 @@
 - 운영의 예전 고정 사용자(demo@example.com) 행은 비밀번호가 없어 로그인할 수 없고 같은 이메일로 가입할 수도 없다. 시연 계정은 다른 이메일로 가입한다.
 - 프론트에 가입 화면이 없다. 그 전까지 로컬은 스웨거로 가입한다.
 - B9c(feature/refresh-token-redis) 위에 쌓았다. #155·#166·B9c 가 develop 에 들어간 뒤 PR 을 올린다.
+
+## 16:44 로컬 check 결과
+
+- `gradlew -p backend check` 통과(로컬, feature/email-account).
