@@ -1,5 +1,6 @@
 package com.ktc4.pusan4.judgment.api;
 
+import com.ktc4.pusan4.judgment.domain.StatuteVersion;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDate;
@@ -14,4 +15,9 @@ public record StatuteResponse(
     String sourceUrl,
     String body
 ) {
+
+    static StatuteResponse from(StatuteVersion statute) {
+        return new StatuteResponse(statute.id(), statute.statuteId(), statute.title(), statute.hierarchy(),
+            statute.effectiveFrom(), statute.effectiveTo(), statute.sourceUrl(), statute.body());
+    }
 }

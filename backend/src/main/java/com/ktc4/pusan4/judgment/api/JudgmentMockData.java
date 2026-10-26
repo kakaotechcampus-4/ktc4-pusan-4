@@ -32,7 +32,7 @@ import static com.ktc4.pusan4.shared.api.MockFixtures.page;
 import static com.ktc4.pusan4.shared.api.MockFixtures.singlePage;
 
 /**
- * 서비스 레이어가 붙기 전까지 judgment-runs·judgments·questions·statutes API 가 반환하는 고정 응답.
+ * 서비스 레이어가 붙기 전까지 judgment-runs·judgments·questions API 가 반환하는 고정 응답.
  *
  * <p>스타벅스 거래 하나가 용도 질문을 기다리는(NEEDS_REVIEW) 장면을 보여 준다.
  */
@@ -144,12 +144,5 @@ public class JudgmentMockData {
 
     public BulkAnswerResponse bulkAnswer() {
         return new BulkAnswerResponse(1, 0, /* excludedCount */ 0, List.of(FACT_ID), 1, new Unresolved(0, 0L));
-    }
-
-    public StatuteResponse statute() {
-        return new StatuteResponse(1418, "소득세법-27-1", "소득세법 제27조 제1항", "법률",
-            LocalDate.parse("2025-01-01"), null, "https://www.law.go.kr/",
-            "거주자의 각 소득에 대한 총수입금액을 계산할 때 필요경비에 산입할 금액은 해당 과세기간에 "
-                + "총수입금액에 대응하는 비용으로서 일반적으로 용인되는 통상적인 것의 합계액으로 한다.");
     }
 }

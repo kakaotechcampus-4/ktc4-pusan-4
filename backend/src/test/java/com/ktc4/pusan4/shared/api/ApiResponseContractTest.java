@@ -2,6 +2,8 @@ package com.ktc4.pusan4.shared.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ktc4.pusan4.judgment.api.JudgmentMockData;
+import com.ktc4.pusan4.judgment.domain.StatuteVersion;
+import com.ktc4.pusan4.judgment.persistence.StatuteService;
 import com.ktc4.pusan4.merchant.api.ClassificationMockData;
 import com.ktc4.pusan4.shared.UuidV7Generator;
 import com.ktc4.pusan4.shared.auth.TemporaryCurrentUserProvider;
@@ -36,6 +38,7 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -67,6 +70,9 @@ class ApiResponseContractTest {
     @MockitoBean
     private BusinessContextService contextService;
 
+    @MockitoBean
+    private StatuteService statuteService;
+
     @BeforeEach
     void stubServices() {
         given(userService.get(any())).willReturn(new AppUser(
@@ -79,6 +85,9 @@ class ApiResponseContractTest {
         given(contextService.create(any(), any())).willReturn(context);
         given(contextService.current(any())).willReturn(context);
         given(contextService.history(any())).willReturn(List.of(context));
+
+        given(statuteService.get(anyLong())).willReturn(new StatuteVersion(1523, "소득세법시행령-67-4",
+            "소득세법 시행령 제67조 제4항", "시행령", LocalDate.parse("2026-01-01"), null, "https://www.law.go.kr/", "..."));
     }
 
     static Stream<Arguments> endpoints() {

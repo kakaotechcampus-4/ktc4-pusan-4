@@ -1,5 +1,6 @@
 package com.ktc4.pusan4.judgment.persistence;
 
+import com.ktc4.pusan4.judgment.domain.StatuteVersion;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -28,6 +29,22 @@ class StatuteVersionEntity {
     @Column(name = "effective_to")
     private LocalDate effectiveTo;
 
+    @Column(nullable = false)
+    private String title;
+
+    @Column(nullable = false)
+    private String hierarchy;
+
+    @Column(name = "source_url", nullable = false)
+    private String sourceUrl;
+
+    @Column(nullable = false)
+    private String body;
+
     protected StatuteVersionEntity() {
+    }
+
+    StatuteVersion toDomain() {
+        return new StatuteVersion(id, statuteId, title, hierarchy, effectiveFrom, effectiveTo, sourceUrl, body);
     }
 }

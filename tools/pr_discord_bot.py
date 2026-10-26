@@ -12,6 +12,9 @@ REVIEW_WAIT_THRESHOLD = timedelta(hours=24)
 REMIND_INTERVAL = timedelta(hours=12)
 # 새 PR 알림은 이만큼 기다렸다가 리뷰어를 조회하고, 그 사이 들어온 리뷰 요청은 따로 알리지 않는다.
 REVIEWER_SETTLE_WINDOW = timedelta(minutes=2)
+# Issue 를 만들며 지정한 담당자도 assigned 이벤트가 오고, 생성 1~2초 뒤로 찍힌다(#112: 6명).
+# 이들은 새 Issue 알림의 Assignees: 줄에 이미 나갔다.
+ASSIGNED_WITH_ISSUE_WINDOW = timedelta(seconds=10)
 REVIEW_STATE_LABELS = {
     "APPROVED": "approve",
     "COMMENTED": "comment",
@@ -21,7 +24,7 @@ DIVIDER = "-" * 51
 
 
 def framed(title: str, body: str) -> str:
-    return f"{DIVIDER}\n[{title}]\n{body}\n{DIVIDER}"
+    return f"[{title}]\n{body}\n{DIVIDER}"
 
 
 def mention(login: str, user_ids: dict[str, str]) -> str:
@@ -64,10 +67,36 @@ def build_new_issue_message(issue: dict, user_ids: dict[str, str]) -> str | None
     author = issue["user"]["login"]
     if author not in user_ids:
         return None
+    assignees = " ".join(
+        mention(assignee["login"], user_ids) for assignee in issue["assignees"]
+    )
     mentioned = _body_mentions(issue, user_ids)
     return framed(
         "새 Issue",
-        f"{_pr_link(issue)}\n{author}" + (f"\nmention: {mentioned}" if mentioned else ""),
+        f"{_pr_link(issue)}\n{author}"
+        + (f"\nAssignees: {assignees}" if assignees else "")
+        + (f"\nmention: {mentioned}" if mentioned else ""),
+    )
+
+
+def build_assigned_message(
+    issue: dict,
+    login: str,
+    assigner: str,
+    assigned_at: datetime,
+    user_ids: dict[str, str],
+) -> str | None:
+    # 팀원이 아닌 사람이나 스스로 맡은 건 알리지 않는다.
+    if (
+        login not in user_ids
+        or login == assigner
+        or assigned_at - datetime.fromisoformat(issue["created_at"])
+        <= ASSIGNED_WITH_ISSUE_WINDOW
+    ):
+        return None
+    return framed(
+        "담당자 지정",
+        f"{mention(login, user_ids)}\nIssue {_pr_link(issue)}의 담당자로 지정됐습니다.",
     )
 
 
@@ -266,9 +295,26 @@ def collect_notification(
     now: datetime,
     settle_seconds: float,
 ) -> str | None:
-    if "issue" in event:
-        return build_new_issue_message(event["issue"], user_ids)
     api = f"https://api.github.com/repos/{repo}"
+    if "issue" in event:
+        issue = event["issue"]
+        if event["action"] == "opened":
+            return build_new_issue_message(issue, user_ids)
+        login = event["assignee"]["login"]
+        events = github_get_all(
+            f"{api}/issues/{issue['number']}/events?per_page=100", token
+        )
+        assigned_at = max(
+            (
+                datetime.fromisoformat(item["created_at"])
+                for item in events
+                if item["event"] == "assigned" and item["assignee"]["login"] == login
+            ),
+            default=now,
+        )
+        return build_assigned_message(
+            issue, login, event["sender"]["login"], assigned_at, user_ids
+        )
     pr_url = f"{api}/pulls/{event['pull_request']['number']}"
     if event["action"] != "review_requested":
         # 열자마자 지정하는 리뷰어까지 한 메시지에 담으려고 기다렸다가 다시 조회한다.

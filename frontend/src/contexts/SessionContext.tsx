@@ -4,6 +4,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState } from
 'react';
 import type { BusinessContext, BusinessContextRef, StoredBusinessContext, User } from '../types/domain';
@@ -60,7 +61,15 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
   const [contextRef, setContextRef] = useState<BusinessContextRef | null>(seedSession?.contextRef ?? null);
   const [runId, setRunId] = useState<string | null>(seedSession?.runId ?? null);
 
+  /**
+   * 로그인·로그아웃·풀림마다 올린다. 그 전에 시작한 이어 가기·내 정보·최근 업로드 응답이 늦게 와도
+   * 지금 세션을 바꾸지 않는다 — 늦은 이어 가기가 방금 한 로그인을 「로그인 전」으로 덮거나,
+   * 앞 사람의 최근 업로드가 새 세션의 배치로 들어가지 않게 한다
+   */
+  const epoch = useRef(0);
+
   const clear = useCallback(() => {
+    epoch.current += 1;
     setUser(null);
     setStatus('anonymous');
     setBatchId(seedSession?.batchId ?? null);
@@ -77,9 +86,12 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
     setUser(me);
     setStatus('signedIn');
     if (seedSession) return;
+    const startedAt = epoch.current;
     void api.uploads.
     list({ size: 1 }).
-    then((page) => setBatchId((current) => current ?? page.items[0]?.id ?? null)).
+    then((page) => {
+      if (epoch.current === startedAt) setBatchId((current) => current ?? page.items[0]?.id ?? null);
+    }).
     catch(() => {
       // 못 읽으면 「올린 카드내역이 없습니다」에서 업로드 이력으로 가면 된다
     });
@@ -88,16 +100,18 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
   // 새로고침 뒤 리프레시 쿠키로 로그인을 이어 간다 (#139)
   useEffect(() => {
     let cancelled = false;
+    const startedAt = epoch.current;
+    const stale = () => cancelled || epoch.current !== startedAt;
     void api.auth.
     restore().
     then((restored) => restored ? api.users.me() : null).
     then((me) => {
-      if (cancelled) return;
+      if (stale()) return;
       if (me) start(me);
       else setStatus('anonymous');
     }).
     catch(() => {
-      if (!cancelled) setStatus('anonymous');
+      if (!stale()) setStatus('anonymous');
     });
     return () => {
       cancelled = true;
@@ -108,15 +122,21 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
   useEffect(() => api.auth.onLost(clear), [clear]);
 
   const signIn = useCallback(async (nextEmail: string, password: string) => {
+    // 로그인한 채로 /login 에서 다른 계정으로 들어오면 앞 사람의 배치·문진·실행이 남는다.
+    // start 는 이미 있는 배치를 덮지 않고, 문진 효과는 서버에 문진이 없으면 그대로 둔다 (#142 리뷰)
+    clear();
+    const startedAt = epoch.current;
     await api.auth.login({ email: nextEmail, password });
     try {
-      start(await api.users.me());
+      const me = await api.users.me();
+      // 그사이 로그아웃했거나 다시 로그인했다
+      if (epoch.current === startedAt) start(me);
     } catch (caught) {
-      // 토큰만 받고 내 정보를 못 읽었으면 로그인하지 않은 것으로 되돌린다
-      void api.auth.logout().catch(() => undefined);
+      // 토큰만 받고 내 정보를 못 읽었으면 로그인하지 않은 것으로 되돌린다. 그사이 바뀐 세션은 건드리지 않는다
+      if (epoch.current === startedAt) void api.auth.logout().catch(() => undefined);
       throw caught;
     }
-  }, [start]);
+  }, [clear, start]);
 
   /**
    * 3.2 — 서버에 이미 문진이 있으면 그것을 쓴다. 저장만 하고 다시 읽지 않으면

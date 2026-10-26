@@ -4,6 +4,7 @@ import type {
   JudgmentRun,
   QuestionGroup,
   RuleCandidate,
+  QuestionSuggestion,
   Transaction,
   UploadBatch,
   Verdict } from
@@ -1962,4 +1963,30 @@ export const RULE_CANDIDATES: RuleCandidate[] = [
   reviewedBy: 'admin@example.com',
   reviewedAt: '2026-10-08T15:20:00+09:00',
   createdAt: '2026-10-06T03:00:00+09:00'
+}];
+
+/**
+ * 목업 전용: 다른 업로드에서 같은 질문에 한 답 (GET /questions/suggestions, agent-secretary.md 3.1).
+ * 고정비(통신·수도광열)는 A 이어받기, 건별 용도와 해외 SaaS 기간은 B 이력만, 소명 대기는 C 다
+ */
+export const QUESTION_SUGGESTIONS: QuestionSuggestion[] = [
+{ groupKey: 'merchant:SK텔레콤', factType: '전용여부', tier: 'A', value: '전용', sourceLabel: '2025년 12월 업로드(국민)' },
+{ groupKey: 'merchant:자택 관리비', factType: '공간전용여부', tier: 'A', value: '자택 겸용', sourceLabel: '2025년 12월 업로드(국민)' },
+{
+  groupKey: 'transaction:0199c8f2-0000-7000-8000-00000000001004',
+  factType: '기간',
+  tier: 'B',
+  historyCounts: { '연간 일시불': 1 }
+},
+{
+  groupKey: 'transaction:0199c8f2-0000-7000-8000-00000000001005',
+  factType: '용도',
+  tier: 'B',
+  historyCounts: { 업무미팅: 4, 개인: 1 }
+},
+{
+  groupKey: 'transaction:0199c8f2-0000-7000-8000-00000000001016',
+  factType: '용도',
+  tier: 'C',
+  reason: '소명 대기 질문은 건마다 답해야 합니다'
 }];

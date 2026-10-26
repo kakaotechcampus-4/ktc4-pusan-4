@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LockIcon, MessageCircleIcon } from 'lucide-react';
 import { useSession } from '../contexts/SessionContext';
-import { ApiRequestError, isMock } from '../api';
+import { ApiRequestError, isMock, mockPassword } from '../api';
 
 interface LocationState {
   from?: string;
@@ -133,8 +133,7 @@ export function Login() {
               <button
               type="button"
               disabled={busy}
-              // 목업은 비밀번호를 보지 않는다
-              onClick={() => void complete('kakao-user@kakao.com', 'mock')}
+              onClick={() => void complete('kakao-user@kakao.com', mockPassword ?? '')}
               className="mt-8 flex w-full items-center justify-center gap-2 rounded-xl bg-[#FEE500] px-4 py-3 text-[15px] font-semibold text-[#191600] transition-opacity duration-150 ease-snap hover:opacity-90">
 
                 <MessageCircleIcon className="h-4 w-4" aria-hidden="true" />
@@ -208,11 +207,17 @@ export function Login() {
           <button
             type="button"
             disabled={busy}
-            onClick={() => void complete('demo@expense-verdict.kr', 'mock')}
+            onClick={() => void complete('demo@expense-verdict.kr', mockPassword ?? '')}
             className="mt-3 w-full rounded-xl border border-line px-4 py-3 text-[14px] font-semibold text-ink transition-colors duration-150 ease-snap hover:bg-canvas">
 
               샘플 계정으로 둘러보기
             </button>
+          }
+
+          {isMock &&
+          <p className="mt-2 text-[12px] leading-6 text-muted">
+              목업 비밀번호는 {mockPassword} 입니다. admin@ 으로 시작하는 이메일은 관리자로 들어갑니다.
+            </p>
           }
 
           <p className="mt-6 flex items-start gap-2 text-[12px] leading-6 text-muted">

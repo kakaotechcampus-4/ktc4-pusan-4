@@ -1,4 +1,6 @@
 import type {
+  AssistantChatRequest,
+  AssistantChatResponse,
   BulkAnswerRequest,
   BulkAnswerResult,
   BusinessContext,
@@ -9,6 +11,8 @@ import type {
   ClassificationReviewGroup,
   ClassificationStatus,
   EffectiveStatus,
+  HandoffNote,
+  HandoffNoteRequest,
   Judgment,
   JudgmentRun,
   JudgmentRunCreated,
@@ -17,6 +21,7 @@ import type {
   LoginRequest,
   OverrideRequest,
   Page,
+  Progress,
   Question,
   QuestionGroup,
   QuestionPage,
@@ -24,6 +29,7 @@ import type {
   QuestionResponseRequest,
   QuestionResponseResult,
   QuestionStatus,
+  QuestionSuggestion,
   ReviewStatus,
   RuleCandidate,
   RuleCandidateStatus,
@@ -174,6 +180,22 @@ export interface Api {
     respond(body: QuestionResponseRequest): Promise<QuestionResponseResult>;
     /** 남은 꼬리 질문을 factType 단위로 한 번에 닫는다 */
     bulkAnswer(body: BulkAnswerRequest): Promise<BulkAnswerResult>;
+    /** 다른 업로드에서 같은 질문에 한 답 (명세 3.1). 아직 백엔드 일정에 없다 */
+    suggestions(batchId: string): Promise<{items: QuestionSuggestion[];}>;
+  };
+  /**
+   * 비서 Really (docs/agent-secretary.md 9·10장). 중계·진행 상황·세무대리인 질문 API 는 아직 백엔드 일정에 없다.
+   * 오류는 중계가 1.3 형식으로 바꿔 준다. 429 는 Retry-After(ApiRequestError.retryAfter)
+   */
+  assistant: {
+    chat(body: AssistantChatRequest): Promise<AssistantChatResponse>;
+  };
+  progress: {
+    get(batchId: string): Promise<Progress>;
+  };
+  handoffNotes: {
+    list(): Promise<HandoffNote[]>;
+    create(body: HandoffNoteRequest): Promise<HandoffNote>;
   };
   /** 관리자 (M1). 계약이 아직 없다 — 경로·모양은 가정이다 */
   admin: {
@@ -191,7 +213,9 @@ export class ApiRequestError extends Error {
   public readonly status: number,
   public readonly code: string,
   message: string,
-  public readonly traceId = '')
+  public readonly traceId = '',
+  /** 429 의 Retry-After(초). 없으면 undefined */
+  public readonly retryAfter?: number)
   {
     super(message);
     this.name = 'ApiRequestError';

@@ -1,9 +1,13 @@
 import type { Api } from '../contract';
 import { ApiRequestError } from '../contract';
 import type {
+  AssistantChatRequest,
+  AssistantChatResponse,
+  AssistantProposal,
   ClassificationReview,
   ClassificationReviewGroup,
   EffectiveStatus,
+  HandoffNote,
   Judgment,
   JudgmentRun,
   JudgmentRunFailure,
@@ -21,6 +25,7 @@ import type {
   UserInclusion,
   Verdict } from
 '../../types/domain';
+import { MERCHANT_CATEGORIES } from '../../types/domain';
 import type { JudgmentSeed, QuestionGroupSeed } from './data';
 import {
   CLASSIFICATION_REVIEWS,
@@ -29,6 +34,7 @@ import {
   QUESTION_ANSWER_VERDICT,
   QUESTION_CARDS,
   QUESTION_GROUPS,
+  QUESTION_SUGGESTIONS,
   QUESTION_TRANSACTIONS,
   RULE_CANDIDATES,
   TRANSACTIONS,
@@ -135,16 +141,26 @@ const store = {
   /** overrideId → JudgmentOverride. 해제해도 지우지 않고 active 만 끈다 (api.md 3.8) */
   overrides: new Map<string, { transactionId: string; judgmentId: string; active: boolean }>(),
   reviews: CLASSIFICATION_REVIEWS.map((r) => ({ ...r })) as ClassificationReview[],
-  /** 다음 Run 에서 기술적으로 실패시킬 거래 수 (개발용) */
+  /** 다음 Run 에서 기술적으로 실패시킬 거래 수와 그 실패 코드 (개발용) */
   failNext: 0,
+  failNextCode: 'RULE_PROCESSING_FAILED',
   /** runId → 실패 목록 */
   failures: new Map<string, JudgmentRunFailure[]>(),
   /** 다음 업로드를 이 오류로 실패시킨다 (개발용) */
   failUpload: null as ApiRequestError | null,
-  /** 로그인한 이메일. 목업은 비밀번호를 보지 않고 무엇이든 받는다 */
+  /** 로그인한 이메일. 로그아웃하면 null 이고, 그때 users.me 는 401 이다 */
   email: null as string | null,
-  ruleCandidates: RULE_CANDIDATES.map((c) => ({ ...c })) as RuleCandidate[]
+  ruleCandidates: RULE_CANDIDATES.map((c) => ({ ...c })) as RuleCandidate[],
+  /** 다음 비서 요청을 이 오류로 실패시킨다 (개발용) */
+  failAssistant: null as ApiRequestError | null,
+  handoffNotes: [] as HandoffNote[]
 };
+
+/**
+ * 목업 비밀번호. 이메일은 무엇이든 받고 비밀번호만 본다. 실서버 로컬 프로필의 고정 사용자 비밀번호와 같다(#155).
+ * 로그인 화면의 목업 전용 버튼과 안내도 이 값을 쓴다(Login.tsx)
+ */
+export const MOCK_PASSWORD = 'demo1234';
 
 /** 목업에서 관리자 화면을 보려면 admin@… 으로 로그인한다 */
 const isAdminEmail = (email: string | null) => email?.split('@')[0] === 'admin';
@@ -317,12 +333,12 @@ QUESTION_GROUPS.map((seed) => ({
 })).filter((g) => g.pairs.length > 0);
 
 /**
- * 조회·집계에 보이는 그룹. 사용자가 제외한 거래의 질문은 지우지 않고 여기서만 거른다.
- * 다시 포함하면 그대로 돌아온다 (#134)
+ * 조회·집계에 보이는 그룹. 판정 대상(§5)이 아닌 거래의 질문은 지우지 않고 여기서만 거른다.
+ * 현재 결과와 같은 조건이고, transactionId 를 줘도 거른다. 다시 포함하면 그대로 돌아온다 (#134)
  */
 const visibleGroups = (): LiveGroup[] =>
 liveGroups().
-map((g) => ({ ...g, pairs: g.pairs.filter((p) => p.transaction.effectiveStatus.code === 'JUDGEABLE') })).
+map((g) => ({ ...g, pairs: g.pairs.filter((p) => isJudgeable(p.transaction)) })).
 filter((g) => g.pairs.length > 0);
 
 const isAnswered = (g: LiveGroup) => store.answers.has(g.seed.groupKey);
@@ -446,11 +462,153 @@ const reviewCandidate = (id: number, status: RuleCandidate['status']) => {
   return delay({ ...candidate });
 };
 
+/** 지금 PENDING 그룹에 맞는 지난번 답. 다른 배치·답한 그룹의 것은 주지 않는다 */
+const suggestionsIn = (batchId: string) => {
+  const pending = pendingGroups('PENDING', batchId).map(groupOut);
+  return QUESTION_SUGGESTIONS.filter((s) =>
+  pending.some((g) => g.groupKey === s.groupKey && g.factType === s.factType)
+  );
+};
+
+/** 지난번 답으로 채울 수 있는 질문 수. A 등급이고 충돌이 없고 지금 선택지에 있는 값만 센다 (3.1) */
+const fillableIn = (batchId: string) => {
+  const pending = pendingGroups('PENDING', batchId).map(groupOut);
+  return suggestionsIn(batchId).reduce((sum, s) => {
+    const group = pending.find((g) => g.groupKey === s.groupKey && g.factType === s.factType);
+    const usable = s.tier === 'A' && !s.conflict && group?.bulkAnswerable && group.options.includes(s.value ?? '');
+    return sum + (usable && group ? group.count : 0);
+  }, 0);
+};
+
+/** 말에 그 가맹점이 나오는지. 비서 도구처럼 정규화 이름과 표기(첫 낱말 포함)를 대소문자 없이 본다 */
+const mentions = (message: string, t: { merchantNorm: string; merchantRaw: string }) => {
+  const text = message.toLowerCase();
+  return [t.merchantNorm, t.merchantRaw, t.merchantRaw.split(' ')[0]].
+  some((name) => name.length >= 2 && text.includes(name.toLowerCase()));
+};
+
+/** 카드에 쓰는 대상 요약. 비서 도구(ai/assistant/tools.py what)와 같은 모양 */
+const cardTarget = (t: TransactionSummary) =>
+`${t.merchantRaw.slice(0, 20)} ${Number(t.approvedAt.slice(5, 7))}/${Number(t.approvedAt.slice(8, 10))} ${t.amount.toLocaleString('ko-KR')}원`;
+
+/**
+ * 목업 비서. LLM 없이 화면과 낱말로 정해진 답과 제안 카드를 만든다. 실제 비서와 같은 응답 모양을 낸다.
+ * 질문 화면: 「스타벅스는 업무미팅」(가맹점 + 선택지) → 답 카드, 「전부 개인」 → 일괄 답 카드
+ * 분류 확인: 가맹점 + 카테고리 → 분류 카드. 결과: 「가능으로·불가로·확인 필요로」 → 판정 수정 카드(고른 거래)
+ * 세무사·비율·세액 → 세무대리인 질문 카드. 그 밖에는 다음 할 일과 화면 이동 카드
+ */
+const mockChat = async ({ message, context }: AssistantChatRequest): Promise<AssistantChatResponse> => {
+  const reply = (answer: string, proposals: AssistantProposal[] = []) => ({
+    answer,
+    proposals,
+    traceId: nextId('mock-trace')
+  });
+  const batchId = context.batchId ?? undefined;
+
+  if (/세무사|세무대리인|비율|세액/.test(message)) {
+    const text = message.trim().slice(0, 300);
+    return reply('비율이나 세액은 이 서비스가 정하지 않습니다. 세무대리인에게 물을 질문으로 넣어 둘 수 있습니다.', [
+    {
+      kind: 'handoff_note',
+      text,
+      transactionIds: context.transactionId ? [context.transactionId] : [],
+      card: `세무대리인 질문 추가: ${text}`
+    }]
+    );
+  }
+
+  if (context.screen.startsWith('/questions') && batchId) {
+    const groups = pendingGroups('PENDING', batchId).map(groupOut);
+    if (/전부|모두/.test(message)) {
+      const target = groups.find((g) => g.options.some((o) => message.includes(o)));
+      const value = target?.options.find((o) => message.includes(o));
+      const sameType = groups.filter((g) => g.factType === target?.factType);
+      if (!target || !value || groups.length > 5 || sameType.length < 2 || sameType.some((g) => !g.bulkAnswerable))
+      return reply('남은 질문이 많거나 소명 대기가 섞여 있어 한 번에 답할 수 없습니다. 하나씩 답해 주세요.');
+      const count = sameType.reduce((sum, g) => sum + g.count, 0);
+      const amount = sameType.reduce((sum, g) => sum + g.totalAmount, 0);
+      return reply(`남은 「${target.factType}」 질문 ${count}건에 같은 답을 넣는 카드를 만들었습니다.`, [
+      {
+        kind: 'bulk_answer',
+        batchId,
+        factType: target.factType,
+        value,
+        card: `남은 '${target.factType}' 질문 ${count}건 ${amount.toLocaleString('ko-KR')}원 → '${value}'`
+      }]
+      );
+    }
+    const group = groups.find((g) =>
+    g.transactions.some((t) => mentions(message, t)) && g.options.some((o) => message.includes(o))
+    );
+    const value = group?.options.find((o) => message.includes(o));
+    if (group && value)
+    return reply('말씀하신 거래의 질문에 답하는 카드를 만들었습니다. [적용]을 누르면 저장하고 다시 판정합니다.', [
+    {
+      kind: 'answer',
+      questionIds: group.questionIds,
+      value,
+      source: 'ASSISTANT',
+      card: `${cardTarget(group.transactions[0])} → '${value}'`
+    }]
+    );
+  }
+
+  if (context.screen.startsWith('/preview') && batchId) {
+    const { items } = await mockApi.classificationReviews.grouped({ batchId, status: 'PENDING', size: 100 });
+    const group = items.find((g) => g.transactions.some((t) => mentions(message, t)));
+    const category = MERCHANT_CATEGORIES.find((c) => message.includes(c));
+    if (group && category)
+    return reply('말씀하신 가맹점의 카테고리를 정하는 카드를 만들었습니다.', [
+    {
+      kind: 'classification',
+      reviewIds: group.reviewIds,
+      merchantCategory: category,
+      card: `${cardTarget(group.transactions[0])} → ${category}`
+    }]
+    );
+  }
+
+  const toVerdict = /확인 필요로/.test(message) ?
+  'NEEDS_REVIEW' :
+  /가능으로/.test(message) ?
+  'AVAILABLE' :
+  /불가로/.test(message) ?
+  'UNAVAILABLE' :
+  null;
+  if (context.screen.startsWith('/results') && context.transactionId && toVerdict) {
+    const current = currentOf(context.transactionId);
+    const t = transactionOf(context.transactionId);
+    if (current && t)
+    return reply('판정을 바꾸는 카드를 만들었습니다. 바꾸는 것은 직접 [적용]을 눌러 정합니다.', [
+    {
+      kind: 'override',
+      judgmentId: current.id,
+      toVerdict,
+      reason: message.trim(),
+      card: `${cardTarget(summaryOf(t))} 판정 ${current.verdict.label} → ${LABEL[toVerdict]}`
+    }]
+    );
+  }
+
+  const next = batchId ? (await mockApi.progress.get(batchId)).next : null;
+  return next ?
+  reply(`다음 할 일은 「${next.label}」입니다.`, [
+  { kind: 'navigation', route: next.route, card: `다음 할 일: ${next.label}` }]
+  ) :
+  reply('카드내역을 올리면 분류 확인부터 차례로 안내합니다.', [
+  { kind: 'navigation', route: '/upload', card: '카드내역 화면으로 이동' }]
+  );
+};
+
 // ── 구현 ────────────────────────────────────────────
 
 export const mockApi: Api = {
   auth: {
-    login: ({ email }) => {
+    login: ({ email, password }) => {
+      if (password !== MOCK_PASSWORD)
+      return Promise.reject(
+        new ApiRequestError(401, 'INVALID_CREDENTIALS', '이메일 또는 비밀번호가 올바르지 않습니다.')
+      );
       store.email = email;
       return delay(undefined);
     },
@@ -466,9 +624,11 @@ export const mockApi: Api = {
 
   users: {
     me: () =>
+    store.email === null ?
+    Promise.reject(new ApiRequestError(401, 'UNAUTHORIZED', '로그인이 필요합니다.')) :
     delay({
       id: USER_ID,
-      email: store.email ?? 'dev@example.com',
+      email: store.email,
       createdAt: '2026-09-01T10:00:00+09:00',
       role: isAdminEmail(store.email) ? 'ADMIN' as const : 'USER' as const
     }),
@@ -619,14 +779,16 @@ export const mockApi: Api = {
 
       // 기술적 실패 예약이 있으면 이 Run 의 실패 목록을 만든다
       const failCount = Math.min(store.failNext, total);
+      const failCode = store.failNextCode;
       store.failNext = 0;
+      store.failNextCode = 'RULE_PROCESSING_FAILED';
       if (failCount > 0) {
         const targets = store.transactions.filter(judgeable).slice(0, failCount);
         store.failures.set(
           run.id,
           targets.map((t) => ({
             transactionId: t.id,
-            errorCode: 'RULE_PROCESSING_FAILED',
+            errorCode: failCode,
             message: '판정 처리 중 오류가 발생했습니다.',
             failedAt: now()
           }))
@@ -897,6 +1059,7 @@ export const mockApi: Api = {
         rejudgedTransactionCount: rejudged.length
       });
     },
+    suggestions: (batchId) => delay({ items: suggestionsIn(batchId) }),
     bulkAnswer: ({ batchId, factType, answer }) => {
       // 이 배치의 PENDING 중 factType 이 같은 질문만 한 번에 닫는다. 새 Run 은 만들지 않는다 (3.11)
       if (!store.batches.some((b) => b.id === batchId))
@@ -1026,6 +1189,67 @@ export const mockApi: Api = {
       approve: (id) => reviewCandidate(id, { code: 'APPROVED', label: '승인' }),
       reject: (id) => reviewCandidate(id, { code: 'REJECTED', label: '기각' })
     }
+  },
+
+  assistant: {
+    chat: (body) => {
+      const failure = store.failAssistant;
+      if (failure) {
+        store.failAssistant = null;
+        return new Promise((_, reject) => window.setTimeout(() => reject(failure), LATENCY_MS));
+      }
+      // 실제 비서는 한 턴에 몇 초 걸린다. 기다리는 동안의 화면을 볼 수 있게 조금 늦춘다
+      return mockChat(body).then((result) => new Promise((resolve) => window.setTimeout(() => resolve(result), 600)));
+    }
+  },
+
+  progress: {
+    get: (batchId) => {
+      const batch = store.batches.find((b) => b.id === batchId);
+      if (!batch) return notFound('BATCH_NOT_FOUND', '업로드를 찾을 수 없습니다.');
+      const context = store.contexts.at(-1);
+      const reviews = filterReviews('PENDING', batchId);
+      const run = [...store.runs.values()].filter((r) => r.batchId === batchId).at(-1);
+      const questions = unresolvedIn(batchId);
+      const next =
+      reviews.length > 0 ?
+      { step: 'CLASSIFICATION', route: '/preview', label: '분류 확인하기' } :
+      !context ?
+      { step: 'INTERVIEW', route: '/interview', label: '사업자 문진 하기' } :
+      !run ?
+      { step: 'RUN', route: '/confirm', label: '판정 전 확인하기' } :
+      questions.count > 0 ?
+      { step: 'QUESTIONS', route: '/questions', label: '질문에 답하기' } :
+      { step: 'SUMMARY', route: '/summary', label: '요약 보기' };
+      return delay({
+        batch: {
+          label: `${batch.cardIssuer} · ${batch.periodStart.slice(0, 7)}`,
+          transactionCount: store.transactions.filter((t) => t.batchId === batchId).length
+        },
+        context: context ?
+        { version: context.version, bookkeeping: context.bookkeepingDuty, hasEmployee: context.hasEmployee } :
+        null,
+        classification: {
+          pendingCount: reviews.length,
+          pendingAmount: reviews.reduce((sum, r) => sum + (transactionOf(r.transactionId)?.amount ?? 0), 0)
+        },
+        run: run ? { status: run.status.code } : null,
+        questions: { pendingCount: questions.count, pendingAmount: questions.amount, fillableFromPrevious: fillableIn(batchId) },
+        next
+      });
+    }
+  },
+
+  handoffNotes: {
+    list: () => delay([...store.handoffNotes]),
+    create: ({ text, transactionIds }) => {
+      const trimmed = text.trim();
+      if (!trimmed || trimmed.length > 300)
+      return Promise.reject(new ApiRequestError(400, 'VALIDATION_ERROR', '질문은 1~300자로 적어 주세요.'));
+      const note = { id: nextId('0199bb21'), text: trimmed, transactionIds: [...transactionIds], createdAt: now() };
+      store.handoffNotes.push(note);
+      return delay(note);
+    }
   }
 };
 
@@ -1036,11 +1260,13 @@ export const mockApi: Api = {
 /**
  * 개발용 스위치. 실패 화면을 보려면 콘솔에서:
  *   (await import('/src/api/index.ts')).mockControls.failNextRun(2)
- * 그다음 판정을 실행하면 그 Run 이 부분 실패로 끝난다.
+ * 그다음 판정을 실행하면 그 Run 이 부분 실패로 끝난다. 실패 코드도 고를 수 있다(api.md 3.6):
+ *   mockControls.failNextRun(2, 'RUN_START_FAILED')
  */
 export const mockControls = {
-  failNextRun(count: number) {
+  failNextRun(count: number, code = 'RULE_PROCESSING_FAILED') {
     store.failNext = Math.max(0, count);
+    store.failNextCode = code;
   },
   /**
    * 다음 업로드 한 번을 이 오류로 실패시킨다. 콘솔에서:
@@ -1053,6 +1279,13 @@ export const mockControls = {
       error.message ?? `요청을 처리하지 못했습니다. (${error.status})`,
       error.traceId
     );
+  },
+  /** 다음 비서 요청 한 번을 실패시킨다. 429 는 Retry-After 5초 (AI 서버의 ASSISTANT_BUSY) */
+  failNextAssistant(status: 422 | 429) {
+    store.failAssistant =
+    status === 429 ?
+    new ApiRequestError(429, 'ASSISTANT_BUSY', '이전 질문에 답하는 중입니다.', '', 5) :
+    new ApiRequestError(422, 'VALIDATION_ERROR', '요청을 확인해 주세요.');
   }
 };
 

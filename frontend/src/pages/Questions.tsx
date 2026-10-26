@@ -5,7 +5,8 @@ import { AppShell } from '../components/AppShell';
 import { Badge, Button, ChoiceGroup, Empty, Pagination } from '../components/ui';
 import { useSession } from '../contexts/SessionContext';
 import { api, ApiRequestError, useApi } from '../api';
-import type { QuestionGroup } from '../types/domain';
+import { previousAnswer } from '../components/assistant/logic';
+import type { AnswerSource, QuestionGroup } from '../types/domain';
 import { formatDate, formatNumber, formatWon, ro } from '../utils/format';
 
 /** F1-a. 한 번에 보여주는 질문 수(잠정). 다 답하면 다음 질문이 이어서 나온다 */
@@ -39,6 +40,8 @@ export function Questions() {
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [bulkChoice, setBulkChoice] = useState<Record<string, string>>({});
+  /** 「지난번 답 한 번에 적용」에서 뺀 그룹 */
+  const [skipped, setSkipped] = useState<Record<string, boolean>>({});
   /** 건너뛴 질문이 앞자리를 막아도 뒤 질문에 닿을 수 있게 페이지를 넘긴다 */
   const [page, setPage] = useState(0);
   const noticeRef = useRef<HTMLParagraphElement>(null);
@@ -55,6 +58,11 @@ export function Questions() {
     batchId ?
     api.questions.grouped({ batchId, status: 'ANSWERED', size: 100 }) :
     Promise.resolve(null),
+    [batchId]
+  );
+  // 지난번 답 (FR-5, agent-secretary.md 3.1). 못 읽으면 지난번 답 없이 그대로 그린다
+  const suggestionsQ = useApi(
+    () => batchId ? api.questions.suggestions(batchId).catch(() => null) : Promise.resolve(null),
     [batchId]
   );
   const errorRef = useRef<HTMLParagraphElement>(null);
@@ -89,7 +97,7 @@ export function Questions() {
     window.setTimeout(() => errorRef.current?.focus(), 0);
   };
 
-  const answer = async (group: QuestionGroup, value: string) => {
+  const answer = async (group: QuestionGroup, value: string, source?: AnswerSource) => {
     if (busy) return;
     const key = groupId(group);
     setBusy(key);
@@ -98,7 +106,8 @@ export function Questions() {
     try {
       const result = await api.questions.respond({
         questionIds: group.questionIds,
-        answer: { value }
+        answer: { value },
+        source
       });
       setEditing(null);
       announce(
@@ -140,6 +149,40 @@ export function Questions() {
     } finally {
       setBusy(null);
     }
+  };
+
+  const previousOf = (group: QuestionGroup) =>
+  previousAnswer(
+    group,
+    suggestionsQ.data?.items.find((item) => item.groupKey === group.groupKey && item.factType === group.factType)
+  );
+  /** 이 페이지에서 지난번 답으로 바로 채울 수 있는 그룹 (A 이어받기) */
+  const carryOver = pending.flatMap((group) => {
+    const previous = previousOf(group);
+    return previous?.kind === 'apply' ? [{ group, value: previous.value, text: previous.text }] : [];
+  });
+  const carryChosen = carryOver.filter(({ group }) => !skipped[groupId(group)]);
+
+  // 확인 목록에서 고른 것만 기존 응답 API 로 하나씩 보낸다. 한 번에 닫는 API 가 따로 없다 (3.1)
+  const applyCarryOver = async () => {
+    if (busy || carryChosen.length === 0) return;
+    setBusy('carry');
+    setError(null);
+    setNotice(null);
+    let saved = 0;
+    for (const { group, value } of carryChosen) {
+      try {
+        await api.questions.respond({ questionIds: group.questionIds, answer: { value }, source: 'PREVIOUS_ANSWER' });
+        saved += 1;
+      } catch {
+        // 남은 것도 보낸다. 몇 개를 못 했는지 알린다
+      }
+    }
+    setBusy(null);
+    const missed = carryChosen.length - saved;
+    if (missed > 0) fail(`지난번 답 ${formatNumber(missed)}개는 저장하지 못했습니다. 그 질문은 그대로 남아 있습니다.`);
+    if (saved > 0) announce(`지난번 답으로 질문 ${formatNumber(saved)}개에 답했습니다. 질문마다 다시 바꿀 수 있습니다.`);
+    reload();
   };
 
   // 남은 질문이 적을 때만 factType 별로 묶어 일괄 답변을 연다
@@ -224,9 +267,9 @@ export function Questions() {
           </span>
           {unresolved &&
           <span className="text-muted">
-              확인 필요{' '}
+              질문이 걸린 금액{' '}
               <strong className={`font-semibold ${unresolved.count > 0 ? 'text-warn' : 'text-ink'}`}>
-                {formatNumber(unresolved.count)}건 · {formatWon(unresolved.amount)}
+                {formatWon(unresolved.amount)}
               </strong>
             </span>
           }
@@ -259,6 +302,50 @@ export function Questions() {
           </p>
         }
 
+        {carryOver.length >= 2 &&
+        <section className="mt-4 rounded-2xl border border-line bg-surface p-5">
+            <h2 className="text-body font-semibold text-ink">지난번 답 한 번에 적용</h2>
+            <p className="mt-1 text-small text-muted">
+              다른 업로드에서 같은 질문에 한 답입니다. 확인하고 고른 것만 적용합니다. 적용한 뒤에도 질문마다 바꿀 수
+              있습니다.
+            </p>
+            <ul className="mt-3 space-y-2">
+              {carryOver.map(({ group, text }) => {
+              const key = groupId(group);
+              return (
+                <li key={key}>
+                    <label className="flex items-start gap-2.5 text-small text-ink2">
+                      <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={!skipped[key]}
+                      disabled={busy !== null}
+                      onChange={(event) => setSkipped((prev) => ({ ...prev, [key]: !event.target.checked }))} />
+
+                      <span>
+                        <span className="font-medium text-ink">
+                          {group.transactions[0]?.merchantNorm} · {group.questionText}
+                        </span>
+                        <span className="block text-muted">{text}</span>
+                      </span>
+                    </label>
+                  </li>);
+
+            })}
+            </ul>
+            <div className="mt-4 flex justify-end">
+              <Button
+              variant="secondary"
+              size="sm"
+              disabled={busy !== null || carryChosen.length === 0}
+              onClick={() => void applyCarryOver()}>
+
+                {busy === 'carry' ? '적용하는 중…' : `${formatNumber(carryChosen.length)}개 적용`}
+              </Button>
+            </div>
+          </section>
+        }
+
         {/* 뒤 페이지가 비면 첫 페이지로 돌아가므로, 그 사이에 「다 답했다」를 띄우지 않는다 */}
         {!pendingQ.loading && pending.length === 0 && shownPage === 0 ?
         <Empty
@@ -280,6 +367,7 @@ export function Questions() {
               {pending.map((group, index) => {
               const key = groupId(group);
               const rows = group.transactions;
+              const previous = previousOf(group);
               return (
                 <motion.li
                   key={key}
@@ -330,6 +418,21 @@ export function Questions() {
                       <div className="px-5 py-4">
                         {/* 저장하는 동안은 다른 카드의 선택지도 막는다. 눌러도 아무 일 없는 버튼을 두지 않는다 */}
                         <fieldset disabled={busy !== null} className={busy !== null ? 'opacity-60' : ''}>
+                          {/* 지난번 답은 사실 그대로 적고, 이어받기(A)만 그 값으로 답할 수 있다. 이력(B)은 미리 고르지 않는다 */}
+                          {previous &&
+                        <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-small text-ink2">
+                              <p>{previous.text}</p>
+                              {previous.kind === 'apply' &&
+                          <Button
+                            size="sm"
+                            variant="soft"
+                            onClick={() => void answer(group, previous.value, 'PREVIOUS_ANSWER')}>
+
+                                  이 답으로
+                                </Button>
+                          }
+                            </div>
+                        }
                           <ChoiceGroup
                           name={group.questionText}
                           columns={group.options.length >= 3 ? 3 : 2}

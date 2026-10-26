@@ -93,6 +93,8 @@ export function Summary() {
     [batchId]
   );
   const contextQ = useApi(() => api.contexts.current(), []);
+  // 비서로 넣어 둔 세무대리인 질문 (FR-16). 사용자 단위로 모은다
+  const notesQ = useApi(() => api.handoffNotes.list(), []);
   // 아직 분류하지 못해 판정하지 않은 거래 수. 배치의 분류 대기 수는 분류 확인 뒤 바로 줄지 않을 수 있어 거래에서 센다
   const unclassifiedQ = useApi(
     () =>
@@ -219,17 +221,21 @@ export function Summary() {
 
   const answeredGroups = answeredQ.data?.page.totalElements ?? 0;
   // 문장에 들어갈 건수를 아직 다 읽지 못했으면 복사하지 않는다. 빠진 채로 넘기면 「남은 것 없음」으로 읽힌다
-  const settling = batchQ.loading || questionsQ.loading || unclassifiedQ.loading || contextQ.loading;
+  const settling = batchQ.loading || questionsQ.loading || unclassifiedQ.loading || contextQ.loading || notesQ.loading;
   const omitted = [
   batchQ.error && '기간',
   questionsQ.error && '답하지 않은 질문',
   unclassifiedQ.error && '분류하지 못한 거래 수',
-  contextQ.error && '문진 응답'].
+  contextQ.error && '문진 응답',
+  notesQ.error && '따로 물을 질문'].
   filter(Boolean);
+  const notes = notesQ.data ?? [];
+  const notesText =
+  notes.length > 0 ? ` 따로 여쭐 것: ${notes.map((note, index) => `${index + 1}) ${note.text}`).join(' ')}` : '';
   const unclassified = unclassifiedQ.data?.page.totalElements ?? 0;
   // 못 읽은 항목은 화면에만 알리지 않고, 붙여 넣은 문장에도 남긴다
   const text = summary ?
-  `${handoffText(period, summary, unclassified, unresolved, contextQ.data)}${
+  `${handoffText(period, summary, unclassified, unresolved, contextQ.data)}${notesText}${
   omitted.length > 0 ? ` (불러오지 못해 빠진 항목: ${omitted.join(', ')})` : ''}` :
   '';
 
