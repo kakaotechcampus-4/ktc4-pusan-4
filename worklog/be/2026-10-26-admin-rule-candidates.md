@@ -27,3 +27,7 @@
 
 - 승인 뒤 규칙 카드 PR 자동 생성은 발표 범위 밖이다.
 - #155(Bearer 인증)·B9c 와 `UserController`·`ApiResponseContractTest` 가 겹친다. 나중에 머지되는 쪽에서 양쪽을 살린다.
+
+## 17:20 이메일이 없는 계정의 관리자 판별
+
+- 카카오 계정(B9b)은 이메일이 없다. `AdminPolicy.roleOf` 가 `email()` 을 바로 소문자로 바꿔 NPE 가 나므로, 이메일이 없으면 USER 로 본다. `AdminPolicyTest` 에 경우를 더했다.
