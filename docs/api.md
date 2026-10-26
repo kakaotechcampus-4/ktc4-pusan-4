@@ -209,8 +209,10 @@ refresh_token={token}; Path=/api/v1/auth; Max-Age=1209600; HttpOnly; Secure; Sam
 - 로컬 프로필(http)에서만 `Secure` 를 뺀다.
 
 > 지금은 실제 계정이 없어 고정 사용자 `demo@example.com` 하나만 로그인한다. 비밀번호는 서버 설정(`APP_AUTH_DEMO_PASSWORD`)이다.
-> 리프레시 토큰은 서버에 저장하지 않아(서명만 확인) 로그아웃해도 이미 복사된 토큰은 만료까지 유효하다.
-> 실제 계정은 B9b, 리프레시 토큰 저장·폐기(Redis)는 B9c 에서 붙이며 아래 계약은 바뀌지 않는다.
+> 실제 계정은 B9b 에서 붙이며 아래 계약은 바뀌지 않는다.
+
+리프레시 토큰은 서버(Redis)가 로그인 단위로 기억한다. 재발급하면 이전 토큰은 쓸 수 없고, 로그아웃하면 그 로그인만 끊긴다(다른 기기는 그대로).
+이미 쓴 리프레시 토큰을 다시 보내면 탈취로 보고 그 로그인을 끊는다. 그래서 프론트는 재발급 요청을 한 번에 하나만 보낸다.
 
 ### `POST /api/v1/auth/login`
 
@@ -238,7 +240,7 @@ refresh_token={token}; Path=/api/v1/auth; Max-Age=1209600; HttpOnly; Secure; Sam
 본문 없음. 쿠키의 리프레시 토큰으로 새 액세스 토큰과 새 리프레시 토큰(`Set-Cookie`)을 준다. 응답은 로그인과 같다.
 
 ```
-401 INVALID_REFRESH_TOKEN   쿠키가 없거나, 틀리거나, 만료됨 → 로그인 화면으로
+401 INVALID_REFRESH_TOKEN   쿠키가 없거나, 틀리거나, 만료됐거나, 로그아웃·재발급으로 폐기됨 → 로그인 화면으로
 ```
 
 ### `POST /api/v1/auth/logout`
@@ -627,6 +629,8 @@ G6
 ```
 
 ### `DELETE /api/v1/users/me`
+
+그 사용자의 모든 로그인(리프레시 토큰)을 끊고 지운다. 이미 받은 액세스 토큰은 만료(15분)까지 남는다.
 
 응답:
 

@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.testcontainers.context.ImportTestcontainers;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -30,6 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @SpringBootTest(properties = "app.auth.demo-password=test-password")
 @Testcontainers
+@ImportTestcontainers(RedisTestContainer.class)
 class AuthIntegrationTest {
 
     @Container
@@ -123,6 +125,37 @@ class AuthIntegrationTest {
         // then
         assertThat(result.getResponse().getHeader(HttpHeaders.SET_COOKIE)).startsWith("refresh_token=");
         mockMvc.perform(get("/api/v1/users/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken(result)))
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    void reusing_rotated_refresh_cookie_logs_out_that_login() throws Exception {
+        // given: 재발급으로 old → next 가 됐다
+        Cookie old = refreshCookie(login(LOGIN_BODY));
+        Cookie next = refreshCookie(mockMvc.perform(post("/api/v1/auth/refresh").cookie(old)).andReturn());
+
+        // when: 이미 쓴 old 를 다시 보낸다 (탈취된 토큰을 쓴 경우)
+        mockMvc.perform(post("/api/v1/auth/refresh").cookie(old))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("INVALID_REFRESH_TOKEN"));
+
+        // then: 그 로그인이 끊겨 next 도 쓸 수 없다
+        mockMvc.perform(post("/api/v1/auth/refresh").cookie(next))
+            .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void logout_revokes_refresh_token_but_keeps_other_logins() throws Exception {
+        Cookie loggedOut = refreshCookie(login(LOGIN_BODY));
+        Cookie otherDevice = refreshCookie(login(LOGIN_BODY));
+
+        // when
+        mockMvc.perform(post("/api/v1/auth/logout").cookie(loggedOut)).andExpect(status().isNoContent());
+
+        // then
+        mockMvc.perform(post("/api/v1/auth/refresh").cookie(loggedOut))
+            .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/v1/auth/refresh").cookie(otherDevice))
             .andExpect(status().isOk());
     }
 

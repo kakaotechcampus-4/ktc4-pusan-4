@@ -46,6 +46,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.InOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -72,6 +73,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
@@ -348,6 +350,17 @@ class ApiResponseContractTest {
 
         // then: 요청 값이 아니라 CurrentUserProvider 가 정한 사용자로 조회한다
         verify(userService).get(FixedUser.ID);
+    }
+
+    @Test
+    void deleting_me_logs_out_everywhere_before_deleting_user() throws Exception {
+        // when
+        mockMvc.perform(request(HttpMethod.DELETE, "/api/v1/users/me")).andExpect(status().isNoContent());
+
+        // then: 로그인을 먼저 끊어야 Redis 가 실패했을 때 지워진 사용자의 토큰이 남지 않는다
+        InOrder order = inOrder(authService, userService);
+        order.verify(authService).logoutEverywhere(FixedUser.ID);
+        order.verify(userService).delete(FixedUser.ID);
     }
 
     @Test
