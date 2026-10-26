@@ -42,6 +42,7 @@ dependencies {
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml")
     implementation("com.github.f4b6a3:uuid-creator:6.1.1")
     implementation("com.nimbusds:nimbus-jose-jwt:10.10")
+    implementation("org.springframework.security:spring-security-crypto")
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
     runtimeOnly("org.postgresql:postgresql")

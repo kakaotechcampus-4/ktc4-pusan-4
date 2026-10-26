@@ -6,6 +6,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
@@ -20,6 +22,12 @@ class AuthConfiguration {
      * 서명 키. 비어 있으면 기동할 때마다 새 키를 만든다 — 열려 있지는 않고, 재기동하면 로그인이 모두 풀릴 뿐이다.
      * 테스트와 키를 아직 안 넣은 서버가 이 경우다. 넣었는데 짧으면 HS256 이 요구하는 길이가 안 돼 기동을 멈춘다.
      */
+    /** 비밀번호 해시. BCrypt 기본 강도(10)다. */
+    @Bean
+    PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
     @Bean
     SignedTokens signedTokens(@Value("${app.auth.jwt-secret}") String secret) throws JOSEException {
         if (secret.isBlank()) {

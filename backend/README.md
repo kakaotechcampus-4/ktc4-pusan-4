@@ -84,19 +84,19 @@ bash ./backend/gradlew -p backend bootRun --args='--spring.profiles.active=local
 
 ### 인증 (`auth`)
 
-지금은 고정 사용자(`FixedUser`, `MockFixtures.USER_ID`와 같은 id) 하나만 로그인합니다. `TemporaryUserSeeder`가 기동할 때 그 사용자 행을 만듭니다. 로컬 프로필의 비밀번호는 `demo1234`입니다(`application-local.yml`, 운영은 `docs/deployment.md` 8절).
+이메일 가입(`POST /api/v1/auth/signup`)으로 만든 계정으로 로그인합니다. 비밀번호는 BCrypt 해시(`app_user.password_hash`)로 저장합니다. 로컬에서는 스웨거에서 가입한 뒤 로그인하면 됩니다.
 
 | 구성요소 | 지금 | 바꿀 때 |
 | --- | --- | --- |
 | `AccessTokens` | JWT 발급·검증(15분) | 그대로 |
 | `RefreshTokenStore` | `RedisRefreshTokenStore` — 로그인 단위(family)로 토큰 해시를 Redis에 둔다. 재발급 때 교체, 이미 쓴 토큰이 오면 그 로그인 폐기, 로그아웃은 그 로그인만, 탈퇴는 전체 폐기 | 그대로 |
-| `CredentialVerifier` | `FixedUserCredentialVerifier` — `FixedUser` + `APP_AUTH_DEMO_PASSWORD` | B9b: 실제 계정·카카오 구현으로 교체, `FixedUser`·`TemporaryUserSeeder` 삭제 |
+| `CredentialVerifier` | `EmailPasswordCredentialVerifier` — 이메일로 찾은 계정의 BCrypt 해시와 비교. 없는 이메일도 같은 시간이 걸리게 한 번 비교한다 | 그대로 |
 
 `AuthService`와 `AuthController`는 위 인터페이스만 보므로 교체해도 바뀌지 않습니다.
 
 ### 테스트에서 인증
 
-자동 구성 MockMvc(`@AutoConfigureMockMvc`, `@WebMvcTest`)의 요청에는 고정 사용자의 액세스 토큰이 기본으로 실립니다(`DefaultBearerTokenContextCustomizerFactory`, `src/test/resources/META-INF/spring.factories`로 모든 테스트 컨텍스트에 붙음). 그래서 API를 부르는 테스트는 `Authorization`을 넣지 않아도 됩니다. 직접 넣으면 그 값을 씁니다.
+자동 구성 MockMvc(`@AutoConfigureMockMvc`, `@WebMvcTest`)의 요청에는 테스트 사용자(`TestUser`)의 액세스 토큰이 기본으로 실리고, 그 사용자 행도 기동할 때 만들어집니다(`DefaultBearerTokenContextCustomizerFactory`, `src/test/resources/META-INF/spring.factories`로 모든 테스트 컨텍스트에 붙음). 그래서 API를 부르는 테스트는 `Authorization`을 넣지 않아도 됩니다. 직접 넣으면 그 값을 씁니다.
 
 - `@WebMvcTest`는 인증 빈이 올라오지 않으므로 `@Import(TestAuthentication.class)`를 붙입니다(`ApiResponseContractTest` 참고).
 - 인증 실패를 보는 테스트는 기본 토큰이 없는 MockMvc를 `MockMvcBuilders.webAppContextSetup`으로 직접 만듭니다(`AuthIntegrationTest` 참고).

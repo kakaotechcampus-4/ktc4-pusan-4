@@ -14,6 +14,22 @@ interface AppUserRepository extends Repository<AppUserEntity, UUID> {
 
     Optional<AppUserEntity> findById(UUID id);
 
+    Optional<AppUserEntity> findByEmail(String email);
+
+    /**
+     * 이메일 계정을 만든다. 같은 이메일이 있으면 아무것도 하지 않는다 — 동시 가입도 UNIQUE(email)가 하나만 남긴다.
+     *
+     * @return 만든 행 수. 이미 있으면 0
+     */
+    @Modifying
+    @Query(value = """
+        insert into app_user(id, email, password_hash)
+        values (:id, :email, :passwordHash)
+        on conflict (email) do nothing
+        """, nativeQuery = true)
+    int insertEmailAccount(@Param("id") UUID id, @Param("email") String email,
+        @Param("passwordHash") String passwordHash);
+
     /** 사용자 단위로 직렬화해야 하는 쓰기(Context 버전 채번 등) 앞에서 잡는다. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""

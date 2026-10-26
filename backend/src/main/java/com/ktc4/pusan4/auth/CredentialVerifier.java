@@ -4,8 +4,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * 로그인 자격 확인. 지금은 {@link FixedUserCredentialVerifier}(고정 사용자 하나)이고,
- * 실제 계정·카카오 로그인(B9b)이 정해지면 구현체만 바꾼다.
+ * 이메일·비밀번호 로그인 자격 확인. 구현은 {@link EmailPasswordCredentialVerifier} 다.
  */
 public interface CredentialVerifier {
 

@@ -1,9 +1,9 @@
 package com.ktc4.pusan4.integration;
 
+import com.ktc4.pusan4.auth.TestUser;
 import com.ktc4.pusan4.judgment.domain.JudgmentOrigin;
 import com.ktc4.pusan4.judgment.domain.JudgmentOriginType;
 import com.ktc4.pusan4.judgment.persistence.JudgmentExecutor;
-import com.ktc4.pusan4.shared.auth.FixedUser;
 import com.ktc4.pusan4.user.domain.BusinessContext;
 import com.ktc4.pusan4.user.persistence.BusinessContextService;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,7 +41,7 @@ class QuestionAnswerIntegrationTest {
     @ServiceConnection
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17-alpine");
 
-    private static final UUID USER_ID = FixedUser.ID;
+    private static final UUID USER_ID = TestUser.ID;
 
     @Autowired
     private MockMvc mockMvc;
