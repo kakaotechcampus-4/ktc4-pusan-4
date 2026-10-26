@@ -30,6 +30,13 @@ class AdminPolicyTest {
     }
 
     @Test
+    void account_without_email_is_not_admin() {
+        AdminPolicy policy = new AdminPolicy(userService, "admin@example.com");
+
+        assertThat(policy.roleOf(user(null))).isEqualTo(UserRole.USER);
+    }
+
+    @Test
     void empty_setting_has_no_admin() {
         AdminPolicy policy = new AdminPolicy(userService, "");
 

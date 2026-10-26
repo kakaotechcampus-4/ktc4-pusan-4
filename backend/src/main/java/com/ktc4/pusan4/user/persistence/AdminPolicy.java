@@ -31,8 +31,10 @@ public class AdminPolicy {
             .collect(Collectors.toUnmodifiableSet());
     }
 
+    /** 이메일이 없는 계정(카카오 로그인, B9b)은 관리자가 될 수 없다. */
     public UserRole roleOf(AppUser user) {
-        return adminEmails.contains(user.email().toLowerCase(Locale.ROOT)) ? UserRole.ADMIN : UserRole.USER;
+        boolean admin = user.email() != null && adminEmails.contains(user.email().toLowerCase(Locale.ROOT));
+        return admin ? UserRole.ADMIN : UserRole.USER;
     }
 
     /** 관리자면 그 사용자를, 아니면 403 FORBIDDEN 을 던진다. */
