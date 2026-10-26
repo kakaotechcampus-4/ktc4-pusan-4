@@ -134,6 +134,7 @@ systemctl list-timers ktc4-corpus.timer
 
 - `/etc/ktc4/production.env`의 `APP_AUTH_JWT_SECRET`에는 `openssl rand -hex 32`로 만든 값을 넣는다. 비우면 백엔드가 기동할 때마다 임시 키를 만들어, 재배포할 때마다 모든 로그인이 풀린다. 32바이트보다 짧으면 백엔드가 뜨지 않는다.
 - 예전 고정 사용자 `demo@example.com` 행은 비밀번호가 없어 로그인할 수 없고, 같은 이메일로 다시 가입할 수도 없다(409). 시연 계정은 다른 이메일로 가입한다. `APP_AUTH_DEMO_PASSWORD`는 더 쓰지 않으니 `production.env`에서 지워도 된다.
+- 카카오 로그인은 `APP_AUTH_KAKAO_REST_API_KEY`(카카오 앱의 REST API 키), `APP_AUTH_KAKAO_CLIENT_SECRET`(보안 메뉴에서 켠 Client Secret, 안 쓰면 비움), `APP_AUTH_KAKAO_REDIRECT_URI`(`https://<DOMAIN>/auth/kakao/callback`, 카카오 앱에 등록한 값과 같게)를 넣는다. 키가 비면 카카오 로그인만 503으로 꺼지고 이메일 로그인은 그대로다. 동의항목은 닉네임만 쓰고 이메일은 켜지 않는다(비즈 앱 심사가 필요하다).
 - 리프레시 토큰 쿠키는 `Secure`라 HTTPS(Caddy)로만 저장된다. 로컬 프로필은 http라 `Secure`를 끈다.
 
 ## 9. Redis

@@ -18,7 +18,8 @@ class AppUserEntity {
     @Id
     private UUID id;
 
-    @Column(nullable = false)
+    /** 카카오 계정은 비어 있다. */
+    @Column
     private String email;
 
     /** 이메일 계정의 BCrypt 해시. 이메일 가입 전에 있던 행은 비어 있다. */

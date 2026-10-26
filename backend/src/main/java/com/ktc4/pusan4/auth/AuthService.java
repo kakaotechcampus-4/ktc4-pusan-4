@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
 import java.util.UUID;
 
 /**
- * 회원가입·로그인·재발급·로그아웃 (api.md 1.1). 자격 확인과 리프레시 토큰 보관은 인터페이스 뒤에 있다.
+ * 회원가입·로그인(이메일·카카오)·재발급·로그아웃 (api.md 1.1). 자격 확인과 리프레시 토큰 보관은 인터페이스 뒤에 있다.
  */
 @Service
 public class AuthService {
@@ -20,14 +20,21 @@ public class AuthService {
     private final RefreshTokenStore refreshTokens;
     private final UserService users;
     private final PasswordEncoder passwordEncoder;
+    private final KakaoClient kakao;
 
     AuthService(CredentialVerifier credentials, AccessTokens accessTokens, RefreshTokenStore refreshTokens,
-        UserService users, PasswordEncoder passwordEncoder) {
+        UserService users, PasswordEncoder passwordEncoder, KakaoClient kakao) {
         this.credentials = credentials;
         this.accessTokens = accessTokens;
         this.refreshTokens = refreshTokens;
         this.users = users;
         this.passwordEncoder = passwordEncoder;
+        this.kakao = kakao;
+    }
+
+    /** 카카오 인가 코드로 로그인한다. 처음 온 카카오 회원이면 계정을 만든다. */
+    public IssuedTokens kakaoLogin(String code) {
+        return issue(users.findOrCreateKakaoAccount(kakao.userId(code)));
     }
 
     /** 이메일로 가입하고 바로 로그인한다. 메일 인증은 하지 않는다. */

@@ -14,6 +14,9 @@ app:
     jwt-secret: ${APP_AUTH_JWT_SECRET:local-only-jwt-secret-not-for-production-0000}
     # 로컬은 http 라 Secure 쿠키를 브라우저가 저장하지 않는다
     cookie-secure: ${APP_AUTH_COOKIE_SECURE:false}
+    # 키는 넣지 않는다(환경변수 APP_AUTH_KAKAO_REST_API_KEY). 콜백 경로는 프론트와 맞춘다
+    kakao:
+      redirect-uri: ${APP_AUTH_KAKAO_REDIRECT_URI:http://localhost:5173/auth/kakao/callback}
 
 springdoc:
   api-docs:

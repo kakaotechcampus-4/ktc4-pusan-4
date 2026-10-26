@@ -90,6 +90,7 @@ bash ./backend/gradlew -p backend bootRun --args='--spring.profiles.active=local
 | --- | --- | --- |
 | `AccessTokens` | JWT 발급·검증(15분) | 그대로 |
 | `RefreshTokenStore` | `RedisRefreshTokenStore` — 로그인 단위(family)로 토큰 해시를 Redis에 둔다. 재발급 때 교체, 이미 쓴 토큰이 오면 그 로그인 폐기, 로그아웃은 그 로그인만, 탈퇴는 전체 폐기 | 그대로 |
+| `KakaoClient` | 인가 코드 → 카카오 토큰 → 카카오 회원번호. 회원번호로 계정을 찾거나 만든다(`UserService.findOrCreateKakaoAccount`) | 그대로 |
 | `CredentialVerifier` | `EmailPasswordCredentialVerifier` — 이메일로 찾은 계정의 BCrypt 해시와 비교. 없는 이메일도 같은 시간이 걸리게 한 번 비교한다 | 그대로 |
 
 `AuthService`와 `AuthController`는 위 인터페이스만 보므로 교체해도 바뀌지 않습니다.
