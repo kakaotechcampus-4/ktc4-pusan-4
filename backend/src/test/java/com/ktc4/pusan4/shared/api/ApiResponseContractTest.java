@@ -1,6 +1,9 @@
 package com.ktc4.pusan4.shared.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ktc4.pusan4.admin.domain.RuleCandidate;
+import com.ktc4.pusan4.admin.domain.RuleCandidateStatus;
+import com.ktc4.pusan4.admin.persistence.RuleCandidateReviewService;
 import com.ktc4.pusan4.judgment.api.JudgmentMockData;
 import com.ktc4.pusan4.judgment.domain.Gate;
 import com.ktc4.pusan4.judgment.domain.JudgmentOrigin;
@@ -37,6 +40,8 @@ import com.ktc4.pusan4.transaction.persistence.UploadService;
 import com.ktc4.pusan4.user.domain.AppUser;
 import com.ktc4.pusan4.user.domain.BookkeepingDuty;
 import com.ktc4.pusan4.user.domain.BusinessContext;
+import com.ktc4.pusan4.user.domain.UserRole;
+import com.ktc4.pusan4.user.persistence.AdminPolicy;
 import com.ktc4.pusan4.user.persistence.BusinessContextService;
 import com.ktc4.pusan4.user.persistence.UserService;
 import org.junit.jupiter.api.BeforeEach;
@@ -124,6 +129,12 @@ class ApiResponseContractTest {
     @MockitoBean
     private TransactionService transactionService;
 
+    @MockitoBean
+    private AdminPolicy adminPolicy;
+
+    @MockitoBean
+    private RuleCandidateReviewService ruleCandidateReviewService;
+
     @BeforeEach
     void stubServices() {
         given(userService.get(any())).willReturn(new AppUser(
@@ -188,6 +199,18 @@ class ApiResponseContractTest {
         given(transactionService.exclude(any(), any())).willReturn(new TransactionDetail(UUID.fromString(ID),
             UUID.fromString(ID), LocalDate.parse("2026-01-03"), "AWS APN1", "Amazon Web Services", "해외SaaS",
             ClassificationStatus.CLASSIFIED, 137_000L, 0, SourceStatus.JUDGEABLE, UserInclusion.EXCLUDED));
+
+        AppUser admin = new AppUser(UUID.fromString(ID), "admin@example.com",
+            OffsetDateTime.parse("2026-09-01T10:00:00+09:00"));
+        given(adminPolicy.roleOf(any())).willReturn(UserRole.USER);
+        given(adminPolicy.requireAdmin(any())).willReturn(admin);
+        RuleCandidate candidate = new RuleCandidate(1L, "사무용품", "940909", 3, 7,
+            List.of(new RuleCandidate.SuggestedDoc("소득세법시행령-55-1", "업무와 관련된 비용", "법령")),
+            "법령", "id: R-900", RuleCandidateStatus.PENDING, null, null,
+            OffsetDateTime.parse("2026-10-20T10:00:00+09:00"));
+        given(ruleCandidateReviewService.list(any(), anyInt(), anyInt()))
+            .willReturn(new PageImpl<>(List.of(candidate), PageRequest.of(0, 20), 1));
+        given(ruleCandidateReviewService.review(anyLong(), any(), any())).willReturn(candidate);
     }
 
     static Stream<Arguments> endpoints() {
@@ -238,7 +261,10 @@ class ApiResponseContractTest {
             Arguments.of("POST", "/api/v1/question-responses", """
                 {"questionIds": ["%s"], "answer": {"value": "사업"}}
                 """.formatted(ID), 200),
-            Arguments.of("GET", "/api/v1/statutes/1523", null, 200)
+            Arguments.of("GET", "/api/v1/statutes/1523", null, 200),
+            Arguments.of("GET", "/api/v1/admin/rule-candidates", null, 200),
+            Arguments.of("POST", "/api/v1/admin/rule-candidates/1/approve", null, 200),
+            Arguments.of("POST", "/api/v1/admin/rule-candidates/1/reject", null, 200)
         );
     }
 
@@ -259,7 +285,7 @@ class ApiResponseContractTest {
         mockMvc.perform(request).andExpect(status().is(expectedStatus));
     }
 
-    private static final Set<String> USER_KEYS = Set.of("id", "email", "createdAt");
+    private static final Set<String> USER_KEYS = Set.of("id", "email", "role", "createdAt");
     private static final Set<String> CONTEXT_KEYS = Set.of("id", "userId", "version", "industryCode",
         "prevYearRevenue", "businessOpenDate", "bookkeepingDuty", "hasEmployee", "homeOfficeRatio", "createdAt");
     private static final Set<String> UPLOAD_BATCH_KEYS = Set.of("id", "sourceType", "cardIssuer", "periodStart",
@@ -287,6 +313,10 @@ class ApiResponseContractTest {
     private static final Set<String> CLASSIFICATION_GROUP_TRANSACTION_KEYS =
         withTransactionSummary("reviewId", "transactionId");
     private static final Set<String> UNRESOLVED_KEYS = Set.of("count", "amount");
+    private static final Set<String> RULE_CANDIDATE_KEYS = Set.of("id", "merchantCategory", "industryCode",
+        "distinctUsers", "occurrenceCount", "suggestedDocs", "searchedTier", "draftYaml", "status", "reviewedBy",
+        "reviewedAt", "createdAt");
+    private static final Set<String> RULE_CANDIDATE_DOC_KEYS = Set.of("statuteId", "quote", "tier");
 
     private static Set<String> withTransactionSummary(String... keys) {
         return Stream.concat(Stream.of(keys), TRANSACTION_SUMMARY_KEYS.stream()).collect(Collectors.toSet());
@@ -317,7 +347,9 @@ class ApiResponseContractTest {
             Arguments.of("/api/v1/classification-reviews?grouped=true", "/items/0", CLASSIFICATION_REVIEW_GROUP_KEYS),
             Arguments.of("/api/v1/classification-reviews?grouped=true", "/items/0/transactions/0",
                 CLASSIFICATION_GROUP_TRANSACTION_KEYS),
-            Arguments.of("/api/v1/classification-reviews?grouped=true", "/unresolved", UNRESOLVED_KEYS)
+            Arguments.of("/api/v1/classification-reviews?grouped=true", "/unresolved", UNRESOLVED_KEYS),
+            Arguments.of("/api/v1/admin/rule-candidates", "/items/0", RULE_CANDIDATE_KEYS),
+            Arguments.of("/api/v1/admin/rule-candidates", "/items/0/suggestedDocs/0", RULE_CANDIDATE_DOC_KEYS)
         );
     }
 

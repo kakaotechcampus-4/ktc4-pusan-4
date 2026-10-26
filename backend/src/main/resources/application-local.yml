@@ -4,6 +4,11 @@ spring:
     username: ${DB_USERNAME:ktc4}
     password: ${DB_PASSWORD:ktc4-local}
 
+# 로컬에서는 고정 사용자(demo@example.com)를 관리자로 둬 /admin 화면을 바로 볼 수 있게 한다
+app:
+  admin:
+    emails: ${APP_ADMIN_EMAILS:demo@example.com}
+
 springdoc:
   api-docs:
     enabled: true

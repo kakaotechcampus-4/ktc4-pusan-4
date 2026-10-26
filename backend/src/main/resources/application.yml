@@ -18,6 +18,10 @@ app:
   rules:
     dir: ../rules
     commit-sha: local
+  # 관리자(규칙 후보 API, api.md 3.14). 쉼표로 나눈 이메일 목록이고 대소문자를 가리지 않는다. 비면 관리자가 없다.
+  # 계정 방식(B9b)이 정해지면 app_user 의 role 로 바꿀 수 있다(AdminPolicy).
+  admin:
+    emails: ${APP_ADMIN_EMAILS:}
 
 management:
   endpoints:

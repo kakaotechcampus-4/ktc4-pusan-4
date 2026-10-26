@@ -61,7 +61,10 @@ class ApiContractIntegrationTest {
         "GET /api/v1/questions",
         "POST /api/v1/questions/bulk-answer",
         "POST /api/v1/question-responses",
-        "GET /api/v1/statutes/{statuteVersionId}"
+        "GET /api/v1/statutes/{statuteVersionId}",
+        "GET /api/v1/admin/rule-candidates",
+        "POST /api/v1/admin/rule-candidates/{candidateId}/approve",
+        "POST /api/v1/admin/rule-candidates/{candidateId}/reject"
     );
 
     @Autowired
