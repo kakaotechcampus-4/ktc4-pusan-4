@@ -17,6 +17,19 @@ services:
       timeout: 5s
       retries: 10
       start_period: 5s
+  # 리프레시 토큰 저장소(B9c). 로컬은 운영과 같은 설정으로 띄운다(deploy/compose.yaml)
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "128mb", "--maxmemory-policy", "volatile-lru"]
+    ports:
+      - "${REDIS_PORT:-16379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
   ai:
     build: ./ai
     environment:
@@ -43,3 +56,4 @@ services:
 
 volumes:
   postgres-data:
+  redis-data:

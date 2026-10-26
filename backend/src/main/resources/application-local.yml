@@ -3,6 +3,10 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:${DB_PORT:15432}/${DB_NAME:ktc4}}
     username: ${DB_USERNAME:ktc4}
     password: ${DB_PASSWORD:ktc4-local}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:16379}
 
 # 로컬 전용 값. 운영에는 /etc/ktc4/production.env 로 따로 넣는다(docs/deployment.md).
 app:

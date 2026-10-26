@@ -59,7 +59,7 @@ sudo docker ps --filter name=ktc4
 curl -I "https://<도메인>/"
 ```
 
-`docker compose ps`에서 PostgreSQL·백엔드·AI가 healthy이고 웹 컨테이너가 running이어야 한다. 브라우저에서 `/`, `/upload`를 새로고침해 SPA 라우팅을 확인한다. 백엔드 `/actuator/health`와 AI `/health/db`는 컨테이너 내부 검사로 확인하며 외부에 공개하지 않는다. `docker stats`와 `df -h`로 4GB 메모리·50GB 디스크 사용량을 확인한다.
+`docker compose ps`에서 PostgreSQL·Redis·백엔드·AI가 healthy이고 웹 컨테이너가 running이어야 한다. 브라우저에서 `/`, `/upload`를 새로고침해 SPA 라우팅을 확인한다. 백엔드 `/actuator/health`와 AI `/health/db`는 컨테이너 내부 검사로 확인하며 외부에 공개하지 않는다. `docker stats`와 `df -h`로 4GB 메모리·50GB 디스크 사용량을 확인한다.
 
 Compose는 기존 백엔드를 내린 뒤 새 백엔드를 띄우고, 새 백엔드가 부팅하면서 Flyway를 실행한다. 마이그레이션이 실패하면 그 시점부터 서비스가 멈추므로 5절의 롤백 명령으로 이전 SHA를 다시 배포한다. 마이그레이션 작성 규칙은 `db/README.md`를 따른다.
 
@@ -135,3 +135,11 @@ systemctl list-timers ktc4-corpus.timer
 - `/etc/ktc4/production.env`의 `APP_AUTH_JWT_SECRET`에는 `openssl rand -hex 32`로 만든 값을 넣는다. 비우면 백엔드가 기동할 때마다 임시 키를 만들어, 재배포할 때마다 모든 로그인이 풀린다. 32바이트보다 짧으면 백엔드가 뜨지 않는다.
 - `APP_AUTH_DEMO_PASSWORD`에는 시연용 비밀번호를 넣는다. 비우면 아무도 로그인할 수 없다(로그인 API가 401 `INVALID_CREDENTIALS`).
 - 리프레시 토큰 쿠키는 `Secure`라 HTTPS(Caddy)로만 저장된다. 로컬 프로필은 http라 `Secure`를 끈다.
+
+## 9. Redis
+
+리프레시 토큰 저장소다(B9c). `redis:7.4-alpine`을 compose 내부망에서만 쓰고 포트는 열지 않는다. 백엔드는 `SPRING_DATA_REDIS_HOST=redis`로 붙고, Redis가 healthy가 된 뒤에 뜬다. 백엔드 `/actuator/health`는 Redis 연결도 보므로 Redis가 내려가면 백엔드도 unhealthy가 된다.
+
+- `--appendonly yes`로 AOF를 켜서 재시작해도 로그인이 유지된다. 데이터는 `redis-data` 볼륨에 남는다.
+- `--maxmemory 128mb --maxmemory-policy volatile-lru`다. 토큰은 모두 TTL이 있어 메모리가 차면 오래 안 쓴 토큰부터 지워지고, 그 사용자는 다시 로그인한다. 컨테이너는 `mem_limit: 192m`이다.
+- Redis를 비우면(`FLUSHALL`, 볼륨 삭제) 모든 사용자가 로그아웃된다. 데이터 손실은 없다.
