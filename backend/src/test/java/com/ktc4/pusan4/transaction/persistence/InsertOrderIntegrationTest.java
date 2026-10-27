@@ -80,7 +80,7 @@ class InsertOrderIntegrationTest {
         UploadBatchEntity batch = new UploadBatchEntity(UUID.randomUUID(), userId,
             new NewUploadBatch(SourceType.승인내역, CardIssuer.국민, LocalDate.parse("2026-01-01"),
                 LocalDate.parse("2026-01-31"), UUID.randomUUID().toString(), List.of()),
-            OffsetDateTime.now());
+            0, OffsetDateTime.now());
         transactionTemplate.executeWithoutResult(status -> entityManager.persist(batch));
         return batch.id();
     }
