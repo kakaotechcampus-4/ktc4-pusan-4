@@ -111,7 +111,7 @@ const store = {
     // 시드 판정·Run 이 문진 v4 로 만들어졌으므로 버전을 맞춘다
     id: '0199d3a1-0000-7000-8000-000000000001',
     version: 4,
-    industryCode: '62010',
+    industryCode: '940909',
     prevYearRevenue: 83_000_000,
     businessOpenDate: '2024-03-01',
     bookkeepingDuty: '복식부기',

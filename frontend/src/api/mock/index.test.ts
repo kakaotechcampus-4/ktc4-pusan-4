@@ -202,7 +202,7 @@ describe('문진·판정 실행', () => {
     if (!seed) throw new Error('시드 문진이 없다');
     expect(seed).toMatchObject({ userId: expect.any(String), createdAt: expect.any(String) });
     await api.contexts.create({
-      industryCode: '62010',
+      industryCode: '940909',
       prevYearRevenue: 1,
       businessOpenDate: '2024-01-01',
       bookkeepingDuty: '간편장부',
