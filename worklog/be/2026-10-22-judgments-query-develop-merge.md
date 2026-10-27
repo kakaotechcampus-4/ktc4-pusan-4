@@ -78,3 +78,17 @@
 ### 남은 것 · 아는 문제
 
 - #157(draft, A5)의 base 는 여전히 feature/question-responses 다. #135 가 merge 되면 develop 으로 바꿔야 한다.
+
+## 16:08 judgment-override(#157) 의 base 를 develop 으로 바꾸고 develop 을 merge 한다
+
+- 브랜치: feature/judgment-override
+- 커밋: 7c24ac4 (merge 1개)
+
+### 한 일
+
+- #135 가 develop 에 들어가(808d636) #157 의 base 였던 feature/question-responses 가 끝났다. base 를 develop 으로 바꾸고 develop 을 merge 했다. PR 은 draft 그대로 둔다.
+- `TransactionRecordEntity` 가 충돌했다. develop 은 package-private `merchantCategory()` 를 지우고 public 판을 두었고, 이 브랜치(199dfee)는 같은 자리에 `judgeable()` 을 더했다. develop 쪽을 쓰고 `judgeable()` 만 더했다.
+
+### 확인한 것
+
+- `gradlew -p backend check` 통과(test 339, integrationTest 111).

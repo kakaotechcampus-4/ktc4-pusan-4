@@ -9,7 +9,7 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 /**
- * 미분류 거래의 분류 확인 요청 (V7, api.md 2.6·3.5). 업로드는 PENDING 으로만 만든다.
+ * 미분류 거래의 분류 확인 요청 (V7, api.md 2.6·3.5). 업로드와 포함(include)은 PENDING 으로만 만든다.
  * 응답(RESOLVED) 처리는 B8 이 이 엔티티에 메서드를 더한다.
  */
 @Entity

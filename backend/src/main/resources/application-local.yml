@@ -3,9 +3,26 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:${DB_PORT:15432}/${DB_NAME:ktc4}}
     username: ${DB_USERNAME:ktc4}
     password: ${DB_PASSWORD:ktc4-local}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:16379}
+
+# 로컬 전용 값. 운영에는 /etc/ktc4/production.env 로 따로 넣는다(docs/deployment.md).
+app:
+  auth:
+    jwt-secret: ${APP_AUTH_JWT_SECRET:local-only-jwt-secret-not-for-production-0000}
 
 springdoc:
   api-docs:
     enabled: true
   swagger-ui:
     enabled: true
+
+app:
+  # 판정 run 실행 풀. 개발 PC(Docker Desktop, CPU 22개) 값이다. 운영 값과 근거는 application.yml.
+  # 같은 Docker 네트워크 측정에서 처리량이 1개 185, 4개 562(3.0배), 8개 829건/초(4.5배)였다.
+  # 4개면 DB 커넥션 10개 중 6개가 웹 요청 몫으로 남는다. 1,200건 run 이 약 8초라 대기열 상한은 150 × 8초 / 4 ≈ 5분이다.
+  judgment-run:
+    workers: 4
+    queue-capacity: 150

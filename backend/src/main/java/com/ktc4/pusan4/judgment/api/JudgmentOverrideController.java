@@ -1,7 +1,8 @@
 package com.ktc4.pusan4.judgment.api;
 
+import com.ktc4.pusan4.judgment.persistence.JudgmentOverrideService;
 import com.ktc4.pusan4.shared.api.ErrorResponse;
-import com.ktc4.pusan4.shared.api.MockResponse;
+import com.ktc4.pusan4.shared.auth.CurrentUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -21,7 +22,12 @@ import java.util.UUID;
 @RequestMapping("/judgment-overrides")
 public class JudgmentOverrideController {
 
-    @MockResponse
+    private final JudgmentOverrideService overrideService;
+
+    public JudgmentOverrideController(JudgmentOverrideService overrideService) {
+        this.overrideService = overrideService;
+    }
+
     @Operation(summary = "사용자 판정 수정 해제",
         description = "Override 와 그 revision 은 삭제하지 않고 active=false, releasedAt 을 기록한다. "
             + "이미 해제된 Override 도 204")
@@ -29,7 +35,7 @@ public class JudgmentOverrideController {
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @DeleteMapping("/{overrideId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void release(@PathVariable UUID overrideId) {
-        // 목 응답: 해제할 Override 가 없다
+    public void release(CurrentUser currentUser, @PathVariable UUID overrideId) {
+        overrideService.release(currentUser.id(), overrideId);
     }
 }

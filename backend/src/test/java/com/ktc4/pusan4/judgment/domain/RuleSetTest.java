@@ -1,5 +1,6 @@
 package com.ktc4.pusan4.judgment.domain;
 
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
@@ -24,6 +25,19 @@ class RuleSetTest {
         // 모든 관문이 동일하게 priority → specificity → id로 정렬된다(G1도 WINNER 사용).
         assertThat(rules.get(gate)).extracting(RuleCard::id)
             .containsExactly("R-040", "R-020", "R-010", "R-030");
+    }
+
+    @Test
+    void collects_statutes_cited_by_cards_and_by_answers() {
+        QuestionSpec purpose = new QuestionSpec("PURPOSE", "용도는?", "용도", "transaction", List.of("업무미팅", "개인"),
+            Map.of("업무미팅", new QuestionEffect(Verdict.AVAILABLE, "접대비", Map.of(), List.of(new Citation("답근거")))));
+        RuleSet rules = new RuleSet(List.of(
+            new RuleCard("R-300", 1, Gate.G2, 500, RuleMatch.categories("카페"), Verdict.NEEDS_REVIEW, null,
+                List.of(new Citation("카드근거")), Map.of(), List.of(purpose)),
+            card("R-010", Gate.G1, 500, RuleMatch.categories("카페"))
+        ));
+
+        assertThat(rules.statuteIds()).containsExactlyInAnyOrder("카드근거", "답근거", "근거");
     }
 
     private static RuleCard card(String id, Gate gate, int priority, RuleMatch match) {

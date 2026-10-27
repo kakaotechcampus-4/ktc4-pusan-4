@@ -230,8 +230,9 @@ def summary(rows: list) -> list[str]:
             f" · 확정 적중 {_of(one, lambda r: r[3]['verdict'] == '일치')}"
         ),
         (
-            f"보류  위험 결론 중 {_of(risky, lambda r: r[2]['hold'])} · 전체 {_of(rows, lambda r: r[2]['hold'])}"
-            f" (오류 {len(rows) - len(ok)} · 결론이 맞는데 보류 {sum(r[2]['hold'] and r[3]['verdict'] == '일치' for r in ok)})"
+            # 오류 키는 보류로 세지 않는다. 운영은 적재하지 않고 다음 배치에서 다시 시도한다(#94)
+            f"보류  위험 결론 중 {_of(risky, lambda r: r[2]['hold'])} · 전체 {_of(rows, lambda r: r[2]['hold'] and not r[2]['error'])}"
+            f" (결론이 맞는데 보류 {sum(r[2]['hold'] and r[3]['verdict'] == '일치' for r in ok)})"
         ),
         f"G1    오판 {_of(no_g1, lambda r: r[2]['gate'] == 'G1')} · 적중 {_of(g1, lambda r: r[2]['gate'] == 'G1')}"
         + (f" · 그 밖의 게이트 불일치 {', '.join(odd)}" if odd else ""),
@@ -300,7 +301,7 @@ def main() -> int:
             note.append(f"선택누락 {len(s['unpicked'])}")
         if s["stray"]:
             note.append(f"카드 밖 {len(s['stray'])}건")
-        if got["hold"]:
+        if got["hold"] and not got["error"]:
             note.append("보류")
         print(
             f"{cat:<14} {gate:<12} {s['hit']}/{s['want']:<5} {s['verdict']:<8} "

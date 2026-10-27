@@ -5,6 +5,9 @@ import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /** 로딩 시 관문별로 정렬해 여러 거래 판정에서 재사용하는 규칙 목록. */
 public final class RuleSet {
@@ -15,6 +18,7 @@ public final class RuleSet {
         .thenComparing(RuleCard::id);
 
     private final Map<Gate, List<RuleCard>> rulesByGate;
+    private final Set<String> statuteIds;
 
     public RuleSet(List<RuleCard> rules) {
         Map<Gate, List<RuleCard>> grouped = new EnumMap<>(Gate.class);
@@ -25,9 +29,27 @@ public final class RuleSet {
             cards.stream().sorted(WINNER).toList()
         );
         rulesByGate = Map.copyOf(grouped);
+        statuteIds = rules.stream()
+            .flatMap(RuleSet::citations)
+            .map(Citation::statuteId)
+            .collect(Collectors.toUnmodifiableSet());
     }
 
     public List<RuleCard> get(Gate gate) {
         return rulesByGate.getOrDefault(gate, List.of());
+    }
+
+    /** 판정이 인용할 수 있는 조문 ID. 엔진은 카드 근거나, 질문에 답했으면 그 선택지의 근거를 싣는다. */
+    public Set<String> statuteIds() {
+        return statuteIds;
+    }
+
+    private static Stream<Citation> citations(RuleCard card) {
+        return Stream.concat(
+            card.citations().stream(),
+            card.questions().stream()
+                .flatMap(question -> question.effects().values().stream())
+                .flatMap(effect -> effect.citations().stream())
+        );
     }
 }
