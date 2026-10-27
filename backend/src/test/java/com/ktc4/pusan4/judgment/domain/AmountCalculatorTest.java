@@ -33,6 +33,9 @@ class AmountCalculatorTest {
         // 33,333 × 15% = 4,999.95 → 4,999
         assertThat(AmountCalculator.finalAmount(homeOffice, transaction(LocalDate.of(2025, 2, 25), 33_333),
             new UserContext("940909", false, 15))).isEqualTo(4_999);
+        // 엔진은 비율이 없으면 확인필요로 둔다. 사용자가 가능으로 수정했으면 전액이다
+        assertThat(AmountCalculator.finalAmount(homeOffice, transaction(LocalDate.of(2025, 2, 25), 80_000), NO_RATIO))
+            .isEqualTo(80_000);
     }
 
     @Test

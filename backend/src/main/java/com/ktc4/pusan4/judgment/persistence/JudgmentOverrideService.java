@@ -1,8 +1,12 @@
 package com.ktc4.pusan4.judgment.persistence;
 
+import com.ktc4.pusan4.judgment.domain.AmountCalculator;
+import com.ktc4.pusan4.judgment.domain.UserContext;
 import com.ktc4.pusan4.judgment.domain.Verdict;
 import com.ktc4.pusan4.shared.UuidGenerator;
 import com.ktc4.pusan4.shared.api.ApiException;
+import com.ktc4.pusan4.user.domain.BusinessContext;
+import com.ktc4.pusan4.user.persistence.BusinessContextService;
 import jakarta.persistence.NoResultException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
@@ -24,6 +28,7 @@ public class JudgmentOverrideService {
     private final JudgmentOverrideRepository overrideRepository;
     private final JudgmentCitationRepository citationRepository;
     private final TransactionRecordRepository transactionRepository;
+    private final BusinessContextService contextService;
     private final UuidGenerator uuidGenerator;
     private final Clock clock;
 
@@ -32,6 +37,7 @@ public class JudgmentOverrideService {
         JudgmentOverrideRepository overrideRepository,
         JudgmentCitationRepository citationRepository,
         TransactionRecordRepository transactionRepository,
+        BusinessContextService contextService,
         UuidGenerator uuidGenerator,
         Clock clock
     ) {
@@ -39,6 +45,7 @@ public class JudgmentOverrideService {
         this.overrideRepository = overrideRepository;
         this.citationRepository = citationRepository;
         this.transactionRepository = transactionRepository;
+        this.contextService = contextService;
         this.uuidGenerator = uuidGenerator;
         this.clock = clock;
     }
@@ -69,9 +76,13 @@ public class JudgmentOverrideService {
         overrideRepository.save(new JudgmentOverrideEntity(
             overrideId, transaction.id(), judgmentId, toVerdict, reason, now));
 
+        // 판정할 때의 문진 버전으로 다시 계산한다(안분 비율).
+        BusinessContext context = contextService.version(userId, source.userContextVersion());
+        long amount = AmountCalculator.finalAmount(toVerdict, source.attributes(), transaction.toInput(),
+            new UserContext(context.industryCode(), context.hasEmployee(), context.homeOfficeRatio()));
         UUID revisionId = uuidGenerator.generate();
         judgmentRepository.save(source.overriddenAs(
-            revisionId, judgmentRepository.findNextRevision(transaction.id()), toVerdict, overrideId));
+            revisionId, judgmentRepository.findNextRevision(transaction.id()), toVerdict, overrideId, amount));
         List<Long> versionIds = citationRepository.findRows(List.of(judgmentId)).stream()
             .map(JudgmentCitationRepository.CitationRow::statuteVersionId)
             .toList();

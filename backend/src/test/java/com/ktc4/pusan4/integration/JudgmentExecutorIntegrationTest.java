@@ -81,10 +81,11 @@ class JudgmentExecutorIntegrationTest {
         UUID judgmentId = executor.judge(transactionId, contextService.version(userId, 1), runOrigin(runId));
 
         assertThat(jdbcTemplate.queryForMap("""
-            select verdict, rule_card_id, run_id, user_context_version, rules_commit_sha, tax_year
+            select verdict, rule_card_id, run_id, user_context_version, rules_commit_sha, tax_year, final_amount
             from judgment where id = ?
             """, judgmentId))
             .containsEntry("verdict", "NEEDS_REVIEW")
+            .containsEntry("final_amount", 0L)
             .containsEntry("rule_card_id", "R-300")
             .containsEntry("run_id", runId)
             .containsEntry("user_context_version", 1)

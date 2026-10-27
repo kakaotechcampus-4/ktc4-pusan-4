@@ -1,10 +1,12 @@
 package com.ktc4.pusan4.judgment.persistence;
 
 import com.ktc4.pusan4.holiday.HolidayCalendar;
+import com.ktc4.pusan4.judgment.domain.AmountCalculator;
 import com.ktc4.pusan4.judgment.domain.Judgment;
 import com.ktc4.pusan4.judgment.domain.JudgmentEngine;
 import com.ktc4.pusan4.judgment.domain.JudgmentOrigin;
 import com.ktc4.pusan4.judgment.domain.RuleSet;
+import com.ktc4.pusan4.judgment.domain.TransactionInput;
 import com.ktc4.pusan4.judgment.domain.UserContext;
 import com.ktc4.pusan4.judgment.domain.UserFact;
 import com.ktc4.pusan4.user.domain.BusinessContext;
@@ -74,20 +76,16 @@ public class JudgmentExecutor {
             throw new IllegalArgumentException("Context belongs to another user: " + context.id());
         }
         List<UserFact> facts = references.userFacts().latest(transaction.userId(), transaction.batchId());
-        Judgment judgment = JudgmentEngine.judge(
-            transaction.toInput(),
-            new UserContext(context.industryCode(), context.hasEmployee(), context.homeOfficeRatio()),
-            facts,
-            ruleSet,
-            references.publicHolidays()
-        );
+        TransactionInput input = transaction.toInput();
+        UserContext userContext = new UserContext(context.industryCode(), context.hasEmployee(), context.homeOfficeRatio());
+        Judgment judgment = JudgmentEngine.judge(input, userContext, facts, ruleSet, references.publicHolidays());
 
         LocalDate approvedAt = transaction.approvedAt();
         UUID judgmentId = judgmentService.save(new SaveJudgmentCommand(
             transactionId, origin, rulesCommitSha, context.version(),
             approvedAt.getYear(), approvedAt,
             transaction.merchantCategory(), transaction.merchantRaw(), context.industryCode(),
-            facts, judgment
+            facts, judgment, AmountCalculator.finalAmount(judgment, input, userContext)
         ), references.statuteVersions());
         questionRepository.cancelPendingOfOtherRevisions(transactionId, judgmentId);
         return judgmentId;

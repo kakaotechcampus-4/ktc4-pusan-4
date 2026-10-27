@@ -63,7 +63,7 @@ class QuestionAnswerIntegrationTest {
     @BeforeEach
     void setUp() {
         for (String statuteId : List.of("소득세법-33-1-5", "소득세법시행령-61-1-1", "소득세법-27-1", "소득세법-35-1",
-            "소득세법-160의2-2", "소득세법시행령-208의2-1-1", "소득세법-81의6-1")) {
+            "소득세법-160의2-2", "소득세법시행령-208의2-1-1", "소득세법-81의6-1", "소득세법시행령-61-1")) {
             jdbcTemplate.update("""
                 insert into statute_version(
                     statute_id, doc_type, hierarchy, effective_from, body, body_hash,
@@ -227,6 +227,24 @@ class QuestionAnswerIntegrationTest {
         assertThat(jdbcTemplate.queryForObject(
             "select count(*) from question_queue where id = ? and status = 'PENDING'", Integer.class, merchantQuestion))
             .isOne();
+    }
+
+    @Test
+    void home_office_answer_saves_the_amount_apportioned_by_the_context_ratio() throws Exception {
+        // given: 문진 작업공간 비율 20%, 전기요금 8만원(R-103 공간전용여부)
+        jdbcTemplate.update("update user_context set home_office_ratio = 20 where id = ?", context.id());
+        UUID utility = insertTransaction("수도광열", "한국전력공사", 80_000L);
+        judge(utility);
+        assertThat(jdbcTemplate.queryForObject(
+            "select final_amount from judgment where transaction_id = ?", Long.class, utility)).isZero();
+
+        // when
+        answer(List.of(pendingQuestion(utility, "공간전용여부")), "자택 겸용").andExpect(status().isOk());
+
+        // then: 가능이 되고 금액은 8만원 × 20%
+        assertThat(jdbcTemplate.queryForMap(
+            "select verdict, final_amount from judgment where transaction_id = ? order by revision desc limit 1",
+            utility)).containsEntry("verdict", "AVAILABLE").containsEntry("final_amount", 16_000L);
     }
 
     @Test

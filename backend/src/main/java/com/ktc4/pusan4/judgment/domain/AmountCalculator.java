@@ -20,15 +20,24 @@ public final class AmountCalculator {
     private AmountCalculator() {
     }
 
-    /** 가능이 아니면 0 이다. 불가는 경비가 아니고, 확인필요는 답을 받으면 다시 계산한다. */
     public static long finalAmount(Judgment judgment, TransactionInput transaction, UserContext context) {
-        if (judgment.verdict() != Verdict.AVAILABLE) {
+        return finalAmount(judgment.verdict(), judgment.attributes(), transaction, context);
+    }
+
+    /**
+     * 가능이 아니면 0 이다. 불가는 경비가 아니고, 확인필요는 답을 받으면 다시 계산한다.
+     * 사용자 수정(override)은 판정의 속성을 이어받아 바뀐 verdict 로 다시 계산한다(api.md 3.8).
+     */
+    public static long finalAmount(
+        Verdict verdict, Map<String, Object> attributes, TransactionInput transaction, UserContext context
+    ) {
+        if (verdict != Verdict.AVAILABLE) {
             return 0;
         }
-        Map<String, Object> attributes = judgment.attributes();
         long amount = transaction.amount();
-        if (JudgmentEngine.HOME_OFFICE_RATIO.equals(attributes.get(JudgmentEngine.APPORTIONMENT))) {
-            // 비율이 없으면 엔진이 확인필요로 둔다.
+        // 엔진은 비율이 없으면 확인필요로 둔다. 비율 없이 가능인 것은 사용자가 가능으로 수정한 경우라 전액이다.
+        if (JudgmentEngine.HOME_OFFICE_RATIO.equals(attributes.get(JudgmentEngine.APPORTIONMENT))
+            && context.homeOfficeRatio() != null) {
             amount = amount * context.homeOfficeRatio() / 100;
         }
         if (Boolean.TRUE.equals(attributes.get("자산"))) {
