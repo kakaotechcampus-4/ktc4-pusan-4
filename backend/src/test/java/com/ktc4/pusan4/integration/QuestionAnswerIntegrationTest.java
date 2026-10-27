@@ -29,8 +29,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * 확인 질문 응답과 부분 재판정 (api.md 3.10). 실제 규칙 카드(../rules)로 판정한다.
+ * 확인 질문 응답과 부분 재판정 (api.md 3.10), 일괄 응답 (api.md 3.11). 실제 규칙 카드(../rules)로 판정한다.
  * 통신(R-205)은 가맹점 단위(merchant_norm)로 「전용여부」를, 카페(R-300)는 거래 단위로 「용도」를 묻는다.
+ * 주말 음식점(R-311)은 불가로 추정하고 「용도」로 소명을 받는다(소명 대기).
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -228,6 +229,84 @@ class QuestionAnswerIntegrationTest {
             .isOne();
     }
 
+    @Test
+    void bulk_answer_closes_pending_questions_of_the_fact_type_except_awaiting_explanation() throws Exception {
+        // given: 카페 둘(용도), 주말 음식점(용도, 소명 대기), 통신(전용여부)
+        UUID firstCafe = insertTransaction("카페", "스타벅스");
+        UUID secondCafe = insertTransaction("카페", "이디야");
+        UUID weekend = insertTransaction("음식점", "김밥천국", 6_500L, "2025-10-11");
+        UUID telecom = insertTransaction("통신", "KT");
+        List.of(firstCafe, secondCafe, weekend, telecom).forEach(this::judge);
+
+        // when: 「혼자작업」은 카페만 받는 값이다. 소명 대기 질문은 허용 검사에도 넣지 않는다
+        bulkAnswer(batchId, "용도", "혼자작업")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.answeredCount").value(2))
+            .andExpect(jsonPath("$.skippedCount").value(1))
+            .andExpect(jsonPath("$.excludedCount").value(1))
+            .andExpect(jsonPath("$.factIds.length()").value(2))
+            .andExpect(jsonPath("$.rejudgedTransactionCount").value(2))
+            .andExpect(jsonPath("$.unresolved.count").value(2))
+            .andExpect(jsonPath("$.unresolved.amount").value(13_000));
+
+        // then: 거래 단위 질문이라 그룹마다 UserFact 가 하나씩 생기고, 카페만 그 답으로 한 번씩 재판정된다
+        assertThat(jdbcTemplate.queryForObject(
+            "select count(*) from user_fact where batch_id = ? and fact_type = '용도'", Integer.class, batchId))
+            .isEqualTo(2);
+        assertThat(latestVerdict(firstCafe)).isEqualTo("UNAVAILABLE");
+        assertThat(latestVerdict(secondCafe)).isEqualTo("UNAVAILABLE");
+        assertThat(jdbcTemplate.queryForList("""
+            select judgment.transaction_id
+            from judgment
+            join transaction on transaction.id = judgment.transaction_id
+            where transaction.batch_id = ? and judgment.trigger_user_fact_id is not null
+            """, UUID.class, batchId)).containsExactlyInAnyOrder(firstCafe, secondCafe);
+        assertThat(pendingQuestion(weekend, "용도")).isNotNull();
+        assertThat(pendingQuestion(telecom, "전용여부")).isNotNull();
+    }
+
+    @Test
+    void bulk_answer_with_only_excluded_targets_answers_nothing() throws Exception {
+        // given: 「용도」 질문은 소명 대기 거래에만 있다
+        UUID weekend = insertTransaction("음식점", "김밥천국", 6_500L, "2025-10-11");
+        judge(weekend);
+
+        // when / then: 이력이 있으니 에러가 아니다
+        bulkAnswer(batchId, "용도", "업무미팅")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.answeredCount").value(0))
+            .andExpect(jsonPath("$.excludedCount").value(1))
+            .andExpect(jsonPath("$.factIds.length()").value(0))
+            .andExpect(jsonPath("$.rejudgedTransactionCount").value(0));
+        assertThat(latestVerdict(weekend)).isEqualTo("UNAVAILABLE");
+    }
+
+    @Test
+    void invalid_bulk_answers_change_nothing() throws Exception {
+        // given: 카페(용도: 업무미팅·개인·혼자작업)
+        UUID cafe = insertTransaction("카페", "스타벅스");
+        judge(cafe);
+
+        // when / then
+        bulkAnswer(UUID.randomUUID(), "용도", "개인")
+            .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("BATCH_NOT_FOUND"));
+        bulkAnswer(batchId, "자산여부", "개인")
+            .andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("UNKNOWN_FACT_TYPE"));
+        bulkAnswer(batchId, "용도", "전용")
+            .andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("INVALID_ANSWER_VALUE"));
+        mockMvc.perform(post("/api/v1/questions/bulk-answer")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"batchId": "%s", "factType": "용도"}
+                    """.formatted(batchId)))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+
+        // then
+        assertThat(jdbcTemplate.queryForObject(
+            "select count(*) from user_fact where batch_id = ?", Integer.class, batchId)).isZero();
+        assertThat(pendingQuestion(cafe, "용도")).isNotNull();
+    }
+
     /** 같은 사용자의 다른 batch 에 생긴 가맹점 질문. */
     private UUID otherBatchQuestion() {
         UUID mainBatchId = batchId;
@@ -245,6 +324,14 @@ class QuestionAnswerIntegrationTest {
             .content("""
                 {"questionIds": ["%s"], "answer": {"value": "%s"}}
                 """.formatted(ids, value)));
+    }
+
+    private ResultActions bulkAnswer(UUID targetBatchId, String factType, String value) throws Exception {
+        return mockMvc.perform(post("/api/v1/questions/bulk-answer")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"batchId": "%s", "factType": "%s", "answer": {"value": "%s"}}
+                """.formatted(targetBatchId, factType, value)));
     }
 
     private void judge(UUID transactionId) {
@@ -301,13 +388,17 @@ class QuestionAnswerIntegrationTest {
     }
 
     private UUID insertTransaction(String category, String merchantNorm, long amount) {
+        return insertTransaction(category, merchantNorm, amount, "2025-10-08");
+    }
+
+    private UUID insertTransaction(String category, String merchantNorm, long amount, String approvedAt) {
         UUID id = UUID.randomUUID();
         jdbcTemplate.update("""
             insert into transaction(
                 id, batch_id, user_id, approved_at, merchant_raw, merchant_norm, merchant_category,
                 amount, natural_key, source_status, user_inclusion, classification_status
-            ) values (?, ?, ?, '2025-10-08', ?, ?, ?, ?, ?, 'JUDGEABLE', 'AUTO', 'CLASSIFIED')
-            """, id, batchId, USER_ID, merchantNorm, merchantNorm, category, amount, id.toString());
+            ) values (?, ?, ?, ?::date, ?, ?, ?, ?, ?, 'JUDGEABLE', 'AUTO', 'CLASSIFIED')
+            """, id, batchId, USER_ID, approvedAt, merchantNorm, merchantNorm, category, amount, id.toString());
         return id;
     }
 }

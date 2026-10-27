@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -111,5 +112,13 @@ public class JudgmentExecutor {
         BusinessContext context = contextService.version(userId, contextVersion);
         JudgmentReferences references = references();
         transactionIds.forEach(transactionId -> judge(transactionId, context, origin, references));
+    }
+
+    /** 거래마다 origin 이 다른 재판정(일괄 응답). 넘긴 Map 의 순서대로 판정한다. */
+    @Transactional
+    public void rejudge(UUID userId, Map<UUID, JudgmentOrigin> origins, int contextVersion) {
+        BusinessContext context = contextService.version(userId, contextVersion);
+        JudgmentReferences references = references();
+        origins.forEach((transactionId, origin) -> judge(transactionId, context, origin, references));
     }
 }
