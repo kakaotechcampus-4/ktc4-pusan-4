@@ -37,6 +37,7 @@ public class JudgmentExecutor {
     private final JudgmentService judgmentService;
     private final QuestionQueueRepository questionRepository;
     private final BusinessContextService contextService;
+    private final LimitSettlementService limitSettlement;
 
     public JudgmentExecutor(
         RuleSet ruleSet,
@@ -46,7 +47,8 @@ public class JudgmentExecutor {
         UserFactPersistenceService userFactService,
         JudgmentService judgmentService,
         QuestionQueueRepository questionRepository,
-        BusinessContextService contextService
+        BusinessContextService contextService,
+        LimitSettlementService limitSettlement
     ) {
         this.ruleSet = ruleSet;
         this.rulesCommitSha = rulesCommitSha;
@@ -56,6 +58,7 @@ public class JudgmentExecutor {
         this.judgmentService = judgmentService;
         this.questionRepository = questionRepository;
         this.contextService = contextService;
+        this.limitSettlement = limitSettlement;
     }
 
     /**
@@ -104,12 +107,14 @@ public class JudgmentExecutor {
      * Context 버전은 호출하는 쪽이 api.md 규칙(최근 run 의 버전, 질문이 생긴 판정의 버전)으로 정해 넘긴다.
      * 호출한 쪽 트랜잭션에 묶여, 한 건이라도 실패하면 응답 전체가 롤백된다.
      * 판정 입력은 여기서 읽으므로, 호출한 쪽이 먼저 저장한 UserFact(질문 응답)가 반영된다.
+     * 끝나면 한도를 다시 집계한다(같은 트랜잭션).
      */
     @Transactional
     public void rejudge(UUID userId, List<UUID> transactionIds, JudgmentOrigin origin, int contextVersion) {
         BusinessContext context = contextService.version(userId, contextVersion);
         JudgmentReferences references = references();
         transactionIds.forEach(transactionId -> judge(transactionId, context, origin, references));
+        limitSettlement.settleProvisional(userId);
     }
 
     /** 거래마다 origin 이 다른 재판정(일괄 응답). 넘긴 Map 의 순서대로 판정한다. */
@@ -118,5 +123,6 @@ public class JudgmentExecutor {
         BusinessContext context = contextService.version(userId, contextVersion);
         JudgmentReferences references = references();
         origins.forEach((transactionId, origin) -> judge(transactionId, context, origin, references));
+        limitSettlement.settleProvisional(userId);
     }
 }

@@ -230,6 +230,27 @@ class QuestionAnswerIntegrationTest {
     }
 
     @Test
+    void answer_that_makes_an_entertainment_expense_settles_the_limit() throws Exception {
+        // given
+        UUID cafe = insertTransaction("카페", "스타벅스");
+        judge(cafe);
+
+        // when: 업무미팅 → 가능(접대비)
+        answer(List.of(pendingQuestion(cafe, "용도")), "업무미팅").andExpect(status().isOk());
+
+        // then: 재판정한 revision 이 한도 항목에 들어간다
+        assertThat(jdbcTemplate.queryForMap("""
+            select entry.judgment_id, entry.allowed_amount
+            from limit_bucket_entry entry
+            join judgment on judgment.id = entry.judgment_id
+            where judgment.transaction_id = ?
+            """, cafe))
+            .containsEntry("judgment_id", jdbcTemplate.queryForObject(
+                "select id from judgment where transaction_id = ? order by revision desc limit 1", UUID.class, cafe))
+            .containsEntry("allowed_amount", 6_500L);
+    }
+
+    @Test
     void home_office_answer_saves_the_amount_apportioned_by_the_context_ratio() throws Exception {
         // given: 문진 작업공간 비율 20%, 전기요금 8만원(R-103 공간전용여부)
         jdbcTemplate.update("update user_context set home_office_ratio = 20 where id = ?", context.id());
