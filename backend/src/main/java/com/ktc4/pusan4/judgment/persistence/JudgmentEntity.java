@@ -188,10 +188,6 @@ class JudgmentEntity extends AssignedIdEntity<UUID> {
         return attributes;
     }
 
-    Long finalAmount() {
-        return finalAmount;
-    }
-
     JudgmentRevision toDomain(JudgedTransaction transaction, List<CitedStatute> citations) {
         return new JudgmentRevision(id, transactionId, transaction, revision, origin(),
             Verdict.valueOf(verdict),

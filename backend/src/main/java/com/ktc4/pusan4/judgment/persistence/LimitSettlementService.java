@@ -1,16 +1,14 @@
 package com.ktc4.pusan4.judgment.persistence;
 
-import com.ktc4.pusan4.judgment.domain.Verdict;
 import com.ktc4.pusan4.judgment.limit.AnnualLimitAllocator;
 import com.ktc4.pusan4.judgment.limit.EntertainmentLimit;
 import com.ktc4.pusan4.judgment.limit.LimitCandidate;
+import com.ktc4.pusan4.judgment.persistence.JudgmentRepository.LimitTagged;
 import com.ktc4.pusan4.user.persistence.BusinessContextService;
 import jakarta.persistence.NoResultException;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -18,8 +16,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * 접대비 한도 잠정 집계 (CONTEXT.md §4 집계 단계). 사용자의 현재 판정(api.md §5) 중 가능이면서
@@ -32,7 +28,6 @@ public class LimitSettlementService {
 
     private final UserFactRepository userFactRepository;
     private final JudgmentRepository judgmentRepository;
-    private final TransactionRecordRepository transactionRepository;
     private final LimitBucketEntryRepository entryRepository;
     private final BusinessContextService contextService;
     private final LimitBucketPersistenceService limitService;
@@ -40,14 +35,12 @@ public class LimitSettlementService {
     public LimitSettlementService(
         UserFactRepository userFactRepository,
         JudgmentRepository judgmentRepository,
-        TransactionRecordRepository transactionRepository,
         LimitBucketEntryRepository entryRepository,
         BusinessContextService contextService,
         LimitBucketPersistenceService limitService
     ) {
         this.userFactRepository = userFactRepository;
         this.judgmentRepository = judgmentRepository;
-        this.transactionRepository = transactionRepository;
         this.entryRepository = entryRepository;
         this.contextService = contextService;
         this.limitService = limitService;
@@ -64,22 +57,12 @@ public class LimitSettlementService {
         userFactRepository.lockUser(userId).orElseThrow(NoResultException::new);
         long annualLimit = EntertainmentLimit.annual(contextService.current(userId).prevYearRevenue());
 
-        List<JudgmentEntity> tagged = judgmentRepository.findPage(userId, null, null, null, null,
-                Verdict.AVAILABLE.name(), null, false, Pageable.unpaged()).stream()
-            .filter(judgment -> EntertainmentLimit.BUCKET.equals(judgment.attributes().get("limit_bucket")))
-            .toList();
-        Map<UUID, TransactionRecordEntity> transactions = transactionRepository.findByIdIn(
-                tagged.stream().map(JudgmentEntity::transactionId).toList()).stream()
-            .collect(Collectors.toMap(TransactionRecordEntity::id, Function.identity()));
-
         Map<Integer, List<LimitCandidate>> byYear = new HashMap<>();
-        for (JudgmentEntity judgment : tagged) {
-            TransactionRecordEntity transaction = transactions.get(judgment.transactionId());
-            LocalDate approvedAt = transaction.approvedAt();
+        for (LimitTagged tagged : judgmentRepository.findCurrentLimitTagged(userId, EntertainmentLimit.BUCKET)) {
             // 금액 계산 전에 저장된 판정은 결제금액으로 본다. 접대비에는 안분·상각이 없다.
-            long amount = judgment.finalAmount() == null ? transaction.toInput().amount() : judgment.finalAmount();
-            byYear.computeIfAbsent(approvedAt.getYear(), year -> new ArrayList<>())
-                .add(new LimitCandidate(judgment.id(), approvedAt, amount));
+            long amount = tagged.finalAmount() == null ? tagged.amount() : tagged.finalAmount();
+            byYear.computeIfAbsent(tagged.approvedAt().getYear(), year -> new ArrayList<>())
+                .add(new LimitCandidate(tagged.judgmentId(), tagged.approvedAt(), amount));
         }
         // 접대비가 모두 빠진 해에 남은 항목도 비운다.
         Set<Integer> years = new TreeSet<>(byYear.keySet());
