@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.context.ImportTestcontainers;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
@@ -27,7 +26,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
-@ImportTestcontainers(RedisTestContainer.class) // health 가 Redis 연결까지 본다
 class BackendApplicationIntegrationTest {
 
     @Container
@@ -45,6 +43,7 @@ class BackendApplicationIntegrationTest {
 
     @Test
     void health_endpoint_reports_application_up() throws Exception {
+        // Redis 컨테이너 없이 UP 이어야 한다. Redis 는 health 에서 뺐다(application.yml management.health.redis)
         mockMvc.perform(get("/actuator/health"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("UP"));

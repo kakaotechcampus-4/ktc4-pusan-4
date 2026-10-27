@@ -16,6 +16,7 @@ import com.ktc4.pusan4.judgment.domain.JudgmentRunFailure;
 import com.ktc4.pusan4.judgment.domain.JudgmentRunStatus;
 import com.ktc4.pusan4.judgment.domain.StatuteVersion;
 import com.ktc4.pusan4.judgment.domain.Verdict;
+import com.ktc4.pusan4.judgment.persistence.JudgmentOverrideService;
 import com.ktc4.pusan4.judgment.persistence.JudgmentQueryService;
 import com.ktc4.pusan4.judgment.persistence.JudgmentRunService;
 import com.ktc4.pusan4.judgment.persistence.QuestionAnswerResult;
@@ -24,6 +25,7 @@ import com.ktc4.pusan4.judgment.persistence.QuestionQueryService;
 import com.ktc4.pusan4.judgment.persistence.StatuteService;
 import com.ktc4.pusan4.merchant.api.ClassificationMockData;
 import com.ktc4.pusan4.shared.UuidV7Generator;
+import com.ktc4.pusan4.shared.auth.FixedUser;
 import com.ktc4.pusan4.transaction.api.CardIssuer;
 import com.ktc4.pusan4.transaction.api.ClassificationStatus;
 import com.ktc4.pusan4.transaction.api.SourceStatus;
@@ -35,7 +37,6 @@ import com.ktc4.pusan4.transaction.domain.UploadResult;
 import com.ktc4.pusan4.transaction.persistence.TransactionService;
 import com.ktc4.pusan4.transaction.persistence.UploadBatchService;
 import com.ktc4.pusan4.transaction.persistence.UploadService;
-import com.ktc4.pusan4.shared.auth.FixedUser;
 import com.ktc4.pusan4.user.domain.AppUser;
 import com.ktc4.pusan4.user.domain.BookkeepingDuty;
 import com.ktc4.pusan4.user.domain.BusinessContext;
@@ -111,6 +112,9 @@ class ApiResponseContractTest {
     private JudgmentQueryService judgmentQueryService;
 
     @MockitoBean
+    private JudgmentOverrideService overrideService;
+
+    @MockitoBean
     private QuestionQueryService questionQueryService;
 
     @MockitoBean
@@ -162,6 +166,7 @@ class ApiResponseContractTest {
             OffsetDateTime.parse("2026-09-12T14:05:00+09:00"),
             List.of(new JudgmentRevision.CitedStatute(1418, "소득세법-27-1")));
         given(judgmentQueryService.get(any(), any())).willReturn(judgment);
+        given(overrideService.override(any(), any(), any(), any())).willReturn(UUID.fromString(ID));
         given(judgmentQueryService.list(any(), any(), anyInt(), anyInt())).willReturn(new PageImpl<>(List.of(judgment)));
         given(judgmentQueryService.summary(any(), any(), any(), any())).willReturn(JudgmentSummary.of(List.of(
             new JudgmentSummary.Row(Verdict.AVAILABLE, "소모품비", 12_800L))));
@@ -175,6 +180,7 @@ class ApiResponseContractTest {
 
         given(statuteService.get(anyLong())).willReturn(new StatuteVersion(1523, "소득세법시행령-67-4",
             "소득세법 시행령 제67조 제4항", "시행령", LocalDate.parse("2026-01-01"), null, "https://www.law.go.kr/", "..."));
+
         given(uploadService.upload(any(), any(), any())).willReturn(new UploadResult(UUID.fromString(ID), 1, 0, 0,
             OffsetDateTime.parse("2026-09-18T01:10:00+09:00")));
 

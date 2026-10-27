@@ -25,7 +25,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "judgment")
-class JudgmentEntity {
+class JudgmentEntity extends AssignedIdEntity<UUID> {
 
     @Id
     private UUID id;
@@ -135,7 +135,39 @@ class JudgmentEntity {
         }
     }
 
+    /**
+     * 사용자 수정 revision (api.md 3.8). verdict 만 바꾸고 나머지는 이 판정에서 이어받는다.
+     * 대상 밖 표시는 확인 필요에만 붙으므로(judgment_out_of_scope_needs_review) 끈다. 수정은 확인 필요로 가지 않는다.
+     */
+    JudgmentEntity overriddenAs(UUID revisionId, int nextRevision, Verdict toVerdict, UUID overrideId) {
+        JudgmentEntity revision = new JudgmentEntity();
+        revision.id = revisionId;
+        revision.transactionId = transactionId;
+        revision.revision = nextRevision;
+        revision.ruleCardId = ruleCardId;
+        revision.ruleCardVersion = ruleCardVersion;
+        revision.rulesCommitSha = rulesCommitSha;
+        revision.userContextVersion = userContextVersion;
+        revision.taxYear = taxYear;
+        revision.verdict = toVerdict.name();
+        revision.blockedAtGate = blockedAtGate;
+        revision.inference = inference;
+        revision.unmatchedReason = unmatchedReason;
+        revision.outOfScope = false;
+        revision.account = account;
+        revision.attributes = attributes;
+        revision.appliedRuleIds = appliedRuleIds;
+        revision.inputFacts = inputFacts;
+        revision.judgmentOverrideId = overrideId;
+        return revision;
+    }
+
     UUID id() {
+        return id;
+    }
+
+    @Override
+    public UUID getId() {
         return id;
     }
 
