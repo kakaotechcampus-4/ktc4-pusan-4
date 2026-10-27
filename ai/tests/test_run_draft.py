@@ -65,14 +65,14 @@ def test_요약은_오류_키를_분모에서_빼고_기본_조문을_따로_센
     cases = [
         # 물어볼 카드인데 불가로 단정했다. 33-1-5 는 후보에 있었고 35-1 은 없었다
         (ask, {"error": None, "refs": ["소득세법-33-1-13"], "pool": pool, "gate": "G2", "verdict": "불가", "hold": False}),
-        # 오류는 결론·근거 분모에서 빠지고 보류에는 남는다
-        (ask, {"error": "재시도 소진", "refs": [], "pool": pool, "gate": None, "verdict": None, "hold": True}),
+        # 오류는 결론·근거 분모에서 빠지고 보류로도 세지 않는다 — 운영이 적재하지 않는다(#94)
+        (ask,{"error": "재시도 소진", "refs": [], "pool": pool, "gate": None, "verdict": None, "hold": True}),
         (split, {"error": None, "refs": ["소득세법-27-1"], "pool": pool, "gate": "G2", "verdict": "가능", "hold": True}),
     ]
     text = "\n".join(summary([(("키", "940909"), w, g, score(g, w)) for w, g in cases]))
 
     assert "과잉확정 1/1 · 반대 1/1 · 확정 적중 0/0" in text
-    assert "위험 결론 중 1/2 · 전체 2/3 (오류 1" in text
+    assert "위험 결론 중 1/2 · 전체 1/3 (결론이 맞는데 보류 0)" in text
     assert "기본 조문 1/2 · 그 외 조문 0/1 (검색누락 1 · 선택누락 0)" in text
     assert "키당 카드 밖 인용 0.50" in text
 
