@@ -18,6 +18,11 @@ app:
   rules:
     dir: ../rules
     commit-sha: local
+  # 인증 (api.md 1.1). jwt-secret 이 비면 기동할 때마다 임시 키를 만든다(재기동하면 로그인이 풀린다).
+  # 넣는다면 32바이트 이상.
+  auth:
+    jwt-secret: ${APP_AUTH_JWT_SECRET:}
+    access-token-ttl: 15m
   # 관리자(규칙 후보 API, api.md 3.14). 쉼표로 나눈 이메일 목록이고 대소문자를 가리지 않는다. 비면 관리자가 없다.
   # 계정 방식(B9b)이 정해지면 app_user 의 role 로 바꿀 수 있다(AdminPolicy).
   admin:
@@ -28,6 +33,10 @@ management:
     web:
       exposure:
         include: health
+  # Redis 는 리프레시 토큰만 맡는다. Redis 가 내려가도 백엔드 전체를 unhealthy 로 만들어 배포를 멈추지 않게 health 에서 뺀다.
+  health:
+    redis:
+      enabled: false
 
 # 스웨거는 기본으로 닫는다. 로컬(application-local.yml)에서만 연다.
 # 프로필을 빠뜨려도 운영에 노출되지 않는 쪽으로 떨어지게 하기 위해서다.

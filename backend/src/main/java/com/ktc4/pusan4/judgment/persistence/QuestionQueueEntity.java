@@ -18,7 +18,7 @@ import java.time.OffsetDateTime;
 
 @Entity
 @Table(name = "question_queue")
-class QuestionQueueEntity {
+class QuestionQueueEntity extends AssignedIdEntity<UUID> {
 
     @Id
     private UUID id;
@@ -66,6 +66,11 @@ class QuestionQueueEntity {
         this.factType = question.factType();
         this.options = question.options();
         this.status = "PENDING";
+    }
+
+    @Override
+    public UUID getId() {
+        return id;
     }
 
     UUID answeredFactId() {

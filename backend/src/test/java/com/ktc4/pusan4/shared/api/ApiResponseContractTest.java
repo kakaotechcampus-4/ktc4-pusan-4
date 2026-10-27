@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ktc4.pusan4.admin.domain.RuleCandidate;
 import com.ktc4.pusan4.admin.domain.RuleCandidateStatus;
 import com.ktc4.pusan4.admin.persistence.RuleCandidateReviewService;
+import com.ktc4.pusan4.auth.TestAuthentication;
 import com.ktc4.pusan4.judgment.api.JudgmentMockData;
 import com.ktc4.pusan4.judgment.domain.Gate;
 import com.ktc4.pusan4.judgment.domain.JudgmentOrigin;
@@ -17,6 +18,7 @@ import com.ktc4.pusan4.judgment.domain.JudgmentRunFailure;
 import com.ktc4.pusan4.judgment.domain.JudgmentRunStatus;
 import com.ktc4.pusan4.judgment.domain.StatuteVersion;
 import com.ktc4.pusan4.judgment.domain.Verdict;
+import com.ktc4.pusan4.judgment.persistence.JudgmentOverrideService;
 import com.ktc4.pusan4.judgment.persistence.JudgmentQueryService;
 import com.ktc4.pusan4.judgment.persistence.JudgmentRunService;
 import com.ktc4.pusan4.judgment.persistence.QuestionAnswerResult;
@@ -25,7 +27,7 @@ import com.ktc4.pusan4.judgment.persistence.QuestionQueryService;
 import com.ktc4.pusan4.judgment.persistence.StatuteService;
 import com.ktc4.pusan4.merchant.api.ClassificationMockData;
 import com.ktc4.pusan4.shared.UuidV7Generator;
-import com.ktc4.pusan4.shared.auth.TemporaryCurrentUserProvider;
+import com.ktc4.pusan4.shared.auth.FixedUser;
 import com.ktc4.pusan4.transaction.api.CardIssuer;
 import com.ktc4.pusan4.transaction.api.ClassificationStatus;
 import com.ktc4.pusan4.transaction.api.SourceStatus;
@@ -86,7 +88,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 목 응답이 api.md 의 상태 코드를 지키는지 확인한다. 값은 보지 않는다 — 서비스로 바꿔도 깨지지 않아야 한다.
  */
 @WebMvcTest
-@Import({ApiExceptionHandler.class, UuidV7Generator.class, TemporaryCurrentUserProvider.class,
+@Import({ApiExceptionHandler.class, UuidV7Generator.class, TestAuthentication.class,
     ClassificationMockData.class, JudgmentMockData.class})
 class ApiResponseContractTest {
 
@@ -110,6 +112,9 @@ class ApiResponseContractTest {
 
     @MockitoBean
     private JudgmentQueryService judgmentQueryService;
+
+    @MockitoBean
+    private JudgmentOverrideService overrideService;
 
     @MockitoBean
     private QuestionQueryService questionQueryService;
@@ -138,11 +143,11 @@ class ApiResponseContractTest {
     @BeforeEach
     void stubServices() {
         given(userService.get(any())).willReturn(new AppUser(
-            TemporaryCurrentUserProvider.TEMPORARY_USER_ID, "demo@example.com",
+            FixedUser.ID, "demo@example.com",
             OffsetDateTime.parse("2026-09-01T10:00:00+09:00")));
 
         BusinessContext context = new BusinessContext(UUID.fromString(ID),
-            TemporaryCurrentUserProvider.TEMPORARY_USER_ID, 1, "62010", 82_000_000L, LocalDate.parse("2024-03-15"),
+            FixedUser.ID, 1, "62010", 82_000_000L, LocalDate.parse("2024-03-15"),
             BookkeepingDuty.간편장부, false, 20, OffsetDateTime.parse("2026-09-01T10:05:00+09:00"));
         given(contextService.create(any(), any())).willReturn(context);
         given(contextService.current(any())).willReturn(context);
@@ -165,6 +170,7 @@ class ApiResponseContractTest {
             OffsetDateTime.parse("2026-09-12T14:05:00+09:00"),
             List.of(new JudgmentRevision.CitedStatute(1418, "소득세법-27-1")));
         given(judgmentQueryService.get(any(), any())).willReturn(judgment);
+        given(overrideService.override(any(), any(), any(), any())).willReturn(UUID.fromString(ID));
         given(judgmentQueryService.list(any(), any(), anyInt(), anyInt())).willReturn(new PageImpl<>(List.of(judgment)));
         given(judgmentQueryService.summary(any(), any(), any(), any())).willReturn(JudgmentSummary.of(List.of(
             new JudgmentSummary.Row(Verdict.AVAILABLE, "소모품비", 12_800L))));
@@ -374,7 +380,7 @@ class ApiResponseContractTest {
         mockMvc.perform(get("/api/v1/users/me")).andExpect(status().isOk());
 
         // then: 요청 값이 아니라 CurrentUserProvider 가 정한 사용자로 조회한다
-        verify(userService).get(TemporaryCurrentUserProvider.TEMPORARY_USER_ID);
+        verify(userService).get(FixedUser.ID);
     }
 
     @Test

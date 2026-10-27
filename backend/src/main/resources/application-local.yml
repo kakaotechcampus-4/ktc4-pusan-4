@@ -3,9 +3,16 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:${DB_PORT:15432}/${DB_NAME:ktc4}}
     username: ${DB_USERNAME:ktc4}
     password: ${DB_PASSWORD:ktc4-local}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:16379}
 
-# 로컬에서는 고정 사용자(demo@example.com)를 관리자로 둬 /admin 화면을 바로 볼 수 있게 한다
+# 로컬 전용 값. 운영에는 /etc/ktc4/production.env 로 따로 넣는다(docs/deployment.md).
 app:
+  auth:
+    jwt-secret: ${APP_AUTH_JWT_SECRET:local-only-jwt-secret-not-for-production-0000}
+  # 로컬에서는 고정 사용자(demo@example.com)를 관리자로 둬 /admin 화면을 바로 볼 수 있게 한다
   admin:
     emails: ${APP_ADMIN_EMAILS:demo@example.com}
 

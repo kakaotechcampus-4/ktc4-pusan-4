@@ -115,7 +115,9 @@ public class JudgmentRunService {
         UUID userId = batchRepository.findById(run.batchId()).orElseThrow().userId();
         BusinessContext context = contextService.find(userId, run.contextId());
         run.start(now());
-        return Optional.of(new RunStart(context, itemRepository.findPendingTransactionIds(runId)));
+        return Optional.of(new RunStart(
+            context, itemRepository.findPendingTransactionIds(runId), executor.references()
+        ));
     }
 
     /**
@@ -123,12 +125,12 @@ public class JudgmentRunService {
      * run 이 이미 끝났으면 판정하지 않고 false 를 돌려준다. 실행기는 거기서 멈춘다.
      */
     @Transactional
-    boolean judgeItem(UUID runId, UUID transactionId, BusinessContext context) {
+    boolean judgeItem(UUID runId, UUID transactionId, BusinessContext context, JudgmentReferences references) {
         JudgmentRunEntity run = lock(runId);
         if (!run.isRunning()) {
             return false;
         }
-        executor.judge(transactionId, context, new JudgmentOrigin(JudgmentOriginType.RUN, runId));
+        executor.judge(transactionId, context, new JudgmentOrigin(JudgmentOriginType.RUN, runId), references);
         item(runId, transactionId).succeed(now());
         run.recordSuccess(now());
         return true;
@@ -198,6 +200,6 @@ public class JudgmentRunService {
         return OffsetDateTime.now(clock);
     }
 
-    record RunStart(BusinessContext context, List<UUID> transactionIds) {
+    record RunStart(BusinessContext context, List<UUID> transactionIds, JudgmentReferences references) {
     }
 }
