@@ -417,7 +417,7 @@ verdict = AVAILABLE
 finalAmount < transaction.amount
 ```
 
-이면 안분, 상각, 한도 등이 적용된 것이다.
+이면 안분, 상각 등이 적용된 것이다. G6 한도(접대비 등)는 연간 집계라 `finalAmount`에 넣지 않고 한도 집계(`limit_bucket_entry`)에 따로 둔다.
 
 ---
 
@@ -1812,7 +1812,7 @@ GET /api/v1/judgments/summary?runId=R1
 | origin | 이 revision이 생성된 직접 원인 |
 | outOfScope | 룰엔진 판정 범위 밖(핸드오프)인지. `verdict = NEEDS_REVIEW`일 때만 `true`일 수 있고 그 외 verdict에서는 항상 `false` |
 | account | 계정과목 |
-| finalAmount | 안분, 상각, 한도 적용 후 인정 금액 |
+| finalAmount | 안분, 상각 적용 후 인정 금액. `AVAILABLE`이 아니면 0. G6 한도는 연간 집계라 반영하지 않는다 |
 | isInference | 룰로 확정하지 못해 fallback 결과인지 |
 | unmatchedReason | 매칭 실패 원인 |
 | attributes | 판정 과정에서 생성된 속성 |
