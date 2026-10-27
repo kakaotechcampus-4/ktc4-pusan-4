@@ -1609,7 +1609,7 @@ FAILED
 | errorCode | 뜻 |
 | --- | --- |
 | `RULE_PROCESSING_FAILED` | 그 거래를 판정하다 기술적으로 실패했다. `message`는 고정 문구이고, 원인은 서버 로그에만 남긴다 |
-| `RUN_START_FAILED` | Run을 시작하지 못했다(Context를 읽지 못함 등). 대상 거래 전체가 이 코드로 끝난다. 다시 실행해야 한다 |
+| `RUN_START_FAILED` | Run을 시작하지 못했다(Context를 읽지 못함, 판정 대기열이 가득 참 등). 대상 거래 전체가 이 코드로 끝난다. 다시 실행해야 한다 |
 | `RUN_INTERRUPTED` | 실행하던 서버가 내려가 Run이 멈췄다. 진행이 5분 넘게 없는 `QUEUED`·`RUNNING` Run의 남은 거래가 이 코드로 끝난다. Run은 이어 돌리지 않으므로 다시 실행해야 한다 |
 
 ---
@@ -1963,6 +1963,23 @@ JudgmentOverride 생성
   "computedAt": "2026-09-18T01:30:00+09:00"
 }
 ```
+
+새 revision은 수정한 판정에서 `verdict`만 바꾸고 나머지(계정과목, 룰카드, 속성, 인용)는 이어받는다. `outOfScope`는 확인 필요에만 붙으므로 `false`가 된다. 질문은 새로 만들지 않는다. 금액은 아직 계산하지 않아 `null`이다.
+
+에러:
+
+```
+400 VALIDATION_ERROR
+404 JUDGMENT_NOT_FOUND
+409 CONFLICT
+422 UNPROCESSABLE_ENTITY
+```
+
+- `toVerdict`가 없거나 enum 밖이면 `400 VALIDATION_ERROR`.
+- 판정이 없거나 다른 사용자의 판정이면 `404 JUDGMENT_NOT_FOUND`.
+- 거래의 현재 판정(§5)이 아니거나, 거래가 지금 판정 대상(`effectiveStatus = JUDGEABLE` 이고 분류 완료)이 아니면 `409 CONFLICT`.
+- `toVerdict = NEEDS_REVIEW`면 `422 UNPROCESSABLE_ENTITY`. 답할 질문이 없는 확인 필요가 되기 때문이다.
+- 현재와 같은 verdict로 수정하는 것은 허용한다. Idempotency-Key는 받지 않는다.
 
 `JudgmentOverride`는 다음 정보를 보존한다.
 

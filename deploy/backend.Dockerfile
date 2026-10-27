@@ -8,6 +8,10 @@ FROM eclipse-temurin:21-jre-jammy
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
+# CVE-2026-91403: 21.0.13 이하 Temurin 은 키가 유출된 eMudhra 중간 CA 를 믿는다(공휴일 API 호출이 TLS 클라이언트).
+# 고친 Temurin 21 빌드가 나와 이 이미지가 그걸 받으면 이 두 줄과 deploy/emudhra-blocked.certs 를 지운다.
+COPY deploy/emudhra-blocked.certs /tmp/
+RUN cat /tmp/emudhra-blocked.certs >> "$JAVA_HOME/lib/security/blocked.certs" && rm /tmp/emudhra-blocked.certs
 
 WORKDIR /app
 COPY --from=build /src/backend/build/libs/*.jar app.jar

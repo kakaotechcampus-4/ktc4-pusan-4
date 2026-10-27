@@ -120,6 +120,28 @@ systemctl list-timers ktc4-corpus.timer
 
 실패하면 서비스가 failed로 남고 `journalctl`에 원인이 있다. 세 단계 모두 멱등이라 원인을 고친 뒤 `systemctl start ktc4-corpus.service`로 다시 돌리면 된다. 운영 postgres는 메모리 1GB라 결과는 행 수 수준의 가벼운 쿼리로만 확인한다.
 
+### 지난 시행판 채우기 (1회)
+
+주간 동기화는 현행판만 받는다. 처음 적재한 날 현행판의 시행일이 모든 조문의 `effective_from`이 되므로,
+그보다 이른 날짜의 거래(예: 2026-10-01 시행 시행령으로 적재한 DB에서 2026년 1월 거래)는 인용할 조문 판이 없어
+판정이 `RULE_PROCESSING_FAILED`로 실패한다. 이 기능이 들어간 커밋을 배포한 뒤, 현행 적재가 끝난 DB에 한 번 돌린다.
+이미지 태그는 `deploy/corpus-sync.sh`와 같은 방식으로 정한다.
+
+```bash
+sudo -i
+repo=/opt/ktc4/repo; sha=$(cat /opt/ktc4/current-sha)
+set -a; source /etc/ktc4/production.env; set +a
+export IMAGE_TAG=$sha POSTGRES_TAG=$(git -C "$repo" rev-parse "$sha:docker/postgres" | cut -c1-12)
+docker compose --env-file /etc/ktc4/production.env -f "$repo/deploy/compose.yaml" run --rm --no-deps -T ai \
+  python -m pipeline.law_sync --target law --law 001565 --law 003956 --history-since 2024-01-01 --dry-run
+# 행 수를 보고 --dry-run 을 빼서 다시 돌린다
+```
+
+- `--history-since` 날짜에 시행 중이던 판부터, DB에 이미 있는 가장 이른 판 직전까지를 닫힌 행(`is_superseded = true`)으로 넣는다. 현행 행은 건드리지 않는다.
+- 다시 돌려도 아무것도 넣지 않는다. 더 이른 날짜로 넓힐 때만 그 앞을 채운다.
+- 닫힌 행은 `reindex`가 색인하지 않으므로 RAG 검색 결과는 바뀌지 않는다.
+- `--law`를 빼면 `LAWS` 12개 전부다. 판정 카드가 인용하는 건 지금 소득세법과 시행령뿐이다.
+
 ## 7. 공휴일 동기화
 
 판정에 쓸 평일 공휴일(대체·임시공휴일 포함)을 `public_holiday` 표에 둔다. 판정은 API 를 직접 부르지 않고 이 표만 읽는다. 백엔드가 기동할 때와 매일 04:00 KST에 공공데이터포털 「한국천문연구원_특일 정보」(`getRestDeInfo`)에서 올해 앞뒤 1년씩 받아 연도별로 표를 교체한다.
@@ -128,7 +150,15 @@ systemctl list-timers ktc4-corpus.timer
 - 키가 없거나 호출이 실패하면 그 해는 기존 행을 그대로 둔다. 발표 전이라 빈 응답이 온 해도 마찬가지다. 판정은 표에 있는 값으로 계속 돈다.
 - 반영 결과는 백엔드 로그의 `년 공휴일 N건을 반영했다`로 확인한다.
 
-## 8. 로그인
+## 8. Redis
+
+리프레시 토큰 저장소다(B9c). `redis:7.4-alpine`을 compose 내부망에서만 쓰고 포트는 열지 않는다. 백엔드는 `SPRING_DATA_REDIS_HOST=redis`로 붙고, Redis가 healthy가 된 뒤에 뜬다. 백엔드 `/actuator/health`는 Redis를 보지 않는다. Redis가 내려가도 백엔드는 healthy로 남고, 로그인·토큰 재발급·로그아웃만 실패한다(이미 받은 액세스 토큰으로 부르는 API는 15분 동안 그대로 된다).
+
+- `--appendonly yes`로 AOF를 켜서 재시작해도 로그인이 유지된다. 데이터는 `redis-data` 볼륨에 남는다.
+- `--maxmemory 128mb --maxmemory-policy volatile-lru`다. 토큰은 모두 TTL이 있어 메모리가 차면 오래 안 쓴 토큰부터 지워지고, 그 사용자는 다시 로그인한다. 컨테이너는 `mem_limit: 192m`이다.
+- Redis를 비우면(`FLUSHALL`, 볼륨 삭제) 모든 사용자가 로그아웃된다. 데이터 손실은 없다.
+
+## 9. 로그인
 
 이메일로 가입한 계정으로 로그인한다(api.md 1.1). 새 값을 넣은 뒤 백엔드를 다시 배포해야 반영된다.
 
@@ -136,11 +166,3 @@ systemctl list-timers ktc4-corpus.timer
 - 예전 고정 사용자 `demo@example.com` 행은 비밀번호가 없어 로그인할 수 없고, 같은 이메일로 다시 가입할 수도 없다(409). 시연 계정은 다른 이메일로 가입한다. `APP_AUTH_DEMO_PASSWORD`는 더 쓰지 않으니 `production.env`에서 지워도 된다.
 - 카카오 로그인은 `APP_AUTH_KAKAO_REST_API_KEY`(카카오 앱의 REST API 키), `APP_AUTH_KAKAO_CLIENT_SECRET`(보안 메뉴에서 켠 Client Secret, 안 쓰면 비움), `APP_AUTH_KAKAO_REDIRECT_URI`(`https://<DOMAIN>/auth/kakao/callback`, 카카오 앱에 등록한 값과 같게)를 넣는다. 키가 비면 카카오 로그인만 503으로 꺼지고 이메일 로그인은 그대로다. 동의항목은 닉네임만 쓰고 이메일은 켜지 않는다(비즈 앱 심사가 필요하다).
 - 리프레시 토큰 쿠키는 `Secure`라 HTTPS(Caddy)로만 저장된다. 로컬 프로필은 http라 `Secure`를 끈다.
-
-## 9. Redis
-
-리프레시 토큰 저장소다(B9c). `redis:7.4-alpine`을 compose 내부망에서만 쓰고 포트는 열지 않는다. 백엔드는 `SPRING_DATA_REDIS_HOST=redis`로 붙고, Redis가 healthy가 된 뒤에 뜬다. 백엔드 `/actuator/health`는 Redis 연결도 보므로 Redis가 내려가면 백엔드도 unhealthy가 된다.
-
-- `--appendonly yes`로 AOF를 켜서 재시작해도 로그인이 유지된다. 데이터는 `redis-data` 볼륨에 남는다.
-- `--maxmemory 128mb --maxmemory-policy volatile-lru`다. 토큰은 모두 TTL이 있어 메모리가 차면 오래 안 쓴 토큰부터 지워지고, 그 사용자는 다시 로그인한다. 컨테이너는 `mem_limit: 192m`이다.
-- Redis를 비우면(`FLUSHALL`, 볼륨 삭제) 모든 사용자가 로그아웃된다. 데이터 손실은 없다.

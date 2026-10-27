@@ -1,17 +1,20 @@
 """법령·사례 코퍼스 수집.
 
 빈 DB에 돌리면 백필, 매일 돌리면 증분이다. 같은 코드다.
+법령의 지난 시행판은 --history-since 로 따로 채운다(현행 적재 뒤에).
 
 사용:
     python -m pipeline.law_sync
     python -m pipeline.law_sync --target prec --limit 20 --dry-run
     python -m pipeline.law_sync --target law --law 001565
+    python -m pipeline.law_sync --target law --history-since 2024-01-01
 """
 
 from __future__ import annotations
 
 import argparse
 import contextlib
+import dataclasses
 import sys
 from collections.abc import Iterator
 from datetime import date, datetime
@@ -80,6 +83,18 @@ INSERT INTO statute_version (
 VALUES (
     %(statute_id)s, %(doc_type)s, %(doc_id)s, %(unit_level)s, %(hierarchy)s,
     %(title)s, %(doc_no)s, %(effective_from)s, %(issued_at)s, %(body)s,
+    %(body_hash)s, %(source_url)s, %(meta)s)
+"""
+
+
+# 지난 시행판. 처음부터 닫힌 행이라 현행 행 유일 인덱스와 부딪히지 않는다
+_INSERT_CLOSED = """
+INSERT INTO statute_version (
+    statute_id, doc_type, doc_id, unit_level, hierarchy, title, doc_no,
+    effective_from, effective_to, is_superseded, issued_at, body, body_hash, source_url, meta)
+VALUES (
+    %(statute_id)s, %(doc_type)s, %(doc_id)s, %(unit_level)s, %(hierarchy)s,
+    %(title)s, %(doc_no)s, %(effective_from)s, %(effective_to)s, true, %(issued_at)s, %(body)s,
     %(body_hash)s, %(source_url)s, %(meta)s)
 """
 
@@ -282,6 +297,75 @@ def collect(
                 yield from parse_prec(body, row)
 
 
+def versions(rows: list[dict], since: date, before: date) -> list[tuple[date, str]]:
+    """연혁 목록에서 since 에 시행 중이던 판부터 before 직전 판까지 (시행일, MST)를 고른다.
+
+    한 공포본(MST)이 나눠 시행되면 목록에 시행일마다 한 줄씩 나온다. 같은 시행일에
+    공포본이 여럿이면 가장 나중 공포본을 그 시행일로 받은 것이 그날의 통합본이다.
+    """
+    # 이미 since 부터 적재돼 있다. 다시 돌린 런이 더 이른 판을 끌어오지 않게 한다
+    if before <= since:
+        return []
+    latest: dict[date, tuple[str, int]] = {}
+    for row in rows:
+        ef = date.fromisoformat(row["시행일자"])
+        if ef >= before:
+            continue
+        key = (row["공포일자"], int(row["법령일련번호"]))
+        if ef not in latest or key > latest[ef]:
+            latest[ef] = key
+    dates = sorted(latest)
+    start = max((d for d in dates if d <= since), default=dates[0] if dates else None)
+    return [(d, str(latest[d][1])) for d in dates if d >= start]
+
+
+def segments(history: list[tuple[date, list[Unit]]], until: date) -> list[tuple[Unit, date]]:
+    """판별 조문을 (행, 닫는 날)로 접는다.
+
+    upsert 와 같은 모양이다. 본문이 그대로인 연속 판은 처음 나온 판 한 행으로 잇고,
+    바뀌거나 빠진 판에서 닫는다. 마지막까지 남은 행은 until(이미 적재된 판의 시작)에서 닫는다.
+    """
+    open_: dict[str, Unit] = {}
+    out: list[tuple[Unit, date]] = []
+    for when, units in history:
+        now = {u.statute_id: u for u in units}
+        for sid, u in list(open_.items()):
+            if sid not in now or now[sid].body_hash != u.body_hash:
+                out.append((u, when))
+                del open_[sid]
+        for sid, u in now.items():
+            if sid not in open_:
+                # 시작은 판의 시행일이다. 닫는 날이 늘 시작보다 뒤라 CHECK 제약을 지킨다
+                open_[sid] = dataclasses.replace(u, effective_from=when)
+    out.extend((u, until) for u in open_.values())
+    return out
+
+
+def backfill(conn: psycopg.Connection, oc: str, law_id: str, since: date) -> int:
+    """법령 하나의 지난 시행판을 닫힌 행으로 채운다. 현행 행은 건드리지 않는다.
+
+    이미 적재된 판 중 가장 이른 시행일 전까지만 채우므로 다시 돌려도 결과가 같다.
+    현행을 먼저 적재해야 한다. 기준이 없으면 어디까지 채울지 모른다.
+    """
+    loaded = conn.execute(
+        "SELECT min(effective_from) FROM statute_version WHERE doc_type = '법령' AND doc_id = %s",
+        (law_id,),
+    ).fetchone()[0]
+    if loaded is None:
+        print(f"law      {law_id} 건너뜀 — 현행이 없다. 먼저 --target law 로 적재할 것")
+        return 0
+    rows = list(_rows(oc, "eflaw", "law", None, LID=law_id, nw="1,2,3"))
+    picked = versions(rows, since, loaded)
+    history = [(when, parse_law(service(oc, "eflaw", MST=mst, efYd=when.strftime("%Y%m%d"))))
+               for when, mst in picked]
+    n = 0
+    for unit, until in segments(history, loaded):
+        conn.execute(_INSERT_CLOSED, _row(unit) | {"effective_to": until})
+        n += 1
+    print(f"law      {law_id} 시행판 {len(picked)}개({picked[0][0] if picked else '-'}~{loaded} 전) 행 {n}")
+    return n
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="법령·사례 코퍼스 수집")
     ap.add_argument("--target", choices=[*TARGETS, "all"], default="all")
@@ -294,7 +378,28 @@ def main() -> int:
         help="이미 적재된 판례·해석례·심판례는 본문을 받지 않는다. "
         "불변 문서라 안전하지만 파서를 고친 뒤에는 쓰지 말 것",
     )
+    ap.add_argument(
+        "--history-since",
+        type=date.fromisoformat,
+        metavar="YYYY-MM-DD",
+        help="법령의 지난 시행판을 이 날짜에 시행 중이던 판부터 닫힌 행으로 채운다(--target law 전용)",
+    )
     args = ap.parse_args()
+
+    if args.history_since:
+        if args.target != "law":
+            ap.error("--history-since 는 --target law 와 같이 쓴다")
+        with psycopg.connect(settings.database_url) as conn:
+            total = 0
+            for law_id in args.law or LAWS:
+                total += backfill(conn, settings.law_api_oc, law_id, args.history_since)
+                # 법령 하나가 한 트랜잭션이다. 중간에 죽어도 다시 돌리면 남은 법령부터 채운다
+                if not args.dry_run:
+                    conn.commit()
+            if args.dry_run:
+                conn.rollback()
+            print(f"\n{'dry-run: ' if args.dry_run else ''}지난 시행판 {total}행")
+        return 0
 
     targets = TARGETS if args.target == "all" else [args.target]
     total = 0
