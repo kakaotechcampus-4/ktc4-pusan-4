@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.ktc4.pusan4.judgment.domain.AmountCalculator;
 import com.ktc4.pusan4.judgment.domain.Citation;
 import com.ktc4.pusan4.judgment.domain.Gate;
 import com.ktc4.pusan4.judgment.domain.QuestionEffect;
@@ -151,6 +152,10 @@ public final class RuleCardLoader {
         if (ruleMatch.holiday()) {
             validateHolidayVerdict(id, verdict, questions);
         }
+        Map<String, Object> attributes = objectMap(root.path("attributes"));
+        validateAssetAttributes(id, attributes);
+        questions.forEach(question ->
+            question.effects().values().forEach(effect -> validateAssetAttributes(id, effect.attributes())));
 
         JsonNode review = root.path("review");
         String reviewedBy = requiredText(review, "by");
@@ -159,9 +164,19 @@ public final class RuleCardLoader {
         return new RuleCard(
             id, version, gate, priority, ruleMatch, verdict, outOfScope,
             optionalText(root, "account"), citations,
-            objectMap(root.path("attributes")), questions,
+            attributes, questions,
             effectiveFrom, effectiveTo, reviewedBy, reviewedAt
         );
+    }
+
+    // 자산이면 금액을 첫해 상각으로 계산한다(AmountCalculator). 상각률을 모르는 카드가 실행 중에 드러나면
+    // 그 카드에 걸린 질문 답변이 서버 오류로 저장되지 않으므로, 카드를 읽을 때(CI 의 실물 카드 테스트) 막는다.
+    private static void validateAssetAttributes(String id, Map<String, Object> attributes) {
+        if (Boolean.TRUE.equals(attributes.get("자산"))
+            && !AmountCalculator.hasDepreciationRate(attributes.get("상각방법"), attributes.get("내용연수"))) {
+            throw new RuleCardValidationException(
+                id + ": 자산 requires 상각방법 and 내용연수 with a known depreciation rate");
+        }
     }
 
     // 휴일(주말·공휴일)은 조문이 아니라 추정의 근거다(요일로 경비를 막는 조문은 없다). 그래서 휴일

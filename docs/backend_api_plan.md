@@ -267,7 +267,7 @@ flowchart LR
 | PR | 트랙 | 날짜 | 내용 |
 | --- | --- | --- | --- |
 | A5 | A | 10/26 → 10/18 (#157) | `POST /judgments/{id}/override`와 `DELETE /judgment-overrides/{id}`를 구현한다. 생성되는 override revision의 origin은 `judgment_override_id`로 지정한다. |
-| A6a | A | 10/27 | 금액 계산 최소판을 구현하고 G3 안분 비율을 적용한다. 자산 처리 규칙은 착수 전에 `CONTEXT.md` §14를 기준으로 확정한다. 자산 경계는 100만 원 "초과"이고, 무신고 시 건축물 외 유형자산의 기본 상각방법은 정률법이다. 정액 5년은 맥북 예시일 뿐 일반 규칙이 아니다. 상각방법이나 내용연수를 알 수 없으면 금액을 확정하지 않고 확인 필요로 둔다. |
+| A6a | A | 10/27 | 금액 계산 최소판을 구현하고 G3 안분 비율을 적용한다. 자산 처리 규칙은 착수 전에 `CONTEXT.md` §14를 기준으로 확정한다. 자산 경계는 100만 원 "초과"이고, 무신고 시 건축물 외 유형자산의 기본 상각방법은 정률법이다. 정액 5년은 맥북 예시일 뿐 일반 규칙이 아니다. **결정(10/28)**: 상각방법과 내용연수는 카드가 무신고 기본값(정률법, 기준내용연수 5년)으로 갖는다. 둘이 빠졌거나 상각률 표에 없는 카드는 확인 필요로 두지 않고 카드 로드에서 거부한다. 확인 필요로 두면 사용자가 답할 질문이 없고, 실행 중 오류로 두면 그 카드에 걸린 질문 답변이 서버 오류로 저장되지 않는다. 잘못된 카드는 CI의 실물 카드 테스트에서 걸린다(`docs/rule-card-fields.md`). |
 | A6b | A | 10/28 | run 실행 순서를 `judge → computeAmount → settleLimits(잠정)`으로 구성하고 `LimitBucketPersistenceService.replaceProvisional`을 연결한다. |
 | A7 | A | 10/29 | `POST /questions/bulk-answer`를 구현한다. 단건 답변 로직을 반복해서 호출하되, 같은 거래는 한 번만 재판정한다. 소명 대기 거래(Override를 뺀 최신 자동 판정이 불가인데 대기 질문이 남은 거래)의 질문은 대상과 `answer.value` 허용 검사에서 빼고 `excludedCount`로 센다(api.md 3.11, #103). |
 | B8 | B | 10/26 → 10/18 (#156, #158) | `GET /classification-reviews`와 `POST /classification-responses`를 구현한다. 사용자 응답은 개인 scope의 `merchant_dict`에 저장한다. 해당 batch에 완료된 run이 없으면 분류만 확정하고 `judgedCount=0`으로 응답한다. 완료된 run이 있으면 최근 run의 Context로 `rejudge`한다(api.md "판정 처리" 절). |

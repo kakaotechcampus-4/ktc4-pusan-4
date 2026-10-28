@@ -46,14 +46,24 @@ public final class AmountCalculator {
         return amount;
     }
 
+    /** 상각률 표에 있는 상각방법·내용연수인가. 카드 로더가 자산 선택지를 이것으로 검사한다. */
+    public static boolean hasDepreciationRate(Object method, Object life) {
+        return depreciationRate(method, life) != null;
+    }
+
+    private static Integer depreciationRate(Object method, Object life) {
+        return life == null || method == null ? null : RATES_PER_MILLE.getOrDefault(life, Map.of()).get(method);
+    }
+
     /**
      * 취득한 해의 상각범위액. 상각률 × 사업에 쓴 월수 / 12 이고, 1월 미만은 1월로 센다(소득세법 시행령 §62①).
      * 정률법도 첫해는 상각누계액이 없어 취득가액에 상각률을 곱한다.
+     * 상각률이 없는 자산 카드는 로드에서 막으므로(RuleCardLoader), 여기 오면 버그다.
      */
     private static long firstYearDepreciation(long cost, int acquiredMonth, Map<String, Object> attributes) {
         Object method = attributes.get("상각방법");
         Object life = attributes.get("내용연수");
-        Integer rate = life == null || method == null ? null : RATES_PER_MILLE.getOrDefault(life, Map.of()).get(method);
+        Integer rate = depreciationRate(method, life);
         if (rate == null) {
             throw new IllegalStateException("상각률을 모르는 자산 속성: 상각방법=%s, 내용연수=%s".formatted(method, life));
         }
