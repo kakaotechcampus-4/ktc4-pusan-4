@@ -305,6 +305,21 @@ class QuestionAnswerIntegrationTest {
     }
 
     @Test
+    void bulk_answer_reports_unresolved_after_the_rejudge_canceled_other_questions() throws Exception {
+        // given: 4만원 카페는 용도와 증빙유무를 함께 묻는다
+        UUID cafe = insertTransaction("카페", "스타벅스", 40_000L);
+        judge(cafe);
+        assertThat(pendingQuestion(cafe, "증빙유무")).isNotNull();
+
+        // when / then: 「개인」이면 불가로 확정되어 증빙유무 질문도 취소된다. 남은 질문은 없다
+        bulkAnswer(batchId, "용도", "개인")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.answeredCount").value(1))
+            .andExpect(jsonPath("$.unresolved.count").value(0))
+            .andExpect(jsonPath("$.unresolved.amount").value(0));
+    }
+
+    @Test
     void bulk_answer_with_only_excluded_targets_answers_nothing() throws Exception {
         // given: 「용도」 질문은 소명 대기 거래에만 있다
         UUID weekend = insertTransaction("음식점", "김밥천국", 6_500L, "2025-10-11");

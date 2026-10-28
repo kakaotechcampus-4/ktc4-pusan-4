@@ -9,6 +9,7 @@ import com.ktc4.pusan4.judgment.domain.QuestionStatus;
 import com.ktc4.pusan4.judgment.domain.UserFact;
 import com.ktc4.pusan4.judgment.persistence.QuestionQueueRepository.AnswerTarget;
 import com.ktc4.pusan4.shared.api.ApiException;
+import jakarta.persistence.EntityManager;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +39,7 @@ public class QuestionAnswerService {
     private final QuestionQueryService queryService;
     private final JudgmentExecutor executor;
     private final Clock clock;
+    private final EntityManager entityManager;
 
     public QuestionAnswerService(
         QuestionQueueRepository questionRepository,
@@ -46,7 +48,8 @@ public class QuestionAnswerService {
         UserFactPersistenceService userFactService,
         QuestionQueryService queryService,
         JudgmentExecutor executor,
-        Clock clock
+        Clock clock,
+        EntityManager entityManager
     ) {
         this.questionRepository = questionRepository;
         this.transactionRepository = transactionRepository;
@@ -55,6 +58,7 @@ public class QuestionAnswerService {
         this.queryService = queryService;
         this.executor = executor;
         this.clock = clock;
+        this.entityManager = entityManager;
     }
 
     /**
@@ -105,6 +109,10 @@ public class QuestionAnswerService {
             .map(group -> record(userId, batchId, group.groupKey(), factType, value))
             .toList();
         int rejudged = rejudge(userId, answered);
+        // 재판정은 다른 revision 의 대기 질문을 bulk update 로 취소한다(DB 에만 반영). 앞에서 읽은 질문 엔티티가
+        // PENDING 으로 남아 있으면 미해소 집계에 섞이므로, 반영한 뒤 비우고 다시 읽는다.
+        entityManager.flush();
+        entityManager.clear();
         return new BulkAnswerResult(
             answered.stream().mapToInt(Answered::questionCount).sum(),
             questionCount(pending) - questionCount(sameType),
