@@ -9,7 +9,8 @@ CONTEXT.md 9.5 의 [1] 과 [6]. 가운데 셋(질의·근거 선택·초안)은 
 집계는 기간을 안 자른다. 대신 이미 후보 행이 있는 (카테고리 × 업종)을 건너뛴다.
 기간으로 자르면 주당 한두 건씩 쌓이는 카테고리가 영영 임계값을 못 넘고, 안 자르면
 매주 같은 후보가 중복 적재된다. 승인된 건은 카드가 생겨 미판정이 멎으므로 자연히
-빠지고, 기각된 건은 사람이 아니라고 했으니 다시 올리지 않는다.
+빠지고, 기각된 건은 사람이 아니라고 했으니 다시 올리지 않는다. 에이전트가 실패한 건은
+행을 넣지 않으므로 다음 배치에서 다시 시도한다.
 
 distinct_users 는 조인으로만 나온다. unmatched_log 에 user_id 가 일부러 없다 —
 규칙 후보 큐에 개인 지출 패턴이 드러나면 안 된다(CONTEXT.md 8). 집계 결과만 남기고
@@ -109,30 +110,25 @@ def hold_reasons(conn: psycopg.Connection, ev: Evidence, by_tier: dict[str, list
 @observe()
 def propose(
     conn: psycopg.Connection, row: dict, meta: dict, as_of: date, today: date
-) -> tuple[dict, str]:
+) -> tuple[dict | None, str]:
     """집계 한 줄을 rule_candidate 행으로. 실패해도 예외를 밖으로 안 내보낸다.
 
     한 후보가 깨졌다고 배치가 죽으면 나머지 후보도 다음 주까지 밀린다.
-    깨진 건은 초안 없이 보류로 넣어 사람이 보게 한다.
+    깨진 건은 행 대신 None 을 돌려준다(#94). 초안 없는 행은 검수자가 기각밖에 못 하고,
+    행이 있으면 집계가 그 조합을 건너뛰어 다시 만들지 않는다.
     """
     cat, ind = row["merchant_category"], row["industry_code"]
     block = context(cat, ind, REASON, meta)
-    out = dict(row) | {
-        "suggested_docs": Json([]),
-        "searched_tier": None,
-        "draft_yaml": None,
-        "status": "보류",
-    }
     try:
         plan = rewrite(cat, ind, REASON, meta)
         by_tier = retrieve(conn, plan.queries, plan.keywords, as_of)
         ev = select(block, by_tier)
         card = draft(block, ev)
     except (ValueError, RuntimeError) as e:
-        return out, f"에이전트 실패 — {e}"
+        return None, f"에이전트 실패 — {e}"
 
     hold = hold_reasons(conn, ev, by_tier)
-    out |= {
+    out = dict(row) | {
         "suggested_docs": Json(docs(ev, by_tier)),
         "searched_tier": top_tier(ev, by_tier),
         "draft_yaml": render(card, ev, cat, ind, today),
@@ -162,11 +158,20 @@ def main() -> int:
             conn.rollback()
             return 0
 
+        failed = []
         for r in rows:
             params, why = propose(conn, r, meta, today, today)
+            if params is None:
+                failed.append(f"{r['merchant_category']}/{r['industry_code']}")
+                print(f"  - {r['merchant_category']} [건너뜀 · 다음 배치에서 다시] {why}")
+                continue
             new_id = conn.execute(_INSERT, params).fetchone()["id"]
             print(f"  #{new_id} {r['merchant_category']} [{params['status']}] {why}")
         conn.commit()
+
+    # 실패한 조합은 적재되지 않아 관리자 화면에 안 보인다. 계속 실패하는 걸 여기서 알아챈다
+    if failed:
+        print(f"실패 {len(failed)}건 ({', '.join(failed)})")
 
     return 0
 

@@ -96,6 +96,14 @@ Question
 ```
 /api/v1
 │
+├── auth/                               (Authorization 없이 부른다)
+│   ├── login/
+│   │   └── POST                        로그인
+│   ├── refresh/
+│   │   └── POST                        액세스 토큰 재발급
+│   └── logout/
+│       └── POST                        로그아웃
+│
 ├── users/
 │   └── me/
 │       ├── GET                         내 정보 조회
@@ -182,6 +190,61 @@ Question
 Authorization: Bearer {accessToken}
 ```
 
+`/auth/*` 를 뺀 모든 API 는 위 헤더가 있어야 한다. 없거나 토큰이 틀리거나 만료됐으면 `401 UNAUTHORIZED` 다.
+프론트는 이 401 을 받으면 `POST /auth/refresh` 로 한 번 재발급해 보고 같은 요청을 다시 보낸다.
+
+| 토큰 | 어디에 | 수명 | 모양 |
+| --- | --- | --- | --- |
+| 액세스 토큰 | 응답 본문 → 요청의 `Authorization` 헤더. 프론트는 메모리에만 둔다 | 15분 | JWT(HS256) |
+| 리프레시 토큰 | `Set-Cookie` → 브라우저가 `/auth/*` 요청에 실어 보낸다 | 14일 | 프론트는 값을 모른다 |
+
+리프레시 토큰 쿠키:
+
+```
+refresh_token={token}; Path=/api/v1/auth; Max-Age=1209600; HttpOnly; Secure; SameSite=Strict
+```
+
+- `Path=/api/v1/auth` 라 인증 API 에만 실린다.
+- `Domain` 은 붙이지 않는다. 배포는 Caddy 뒤 같은 오리진이다.
+- 로컬 프로필(http)에서만 `Secure` 를 뺀다.
+
+> 지금은 실제 계정이 없어 고정 사용자 `demo@example.com` 하나만 로그인한다. 비밀번호는 서버 설정(`APP_AUTH_DEMO_PASSWORD`)이다.
+> 리프레시 토큰은 서버에 저장하지 않아(서명만 확인) 로그아웃해도 이미 복사된 토큰은 만료까지 유효하다.
+> 실제 계정은 B9b, 리프레시 토큰 저장·폐기(Redis)는 B9c 에서 붙이며 아래 계약은 바뀌지 않는다.
+
+### `POST /api/v1/auth/login`
+
+```
+{
+  "email": "demo@example.com",
+  "password": "..."
+}
+```
+
+응답 `200` + 리프레시 토큰 `Set-Cookie`:
+
+```
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiJ9..."
+}
+```
+
+```
+401 INVALID_CREDENTIALS   이메일 또는 비밀번호가 틀림 (어느 쪽인지 구분하지 않는다)
+```
+
+### `POST /api/v1/auth/refresh`
+
+본문 없음. 쿠키의 리프레시 토큰으로 새 액세스 토큰과 새 리프레시 토큰(`Set-Cookie`)을 준다. 응답은 로그인과 같다.
+
+```
+401 INVALID_REFRESH_TOKEN   쿠키가 없거나, 틀리거나, 만료됨 → 로그인 화면으로
+```
+
+### `POST /api/v1/auth/logout`
+
+본문 없음. 응답 `204` + 리프레시 토큰 쿠키를 지우는 `Set-Cookie`(`Max-Age=0`). 쿠키가 없어도 `204` 다.
+
 ---
 
 ## 1.2 타입
@@ -221,7 +284,7 @@ ID      "0199c8f2-1a2b-7c3d-8e4f-5a6b7c8d9e0f"
 | 상태 | code | 쓰임 |
 | --- | --- | --- |
 | 400 | VALIDATION_ERROR | 필수 필드 누락·타입 불일치 등 문서화되지 않은 요청 검증 실패 |
-| 401 | UNAUTHORIZED | `Authorization` 헤더 누락 |
+| 401 | UNAUTHORIZED | `Authorization` 헤더 누락, 토큰이 틀리거나 만료됨 |
 | 404 | NOT_FOUND | 전용 `*_NOT_FOUND`가 없는 경로의 리소스 없음 |
 | 405 | METHOD_NOT_ALLOWED | 경로는 있으나 지원하지 않는 HTTP 메서드 |
 | 409 | CONFLICT | 전용 코드가 없는 상태 충돌 |
@@ -808,8 +871,10 @@ size
 정렬:
 
 ```
-createdAt DESC
+createdAt DESC, id DESC
 ```
+
+`transactionCount`와 `classificationPendingCount`는 조회 시점 값이다. `classificationPendingCount`는 지금 판정 대상(effectiveStatus = JUDGEABLE)인 거래의 PENDING 분류 검토 수다. 사용자가 분류 확인에 답하거나 거래를 제외하면 줄고, 다시 포함하면 돌아온다. `skippedDuplicateCount`는 업로드할 때 센 값이다.
 
 응답:
 
@@ -915,6 +980,12 @@ size
 ```
 
 `status`는 `effectiveStatus` 기준이다.
+
+`verdict`는 §5의 현재 결과 기준이다. 거래마다 현재 판정(활성 Override 우선, 없으면 Override가 아닌 최신 revision)을 고르고, 지금 판정 대상이 아닌 거래(사용자가 제외한 거래, 미분류 거래)는 뺀다. 판정이 없는 거래도 빠진다. 그래서 `verdict`로 거른 건수는 같은 범위의 판정 요약(3.7) 건수와 같다.
+
+`month`는 1~12다. `year` 없이 주면 모든 해의 그 달이다. `year`가 있으면 승인일 범위(그 해 또는 그 달의 첫날 이상, 다음 해 또는 다음 달 첫날 미만)로 건다.
+
+조건은 모두 AND로 건다.
 
 응답:
 
@@ -1489,7 +1560,7 @@ FAILED
 | errorCode | 뜻 |
 | --- | --- |
 | `RULE_PROCESSING_FAILED` | 그 거래를 판정하다 기술적으로 실패했다. `message`는 고정 문구이고, 원인은 서버 로그에만 남긴다 |
-| `RUN_START_FAILED` | Run을 시작하지 못했다(Context를 읽지 못함 등). 대상 거래 전체가 이 코드로 끝난다. 다시 실행해야 한다 |
+| `RUN_START_FAILED` | Run을 시작하지 못했다(Context를 읽지 못함, 판정 대기열이 가득 참 등). 대상 거래 전체가 이 코드로 끝난다. 다시 실행해야 한다 |
 | `RUN_INTERRUPTED` | 실행하던 서버가 내려가 Run이 멈췄다. 진행이 5분 넘게 없는 `QUEUED`·`RUNNING` Run의 남은 거래가 이 코드로 끝난다. Run은 이어 돌리지 않으므로 다시 실행해야 한다 |
 
 ---
@@ -1843,6 +1914,23 @@ JudgmentOverride 생성
   "computedAt": "2026-09-18T01:30:00+09:00"
 }
 ```
+
+새 revision은 수정한 판정에서 `verdict`만 바꾸고 나머지(계정과목, 룰카드, 속성, 인용)는 이어받는다. `outOfScope`는 확인 필요에만 붙으므로 `false`가 된다. 질문은 새로 만들지 않는다. 금액은 아직 계산하지 않아 `null`이다.
+
+에러:
+
+```
+400 VALIDATION_ERROR
+404 JUDGMENT_NOT_FOUND
+409 CONFLICT
+422 UNPROCESSABLE_ENTITY
+```
+
+- `toVerdict`가 없거나 enum 밖이면 `400 VALIDATION_ERROR`.
+- 판정이 없거나 다른 사용자의 판정이면 `404 JUDGMENT_NOT_FOUND`.
+- 거래의 현재 판정(§5)이 아니거나, 거래가 지금 판정 대상(`effectiveStatus = JUDGEABLE` 이고 분류 완료)이 아니면 `409 CONFLICT`.
+- `toVerdict = NEEDS_REVIEW`면 `422 UNPROCESSABLE_ENTITY`. 답할 질문이 없는 확인 필요가 되기 때문이다.
+- 현재와 같은 verdict로 수정하는 것은 허용한다. Idempotency-Key는 받지 않는다.
 
 `JudgmentOverride`는 다음 정보를 보존한다.
 
