@@ -54,3 +54,11 @@
 - 쓰는 곳이 없어진 `rejudge(List)` 를 지웠다. 거래 락 다음에 사용자 락을 잡아 정해 둔 락 순서와 반대였다. #158 은 `executor.judge` 를 직접 불러 영향이 없다.
 - `gradlew -p backend check` 통과(unit 375, integration 160).
 - 남은 것: 일괄 응답의 버전 하나 재판정(api.md 에 없음), 락 전 대상 조회, 잠정 집계가 확정 항목을 덮어씀(확정 기능 없음), `answeredCount` 가 기존 ANSWERED 를 셈, #158 재판정 뒤 한도 재집계 없음.
+
+## 13:40 서비스의 EntityManager 사용을 Repository 로 옮김
+
+- 커밋: 3f6d3c3
+- 서비스에 쿼리나 EntityManager 를 두지 않기로 했다. develop 에 있던 것은 #186 으로 따로 옮기고, 이 PR 에 관련된 것만 여기서 옮겼다.
+- `LimitBucketPersistenceService` 의 조회(JPQL), persist, remove 를 `LimitBucketEntryRepository` 의 `findEntries`·`save`·`delete` 로 옮겼다. develop 코드지만 이 PR 이 `LimitBucketEntryRepository` 를 새로 만들어서 여기서 옮겼다. #186 에서도 만들면 두 PR 이 같은 파일을 추가해 충돌한다.
+- 일괄 응답의 `flush`·`clear` 는 `QuestionQueueRepository` 에 붙인 Spring Data 조각(`PersistenceContextSync`, 구현 `PersistenceContextSyncImpl`)으로 옮겼다.
+- `gradlew -p backend check` 통과(unit 375, integration 160).
