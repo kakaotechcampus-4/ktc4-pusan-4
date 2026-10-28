@@ -98,6 +98,19 @@ class LimitSettlementIntegrationTest {
                 tuple(march, 2025, 5_000_000L, 2_090_000L, "잠정"));
     }
 
+    @Test
+    void refunds_do_not_enter_the_limit() {
+        // 사용자가 포함시킨 승인취소처럼 금액이 음수인 거래가 접대비 가능으로 판정되어도 집계가 멈추지 않는다
+        UUID meal = judgment(transaction("2025-03-02", "AUTO"), "AVAILABLE", ENTERTAINMENT, 6_500L);
+        judgment(transaction("2025-03-03", "INCLUDED"), "AVAILABLE", ENTERTAINMENT, -6_500L);
+
+        settlementService.settleProvisional(userId);
+
+        assertThat(jdbcTemplate.queryForList(
+            "select judgment_id from limit_bucket_entry where user_id = ?", UUID.class, userId))
+            .containsExactly(meal);
+    }
+
     private UUID transaction(String approvedAt, String userInclusion) {
         UUID id = UUID.randomUUID();
         jdbcTemplate.update("""

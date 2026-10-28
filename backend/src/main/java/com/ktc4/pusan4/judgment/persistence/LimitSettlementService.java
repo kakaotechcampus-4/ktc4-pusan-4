@@ -61,6 +61,11 @@ public class LimitSettlementService {
         for (LimitTagged tagged : judgmentRepository.findCurrentLimitTagged(userId, EntertainmentLimit.BUCKET)) {
             // 금액 계산 전에 저장된 판정은 결제금액으로 본다. 접대비에는 안분·상각이 없다.
             long amount = tagged.finalAmount() == null ? tagged.amount() : tagged.finalAmount();
+            // 승인취소·환불(음수 금액)은 접대비 지출이 아니라 한도를 나눠 받을 차례에 넣지 않는다.
+            // 넣으면 배분기가 음수를 거부해, 이 사용자의 run 완료와 질문 답변이 모두 실패한다.
+            if (amount < 0) {
+                continue;
+            }
             byYear.computeIfAbsent(tagged.approvedAt().getYear(), year -> new ArrayList<>())
                 .add(new LimitCandidate(tagged.judgmentId(), tagged.approvedAt(), amount));
         }
