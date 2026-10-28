@@ -115,16 +115,17 @@ class QuestionAnswerIntegrationTest {
      */
     @Test
     void personal_answer_to_awaiting_explanation_cancels_other_questions_of_the_transaction() throws Exception {
-        // given: 3만원 넘는 생활용품 — 기본 불가(R-207)로 「용도」를 묻고, 적격증빙(R-060)도 묻는다
-        UUID household = insertTransaction("생활용품", "다이소", 45_000L);
+        // given: 100만원 넘는 생활용품 — 기본 불가(R-207)로 「용도」를 묻고, 자산 여부(R-241)도 묻는다
+        // (예전엔 적격증빙(R-060)을 두 번째 질문으로 썼는데, 카드매출전표 자동 인정으로 묻지 않게 됐다)
+        UUID household = insertTransaction("생활용품", "다이소", 1_500_000L);
         judge(household);
         UUID purpose = pendingQuestion(household, "용도");
-        UUID receipt = pendingQuestion(household, "증빙유무");
+        UUID receipt = pendingQuestion(household, "자산여부");
 
         // when
         answer(List.of(purpose), "개인").andExpect(status().isOk());
 
-        // then: 불가가 확정되고 증빙 질문은 취소되며, 새로 묻는 질문도 없다
+        // then: 불가가 확정되고 자산 질문은 취소되며, 새로 묻는 질문도 없다
         assertThat(latestVerdict(household)).isEqualTo("UNAVAILABLE");
         assertThat(jdbcTemplate.queryForObject(
             "select status from question_queue where id = ?", String.class, receipt)).isEqualTo("CANCELED");
