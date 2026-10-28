@@ -82,7 +82,17 @@ bash ./backend/gradlew -p backend bootRun --args='--spring.profiles.active=local
 
 `CurrentUserProvider` 구현체는 `auth.BearerCurrentUserProvider`이고, `Authorization: Bearer {accessToken}`의 사용자를 돌려줍니다. `/api/v1/auth/**`를 뺀 모든 API는 `CurrentUserWebConfig`의 인터셉터가 이를 확인해, 토큰이 없으면 `CurrentUser` 인자가 없는 API(목 응답 등)도 401 `UNAUTHORIZED`입니다. 계약은 `docs/api.md` 1.1에 있습니다.
 
-실제 계정이 생기기 전까지 사용자는 고정 사용자(`FixedUser`, `MockFixtures.USER_ID`와 같은 id) 하나이고, `TemporaryUserSeeder`가 기동할 때 그 행을 만듭니다.
+### 인증 (`auth`)
+
+지금은 고정 사용자(`FixedUser`, `MockFixtures.USER_ID`와 같은 id) 하나만 로그인합니다. `TemporaryUserSeeder`가 기동할 때 그 사용자 행을 만듭니다. 로컬 프로필의 비밀번호는 `demo1234`입니다(`application-local.yml`, 운영은 `docs/deployment.md` 9절).
+
+| 구성요소 | 지금 | 바꿀 때 |
+| --- | --- | --- |
+| `AccessTokens` | JWT 발급·검증(15분) | 그대로 |
+| `RefreshTokenStore` | `StatelessRefreshTokenStore` — 서명만 확인, 저장 없음. `revoke`·`revokeAll`은 아무것도 하지 않는다 | B9c: Redis 구현으로 빈만 교체(교체·폐기·탈퇴 시 전체 폐기) |
+| `CredentialVerifier` | `FixedUserCredentialVerifier` — `FixedUser` + `APP_AUTH_DEMO_PASSWORD` | B9b: 실제 계정·카카오 구현으로 교체, `FixedUser`·`TemporaryUserSeeder` 삭제 |
+
+`AuthService`와 `AuthController`는 위 인터페이스만 보므로 교체해도 바뀌지 않습니다.
 
 ### 테스트에서 인증
 

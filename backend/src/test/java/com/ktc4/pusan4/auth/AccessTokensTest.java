@@ -56,6 +56,14 @@ class AccessTokensTest {
     }
 
     @Test
+    void refresh_token_is_not_an_access_token() {
+        String refresh = new StatelessRefreshTokenStore(tokens, Clock.fixed(NOW, ZoneOffset.UTC), Duration.ofDays(14))
+            .issue(USER_ID).value();
+
+        assertThat(accessTokensAt(NOW).verify(refresh)).isEmpty();
+    }
+
+    @Test
     void garbage_is_rejected() {
         assertThat(accessTokensAt(NOW).verify("not-a-jwt")).isEmpty();
     }

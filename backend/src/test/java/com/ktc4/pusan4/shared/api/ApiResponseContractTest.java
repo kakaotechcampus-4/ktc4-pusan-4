@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ktc4.pusan4.admin.domain.RuleCandidate;
 import com.ktc4.pusan4.admin.domain.RuleCandidateStatus;
 import com.ktc4.pusan4.admin.persistence.RuleCandidateReviewService;
+import com.ktc4.pusan4.auth.AuthService;
 import com.ktc4.pusan4.auth.TestAuthentication;
 import com.ktc4.pusan4.judgment.api.JudgmentMockData;
 import com.ktc4.pusan4.judgment.domain.Gate;
@@ -139,6 +140,10 @@ class ApiResponseContractTest {
 
     @MockitoBean
     private RuleCandidateReviewService ruleCandidateReviewService;
+
+    /** 인증 API 의 동작은 AuthIntegrationTest 가 본다. 여기서는 컨텍스트에 컨트롤러가 뜨도록 자리만 채운다. */
+    @MockitoBean
+    private AuthService authService;
 
     @BeforeEach
     void stubServices() {

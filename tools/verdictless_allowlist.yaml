@@ -16,5 +16,3 @@ allow:
   - { card: R-210, option: "자택 겸용", issue: "#65" }
   - { card: R-211, option: "업무·개인 혼재", issue: "#65" }
   - { card: R-213, option: "모르겠음", issue: "#65" }
-  - { card: R-306, option: "업무관련", issue: "#65" }
-  - { card: R-307, option: "업무관련", issue: "#65" }

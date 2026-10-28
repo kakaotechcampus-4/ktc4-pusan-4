@@ -42,3 +42,32 @@
   이 PR 뒤에 머지하면 컴파일이 깨지므로 `FixedUser.ID`·`FixedUser.EMAIL` 로 바꾸고,
   `ApiResponseContractTest` 의 `@Import` 는 `TestAuthentication.class` 로 바꾼다.
 - 로컬에서 bootRun 으로 직접 띄워 보지는 않았다. 통합 테스트로만 확인했다.
+
+## 01:10 고정 사용자 로그인·토큰 재발급·로그아웃 API (feature/fixed-jwt-auth, 057b9e3)
+
+앞 PR(feature/bearer-access-token) 위에 쌓았다. 1000줄 제한 때문에 나눴고 둘은 함께 머지한다.
+
+- `POST /api/v1/auth/login`·`/refresh`·`/logout`. 계약은 api.md 1.1 에 새로 적었다(FE #142 의 #139 가정과 같다).
+  액세스 토큰은 본문, 리프레시 토큰은 `refresh_token` 쿠키(HttpOnly, SameSite=Strict, Path=/api/v1/auth, Domain 없음, 14일).
+- 나중에 바꿀 곳은 인터페이스 두 개로만 뒀다.
+  - `RefreshTokenStore`(issue·rotate·revoke·revokeAll): 지금은 `StatelessRefreshTokenStore` — 서명만 보고 저장하지 않아
+    `revoke`·`revokeAll` 은 아무것도 하지 않는다. B9c 에서 Redis 구현으로 빈만 바꾼다.
+  - `CredentialVerifier`: 지금은 `FixedUserCredentialVerifier` — `demo@example.com` 과 `APP_AUTH_DEMO_PASSWORD` 만 통과.
+    비밀번호 설정이 비면 아무도 로그인하지 못한다. B9b 에서 실제 계정·카카오 구현으로 바꾼다.
+  - `AuthService`·`AuthController` 는 두 인터페이스만 봐서 교체해도 바뀌지 않는다.
+- 쿠키 모양은 `RefreshCookie` 한 곳에만 둔다. `Secure` 는 `app.auth.cookie-secure`(로컬 프로필만 false).
+- 로컬 프로필 비밀번호는 `demo1234`. 운영은 `/etc/ktc4/production.env` 의 `APP_AUTH_JWT_SECRET`·`APP_AUTH_DEMO_PASSWORD`
+  (deploy/compose.yaml 이 백엔드에 넘긴다, docs/deployment.md 8절).
+- docs/backend_api_plan.md 의 B9b·B9c 에 끝난 것과 남은 것을, 결정 표의 인증 행에 10/18 결정을 적었다.
+
+확인: `gradlew -p backend test`·`integrationTest` 통과(test 306, integrationTest 69).
+`AuthIntegrationTest` 가 로그인 성공·쿠키 속성, 비밀번호 오류 401 `INVALID_CREDENTIALS`, 재발급, 쿠키 없는 재발급 401
+`INVALID_REFRESH_TOKEN`, 로그아웃 시 `Max-Age=0`, 리프레시 토큰을 Bearer 로 쓰면 401 을 본다.
+
+남은 것: 운영 서버의 환경 파일에 두 값을 넣는 일은 하지 않았다. 브라우저(FE #142)로 실제 로그인·새로고침 복원은 아직 해 보지 않았다.
+
+## 18:13 계획 문서 변경을 문서 PR로 옮김 (df56204)
+
+`docs/backend_api_plan.md` 를 #154 브랜치 상태로 되돌렸다. 위 01:10 절에 적은 B9b·B9c 행, 사용자 식별 문단, 결정 표 인증 행 수정은 그대로 `docs/backend-plan-poc` 브랜치(계획 문서 PR)로 옮겼다.
+
+같은 B9b·B9c 행을 이 PR과 계획 문서 PR이 함께 고쳐 머지 때 충돌이 나서, 계획 변경을 PR 하나에 모았다.

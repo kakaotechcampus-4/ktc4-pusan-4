@@ -23,3 +23,17 @@
 
 - #155(feature/fixed-jwt-auth)는 이 브랜치 위에 쌓여 있어 이 merge 를 다시 받아야 한다.
 - `backend/README.md` 71줄이 develop 에서 지운 `TransactionMockData` 를 아직 목 응답 예로 든다. develop 에서 생긴 일이라 여기선 고치지 않았다.
+
+## 13:12 fixed-jwt-auth(#155) 에 bearer-access-token 을 merge 한다
+
+- 브랜치: feature/fixed-jwt-auth
+- 커밋: 04109f9 (merge 1개)
+
+### 한 일
+
+- 위 merge 를 받으려고 feature/bearer-access-token(a6eefbf)을 이 브랜치에 merge 했다.
+- `ApiResponseContractTest`: develop 에서 온 `UploadService`·`UploadBatchService`·`TransactionService` 목과 이 브랜치의 `AuthService` 목이 같은 자리에 붙어 충돌했다. 둘 다 남기고 develop 쪽을 앞에 뒀다.
+
+### 확인한 것
+
+- `gradlew -p backend check` 통과(test 359, integrationTest 132).
