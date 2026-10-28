@@ -6,5 +6,7 @@ import java.util.UUID;
 
 interface ClassificationReviewRepository extends Repository<ClassificationReviewEntity, UUID> {
 
+    ClassificationReviewEntity save(ClassificationReviewEntity review);
+
     boolean existsByTransactionIdAndStatus(UUID transactionId, String status);
 }
