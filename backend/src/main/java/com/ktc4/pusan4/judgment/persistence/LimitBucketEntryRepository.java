@@ -9,6 +9,23 @@ import java.util.UUID;
 
 interface LimitBucketEntryRepository extends Repository<LimitBucketEntryEntity, Long> {
 
+    LimitBucketEntryEntity save(LimitBucketEntryEntity entry);
+
+    void delete(LimitBucketEntryEntity entry);
+
+    @Query("""
+        select entry
+        from LimitBucketEntryEntity entry
+        where entry.userId = :userId
+          and entry.taxYear = :taxYear
+          and entry.bucketCode = :bucketCode
+        """)
+    List<LimitBucketEntryEntity> findEntries(
+        @Param("userId") UUID userId,
+        @Param("taxYear") int taxYear,
+        @Param("bucketCode") String bucketCode
+    );
+
     /** 이 버킷에 항목이 남아 있는 과세연도. */
     @Query("""
         select distinct entry.taxYear
