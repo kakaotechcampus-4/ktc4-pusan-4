@@ -33,3 +33,12 @@
 - 혼용 비율 입력(#65), 선급비용 기간배분(E-043), 부가세 단계, 접대비 배분 순서(#15)가 남았다.
 - (기존 문제) 판정 행마다 batch 의 UserFact 전부를 `input_facts` 로 저장한다. 그래서 답이 많은 batch 의 run 은 거래 수의 제곱에 비례해 느려진다.
 - 비서 PR(feature/assistant-backend)과 함께 들어가면, 나중에 머지되는 쪽에서 일괄 응답이 `AnswerSource.BULK` 를 넘기도록 한 줄 고쳐야 한다.
+
+## 12:02 상각률을 모르는 자산 카드는 카드 로드에서 거부
+
+- 커밋: 6f1a3b2
+- `RuleCardLoader` 가 `자산: true` 를 싣는 자리(카드 `attributes` 나 선택지)에 `상각방법` 과 `내용연수` 가 있는지, 그 조합이 상각률 표에 있는지 검사한다. 표는 `AmountCalculator.hasDepreciationRate` 로 같은 것을 쓴다.
+- 전에는 `AmountCalculator` 가 금액을 계산하다 예외를 던졌다. run 에서는 그 거래만 실패로 남지만, 질문 답변과 일괄 응답에서는 답 저장까지 롤백되어 사용자에게 500 "서버 오류" 가 보이고 다시 눌러도 같은 오류가 난다. 사용자가 할 수 있는 게 없는 오류라 CI 에서 잡기로 했다. Backend CI 는 `rules/**` 변경에도 돌고 `RuleCardLoaderRealCardsTest` 가 실물 카드를 읽는다.
+- 계획 문서 A6a 의 "알 수 없으면 확인필요" 와 다르게 간다. 확인필요로 두면 답할 질문이 없다. 계획 문서에 결정(10/28)으로 적었다.
+- `gradlew -p backend check` 통과(unit 375, integration 158). 구현을 빼면 새 테스트 5개가 실패하는 것을 먼저 봤다.
+- `tools/validate_rules.py` 에는 넣지 않았다. 어느 CI 워크플로에서도 돌지 않아 막는 효과가 없다.
