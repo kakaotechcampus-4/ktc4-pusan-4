@@ -61,8 +61,11 @@ class QuestionAnswerIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        // 판정 저장은 카드가 인용한 조문마다 statute_version 행이 있어야 한다(StatuteVersions).
+        // 208의2-4 는 R-060, 62·67-* 는 R-241(100만원 초과 생활용품) 인용이다.
         for (String statuteId : List.of("소득세법-33-1-5", "소득세법시행령-61-1-1", "소득세법-27-1", "소득세법-35-1",
-            "소득세법-160의2-2", "소득세법시행령-208의2-1-1", "소득세법-81의6-1")) {
+            "소득세법-160의2-2", "소득세법시행령-208의2-1-1", "소득세법시행령-208의2-4", "소득세법-81의6-1",
+            "소득세법시행령-62", "소득세법시행령-67-4", "소득세법시행령-67-5", "소득세법시행령-67-7")) {
             jdbcTemplate.update("""
                 insert into statute_version(
                     statute_id, doc_type, hierarchy, effective_from, body, body_hash,
