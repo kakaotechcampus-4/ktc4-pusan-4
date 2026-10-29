@@ -2,6 +2,7 @@ package com.ktc4.pusan4.shared.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ktc4.pusan4.auth.AuthService;
+import com.ktc4.pusan4.auth.EmailVerificationService;
 import com.ktc4.pusan4.auth.TestAuthentication;
 import com.ktc4.pusan4.auth.TestUser;
 import com.ktc4.pusan4.judgment.api.JudgmentMockData;
@@ -135,6 +136,9 @@ class ApiResponseContractTest {
     /** 인증 API 의 동작은 AuthIntegrationTest 가 본다. 여기서는 컨텍스트에 컨트롤러가 뜨도록 자리만 채운다. */
     @MockitoBean
     private AuthService authService;
+
+    @MockitoBean
+    private EmailVerificationService emailVerificationService;
 
     @BeforeEach
     void stubServices() {

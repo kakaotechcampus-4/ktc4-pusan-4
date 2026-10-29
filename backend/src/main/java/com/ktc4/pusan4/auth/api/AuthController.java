@@ -2,6 +2,7 @@ package com.ktc4.pusan4.auth.api;
 
 import com.ktc4.pusan4.auth.AuthService;
 import com.ktc4.pusan4.auth.AuthService.IssuedTokens;
+import com.ktc4.pusan4.auth.EmailVerificationService;
 import com.ktc4.pusan4.shared.api.ErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -30,19 +31,54 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+    private final EmailVerificationService emailVerification;
     private final RefreshCookie refreshCookie;
 
-    AuthController(AuthService authService, @Value("${app.auth.cookie-secure}") boolean secureCookie) {
+    AuthController(AuthService authService, EmailVerificationService emailVerification,
+        @Value("${app.auth.cookie-secure}") boolean secureCookie) {
         this.authService = authService;
+        this.emailVerification = emailVerification;
         this.refreshCookie = new RefreshCookie(secureCookie);
     }
 
-    @Operation(summary = "이메일 회원가입", description = "가입하고 바로 로그인한다. 응답은 로그인과 같고 상태만 201 이다")
+    @Operation(summary = "가입 인증 코드 메일 보내기",
+        description = "6자리 코드를 메일로 보낸다. 코드는 5분 동안 쓸 수 있고, 다시 받으면 이전 코드는 쓸 수 없다")
+    @ApiResponse(responseCode = "204", description = "보냄")
+    @ApiResponse(responseCode = "409", description = "EMAIL_ALREADY_EXISTS",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode = "429", description = "VERIFICATION_RESEND_TOO_SOON — 60초 안에 다시 요청 / VERIFICATION_DAILY_LIMIT",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode = "502", description = "EMAIL_SEND_FAILED",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode = "503", description = "EMAIL_VERIFICATION_UNAVAILABLE — 서버에 메일 계정이 없음",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @PostMapping("/email-verification")
+    public ResponseEntity<Void> sendVerificationCode(@Valid @RequestBody EmailVerificationRequest request) {
+        emailVerification.sendCode(request.email());
+        return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "가입 인증 코드 확인", description = "코드가 맞으면 가입에 쓸 인증 토큰(30분)을 준다")
+    @ApiResponse(responseCode = "400",
+        description = "INVALID_VERIFICATION_CODE — 틀림 / VERIFICATION_CODE_EXPIRED — 만료됐거나 5번 틀려 폐기됨",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @PostMapping("/email-verification/confirm")
+    public EmailVerificationResponse confirmVerificationCode(
+        @Valid @RequestBody EmailVerificationConfirmRequest request
+    ) {
+        return new EmailVerificationResponse(emailVerification.confirm(request.email(), request.code()));
+    }
+
+    @Operation(summary = "이메일 회원가입",
+        description = "메일 인증으로 받은 토큰을 함께 보낸다. 가입하고 바로 로그인한다. 응답은 로그인과 같고 상태만 201 이다")
+    @ApiResponse(responseCode = "400", description = "EMAIL_NOT_VERIFIED — 인증 토큰이 없거나 틀렸거나 만료됨",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @ApiResponse(responseCode = "409", description = "EMAIL_ALREADY_EXISTS",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @PostMapping("/signup")
     public ResponseEntity<AccessTokenResponse> signup(@Valid @RequestBody SignupRequest request) {
-        return issued(HttpStatus.CREATED, authService.signup(request.email(), request.password()));
+        return issued(HttpStatus.CREATED,
+            authService.signup(request.email(), request.password(), request.verificationToken()));
     }
 
     @Operation(summary = "로그인", description = "액세스 토큰을 본문으로, 리프레시 토큰을 Set-Cookie 로 준다")

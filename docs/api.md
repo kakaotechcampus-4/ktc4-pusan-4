@@ -97,6 +97,10 @@ Question
 /api/v1
 │
 ├── auth/                               (Authorization 없이 부른다)
+│   ├── email-verification/
+│   │   ├── POST                        가입 인증 코드 메일 보내기
+│   │   └── confirm/
+│   │       └── POST                    가입 인증 코드 확인
 │   ├── signup/
 │   │   └── POST                        이메일 회원가입
 │   ├── login/
@@ -212,30 +216,79 @@ refresh_token={token}; Path=/api/v1/auth; Max-Age=1209600; HttpOnly; Secure; Sam
 - `Domain` 은 붙이지 않는다. 배포는 Caddy 뒤 같은 오리진이다.
 - 로컬 프로필(http)에서만 `Secure` 를 뺀다.
 
-계정은 이메일 가입이나 카카오 로그인으로 만든다. 이메일은 앞뒤 공백을 빼고 소문자로 저장하고, 로그인할 때도 같은 규칙으로 찾는다. 메일 인증은 아직 없다.
+계정은 이메일 가입이나 카카오 로그인으로 만든다. 이메일은 앞뒤 공백을 빼고 소문자로 저장하고, 로그인할 때도 같은 규칙으로 찾는다.
+이메일 가입은 메일 인증을 먼저 한다: 코드 요청 → 메일로 받은 6자리 코드 확인 → 받은 `verificationToken` 으로 가입. 인증하지 않은 계정은 만들어지지 않는다.
 카카오 계정은 카카오 회원번호로만 식별하고 이메일을 받지 않는다(`GET /users/me` 의 `email` 이 `null`). 같은 이메일이어도 이메일 계정과 카카오 계정은 따로다.
 
 리프레시 토큰은 서버(Redis)가 로그인 단위로 기억한다. 재발급하면 이전 토큰은 쓸 수 없고, 로그아웃하면 그 로그인만 끊긴다(다른 기기는 그대로).
 이미 쓴 리프레시 토큰을 다시 보내면 탈취로 보고 그 로그인을 끊는다. 그래서 프론트는 재발급 요청을 한 번에 하나만 보낸다.
+
+### `POST /api/v1/auth/email-verification`
+
+```
+{
+  "email": "user@example.com"
+}
+```
+
+6자리 인증 코드를 메일로 보낸다. 응답 `204`. 코드는 5분 동안 쓸 수 있고, 다시 받으면 이전 코드는 쓸 수 없다.
+다시 받기는 60초에 한 번, 이메일 하나에 하루 10번까지다.
+
+```
+400 VALIDATION_ERROR                 이메일 형식이 아님
+409 EMAIL_ALREADY_EXISTS             이미 가입한 이메일
+429 VERIFICATION_RESEND_TOO_SOON     60초 안에 다시 요청함 (message 에 남은 초)
+429 VERIFICATION_DAILY_LIMIT         오늘 이 이메일로 10번 보냄
+502 EMAIL_SEND_FAILED                메일을 보내지 못함 → 바로 다시 요청해도 된다
+503 EMAIL_VERIFICATION_UNAVAILABLE   서버에 메일 계정이 설정되지 않음
+```
+
+### `POST /api/v1/auth/email-verification/confirm`
+
+```
+{
+  "email": "user@example.com",
+  "code": "123456"
+}
+```
+
+응답 `200`:
+
+```
+{
+  "verificationToken": "..."
+}
+```
+
+토큰은 30분 동안 그 이메일의 가입에만 쓸 수 있다.
+
+```
+400 VALIDATION_ERROR            코드가 숫자 6자리가 아님
+400 INVALID_VERIFICATION_CODE   코드가 틀림 → 다시 입력
+400 VERIFICATION_CODE_EXPIRED   만료됐거나 5번 틀려 폐기됨 → 코드를 다시 받는다
+```
 
 ### `POST /api/v1/auth/signup`
 
 ```
 {
   "email": "user@example.com",
-  "password": "..."
+  "password": "...",
+  "verificationToken": "..."
 }
 ```
 
 | 필드 | 제약 |
 | --- | --- |
-| email | 이메일 형식, 최대 320자 |
+| email | 이메일 형식, 최대 320자. 인증한 이메일과 같아야 한다(대소문자·앞뒤 공백 무시) |
 | password | 8자 이상, UTF-8 72바이트 이하 |
+| verificationToken | `email-verification/confirm` 응답의 값 |
 
-가입하고 바로 로그인한다. 응답은 로그인과 같고 상태만 `201` 이다.
+가입하고 바로 로그인한다. 응답은 로그인과 같고 상태만 `201` 이다. 가입하면 인증 토큰은 더 쓸 수 없다.
 
 ```
 400 VALIDATION_ERROR       형식·길이가 맞지 않음
+400 EMAIL_NOT_VERIFIED     인증 토큰이 없거나, 다른 이메일 것이거나, 만료됨 → 인증부터 다시
 409 EMAIL_ALREADY_EXISTS   이미 가입한 이메일
 ```
 
