@@ -4,6 +4,7 @@ import { ArrowRightIcon } from 'lucide-react';
 import { MarketingHeader } from '../components/MarketingHeader';
 import { MarketingFooter } from '../components/MarketingFooter';
 import { OrbitStage } from '../components/OrbitStage';
+import { ExampleCarousel } from '../components/ExampleCarousel';
 import {
   FLOW_STEPS,
   HERO_SUMMARY,
@@ -37,7 +38,7 @@ function ArrowDot({ size = 'md' }: {size?: 'sm' | 'md';}) {
  */
 function IrHeading({ children }: {children: React.ReactNode;}) {
   return (
-    <h2 className="flex items-center gap-4 text-h2 font-normal tracking-ir text-ink lg:text-ir-section">
+    <h2 className="flex items-center gap-4 text-h2 font-normal tracking-ir text-ink [word-break:keep-all] lg:text-ir-section">
       <span
         aria-hidden="true"
         className="flex h-12 w-12 shrink-0 items-center justify-center gap-[3px] rounded-xl bg-surface">
@@ -232,6 +233,18 @@ export function Landing() {
               판정 흐름 전체보기
               <ArrowDot />
             </Link>
+          </div>
+        </section>
+
+        {/* 지출 예시 — 가로로 넘겨 본다 */}
+        <section className={`${SHELL} pt-28`}>
+          <IrHeading>이런 지출을 이렇게 봅니다</IrHeading>
+          <p className="mt-5 max-w-xl text-body-lg text-ink2 [word-break:keep-all]">
+            1인 개발 사업자가 자주 쓰는 항목입니다. 같은 지출도 상황에 따라
+            결과가 달라집니다.
+          </p>
+          <div className="mt-10">
+            <ExampleCarousel />
           </div>
         </section>
 
