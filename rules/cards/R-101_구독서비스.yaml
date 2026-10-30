@@ -34,6 +34,7 @@ question:
   text: "이 구독은 업무 전용인가요?"
   fact_type: 전용여부
   group_by: merchant_norm
+  previous_answer: carry
   options:
     - { value: 업무 전용, verdict: 가능, account: 지급수수료 }
     - { value: 개인 전용, verdict: 불가 }

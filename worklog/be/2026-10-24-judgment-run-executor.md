@@ -49,3 +49,29 @@
 - CPU 제한 측정은 EBS fsync 와 t3 CPU 크레딧(버스트)을 반영하지 않는다. 실제 EC2 는 더 느릴 수 있다
 - 운영 값에서 1,200건 run 100개가 몰리면(12만 건, 약 7.9분) 대기열 50 을 넘는 run 은 RUN_START_FAILED 로 끝난다
 - 로컬 프로필에서 4·150 이 실제로 적용되는지는 앱을 띄워 확인하지 않았다
+
+## 03:50 배포로 종료할 때 판정 run 을 60초까지 마저 처리한다
+
+- 브랜치: refactor/judgment-run-graceful-shutdown (refactor/judgment-run-executor 위)
+- 커밋: fa4fcbc (1개)
+
+### 한 일
+
+- `judgmentRunExecutor` 에 `waitForTasksToCompleteOnShutdown(true)` 와 `app.judgment-run.await-termination`(운영 60s)을 줬다
+- `deploy/compose.yaml` 백엔드에 `stop_grace_period: 90s` 를 줬다
+- `docs/architecture.md` 에 정상 종료 때의 동작과 DB 대기열을 쓰지 않는 이유를, `docs/deployment.md` 4절에 배포 중 백엔드가 멈춰 있는 시간이 길어지는 것을 적었다
+
+### 왜 이렇게 했나
+
+- run 도중 컨테이너에 SIGTERM 을 보내 설정 전후를 비교했다(백엔드·Postgres 에 CPU 1개씩, `docker stop -t 120~150`)
+  - 3,000건 run 1개, 4개(워커 2 실행 + 대기열 2): 설정이 없어도 Spring 6.1 의 실행기 종료 처리가 돌던 run 과 대기열의 run 을 기다려 모두 COMPLETED 였다. 커넥션 풀은 그 뒤에 닫혔다
+  - 6,000건 run 1개(약 47초): 설정이 없으면 30초 뒤 `Shutdown phase ... ends with 1 bean still running after timeout of 30000ms: [judgmentRunExecutor]` 를 남기고 커넥션 풀을 닫아 RUNNING 3823/6000 으로 남았다. 설정을 넣으니 43.9초 만에 COMPLETED 로 끝나고 커넥션 풀이 그 뒤에 닫혔다
+- 60s: 같은 조건에서 3,000건 run 약 28초, 6,000건 약 47초다
+- 90s: 웹 요청 종료 대기(`spring.lifecycle.timeout-per-shutdown-phase`, 최대 30s)까지 더했다
+- 중간에 죽는 것은 치명적이지 않다고 봤다(사용자 결정). 판정은 다시 돌리면 같은 결과가 나오고 append-only 라 DB 대기열 대신 지금의 멈춘 run 정리(#128)로 둔다
+
+### 남은 것 · 아는 문제
+
+- 종료 동작은 자동 테스트가 없다. 측정용 스크립트로 직접 확인했다
+- 판정이 도는 중에 배포하면 새 백엔드가 뜨기 전까지 멈춰 있는 시간이 최대 60초 늘어난다
+- 60초 안에 못 끝낸 run 은 새 서버의 정리가 5분 뒤 RUN_INTERRUPTED 로 끝낸다

@@ -28,6 +28,7 @@ question:
   text: "이 임차료는 어떤 공간에 대한 것인가요?"
   fact_type: 사업장형태
   group_by: merchant_norm
+  previous_answer: carry
   options:
     - { value: 별도 사무실, verdict: 가능, citations: [{ id: 소득세법-27-1, verified: true }], account: 지급임차료 }
     - { value: 자택 겸용 }
