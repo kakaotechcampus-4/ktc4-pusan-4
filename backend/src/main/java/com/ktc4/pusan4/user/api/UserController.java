@@ -1,8 +1,6 @@
 package com.ktc4.pusan4.user.api;
 
 import com.ktc4.pusan4.shared.auth.CurrentUser;
-import com.ktc4.pusan4.user.domain.AppUser;
-import com.ktc4.pusan4.user.persistence.AdminPolicy;
 import com.ktc4.pusan4.user.persistence.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -19,18 +17,15 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserController {
 
     private final UserService userService;
-    private final AdminPolicy adminPolicy;
 
-    public UserController(UserService userService, AdminPolicy adminPolicy) {
+    public UserController(UserService userService) {
         this.userService = userService;
-        this.adminPolicy = adminPolicy;
     }
 
     @Operation(summary = "내 정보 조회", description = "role 이 ADMIN 이면 관리자 API(규칙 후보)를 쓸 수 있다")
     @GetMapping
     public UserResponse me(CurrentUser currentUser) {
-        AppUser user = userService.get(currentUser.id());
-        return UserResponse.from(user, adminPolicy.roleOf(user));
+        return UserResponse.from(userService.get(currentUser.id()));
     }
 
     @Operation(summary = "회원 탈퇴",

@@ -1,4 +1,4 @@
-package com.ktc4.pusan4.admin.domain;
+package com.ktc4.pusan4.judgment.domain;
 
 import java.time.OffsetDateTime;
 import java.util.List;

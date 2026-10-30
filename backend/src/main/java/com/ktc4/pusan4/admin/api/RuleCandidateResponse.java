@@ -1,8 +1,8 @@
 package com.ktc4.pusan4.admin.api;
 
-import com.ktc4.pusan4.admin.domain.RuleCandidate;
-import com.ktc4.pusan4.admin.domain.RuleCandidate.SuggestedDoc;
-import com.ktc4.pusan4.admin.domain.RuleCandidateStatus;
+import com.ktc4.pusan4.judgment.domain.RuleCandidate;
+import com.ktc4.pusan4.judgment.domain.RuleCandidate.SuggestedDoc;
+import com.ktc4.pusan4.judgment.domain.RuleCandidateStatus;
 import com.ktc4.pusan4.shared.api.Coded;
 
 import java.time.OffsetDateTime;

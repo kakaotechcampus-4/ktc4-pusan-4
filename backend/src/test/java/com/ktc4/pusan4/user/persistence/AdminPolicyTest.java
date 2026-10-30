@@ -19,37 +19,19 @@ class AdminPolicyTest {
     private static final UUID USER_ID = UUID.fromString("0199c8f2-0000-7000-8000-000000000001");
 
     private final UserService userService = mock(UserService.class);
+    private final AdminPolicy policy = new AdminPolicy(userService);
 
     @Test
-    void configured_email_is_admin_ignoring_case_and_spaces() {
-        AdminPolicy policy = new AdminPolicy(userService, " Admin@Example.com , ops@example.com");
+    void admin_role_passes() {
+        given(userService.get(USER_ID)).willReturn(user(UserRole.ADMIN));
 
-        assertThat(policy.roleOf(user("admin@example.com"))).isEqualTo(UserRole.ADMIN);
-        assertThat(policy.roleOf(user("OPS@example.com"))).isEqualTo(UserRole.ADMIN);
-        assertThat(policy.roleOf(user("demo@example.com"))).isEqualTo(UserRole.USER);
+        assertThat(policy.requireAdmin(USER_ID).role()).isEqualTo(UserRole.ADMIN);
     }
 
     @Test
-    void account_without_email_is_not_admin() {
-        AdminPolicy policy = new AdminPolicy(userService, "admin@example.com");
+    void user_role_is_forbidden() {
+        given(userService.get(USER_ID)).willReturn(user(UserRole.USER));
 
-        assertThat(policy.roleOf(user(null))).isEqualTo(UserRole.USER);
-    }
-
-    @Test
-    void empty_setting_has_no_admin() {
-        AdminPolicy policy = new AdminPolicy(userService, "");
-
-        assertThat(policy.roleOf(user("admin@example.com"))).isEqualTo(UserRole.USER);
-    }
-
-    @Test
-    void require_admin_returns_user_or_forbidden() {
-        AdminPolicy policy = new AdminPolicy(userService, "admin@example.com");
-        given(userService.get(USER_ID)).willReturn(user("admin@example.com"));
-        assertThat(policy.requireAdmin(USER_ID).email()).isEqualTo("admin@example.com");
-
-        given(userService.get(USER_ID)).willReturn(user("demo@example.com"));
         assertThatThrownBy(() -> policy.requireAdmin(USER_ID))
             .isInstanceOfSatisfying(ApiException.class, e -> {
                 assertThat(e.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
@@ -57,7 +39,7 @@ class AdminPolicyTest {
             });
     }
 
-    private static AppUser user(String email) {
-        return new AppUser(USER_ID, email, OffsetDateTime.parse("2026-09-01T10:00:00+09:00"));
+    private static AppUser user(UserRole role) {
+        return new AppUser(USER_ID, "user@example.com", role, OffsetDateTime.parse("2026-09-01T10:00:00+09:00"));
     }
 }

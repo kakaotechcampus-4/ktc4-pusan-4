@@ -1,9 +1,8 @@
 package com.ktc4.pusan4.shared.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ktc4.pusan4.admin.domain.RuleCandidate;
-import com.ktc4.pusan4.admin.domain.RuleCandidateStatus;
-import com.ktc4.pusan4.admin.persistence.RuleCandidateReviewService;
+import com.ktc4.pusan4.assistant.AssistantRelayService;
+import com.ktc4.pusan4.assistant.api.ChatResponse;
 import com.ktc4.pusan4.auth.AuthService;
 import com.ktc4.pusan4.auth.TestAuthentication;
 import com.ktc4.pusan4.judgment.api.JudgmentMockData;
@@ -12,12 +11,14 @@ import com.ktc4.pusan4.judgment.domain.JudgmentOrigin;
 import com.ktc4.pusan4.judgment.domain.JudgmentOriginType;
 import com.ktc4.pusan4.judgment.domain.JudgmentRevision;
 import com.ktc4.pusan4.judgment.domain.JudgmentRun;
+import com.ktc4.pusan4.judgment.domain.JudgmentRunFailure;
+import com.ktc4.pusan4.judgment.domain.JudgmentRunStatus;
 import com.ktc4.pusan4.judgment.domain.JudgmentSummary;
 import com.ktc4.pusan4.judgment.domain.PendingTotal;
 import com.ktc4.pusan4.judgment.domain.Question;
 import com.ktc4.pusan4.judgment.domain.QuestionStatus;
-import com.ktc4.pusan4.judgment.domain.JudgmentRunFailure;
-import com.ktc4.pusan4.judgment.domain.JudgmentRunStatus;
+import com.ktc4.pusan4.judgment.domain.RuleCandidate;
+import com.ktc4.pusan4.judgment.domain.RuleCandidateStatus;
 import com.ktc4.pusan4.judgment.domain.StatuteVersion;
 import com.ktc4.pusan4.judgment.domain.Verdict;
 import com.ktc4.pusan4.judgment.persistence.JudgmentOverrideService;
@@ -27,12 +28,11 @@ import com.ktc4.pusan4.judgment.persistence.QuestionAnswerResult;
 import com.ktc4.pusan4.judgment.persistence.QuestionAnswerService;
 import com.ktc4.pusan4.judgment.persistence.QuestionQueryService;
 import com.ktc4.pusan4.judgment.persistence.QuestionSuggestionService;
-import com.ktc4.pusan4.assistant.AssistantRelayService;
-import com.ktc4.pusan4.assistant.api.ChatResponse;
-import com.ktc4.pusan4.progress.domain.NextStep;
-import com.ktc4.pusan4.progress.persistence.ProgressService;
+import com.ktc4.pusan4.judgment.persistence.RuleCandidateReviewService;
 import com.ktc4.pusan4.judgment.persistence.StatuteService;
 import com.ktc4.pusan4.merchant.api.ClassificationReviewStatus;
+import com.ktc4.pusan4.progress.domain.NextStep;
+import com.ktc4.pusan4.progress.persistence.ProgressService;
 import com.ktc4.pusan4.shared.UuidV7Generator;
 import com.ktc4.pusan4.shared.auth.FixedUser;
 import com.ktc4.pusan4.transaction.api.CardIssuer;
@@ -181,7 +181,7 @@ class ApiResponseContractTest {
         given(reviewService.answer(any(), any(), any())).willReturn(new ClassificationAnswer(1, "해외SaaS", 1));
 
         given(userService.get(any())).willReturn(new AppUser(
-            FixedUser.ID, "demo@example.com",
+            FixedUser.ID, "demo@example.com", UserRole.USER,
             OffsetDateTime.parse("2026-09-01T10:00:00+09:00")));
 
         BusinessContext context = new BusinessContext(UUID.fromString(ID),
@@ -252,9 +252,8 @@ class ApiResponseContractTest {
             UUID.fromString(ID), LocalDate.parse("2026-01-03"), "AWS APN1", "Amazon Web Services", "해외SaaS",
             ClassificationStatus.CLASSIFIED, 137_000L, 0, SourceStatus.JUDGEABLE, UserInclusion.EXCLUDED));
 
-        AppUser admin = new AppUser(UUID.fromString(ID), "admin@example.com",
+        AppUser admin = new AppUser(UUID.fromString(ID), "admin@example.com", UserRole.ADMIN,
             OffsetDateTime.parse("2026-09-01T10:00:00+09:00"));
-        given(adminPolicy.roleOf(any())).willReturn(UserRole.USER);
         given(adminPolicy.requireAdmin(any())).willReturn(admin);
         RuleCandidate candidate = new RuleCandidate(1L, "사무용품", "940909", 3, 7,
             List.of(new RuleCandidate.SuggestedDoc("소득세법시행령-55-1", "업무와 관련된 비용", "법령")),

@@ -1,5 +1,7 @@
 package com.ktc4.pusan4.integration;
 
+import com.ktc4.pusan4.shared.auth.FixedUser;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,10 +22,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * 규칙 후보 관리자 API (M1, api.md 3.15). 요청 사용자(demo@example.com)를 관리자 목록에 넣고 부른다.
- * 관리자가 아닐 때의 403 은 AdminPolicyTest 가 본다.
+ * 규칙 후보 관리자 API (M1, api.md 3.15). 요청 사용자(demo@example.com)의 role 을 ADMIN 으로 바꾸고 부른다.
+ * 컨텍스트를 같이 쓰는 다른 테스트에 새지 않게 끝나면 USER 로 되돌린다.
  */
-@SpringBootTest(properties = "app.admin.emails=Demo@Example.com")
+@SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
 class AdminRuleCandidateIntegrationTest {
@@ -44,15 +46,30 @@ class AdminRuleCandidateIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
-    void clean() {
+    void setUp() {
         jdbcTemplate.update("delete from rule_candidate");
+        setRole("ADMIN");
+    }
+
+    @AfterEach
+    void restoreRole() {
+        setRole("USER");
     }
 
     @Test
-    void me_reports_admin_role_for_configured_email() throws Exception {
+    void me_reports_role_from_app_user() throws Exception {
         mockMvc.perform(get("/api/v1/users/me"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.role").value("ADMIN"));
+    }
+
+    @Test
+    void user_role_cannot_list_candidates() throws Exception {
+        setRole("USER");
+
+        mockMvc.perform(get("/api/v1/admin/rule-candidates"))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("FORBIDDEN"));
     }
 
     @Test
@@ -119,6 +136,10 @@ class AdminRuleCandidateIntegrationTest {
         mockMvc.perform(post("/api/v1/admin/rule-candidates/{id}/approve", 999_999))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.code").value("RULE_CANDIDATE_NOT_FOUND"));
+    }
+
+    private void setRole(String role) {
+        jdbcTemplate.update("update app_user set role = ? where id = ?", role, FixedUser.ID);
     }
 
     private long insert(String category, String status, String createdAt) {

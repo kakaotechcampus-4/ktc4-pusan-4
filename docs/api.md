@@ -2602,7 +2602,7 @@ Question을 삭제하지 않고 상태를 남겨 판정 이력을 보존한다.
 # 3.15 관리자 — 규칙 후보
 
 규칙 후보는 여러 사용자에게서 판정할 규칙이 없던 업종·카테고리 조합과 그 규칙 카드 초안이다. AI 규칙 후보 파이프라인이 만든다.
-관리자만 부를 수 있고, 아니면 `403 FORBIDDEN` 이다. 관리자는 서버 설정(`APP_ADMIN_EMAILS`)의 이메일로 정한다.
+관리자만 부를 수 있고, 아니면 `403 FORBIDDEN` 이다. 관리자는 `app_user.role` 이 `ADMIN` 인 사용자다(`GET /users/me` 의 `role`). 가입하면 `USER` 이고, 관리자는 운영에서 DB 로 지정한다(docs/deployment.md "관리자 지정").
 
 `status` 는 `PENDING`(대기) · `IN_REVIEW`(검토중) · `APPROVED`(승인) · `REJECTED`(기각) · `ON_HOLD`(보류) 이다.
 
@@ -2639,7 +2639,7 @@ Query: `status`(없으면 전체), `page`, `size`(1.4). 정렬은 `createdAt` DE
 ### `POST /api/v1/admin/rule-candidates/{candidateId}/approve`
 ### `POST /api/v1/admin/rule-candidates/{candidateId}/reject`
 
-본문 없음. `PENDING`·`IN_REVIEW`·`ON_HOLD` 후보를 `APPROVED`·`REJECTED` 로 바꾸고, `reviewedBy`(관리자 이메일)와 `reviewedAt` 을 남긴다.
+본문 없음. `PENDING`·`IN_REVIEW`·`ON_HOLD` 후보를 `APPROVED`·`REJECTED` 로 바꾸고, `reviewedBy`(관리자 이메일. 이메일이 없는 계정이면 사용자 id)와 `reviewedAt` 을 남긴다.
 응답 `200` 은 바뀐 후보 하나(목록의 항목과 같은 모양)다. 승인해도 규칙 카드를 만들지는 않는다 — 카드 PR 은 사람이 올린다.
 
 ```

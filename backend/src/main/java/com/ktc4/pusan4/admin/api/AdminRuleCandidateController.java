@@ -1,7 +1,7 @@
 package com.ktc4.pusan4.admin.api;
 
-import com.ktc4.pusan4.admin.domain.RuleCandidateStatus;
-import com.ktc4.pusan4.admin.persistence.RuleCandidateReviewService;
+import com.ktc4.pusan4.judgment.domain.RuleCandidateStatus;
+import com.ktc4.pusan4.judgment.persistence.RuleCandidateReviewService;
 import com.ktc4.pusan4.shared.api.ErrorResponse;
 import com.ktc4.pusan4.shared.api.PageResponse;
 import com.ktc4.pusan4.shared.auth.CurrentUser;
@@ -68,8 +68,13 @@ public class AdminRuleCandidateController {
         return review(currentUser, candidateId, RuleCandidateStatus.REJECTED);
     }
 
+    /** 검토한 사람으로 남길 값. 이메일이 없는 계정(카카오 로그인)은 사용자 id 를 남긴다. */
+    private static String reviewer(AppUser admin) {
+        return admin.email() != null ? admin.email() : admin.id().toString();
+    }
+
     private RuleCandidateResponse review(CurrentUser currentUser, long candidateId, RuleCandidateStatus decision) {
         AppUser admin = adminPolicy.requireAdmin(currentUser.id());
-        return RuleCandidateResponse.from(reviewService.review(candidateId, decision, admin.email()));
+        return RuleCandidateResponse.from(reviewService.review(candidateId, decision, reviewer(admin)));
     }
 }

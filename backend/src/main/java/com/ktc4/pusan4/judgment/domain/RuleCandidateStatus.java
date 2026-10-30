@@ -1,4 +1,4 @@
-package com.ktc4.pusan4.admin.domain;
+package com.ktc4.pusan4.judgment.domain;
 
 /** rule_candidate.status. DB 에는 한글(대기·검토중·승인·기각·보류)로 들어 있다. */
 public enum RuleCandidateStatus {

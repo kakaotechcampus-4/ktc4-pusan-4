@@ -8,7 +8,7 @@ import java.util.UUID;
 
 public record UserResponse(UUID id, String email, UserRole role, OffsetDateTime createdAt) {
 
-    static UserResponse from(AppUser user, UserRole role) {
-        return new UserResponse(user.id(), user.email(), role, user.createdAt());
+    static UserResponse from(AppUser user) {
+        return new UserResponse(user.id(), user.email(), user.role(), user.createdAt());
     }
 }
