@@ -4,6 +4,7 @@ import com.ktc4.pusan4.judgment.domain.Citation;
 import com.ktc4.pusan4.judgment.domain.Gate;
 import com.ktc4.pusan4.judgment.domain.Judgment;
 import com.ktc4.pusan4.judgment.domain.JudgmentEngine;
+import com.ktc4.pusan4.judgment.domain.PreviousAnswer;
 import com.ktc4.pusan4.judgment.domain.RuleCard;
 import com.ktc4.pusan4.judgment.domain.RuleSet;
 import com.ktc4.pusan4.judgment.domain.TransactionInput;
@@ -63,6 +64,21 @@ class RuleCardLoaderRealCardsTest {
         assertThat(rules.get(Gate.G1))
             .extracting(RuleCard::id)
             .contains("R-001", "R-002", "R-003", "R-004", "R-005", "R-007");
+    }
+
+    @Test
+    void 지난번_답은_고정비_6종만_이어받고_건별_용도_4종은_이력만_보여준다() throws IOException {
+        RuleSet rules = load();
+
+        // docs/agent-secretary.md 3.1. 나머지 질문은 띄우지 않는다
+        assertThat(List.of("SUBSCRIPTION_DEDICATION", "UTILITY_DEDICATION", "TELECOM_DEDICATION", "FINANCE_KIND",
+            "LEASE_WORKPLACE", "INSURANCE_KIND"))
+            .allSatisfy(code -> assertThat(rules.previousAnswer(code)).isEqualTo(PreviousAnswer.CARRY));
+        assertThat(List.of("CAFE_PURPOSE", "RESTAURANT_PURPOSE", "DELIVERY_PURPOSE", "SAAS_BILLING_PERIOD"))
+            .allSatisfy(code -> assertThat(rules.previousAnswer(code)).isEqualTo(PreviousAnswer.HISTORY));
+        assertThat(List.of("WEEKEND_CAFE_PURPOSE", "CONVENIENCE_PURPOSE", "TRAVEL_PURPOSE", "LODGING_PURPOSE",
+            "PG_UNKNOWN_PURPOSE", "SHOPPING_ITEM_PURPOSE", "ASSET_UNIT_OVER_LIMIT", "QUALIFIED_RECEIPT"))
+            .allSatisfy(code -> assertThat(rules.previousAnswer(code)).isEqualTo(PreviousAnswer.NONE));
     }
 
     @Test

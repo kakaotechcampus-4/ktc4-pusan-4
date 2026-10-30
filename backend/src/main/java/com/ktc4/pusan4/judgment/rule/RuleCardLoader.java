@@ -7,6 +7,7 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.ktc4.pusan4.judgment.domain.Citation;
 import com.ktc4.pusan4.judgment.domain.Gate;
 import com.ktc4.pusan4.judgment.domain.QuestionEffect;
+import com.ktc4.pusan4.judgment.domain.PreviousAnswer;
 import com.ktc4.pusan4.judgment.domain.QuestionSpec;
 import com.ktc4.pusan4.judgment.domain.RuleCard;
 import com.ktc4.pusan4.judgment.domain.RuleMatch;
@@ -317,13 +318,19 @@ public final class RuleCardLoader {
                 ));
             }
         });
+        PreviousAnswer previousAnswer = PreviousAnswer.fromYaml(optionalText(question, "previous_answer"));
+        if (previousAnswer == null) {
+            throw new RuleCardValidationException(
+                root.path("id").asText() + ": previous_answer must be carry or history");
+        }
         return List.of(new QuestionSpec(
             optionalText(question, "code") == null ? "RULE_QUESTION" : optionalText(question, "code"),
             requiredText(question, "text"),
             requiredText(question, "fact_type"),
             requiredText(question, "group_by"),
             options,
-            effects
+            effects,
+            previousAnswer
         ));
     }
 

@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -76,6 +77,33 @@ interface QuestionQueueRepository extends Repository<QuestionQueueEntity, UUID> 
 
     /** 답할 질문과, 그 질문이 생긴 판정의 거래·batch·Context 버전. */
     record AnswerTarget(QuestionQueueEntity question, UUID transactionId, UUID batchId, int contextVersion) {
+    }
+
+    // 지난번 답 (api.md 3.14): 같은 사용자의 다른 batch 에서 답한 질문과 그 질문이 가리키는 UserFact.
+    // 사용자 조건은 거래의 user_id 로 건다. 다른 사용자의 답이 섞이면 안 되는 자리다(agent-secretary.md QR-12).
+    @Query("""
+        select new com.ktc4.pusan4.judgment.persistence.QuestionQueueRepository$PastAnswerRow(
+            question.reasonCode, question.groupKey, transaction.merchantNorm, fact,
+            batch.id, batch.periodStart, batch.periodEnd, batch.cardIssuer)
+        from QuestionQueueEntity question, JudgmentEntity judgment, TransactionRecordEntity transaction,
+             UserFactEntity fact, UploadBatchEntity batch
+        where question.judgmentId = judgment.id
+          and judgment.transactionId = transaction.id
+          and transaction.userId = :userId
+          and transaction.batchId <> :batchId
+          and batch.id = transaction.batchId
+          and question.status = 'ANSWERED'
+          and fact.id = question.answeredFactId
+          and question.reasonCode in :codes
+        """)
+    List<PastAnswerRow> findPastAnswers(
+        @Param("userId") UUID userId,
+        @Param("batchId") UUID batchId,
+        @Param("codes") Collection<String> codes
+    );
+
+    record PastAnswerRow(String code, String groupKey, String merchantNorm, UserFactEntity fact, UUID batchId,
+        LocalDate periodStart, LocalDate periodEnd, String cardIssuer) {
     }
 
     @Query("""
