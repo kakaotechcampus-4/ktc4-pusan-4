@@ -16,6 +16,7 @@ import java.util.UUID;
 public record QuestionGroupResponse(
     @Schema(example = "merchant:스타벅스") String groupKey,
     @Schema(example = "용도") String factType,
+    @Schema(description = "규칙 카드의 질문 코드", example = "CAFE_PURPOSE") String code,
     @Schema(description = "그룹 안 Question 의 상태. 그룹 안에서 모두 같다") Coded<QuestionStatus> status,
     List<UUID> questionIds,
     @Schema(description = "항상 questionIds.length, transactions.length 와 같다") int count,
@@ -34,7 +35,8 @@ public record QuestionGroupResponse(
 
     static QuestionGroupResponse from(QuestionGroup group) {
         Question first = group.questions().getFirst();
-        return new QuestionGroupResponse(group.groupKey(), group.factType(), QuestionResponse.status(group.status()),
+        return new QuestionGroupResponse(group.groupKey(), group.factType(), first.code(),
+            QuestionResponse.status(group.status()),
             group.questionIds(), group.count(), group.totalAmount(), first.questionText(), first.options(),
             QuestionResponse.answer(group.answer()), group.bulkAnswerable(),
             group.questions().stream().map(QuestionTransaction::from).toList());

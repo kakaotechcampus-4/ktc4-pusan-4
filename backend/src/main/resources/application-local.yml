@@ -15,17 +15,15 @@ app:
     demo-password: ${APP_AUTH_DEMO_PASSWORD:demo1234}
     # 로컬은 http 라 Secure 쿠키를 브라우저가 저장하지 않는다
     cookie-secure: ${APP_AUTH_COOKIE_SECURE:false}
-
-springdoc:
-  api-docs:
-    enabled: true
-  swagger-ui:
-    enabled: true
-
-app:
   # 판정 run 실행 풀. 개발 PC(Docker Desktop, CPU 22개) 값이다. 운영 값과 근거는 application.yml.
   # 같은 Docker 네트워크 측정에서 처리량이 1개 185, 4개 562(3.0배), 8개 829건/초(4.5배)였다.
   # 4개면 DB 커넥션 10개 중 6개가 웹 요청 몫으로 남는다. 1,200건 run 이 약 8초라 대기열 상한은 150 × 8초 / 4 ≈ 5분이다.
   judgment-run:
     workers: 4
     queue-capacity: 150
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true

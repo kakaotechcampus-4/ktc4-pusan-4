@@ -170,6 +170,12 @@ public class TransactionRecordEntity {
         this.userInclusion = inclusion.name();
     }
 
+    /** 사용자가 분류 확인에 답한 카테고리로 확정한다 (api.md 3.5). 미분류 검사는 부르는 쪽이 한다. */
+    public void classify(String merchantCategory) {
+        this.merchantCategory = merchantCategory;
+        this.classificationStatus = ClassificationStatus.CLASSIFIED.name();
+    }
+
     public TransactionDetail toDetail() {
         return new TransactionDetail(id, batchId, approvedAt, merchantRaw, merchantNorm, merchantCategory,
             ClassificationStatus.valueOf(classificationStatus), amount, installmentMonths,

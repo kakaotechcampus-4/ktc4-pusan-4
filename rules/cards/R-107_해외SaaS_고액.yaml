@@ -35,6 +35,7 @@ question:
   text: "이 결제는 몇 개월치인가요?"
   fact_type: 기간
   group_by: transaction
+  previous_answer: history
   options:
     - { value: 월 단위 결제, verdict: 가능, account: 지급수수료 }
     - { value: 연간 일시불 }

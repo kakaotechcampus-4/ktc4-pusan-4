@@ -1204,6 +1204,8 @@ size
 createdAt ASC, id ASC
 ```
 
+지금 판정 대상(effectiveStatus = JUDGEABLE)인 거래의 Review만 반환하고 집계한다. 사용자가 거래를 제외하면 그 Review는 목록과 미해소 집계에서 빠지고, 다시 포함하면 돌아온다. Review 자체는 지우지 않는다. 업로드 배치의 `classificationPendingCount`와 같은 기준이다.
+
 ### grouped=false (기본)
 
 Review 개별 항목을 반환한다. `unresolved` 집계는 grouped 여부와 무관하게 항상 최상위에 포함한다(아래 "미해소 집계" 참고).
@@ -2015,6 +2017,7 @@ Question 개별 항목을 반환한다. `unresolved` 집계는 grouped 여부와
       "transactionId": "0199f1...",
       "groupKey": "merchant:스타벅스",
       "factType": "용도",
+      "code": "CAFE_PURPOSE",
       "questionText": "이 가맹점에서 사용한 비용은 주로 어떤 목적으로 지출하셨나요?",
       "options": [
         "사업",
@@ -2040,6 +2043,8 @@ Question 개별 항목을 반환한다. `unresolved` 집계는 grouped 여부와
 ```
 
 `answer`는 답한 값이다. 3.10 요청의 `answer`와 같은 모양(`{ "value": "개인" }`)이고, `ANSWERED`가 아니면 `null`이다. 정정했으면 마지막 답이다.
+
+`code`는 질문을 만든 규칙 카드의 질문 코드(`question.code`)다. 다른 업로드의 같은 질문을 찾는 데 쓴다(3.14 지난번 답). 같은 `factType`이라도 카드마다 선택지가 달라서 `factType`이 아니라 `code`로 맞춘다. 저장 값은 `question_queue.reason_code`다. `grouped=true` 그룹에도 같은 값이 붙는다.
 
 ### grouped=true
 
@@ -2198,9 +2203,14 @@ merchant_norm
 
   "answer": {
     "value": "사업"
-  }
+  },
+  "source": "PREVIOUS_ANSWER"
 }
 ```
+
+| 필드 | 필수 | 비고 |
+| --- | --- | --- |
+| source | N | 답의 출처. `USER`(기본), `ASSISTANT`(비서 제안 카드), `PREVIOUS_ANSWER`(지난번 답 불러오기). 일괄 응답(3.11)으로 만든 답은 `BULK`로 남는다. 판정에는 쓰지 않고, 지난번 답(3.14)이 일괄 응답을 약한 근거로 다룰 때 쓴다 |
 
 같은 요청의 Question은 동일 Batch, `groupKey`, `factType`에 속해야 한다.
 
@@ -2460,6 +2470,118 @@ Question을 삭제하지 않고 상태를 남겨 판정 이력을 보존한다.
 법률, 시행령, 기본통칙, 판례 등의 표시를 구분할 수 있도록 `hierarchy`를 반환한다.
 
 없는 법령이면 `404 STATUTE_NOT_FOUND`.
+
+---
+
+# 3.14 비서 (docs/agent-secretary.md)
+
+## `GET /api/v1/progress?batchId={batchId}`
+
+업로드 하나의 진행 상황과 다음 할 일이다. 비서와 화면 속 도움이 쓴다. 수입금액·이름·이메일은 담지 않는다(agent-secretary.md QR-7).
+
+```json
+{
+  "batch": { "id": "0199aa11-...", "label": "국민 · 2026-09", "transactionCount": 18 },
+  "context": { "version": 4, "bookkeeping": "복식부기", "hasEmployee": false },
+  "classification": { "pendingCount": 2, "pendingAmount": 97000 },
+  "run": { "id": "0199b2...", "status": { "code": "COMPLETED", "label": "완료" } },
+  "questions": { "pendingCount": 9, "pendingAmount": 1038100, "fillableFromPrevious": 2 },
+  "next": { "step": "QUESTIONS", "route": "/questions", "label": "질문에 답하기" }
+}
+```
+
+| 필드 | 뜻 |
+| --- | --- |
+| batch.label | `카드사 · 시작월`. 기간이 여러 달이면 `카드사 · 시작월~끝월` |
+| context | 최신 문진의 버전·기장의무·직원 유무. 문진 전이면 `null` |
+| classification | 이 Batch 에서 분류를 기다리는 거래 수와 금액 |
+| run | 이 Batch 의 최근 판정 실행. 실행한 적 없으면 `null` |
+| questions | 3.9 미해소 집계와 같다. `fillableFromPrevious`는 지난번 답(아래)이 A등급이고 값이 있는 그룹의 질문 수다 |
+| next | 아래 순서로 처음 맞는 것 하나 |
+
+| step | route | 조건 |
+| --- | --- | --- |
+| `CLASSIFY` | `/preview` | 분류 대기 거래가 있다 |
+| `INTERVIEW` | `/interview` | 문진 전이다 |
+| `CONFIRM` | `/confirm` | 판정 실행이 없거나 마지막 실행이 `FAILED`다 |
+| `QUESTIONS` | `/questions` | 미해소 질문이 있다 |
+| `RESULTS` | `/results` | 그 밖 |
+
+실행 중(`QUEUED`·`RUNNING`)이어도 판정된 거래의 질문과 결과는 볼 수 있어 `QUESTIONS`·`RESULTS`로 간다. 실행 중인지는 `run.status`로 안다.
+판정 실행 화면(`/run`)은 실행 id 없이 들어오면 판정을 새로 시작하므로 `route`로 주지 않는다. 비서의 이동 카드와 화면의 이동 버튼이 이 값을 그대로 쓴다.
+
+없거나 다른 사용자의 Batch 면 `404 BATCH_NOT_FOUND`.
+
+## `GET /api/v1/questions/suggestions?batchId={batchId}`
+
+지난번 답 불러오기(agent-secretary.md 3.1, FR-5). 이 Batch 의 `PENDING` 질문 그룹(3.9 `grouped=true` 와 같은 묶음)마다 한 항목을 준다.
+다른 업로드의 답은 읽기만 한다. 적용은 3.10 으로 하고, 그때 이 Batch 에 새 UserFact 가 생긴다(C-6).
+
+```json
+{
+  "items": [
+    { "groupKey": "merchant:SK텔레콤", "factType": "전용여부", "code": "TELECOM_DEDICATION",
+      "tier": "A", "value": "전용", "sourceLabel": "8월 업로드(국민)" },
+    { "groupKey": "merchant:한국전력", "factType": "공간전용여부", "code": "UTILITY_DEDICATION",
+      "tier": "A", "conflict": true,
+      "history": [
+        { "value": "자택 겸용", "sourceLabel": "8월 업로드(국민)", "bulk": false },
+        { "value": "사업 전용", "sourceLabel": "7월 업로드(국민)", "bulk": false }
+      ] },
+    { "groupKey": "transaction:0199f1...", "factType": "용도", "code": "CAFE_PURPOSE",
+      "tier": "B", "historyCounts": { "업무미팅": 6, "개인": 1 } },
+    { "groupKey": "transaction:0199f2...", "factType": "용도", "code": "WEEKEND_CAFE_PURPOSE",
+      "tier": "C", "reason": "소명 대기 질문은 건마다 답해야 합니다" }
+  ]
+}
+```
+
+등급은 규칙 카드 질문의 `previous_answer`로 정한다(rule-card-fields.md). 소명 대기 거래의 질문이 섞인 그룹(3.9 `bulkAnswerable=false`)은 카드와 상관없이 C다.
+
+| tier | 카드 | 내용 |
+| --- | --- | --- |
+| `A` | `carry` | 같은 `groupKey`·`code` 로 다른 Batch 에서 답한 값. Batch 마다 그 Batch 의 마지막 답 하나를 보고, 기간이 늦은 Batch 부터 본다 |
+| `B` | `history` | 같은 `code`, 같은 가맹점(`merchantNorm`)으로 다른 Batch 에서 답한 값별 질문 수(`historyCounts`). 미리 고르지 않는다 |
+| `C` | 없음 | `reason`만 준다 |
+
+등급에 해당하지 않는 필드는 싣지 않는다. A 의 `value`는 아래면 싣지 않고 `history`로 사정을 보여 준다.
+
+- 최근 두 Batch 의 답이 다르다: `conflict: true`, `history`에 두 답
+- 가장 최근 답이 일괄 응답(3.11, `source=BULK`)이다: `history`에 그 답(`bulk: true`)
+- 지난 답이 없다
+
+지금 질문의 `options`에 없는 지난 답은 없는 것으로 본다. `sourceLabel`은 `시작월~끝월 업로드(카드사)`이고 한 달이면 `9월 업로드(국민)`이다.
+
+없거나 다른 사용자의 Batch 면 `404 BATCH_NOT_FOUND`.
+
+## `POST /api/v1/assistant/chat`
+
+비서 대화 한 턴을 AI 서버(`POST /assistant/chat`, agent-secretary.md 9장)로 중계한다. 요청·응답 본문은 AI 서버와 같다.
+대화 기록은 저장하지 않는다(C-12).
+
+```json
+{
+  "message": "토요일 스타벅스는 클라이언트 미팅이었어",
+  "history": [{ "role": "user", "content": "..." }, { "role": "assistant", "content": "..." }],
+  "context": { "screen": "/questions", "batchId": "0199aa11-...", "transactionId": null, "year": 2026 },
+  "sessionId": "browser-conv-1"
+}
+```
+
+| 필드 | 규칙 |
+| --- | --- |
+| message | 1~1,000자 |
+| history | 20개 이하. `role`은 `user`·`assistant`, `content`는 2,000자 이하 |
+| context.screen | 200자 이하 |
+| context.batchId · transactionId | 있으면 요청한 사용자의 것이어야 한다. 아니면 `404 BATCH_NOT_FOUND` · `404 TRANSACTION_NOT_FOUND` |
+| context.year | 2000~2100 |
+| sessionId | 영문·숫자·`-`·`_`, 64자 이하 |
+
+응답 `200`은 AI 서버 응답 그대로다(`answer`, `proposals`, `traceId`).
+
+- AI 서버에는 요청의 `Authorization` 헤더만 함께 넘긴다. AI 서버의 조회 도구는 이 토큰으로 공개 API 를 불러, 사용자 본인 권한 밖을 읽지 못한다.
+- 사용자마다 동시 1턴, 분당 10턴, 하루(한국 시각) 100턴이다. 넘으면 `429 ASSISTANT_RATE_LIMITED`와 `Retry-After`(초)를 준다. AI 서버 전체 한도(8턴)에 걸려도 같다.
+- AI 서버에 닿지 못하거나 응답이 40초를 넘으면 `503 ASSISTANT_UNAVAILABLE`.
 
 ---
 
@@ -2768,6 +2890,12 @@ batch_id
 (user_id, batch_id, scope_key, fact_type, version)
 ```
 
+답의 출처(3.10 `source`):
+
+```
+source  USER | ASSISTANT | PREVIOUS_ANSWER | BULK
+```
+
 ---
 
 ## classification_review
@@ -2822,6 +2950,8 @@ answered_at
 ```
 
 `status=CANCELED`는 시스템만 설정한다.
+
+`reason_code`는 규칙 카드의 질문 코드(`question.code`)이고, 3.9 응답의 `code`로 나간다.
 
 ---
 
