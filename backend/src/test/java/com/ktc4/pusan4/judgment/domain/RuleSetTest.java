@@ -8,8 +8,33 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class RuleSetTest {
+
+    @Test
+    void previous_answer_is_looked_up_by_question_code() {
+        RuleSet rules = new RuleSet(List.of(questionCard("R-205", "TELECOM", PreviousAnswer.CARRY)));
+
+        assertThat(rules.previousAnswer("TELECOM")).isEqualTo(PreviousAnswer.CARRY);
+        assertThat(rules.previousAnswer("UNKNOWN")).isEqualTo(PreviousAnswer.NONE);
+    }
+
+    @Test
+    void rejects_one_question_code_with_two_previous_answer_tiers() {
+        assertThatThrownBy(() -> new RuleSet(List.of(
+            questionCard("R-205", "TELECOM", PreviousAnswer.CARRY),
+            questionCard("R-206", "TELECOM", PreviousAnswer.HISTORY))))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("TELECOM");
+    }
+
+    private static RuleCard questionCard(String id, String code, PreviousAnswer previousAnswer) {
+        QuestionSpec question = new QuestionSpec(code, "질문", "전용여부", "merchant_norm", List.of("전용"), Map.of(),
+            previousAnswer);
+        return new RuleCard(id, 1, Gate.G2, 500, RuleMatch.categories("통신"), Verdict.NEEDS_REVIEW, null,
+            List.of(new Citation("소득세법-33-1-5")), Map.of(), List.of(question));
+    }
 
     @ParameterizedTest
     @EnumSource(Gate.class)

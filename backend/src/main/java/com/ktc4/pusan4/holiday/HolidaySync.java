@@ -15,6 +15,7 @@ import java.util.List;
 /**
  * 공휴일 표를 API 와 맞춘다. 기동할 때와 매일 새벽에 올해 앞뒤 1년씩 받는다.
  * 받지 못한 해는 기존 행을 그대로 둔다. 동기화가 실패해도 판정은 표에 있는 값으로 계속 돈다.
+ * 받지 못한 해가 표에 아예 없으면 시드로 채운다. 이미 받은 해는 시드가 덮지 않는다.
  */
 @Component
 class HolidaySync {
@@ -24,11 +25,13 @@ class HolidaySync {
 
     private final HolidayApiClient client;
     private final HolidayCalendar calendar;
+    private final HolidaySeed seed;
     private final Clock clock;
 
-    HolidaySync(HolidayApiClient client, HolidayCalendar calendar, Clock clock) {
+    HolidaySync(HolidayApiClient client, HolidayCalendar calendar, HolidaySeed seed, Clock clock) {
         this.client = client;
         this.calendar = calendar;
+        this.seed = seed;
         this.clock = clock;
     }
 
@@ -51,11 +54,13 @@ class HolidaySync {
             holidays = client.fetch(year);
         } catch (RuntimeException e) {
             log.warn("{}년 공휴일을 받지 못해 기존 값을 유지한다", year, e);
+            fillFromSeed(year);
             return;
         }
         // 다음 해는 발표 전이면 비어 온다. 빈 응답으로 기존 행을 지우지 않는다.
         if (holidays.isEmpty()) {
             log.info("{}년 공휴일 응답이 비어 기존 값을 유지한다", year);
+            fillFromSeed(year);
             return;
         }
         // 저장 실패도 기동을 막지 않는다. 기동 직후 동기화는 ApplicationReadyEvent 에서 돌아서,
@@ -67,5 +72,17 @@ class HolidaySync {
             return;
         }
         log.info("{}년 공휴일 {}건을 반영했다", year, holidays.size());
+    }
+
+    // 시드를 읽거나 저장하다 실패해도 기동을 막지 않는다(syncYear 의 저장 실패와 같은 이유).
+    private void fillFromSeed(int year) {
+        try {
+            List<PublicHoliday> seeded = seed.holidays(year);
+            if (!seeded.isEmpty() && calendar.fillYearIfEmpty(year, seeded)) {
+                log.info("{}년 공휴일이 표에 없어 시드 {}건을 넣었다", year, seeded.size());
+            }
+        } catch (RuntimeException e) {
+            log.warn("{}년 공휴일 시드를 넣지 못했다", year, e);
+        }
     }
 }

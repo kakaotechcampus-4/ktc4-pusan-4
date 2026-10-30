@@ -1,11 +1,13 @@
 package com.ktc4.pusan4.judgment.api;
 
+import com.ktc4.pusan4.judgment.domain.AnswerSource;
 import com.ktc4.pusan4.judgment.domain.PendingTotal;
 import com.ktc4.pusan4.judgment.domain.Question;
 import com.ktc4.pusan4.judgment.domain.QuestionGroup;
 import com.ktc4.pusan4.judgment.domain.QuestionStatus;
 import com.ktc4.pusan4.judgment.persistence.QuestionAnswerService;
 import com.ktc4.pusan4.judgment.persistence.QuestionQueryService;
+import com.ktc4.pusan4.judgment.persistence.QuestionSuggestionService;
 import com.ktc4.pusan4.shared.api.ErrorResponse;
 import com.ktc4.pusan4.shared.api.MockResponse;
 import com.ktc4.pusan4.shared.api.PageResponse;
@@ -37,15 +39,30 @@ public class QuestionController {
     private final JudgmentMockData mockData;
     private final QuestionQueryService queryService;
     private final QuestionAnswerService answerService;
+    private final QuestionSuggestionService suggestionService;
 
     public QuestionController(
         JudgmentMockData mockData,
         QuestionQueryService queryService,
-        QuestionAnswerService answerService
+        QuestionAnswerService answerService,
+        QuestionSuggestionService suggestionService
     ) {
         this.mockData = mockData;
         this.queryService = queryService;
         this.answerService = answerService;
+        this.suggestionService = suggestionService;
+    }
+
+    @Operation(summary = "지난번 답",
+        description = "이 Batch 의 PENDING 질문 그룹마다 같은 사용자의 다른 업로드에서 한 답을 등급(A 이어받기, B 이력만, "
+            + "C 띄우지 않음)과 함께 준다. 읽기만 하고, 적용은 POST /question-responses 로 한다. 규칙은 api.md 3.14")
+    @ApiResponse(responseCode = "404", description = "BATCH_NOT_FOUND",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @GetMapping("/questions/suggestions")
+    public QuestionSuggestionResponse.Page suggestions(CurrentUser currentUser, @RequestParam UUID batchId) {
+        return new QuestionSuggestionResponse.Page(suggestionService.suggest(currentUser.id(), batchId).stream()
+            .map(QuestionSuggestionResponse::from)
+            .toList());
     }
 
     @Operation(summary = "룰엔진 확인 질문 목록",
@@ -101,7 +118,8 @@ public class QuestionController {
     @PostMapping("/question-responses")
     public QuestionAnswerResponse answer(CurrentUser currentUser, @Valid @RequestBody QuestionAnswerRequest request) {
         return QuestionAnswerResponse.from(
-            answerService.answer(currentUser.id(), request.questionIds(), request.answer().value())
+            answerService.answer(currentUser.id(), request.questionIds(), request.answer().value(),
+                request.source() == null ? AnswerSource.USER : request.source())
         );
     }
 

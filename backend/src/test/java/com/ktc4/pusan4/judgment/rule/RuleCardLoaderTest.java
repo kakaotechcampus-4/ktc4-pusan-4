@@ -3,6 +3,7 @@ package com.ktc4.pusan4.judgment.rule;
 import com.ktc4.pusan4.judgment.domain.Citation;
 import com.ktc4.pusan4.judgment.domain.QuestionEffect;
 import com.ktc4.pusan4.judgment.domain.Gate;
+import com.ktc4.pusan4.judgment.domain.PreviousAnswer;
 import com.ktc4.pusan4.judgment.domain.RuleCard;
 import com.ktc4.pusan4.judgment.domain.Verdict;
 import org.junit.jupiter.api.Test;
@@ -90,6 +91,28 @@ class RuleCardLoaderTest {
                 Map.of("limit_bucket", "접대비")
             )
         );
+    }
+
+    @Test
+    void loads_previous_answer_tier_and_defaults_to_none() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("cards/R-205.yaml"), questionCard("R-205", "TELECOM", "previous_answer: carry"));
+        Files.writeString(root.resolve("cards/R-104.yaml"), questionCard("R-104", "SHOPPING", ""));
+
+        List<RuleCard> cards = new RuleCardLoader().load(root).get(Gate.G2);
+
+        assertThat(cards).extracting(card -> card.questions().getFirst().previousAnswer())
+            .containsExactlyInAnyOrder(PreviousAnswer.CARRY, PreviousAnswer.NONE);
+    }
+
+    @Test
+    void rejects_unknown_previous_answer() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("cards/R-205.yaml"), questionCard("R-205", "TELECOM", "previous_answer: always"));
+
+        assertThatThrownBy(() -> new RuleCardLoader().load(root))
+            .isInstanceOf(RuleCardValidationException.class)
+            .hasMessageContaining("previous_answer");
     }
 
     @Test
@@ -514,6 +537,30 @@ class RuleCardLoaderTest {
               holiday: %s
             review: { by: 외부자문, date: 2026-09-26 }
             """.formatted(holiday) + extra;
+    }
+
+    private static String questionCard(String id, String code, String previousAnswer) {
+        return """
+            id: %s
+            version: 1
+            gate: G2
+            priority: 500
+            effective_period: { start: 2025-01-01, end: null }
+            match:
+              category: [%s]
+            verdict: 확인필요
+            citations: [소득세법-33-1-5]
+            question:
+              code: %s
+              text: 업무 전용인가요?
+              fact_type: 전용여부
+              group_by: merchant_norm
+              %s
+              options:
+                - { value: 전용, verdict: 가능 }
+                - { value: 개인, verdict: 불가 }
+            review: { by: 외부자문, date: 2026-09-05 }
+            """.formatted(id, id, code, previousAnswer);
     }
 
     private static String cardYaml(String id, int priority) {
