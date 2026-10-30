@@ -1,6 +1,11 @@
 package com.ktc4.pusan4.integration;
 
+import com.ktc4.pusan4.judgment.domain.Verdict;
+import com.ktc4.pusan4.judgment.persistence.JudgmentOverrideService;
 import com.ktc4.pusan4.judgment.persistence.LimitSettlementService;
+import com.ktc4.pusan4.transaction.persistence.TransactionService;
+import com.ktc4.pusan4.transaction.persistence.UploadBatchService;
+import org.assertj.core.groups.Tuple;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,6 +41,15 @@ class LimitSettlementIntegrationTest {
 
     @Autowired
     private LimitSettlementService settlementService;
+
+    @Autowired
+    private JudgmentOverrideService overrideService;
+
+    @Autowired
+    private TransactionService transactionService;
+
+    @Autowired
+    private UploadBatchService batchService;
 
     private UUID userId;
     private UUID batchId;
@@ -109,6 +123,77 @@ class LimitSettlementIntegrationTest {
         assertThat(jdbcTemplate.queryForList(
             "select judgment_id from limit_bucket_entry where user_id = ?", UUID.class, userId))
             .containsExactly(meal);
+    }
+
+    @Test
+    void override_and_its_release_settle_the_limit_again() {
+        // given: 1월 1,000만원이 한도를 먼저 채워 3월은 209만원만 인정된다
+        UUID january = judgment(transaction("2025-01-15", "AUTO"), "AVAILABLE", ENTERTAINMENT, 10_000_000L);
+        judgment(transaction("2025-03-02", "AUTO"), "AVAILABLE", ENTERTAINMENT, 5_000_000L);
+        settlementService.settleProvisional(userId);
+
+        // when / then: 1월을 불가로 고치면 3월이 전액 인정되고, 수정을 풀면 되돌아온다
+        overrideService.override(userId, january, Verdict.UNAVAILABLE, "개인 식사");
+        assertThat(allowedByTagged()).containsExactly(tuple(5_000_000L, 5_000_000L));
+
+        overrideService.release(userId, jdbcTemplate.queryForObject(
+            "select id from judgment_override where source_judgment_id = ?", UUID.class, january));
+        assertThat(allowedByTagged())
+            .containsExactly(tuple(10_000_000L, 10_000_000L), tuple(5_000_000L, 2_090_000L));
+    }
+
+    @Test
+    void excluding_and_including_a_transaction_settle_the_limit_again() {
+        // given
+        UUID january = transaction("2025-01-15", "AUTO");
+        judgment(january, "AVAILABLE", ENTERTAINMENT, 10_000_000L);
+        judgment(transaction("2025-03-02", "AUTO"), "AVAILABLE", ENTERTAINMENT, 5_000_000L);
+        settlementService.settleProvisional(userId);
+
+        // when / then
+        transactionService.exclude(userId, january);
+        assertThat(allowedByTagged()).containsExactly(tuple(5_000_000L, 5_000_000L));
+
+        transactionService.include(userId, january);
+        assertThat(allowedByTagged())
+            .containsExactly(tuple(10_000_000L, 10_000_000L), tuple(5_000_000L, 2_090_000L));
+    }
+
+    @Test
+    void deleting_a_batch_settles_the_limit_of_the_other_batches_again() {
+        // given: 1월 거래는 다른 batch 에 있다
+        UUID mainBatchId = batchId;
+        UUID mainRunId = runId;
+        batchId = UUID.randomUUID();
+        jdbcTemplate.update("""
+            insert into upload_batch(id, user_id, source_type, card_issuer, period_start, period_end, file_hash)
+            values (?, ?, '승인내역', '국민', '2025-01-01', '2025-12-31', ?)
+            """, batchId, userId, batchId.toString());
+        runId = UUID.randomUUID();
+        jdbcTemplate.update("""
+            insert into judgment_run(id, batch_id, context_id, context_version, status, total_count)
+            values (?, ?, (select id from user_context where user_id = ?), 1, 'COMPLETED', 0)
+            """, runId, batchId, userId);
+        judgment(transaction("2025-01-15", "AUTO"), "AVAILABLE", ENTERTAINMENT, 10_000_000L);
+        UUID otherBatchId = batchId;
+        batchId = mainBatchId;
+        runId = mainRunId;
+        judgment(transaction("2025-03-02", "AUTO"), "AVAILABLE", ENTERTAINMENT, 5_000_000L);
+        settlementService.settleProvisional(userId);
+
+        // when
+        batchService.delete(userId, otherBatchId);
+
+        // then
+        assertThat(allowedByTagged()).containsExactly(tuple(5_000_000L, 5_000_000L));
+    }
+
+    /** (tagged_amount, allowed_amount), 큰 금액 순. */
+    private List<Tuple> allowedByTagged() {
+        return jdbcTemplate.query("""
+            select tagged_amount, allowed_amount from limit_bucket_entry
+            where user_id = ? order by tagged_amount desc
+            """, (row, index) -> tuple(row.getLong("tagged_amount"), row.getLong("allowed_amount")), userId);
     }
 
     private UUID transaction(String approvedAt, String userInclusion) {

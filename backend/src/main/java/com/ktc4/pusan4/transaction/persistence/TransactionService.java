@@ -1,5 +1,6 @@
 package com.ktc4.pusan4.transaction.persistence;
 
+import com.ktc4.pusan4.judgment.persistence.LimitSettlementService;
 import com.ktc4.pusan4.judgment.persistence.TransactionRecordEntity;
 import com.ktc4.pusan4.judgment.persistence.TransactionRecordRepository;
 import com.ktc4.pusan4.shared.UuidGenerator;
@@ -34,6 +35,7 @@ public class TransactionService {
     private final TransactionRecordRepository transactionRepository;
     private final TransactionQueryRepository queryRepository;
     private final ClassificationReviewRepository reviewRepository;
+    private final LimitSettlementService limitSettlement;
     private final UuidGenerator uuidGenerator;
     private final Clock clock;
 
@@ -42,6 +44,7 @@ public class TransactionService {
         TransactionRecordRepository transactionRepository,
         TransactionQueryRepository queryRepository,
         ClassificationReviewRepository reviewRepository,
+        LimitSettlementService limitSettlement,
         UuidGenerator uuidGenerator,
         Clock clock
     ) {
@@ -49,6 +52,7 @@ public class TransactionService {
         this.transactionRepository = transactionRepository;
         this.queryRepository = queryRepository;
         this.reviewRepository = reviewRepository;
+        this.limitSettlement = limitSettlement;
         this.uuidGenerator = uuidGenerator;
         this.clock = clock;
     }
@@ -68,17 +72,22 @@ public class TransactionService {
             .orElseThrow(TransactionService::transactionNotFound);
     }
 
-    /** userInclusion = EXCLUDED. 기존 판정과 분류 검토는 지우지 않는다(api.md 3.4). */
+    /**
+     * userInclusion = EXCLUDED. 기존 판정과 분류 검토는 지우지 않는다(api.md 3.4).
+     * 판정 대상이 바뀌어 한도를 다시 집계한다.
+     */
     @Transactional
     public TransactionDetail exclude(UUID userId, UUID transactionId) {
         TransactionRecordEntity transaction = lockOwned(userId, transactionId);
         transaction.changeInclusion(UserInclusion.EXCLUDED);
+        limitSettlement.settleProvisional(userId);
         return transaction.toDetail();
     }
 
     /**
      * userInclusion = INCLUDED. 취소상계는 포함할 수 없다(409).
      * 미분류인데 대기 중인 분류 검토가 없으면 지금 만든다. 업로드는 판정에 들어가지 않는 거래의 검토를 만들지 않는다(B4).
+     * 판정 대상이 바뀌어 한도를 다시 집계한다.
      */
     @Transactional
     public TransactionDetail include(UUID userId, UUID transactionId) {
@@ -88,6 +97,7 @@ public class TransactionService {
                 "취소·상계 거래는 판정 대상으로 포함할 수 없습니다.");
         }
         transaction.changeInclusion(UserInclusion.INCLUDED);
+        limitSettlement.settleProvisional(userId);
         if (ClassificationStatus.NEEDS_REVIEW.name().equals(transaction.classificationStatus())
             && !reviewRepository.existsByTransactionIdAndStatus(transaction.id(), "PENDING")) {
             OffsetDateTime now = OffsetDateTime.now(clock.withZone(KST)).truncatedTo(ChronoUnit.MICROS);
@@ -96,8 +106,12 @@ public class TransactionService {
         return transaction.toDetail();
     }
 
-    /** 같은 거래의 포함·제외가 동시에 오면 한 줄로 세운다. 포함 쪽 분류 검토가 두 번 생기지 않는다. */
+    /**
+     * 같은 거래의 포함·제외가 동시에 오면 한 줄로 세운다. 포함 쪽 분류 검토가 두 번 생기지 않는다.
+     * 끝의 한도 집계가 사용자 락을 잡으므로, 거래 락보다 먼저 잡아 "사용자 → 거래" 순서를 지킨다.
+     */
     private TransactionRecordEntity lockOwned(UUID userId, UUID transactionId) {
+        limitSettlement.lockUser(userId);
         return transactionRepository.findByIdForUpdate(transactionId)
             .filter(transaction -> transaction.userId().equals(userId))
             .orElseThrow(TransactionService::transactionNotFound);

@@ -47,7 +47,8 @@ public class LimitSettlementService {
     }
 
     /**
-     * run 이 끝날 때와 재판정(질문 답변 등) 뒤에 부른다. override·거래 제외/포함·batch 삭제 뒤에는 아직 부르지 않는다.
+     * 현재 판정이나 판정 대상이 바뀌는 곳에서 부른다: run 완료, 재판정(질문 응답·분류 응답), override 와 그 해제,
+     * 거래 제외/포함, batch 삭제.
      * 수입금액은 최신 문진의 직전연도 수입금액이다(연중 잠정치, CONTEXT.md §4 잠정/확정).
      */
     @Transactional
@@ -55,7 +56,6 @@ public class LimitSettlementService {
         // 같은 사용자의 집계끼리 limit_bucket_entry 를 동시에 갈아 끼우지 않게 사용자 락을 잡는다.
         // 재판정 쪽은 UserFact 저장에서 이미 잡았다(같은 트랜잭션이라 다시 잡아도 된다).
         lockUser(userId);
-        long annualLimit = EntertainmentLimit.annual(contextService.current(userId).prevYearRevenue());
 
         Map<Integer, List<LimitCandidate>> byYear = new HashMap<>();
         for (LimitTagged tagged : judgmentRepository.findCurrentLimitTagged(userId, EntertainmentLimit.BUCKET)) {
@@ -72,6 +72,11 @@ public class LimitSettlementService {
         // 접대비가 모두 빠진 해에 남은 항목도 비운다.
         Set<Integer> years = new TreeSet<>(byYear.keySet());
         years.addAll(entryRepository.findTaxYears(userId, EntertainmentLimit.BUCKET));
+        // 갈아 끼울 것이 없으면 문진을 읽지 않는다. 문진 전 사용자도 거래를 제외하거나 batch 를 지울 수 있다.
+        if (years.isEmpty()) {
+            return;
+        }
+        long annualLimit = EntertainmentLimit.annual(contextService.current(userId).prevYearRevenue());
         years.forEach(year -> limitService.replaceProvisional(userId, year, EntertainmentLimit.BUCKET,
             AnnualLimitAllocator.allocate(annualLimit, byYear.getOrDefault(year, List.of()))));
     }
