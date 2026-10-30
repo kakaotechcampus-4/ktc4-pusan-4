@@ -1,0 +1,15 @@
+# 자동 PR 경로 시험용 가짜 후보다. 머지하지 않는다
+#
+# 규칙 후보 #1 에서 승격. 승인 2026-10-30
+id: R-C1
+version: 1
+gate: G2
+priority: 410
+effective_period: { start: 2026-10-30, end: null }
+match:
+  category: [미용]
+  industry: ["999999"]
+verdict: 불가
+citations:
+  - { id: 소득세법-33-1-13, verified: true }
+review: { by: 관리자, date: 2026-10-30 }
