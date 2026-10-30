@@ -29,7 +29,7 @@ class SmtpVerificationMailSender implements VerificationMailSender {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(from);
         message.setTo(email);
-        message.setSubject("[TaxMate] 이메일 인증 코드");
+        message.setSubject("[PreeT] 이메일 인증 코드");
         message.setText("""
             인증 코드: %s
 

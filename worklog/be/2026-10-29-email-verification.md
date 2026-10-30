@@ -38,3 +38,7 @@
 ## 10-30 12:18 로컬 check 결과
 
 - `gradlew -p backend check` 통과(로컬, feature/email-verification, 하루 한도 5 반영 후).
+
+## 10-30 서비스 이름 PreeT
+
+- 서비스 이름이 PreeT 로 정해져 인증 메일 제목을 `[PreeT] 이메일 인증 코드` 로 바꿨다. 발송용 Gmail 계정 이름도 PreeT 로 만든다.
