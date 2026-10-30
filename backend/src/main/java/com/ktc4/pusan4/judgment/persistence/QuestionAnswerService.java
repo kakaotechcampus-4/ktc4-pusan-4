@@ -118,8 +118,9 @@ public class QuestionAnswerService {
         // 재판정은 다른 revision 의 대기 질문을 bulk update 로 취소한다(DB 에만 반영). 앞에서 읽은 질문 엔티티가
         // PENDING 으로 남아 있으면 미해소 집계에 섞이므로, 반영한 뒤 비우고 다시 읽는다.
         questionRepository.flushAndClear();
+        // answeredCount 는 PENDING 에서 바꾼 수다. 함께 다시 답한 ANSWERED 형제는 세지 않는다(api.md 3.11, 단건과 다름)
         return new BulkAnswerResult(
-            answered.stream().mapToInt(Answered::questionCount).sum(),
+            questionCount(targets),
             questionCount(pending) - questionCount(sameType),
             questionCount(sameType) - questionCount(targets),
             answered.stream().map(Answered::factId).toList(),

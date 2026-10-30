@@ -382,6 +382,25 @@ class QuestionAnswerIntegrationTest {
     }
 
     @Test
+    void bulk_answer_counts_only_questions_it_turned_from_pending() throws Exception {
+        // given: 같은 가맹점 질문 둘 중 하나만 대기다. 나머지는 이미 답했다(상태는 직접 만든다)
+        UUID first = insertTransaction("통신", "KT");
+        UUID second = insertTransaction("통신", "KT");
+        judge(first);
+        judge(second);
+        UUID secondQuestion = pendingQuestion(second, "전용여부");
+        answer(List.of(pendingQuestion(first, "전용여부")), "전용").andExpect(status().isOk());
+        jdbcTemplate.update("""
+            update question_queue set status = 'PENDING', answered_fact_id = null, answered_at = null where id = ?
+            """, secondQuestion);
+
+        // when / then: 이미 ANSWERED 였던 형제 질문은 세지 않는다 (api.md 3.11 answeredCount)
+        bulkAnswer(batchId, "전용여부", "개인")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.answeredCount").value(1));
+    }
+
+    @Test
     void bulk_answer_with_only_excluded_targets_answers_nothing() throws Exception {
         // given: 「용도」 질문은 소명 대기 거래에만 있다
         UUID weekend = insertTransaction("음식점", "김밥천국", 6_500L, "2025-10-11");
