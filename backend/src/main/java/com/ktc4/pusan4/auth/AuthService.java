@@ -21,15 +21,18 @@ public class AuthService {
     private final UserService users;
     private final PasswordEncoder passwordEncoder;
     private final KakaoClient kakao;
+    private final EmailVerificationService emailVerification;
 
     AuthService(CredentialVerifier credentials, AccessTokens accessTokens, RefreshTokenStore refreshTokens,
-        UserService users, PasswordEncoder passwordEncoder, KakaoClient kakao) {
+        UserService users, PasswordEncoder passwordEncoder, KakaoClient kakao,
+        EmailVerificationService emailVerification) {
         this.credentials = credentials;
         this.accessTokens = accessTokens;
         this.refreshTokens = refreshTokens;
         this.users = users;
         this.passwordEncoder = passwordEncoder;
         this.kakao = kakao;
+        this.emailVerification = emailVerification;
     }
 
     /** 카카오 인가 코드로 로그인한다. 처음 온 카카오 회원이면 계정을 만든다. */
@@ -37,13 +40,18 @@ public class AuthService {
         return issue(users.findOrCreateKakaoAccount(kakao.userId(code)));
     }
 
-    /** 이메일로 가입하고 바로 로그인한다. 메일 인증은 하지 않는다. */
-    public IssuedTokens signup(String email, String password) {
+    /**
+     * 메일 인증을 마친 이메일로 가입하고 바로 로그인한다. 인증 토큰은 가입이 끝나면 지운다.
+     * 같은 토큰으로 동시에 가입해도 UNIQUE(email) 때문에 하나만 남는다.
+     */
+    public IssuedTokens signup(String email, String password, String verificationToken) {
         if (!Passwords.fitsBcrypt(password)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "비밀번호는 72바이트를 넘을 수 없습니다.");
         }
+        emailVerification.requireVerified(email, verificationToken);
         UUID userId = users.registerEmailAccount(email, passwordEncoder.encode(password))
-            .orElseThrow(() -> new ApiException(HttpStatus.CONFLICT, "EMAIL_ALREADY_EXISTS", "이미 가입한 이메일입니다."));
+            .orElseThrow(AuthService::emailAlreadyExists);
+        emailVerification.consume(email);
         return issue(userId);
     }
 
@@ -78,6 +86,10 @@ public class AuthService {
 
     private IssuedTokens issue(UUID userId) {
         return new IssuedTokens(accessTokens.issue(userId), refreshTokens.issue(userId));
+    }
+
+    static ApiException emailAlreadyExists() {
+        return new ApiException(HttpStatus.CONFLICT, "EMAIL_ALREADY_EXISTS", "이미 가입한 이메일입니다.");
     }
 
     private static ApiException invalidRefreshToken() {
