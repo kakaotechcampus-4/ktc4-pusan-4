@@ -6,11 +6,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.client.RestClient;
 
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
+import java.time.Duration;
 
 @Configuration
 class AuthConfiguration {
@@ -22,6 +25,15 @@ class AuthConfiguration {
      * 서명 키. 비어 있으면 기동할 때마다 새 키를 만든다 — 열려 있지는 않고, 재기동하면 로그인이 모두 풀릴 뿐이다.
      * 테스트와 키를 아직 안 넣은 서버가 이 경우다. 넣었는데 짧으면 HS256 이 요구하는 길이가 안 돼 기동을 멈춘다.
      */
+    /** 카카오 로그인 호출. 로그인 요청을 붙잡고 기다리므로 짧게 끊는다. */
+    @Bean
+    RestClient.Builder kakaoRestClientBuilder() {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(Duration.ofSeconds(3));
+        requestFactory.setReadTimeout(Duration.ofSeconds(5));
+        return RestClient.builder().requestFactory(requestFactory);
+    }
+
     /** 비밀번호 해시. BCrypt 기본 강도(10)다. */
     @Bean
     PasswordEncoder passwordEncoder() {

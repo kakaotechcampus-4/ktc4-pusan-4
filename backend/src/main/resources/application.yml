@@ -47,6 +47,12 @@ app:
     access-token-ttl: 15m
     refresh-token-ttl: 14d
     cookie-secure: ${APP_AUTH_COOKIE_SECURE:true}
+    # 카카오 로그인 (developers.kakao.com 앱). 키나 redirect-uri 가 비면 카카오 로그인은 503 KAKAO_LOGIN_UNAVAILABLE 이다.
+    # redirect-uri 는 프론트 콜백 페이지 주소로, 카카오 앱에 등록한 값과 같아야 한다.
+    kakao:
+      rest-api-key: ${APP_AUTH_KAKAO_REST_API_KEY:}
+      client-secret: ${APP_AUTH_KAKAO_CLIENT_SECRET:}
+      redirect-uri: ${APP_AUTH_KAKAO_REDIRECT_URI:}
 
 management:
   endpoints:
