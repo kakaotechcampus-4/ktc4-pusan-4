@@ -265,7 +265,7 @@ refresh_token={token}; Path=/api/v1/auth; Max-Age=1209600; HttpOnly; Secure; Sam
 ```
 400 VALIDATION_ERROR            코드가 숫자 6자리가 아님
 400 INVALID_VERIFICATION_CODE   코드가 틀림 → 다시 입력
-400 VERIFICATION_CODE_EXPIRED   만료됐거나 5번 틀려 폐기됨 → 코드를 다시 받는다
+400 VERIFICATION_CODE_EXPIRED   만료됐거나, 이미 썼거나, 5번 틀려 폐기됨 → 코드를 다시 받는다
 ```
 
 ### `POST /api/v1/auth/signup`

@@ -63,7 +63,7 @@ public class EmailVerificationService {
             case WRONG_CODE -> throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_VERIFICATION_CODE",
                 "인증 코드가 맞지 않습니다.");
             case NO_CODE -> throw new ApiException(HttpStatus.BAD_REQUEST, "VERIFICATION_CODE_EXPIRED",
-                "인증 코드가 만료됐습니다. 코드를 다시 받아 주세요.");
+                "인증 코드가 만료됐거나 이미 사용됐습니다. 코드를 다시 받아 주세요.");
         };
     }
 

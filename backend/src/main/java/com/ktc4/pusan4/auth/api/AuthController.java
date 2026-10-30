@@ -60,7 +60,7 @@ public class AuthController {
 
     @Operation(summary = "가입 인증 코드 확인", description = "코드가 맞으면 가입에 쓸 인증 토큰(30분)을 준다")
     @ApiResponse(responseCode = "400",
-        description = "INVALID_VERIFICATION_CODE — 틀림 / VERIFICATION_CODE_EXPIRED — 만료됐거나 5번 틀려 폐기됨",
+        description = "INVALID_VERIFICATION_CODE — 틀림 / VERIFICATION_CODE_EXPIRED — 만료됐거나, 이미 썼거나, 5번 틀려 폐기됨",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @PostMapping("/email-verification/confirm")
     public EmailVerificationResponse confirmVerificationCode(

@@ -51,3 +51,7 @@
 
 - local 프로필 + `APP_AUTH_EMAIL_DELIVERY=smtp` + 팀 Gmail(preet.noreply) 앱 비밀번호로 bootRun 해 스웨거에서 코드 요청(204) → 메일 수신 → confirm(200) → signup(201) 까지 확인했다.
 - 같은 코드로 confirm 을 두 번 보내 두 번째가 `VERIFICATION_CODE_EXPIRED` 로 나와 버그로 착각했다. 코드는 한 번 쓰면 지워져서 맞는 동작이지만, 메시지가 "만료됐습니다" 뿐이라 헷갈린다.
+
+## 10-30 VERIFICATION_CODE_EXPIRED 메시지
+
+- 이미 쓴 코드를 다시 보내도 "만료됐습니다" 로만 나와 헷갈려서, 메시지를 "인증 코드가 만료됐거나 이미 사용됐습니다. 코드를 다시 받아 주세요." 로 바꿨다(성진 결정). 에러 코드는 그대로라 프론트 처리는 바뀌지 않는다. 스웨거 설명·api.md 도 맞췄다.
