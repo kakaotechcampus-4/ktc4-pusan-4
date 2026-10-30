@@ -2381,6 +2381,8 @@ factType 일치
 
 `factType`이 다른 Question은 변경하지 않는다.
 
+재판정 Context는 3.10과 같이 Question이 발생한 Judgment의 `userContextVersion`이다. 대상 Question끼리 버전이 다르면 그룹을 가리지 않고 가장 큰 버전 하나로 모든 대상 Transaction을 재판정한다.
+
 응답 `200`:
 
 ```json
