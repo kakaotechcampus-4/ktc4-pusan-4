@@ -46,3 +46,8 @@
 ## 10-30 application-local.yml 중복 app 키
 
 - 로컬 프로필 bootRun 이 `found duplicate key app` 으로 뜨지 않았다. develop 은 #183 으로 고쳤지만 이 스택은 그 전에 갈라져 남아 있었다. `judgment-run` 을 첫 `app:` 아래로 옮겨 #183 과 같은 모양으로 맞췄다. 테스트는 local 프로필을 쓰지 않아 check 에서 안 걸렸다.
+
+## 10-30 14:09 로컬 실제 발송 확인
+
+- local 프로필 + `APP_AUTH_EMAIL_DELIVERY=smtp` + 팀 Gmail(preet.noreply) 앱 비밀번호로 bootRun 해 스웨거에서 코드 요청(204) → 메일 수신 → confirm(200) → signup(201) 까지 확인했다.
+- 같은 코드로 confirm 을 두 번 보내 두 번째가 `VERIFICATION_CODE_EXPIRED` 로 나와 버그로 착각했다. 코드는 한 번 쓰면 지워져서 맞는 동작이지만, 메시지가 "만료됐습니다" 뿐이라 헷갈린다.
