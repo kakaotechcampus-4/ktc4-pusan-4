@@ -111,10 +111,10 @@ export function Landing() {
 
                 {/* 글은 궤도 위에 올린다 */}
                 <div className="relative z-10 px-8 pt-12 sm:px-16 sm:pt-16">
-                  <p className="text-body text-ink2">
+                  <p className="text-body text-highlight">
                     1인 IT 개발 사업자를 위한 경비 판정
                   </p>
-                  <strong className="mt-5 block text-h2 font-normal leading-tight tracking-ir text-ink [word-break:keep-all] lg:text-ir-display">
+                  <strong className="mt-5 block text-h2 font-normal leading-tight tracking-ir text-white [word-break:keep-all] lg:text-ir-display">
                     이 카드값이 경비인지,
                     <br />
                     조문까지 붙여 답합니다
@@ -136,7 +136,7 @@ export function Landing() {
 
             {/* 첫 장은 검정에 큰 숫자, 아래로 회색 (레퍼런스 wrap_banner) */}
             <div className="flex flex-col gap-2">
-              <div className="rounded-2xl bg-ink2 p-5 text-white">
+              <div className="rounded-2xl bg-surface2 p-5 text-white">
                 <p className="text-caption text-white/60">이번 달 인정 경비</p>
                 <p className="mt-2 whitespace-nowrap text-ir-num font-bold tracking-ir-sm tabular-nums">
                   {won(HERO_SUMMARY.availableAmount)}
