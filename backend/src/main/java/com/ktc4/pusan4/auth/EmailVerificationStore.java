@@ -30,7 +30,7 @@ class EmailVerificationStore {
     static final Duration RESEND_COOLDOWN = Duration.ofSeconds(60);
     static final Duration VERIFIED_TTL = Duration.ofMinutes(30);
     static final int MAX_ATTEMPTS = 5;
-    static final int DAILY_LIMIT = 10;
+    static final int DAILY_LIMIT = 5;
 
     private static final Duration DAY = Duration.ofDays(1);
 

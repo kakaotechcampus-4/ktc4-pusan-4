@@ -232,13 +232,13 @@ refresh_token={token}; Path=/api/v1/auth; Max-Age=1209600; HttpOnly; Secure; Sam
 ```
 
 6자리 인증 코드를 메일로 보낸다. 응답 `204`. 코드는 5분 동안 쓸 수 있고, 다시 받으면 이전 코드는 쓸 수 없다.
-다시 받기는 60초에 한 번, 이메일 하나에 하루 10번까지다.
+다시 받기는 60초에 한 번, 이메일 하나에 하루 5번까지다.
 
 ```
 400 VALIDATION_ERROR                 이메일 형식이 아님
 409 EMAIL_ALREADY_EXISTS             이미 가입한 이메일
 429 VERIFICATION_RESEND_TOO_SOON     60초 안에 다시 요청함 (message 에 남은 초)
-429 VERIFICATION_DAILY_LIMIT         오늘 이 이메일로 10번 보냄
+429 VERIFICATION_DAILY_LIMIT         오늘 이 이메일로 5번 보냄
 502 EMAIL_SEND_FAILED                메일을 보내지 못함 → 바로 다시 요청해도 된다
 503 EMAIL_VERIFICATION_UNAVAILABLE   서버에 메일 계정이 설정되지 않음
 ```
