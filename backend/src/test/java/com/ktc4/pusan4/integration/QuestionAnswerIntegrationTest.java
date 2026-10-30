@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -134,6 +135,48 @@ class QuestionAnswerIntegrationTest {
             join judgment on judgment.id = question.judgment_id
             where judgment.transaction_id = ? and question.status = 'PENDING'
             """, Integer.class, household)).isZero();
+    }
+
+    @Test
+    void answer_keeps_its_source_and_exposes_the_question_code() throws Exception {
+        // given
+        UUID cafe = insertTransaction("카페", "스타벅스");
+        UUID telecom = insertTransaction("통신", "KT");
+        judge(cafe);
+        judge(telecom);
+        UUID cafeQuestion = pendingQuestion(cafe, "용도");
+        mockMvc.perform(get("/api/v1/questions").param("transactionId", cafe.toString()))
+            .andExpect(jsonPath("$.items[0].code").value("CAFE_PURPOSE"));
+
+        // when: 출처를 적은 답과 적지 않은 답
+        mockMvc.perform(post("/api/v1/question-responses")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"questionIds": ["%s"], "answer": {"value": "업무미팅"}, "source": "PREVIOUS_ANSWER"}
+                    """.formatted(cafeQuestion)))
+            .andExpect(status().isOk());
+        answer(List.of(pendingQuestion(telecom, "전용여부")), "전용").andExpect(status().isOk());
+
+        // then
+        assertThat(jdbcTemplate.queryForList(
+            "select source from user_fact where batch_id = ? order by scope_key", String.class, batchId))
+            .containsExactly("USER", "PREVIOUS_ANSWER");
+    }
+
+    @Test
+    void clients_cannot_claim_a_bulk_answer_source() throws Exception {
+        UUID cafe = insertTransaction("카페", "스타벅스");
+        judge(cafe);
+
+        mockMvc.perform(post("/api/v1/question-responses")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"questionIds": ["%s"], "answer": {"value": "업무미팅"}, "source": "BULK"}
+                    """.formatted(pendingQuestion(cafe, "용도"))))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+        assertThat(jdbcTemplate.queryForObject(
+            "select count(*) from user_fact where batch_id = ?", Integer.class, batchId)).isZero();
     }
 
     @Test

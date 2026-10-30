@@ -261,7 +261,8 @@ public final class JudgmentEngine {
             question.factType(),
             scopeKey(question.groupBy(), transaction),
             question.options(),
-            question.effects()
+            question.effects(),
+            question.previousAnswer()
         );
     }
 

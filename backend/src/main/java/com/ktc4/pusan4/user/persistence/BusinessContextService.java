@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -45,9 +46,14 @@ public class BusinessContextService {
 
     @Transactional(readOnly = true)
     public BusinessContext current(UUID userId) {
-        return contextRepository.findFirstByUserIdOrderByVersionDesc(userId)
-            .map(UserContextEntity::toDomain)
+        return findCurrent(userId)
             .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "CONTEXT_NOT_FOUND", "문진 전입니다."));
+    }
+
+    /** 문진 전이면 비어 있다. */
+    @Transactional(readOnly = true)
+    public Optional<BusinessContext> findCurrent(UUID userId) {
+        return contextRepository.findFirstByUserIdOrderByVersionDesc(userId).map(UserContextEntity::toDomain);
     }
 
     /** 판정 실행은 요청한 Context 를 쓴다 (api.md 3.6). 다른 사용자의 Context 도 없는 것으로 본다. */

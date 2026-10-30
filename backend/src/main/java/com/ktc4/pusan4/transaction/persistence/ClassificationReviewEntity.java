@@ -9,8 +9,8 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 /**
- * 미분류 거래의 분류 확인 요청 (V7, api.md 2.6·3.5). 업로드와 포함(include)은 PENDING 으로만 만든다.
- * 응답(RESOLVED) 처리는 B8 이 이 엔티티에 메서드를 더한다.
+ * 미분류 거래의 분류 확인 요청 (V7, api.md 2.6·3.5). 업로드와 포함(include)은 PENDING 으로만 만들고,
+ * 분류 응답이 RESOLVED 로 바꾼다.
  */
 @Entity
 @Table(name = "classification_review")
@@ -44,5 +44,23 @@ class ClassificationReviewEntity {
         review.status = "PENDING";
         review.createdAt = createdAt;
         return review;
+    }
+
+    UUID id() {
+        return id;
+    }
+
+    UUID transactionId() {
+        return transactionId;
+    }
+
+    boolean resolved() {
+        return "RESOLVED".equals(status);
+    }
+
+    void resolve(String category, OffsetDateTime resolvedAt) {
+        this.status = "RESOLVED";
+        this.selectedCategory = category;
+        this.resolvedAt = resolvedAt;
     }
 }

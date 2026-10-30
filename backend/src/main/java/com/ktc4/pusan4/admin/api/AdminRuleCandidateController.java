@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "admin", description = "관리자 — 규칙 후보 (api.md 3.14). 관리자가 아니면 403 FORBIDDEN")
+@Tag(name = "admin", description = "관리자 — 규칙 후보 (api.md 3.15). 관리자가 아니면 403 FORBIDDEN")
 @ApiResponse(responseCode = "403", description = "FORBIDDEN",
     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
 @RestController

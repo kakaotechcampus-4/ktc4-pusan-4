@@ -9,11 +9,24 @@ public record QuestionSpec(
     String factType,
     String groupBy,
     List<String> options,
-    Map<String, QuestionEffect> effects
+    Map<String, QuestionEffect> effects,
+    PreviousAnswer previousAnswer
 ) {
     public QuestionSpec {
         options = options == null ? List.of() : List.copyOf(options);
         effects = effects == null ? Map.of() : Map.copyOf(effects);
+        previousAnswer = previousAnswer == null ? PreviousAnswer.NONE : previousAnswer;
+    }
+
+    public QuestionSpec(
+        String code,
+        String text,
+        String factType,
+        String groupBy,
+        List<String> options,
+        Map<String, QuestionEffect> effects
+    ) {
+        this(code, text, factType, groupBy, options, effects, PreviousAnswer.NONE);
     }
 
     public QuestionSpec(

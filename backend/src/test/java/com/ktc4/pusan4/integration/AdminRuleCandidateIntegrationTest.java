@@ -20,7 +20,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * 규칙 후보 관리자 API (M1, api.md 3.14). 요청 사용자(demo@example.com)를 관리자 목록에 넣고 부른다.
+ * 규칙 후보 관리자 API (M1, api.md 3.15). 요청 사용자(demo@example.com)를 관리자 목록에 넣고 부른다.
  * 관리자가 아닐 때의 403 은 AdminPolicyTest 가 본다.
  */
 @SpringBootTest(properties = "app.admin.emails=Demo@Example.com")
