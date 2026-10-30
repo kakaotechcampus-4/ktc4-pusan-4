@@ -27,6 +27,7 @@ question:
   text: "어떤 보험의 보험료인가요?"
   fact_type: 보험종류
   group_by: merchant_norm
+  previous_answer: carry
   options:
     - { value: 사업장 재산·배상책임, verdict: 가능, citations: [{ id: 소득세법-27-1, verified: true }], account: 보험료 }
     - { value: 본인 보장성, verdict: 불가 }

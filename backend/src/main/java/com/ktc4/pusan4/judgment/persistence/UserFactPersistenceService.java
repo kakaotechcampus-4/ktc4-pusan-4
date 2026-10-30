@@ -1,5 +1,6 @@
 package com.ktc4.pusan4.judgment.persistence;
 
+import com.ktc4.pusan4.judgment.domain.AnswerSource;
 import com.ktc4.pusan4.judgment.domain.UserFact;
 import com.ktc4.pusan4.shared.UuidGenerator;
 import jakarta.persistence.NoResultException;
@@ -35,13 +36,19 @@ public class UserFactPersistenceService {
     // UserFact 는 batch 범위다. 다른 batch 의 같은 scope 답은 버전도 따로 매기고 읽지도 않는다 (api.md §3.10).
     @Transactional
     public UUID save(UUID userId, UUID batchId, UserFact fact) {
+        return save(userId, batchId, fact, AnswerSource.USER);
+    }
+
+    @Transactional
+    public UUID save(UUID userId, UUID batchId, UserFact fact, AnswerSource source) {
         UUID factId = uuidGenerator.generate();
         userFactRepository.save(new UserFactEntity(
             factId,
             userId,
             batchId,
             fact,
-            nextVersion(userId, batchId, fact.scopeKey(), fact.factType())
+            nextVersion(userId, batchId, fact.scopeKey(), fact.factType()),
+            source
         ));
         return factId;
     }

@@ -131,6 +131,47 @@ class HolidaySyncIntegrationTest {
     }
 
     @Test
+    void fills_a_year_missing_from_the_table_with_the_seed_when_the_api_fails() {
+        deleteYear(2026);
+        when(client.fetch(2026)).thenThrow(new IllegalStateException("Holiday API error"));
+
+        sync.syncYear(2026);
+
+        assertThat(calendar.publicHolidays())
+            .filteredOn(date -> date.getYear() == 2026)
+            .hasSize(22)
+            .contains(LocalDate.of(2026, 9, 24), LocalDate.of(2026, 10, 5));
+    }
+
+    @Test
+    void does_not_overwrite_a_year_already_in_the_table_with_the_seed() {
+        deleteYear(2026);
+        insertHoliday("2026-10-09", "API 로 받은 날");
+        when(client.fetch(2026)).thenThrow(new IllegalStateException("Holiday API error"));
+
+        sync.syncYear(2026);
+
+        assertThat(calendar.publicHolidays())
+            .filteredOn(date -> date.getYear() == 2026)
+            .containsExactly(LocalDate.of(2026, 10, 9));
+    }
+
+    @Test
+    void the_api_replaces_a_year_filled_from_the_seed() {
+        deleteYear(2026);
+        when(client.fetch(2026))
+            .thenThrow(new IllegalStateException("Holiday API error"))
+            .thenReturn(List.of(new PublicHoliday(LocalDate.of(2026, 10, 9), "한글날")));
+
+        sync.syncYear(2026);
+        sync.syncYear(2026);
+
+        assertThat(calendar.publicHolidays())
+            .filteredOn(date -> date.getYear() == 2026)
+            .containsExactly(LocalDate.of(2026, 10, 9));
+    }
+
+    @Test
     void syncs_the_previous_current_and_next_year() {
         int thisYear = LocalDate.now(ZoneId.of("Asia/Seoul")).getYear();
         when(client.configured()).thenReturn(true);
@@ -158,6 +199,13 @@ class HolidaySyncIntegrationTest {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
+    }
+
+    private void deleteYear(int year) {
+        jdbcTemplate.update(
+            "delete from public_holiday where holiday_date between ? and ?",
+            LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31)
+        );
     }
 
     private void insertHoliday(String date, String name) {

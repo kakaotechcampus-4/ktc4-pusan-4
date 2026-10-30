@@ -16,6 +16,7 @@ public record QuestionResponse(
     UUID transactionId,
     @Schema(example = "merchant:스타벅스") String groupKey,
     @Schema(example = "용도") String factType,
+    @Schema(description = "규칙 카드의 질문 코드. 다른 업로드의 같은 질문을 찾을 때 쓴다", example = "CAFE_PURPOSE") String code,
     String questionText,
     List<String> options,
     Coded<QuestionStatus> status,
@@ -27,7 +28,7 @@ public record QuestionResponse(
 
     static QuestionResponse from(Question question) {
         return new QuestionResponse(question.id(), question.batchId(), question.transactionId(), question.groupKey(),
-            question.factType(), question.questionText(), question.options(), status(question.status()),
+            question.factType(), question.code(), question.questionText(), question.options(), status(question.status()),
             question.answeredFactId(), answer(question.answer()), question.createdAt(), question.answeredAt());
     }
 

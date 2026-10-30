@@ -43,6 +43,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: "6379"
+      ASSISTANT_SERVER_URL: http://ai:8000
       HOLIDAY_API_KEY: ${HOLIDAY_API_KEY:-}
       APP_AUTH_JWT_SECRET: ${APP_AUTH_JWT_SECRET:-}
       APP_AUTH_KAKAO_REST_API_KEY: ${APP_AUTH_KAKAO_REST_API_KEY:-}
@@ -61,6 +62,9 @@ services:
       retries: 12
       start_period: 30s
     mem_limit: 1200m
+    # 종료할 때 판정 run 을 app.judgment-run.await-termination(60s)까지 기다린다(application.yml).
+    # Docker 기본값(10s)이면 그 전에 SIGKILL 로 꺼진다. 웹 요청 종료 대기(최대 30s) 뒤에 이어지므로 합 90s 에 10s 를 더 둔다.
+    stop_grace_period: 100s
 
   ai:
     image: ${ECR_REPOSITORY}:ai-${IMAGE_TAG}

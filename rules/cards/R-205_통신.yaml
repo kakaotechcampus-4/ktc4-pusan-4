@@ -36,6 +36,7 @@ question:
   text: "이 회선은 업무 전용인가요?"
   fact_type: 전용여부
   group_by: merchant_norm
+  previous_answer: carry
   options:
     - { value: 전용, verdict: 가능, citations: [{ id: 소득세법-27-1, verified: true }], account: 통신비 }
     - { value: 공용 }
