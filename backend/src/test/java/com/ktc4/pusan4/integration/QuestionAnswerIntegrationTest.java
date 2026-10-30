@@ -1,5 +1,6 @@
 package com.ktc4.pusan4.integration;
 
+import com.ktc4.pusan4.judgment.domain.AnswerSource;
 import com.ktc4.pusan4.judgment.domain.JudgmentOrigin;
 import com.ktc4.pusan4.judgment.domain.JudgmentOriginType;
 import com.ktc4.pusan4.judgment.persistence.BulkAnswerResult;
@@ -438,7 +439,7 @@ class QuestionAnswerIntegrationTest {
             // when: 일괄 응답이 락을 기다리는 동안 다른 응답이 커밋한다
             Future<BulkAnswerResult> bulk = threads.submit(() ->
                 answerService.bulkAnswer(USER_ID, batchId, "용도", "업무미팅"));
-            awaitLockWaiter();
+            UserLockOrder.awaitLockWaiter(jdbcTemplate);
             commit.countDown();
             other.get(10, TimeUnit.SECONDS);
 
@@ -450,6 +451,27 @@ class QuestionAnswerIntegrationTest {
         }
         assertThat(jdbcTemplate.queryForObject(
             "select count(*) from user_fact where batch_id = ?", Integer.class, batchId)).isZero();
+    }
+
+    @Test
+    void answer_takes_the_user_lock_before_the_transaction_lock() throws Exception {
+        UUID cafe = insertTransaction("카페", "스타벅스");
+        judge(cafe);
+        UUID question = pendingQuestion(cafe, "용도");
+
+        UserLockOrder.assertTakesUserLockFirst(jdbcTemplate, transactionManager, USER_ID,
+            UserLockOrder.TRANSACTION_ROW, cafe,
+            () -> answerService.answer(USER_ID, List.of(question), "업무미팅", AnswerSource.USER));
+    }
+
+    @Test
+    void bulk_answer_takes_the_user_lock_before_the_transaction_lock() throws Exception {
+        UUID cafe = insertTransaction("카페", "스타벅스");
+        judge(cafe);
+
+        UserLockOrder.assertTakesUserLockFirst(jdbcTemplate, transactionManager, USER_ID,
+            UserLockOrder.TRANSACTION_ROW, cafe,
+            () -> answerService.bulkAnswer(USER_ID, batchId, "용도", "업무미팅"));
     }
 
     @Test
@@ -476,20 +498,6 @@ class QuestionAnswerIntegrationTest {
         assertThat(jdbcTemplate.queryForObject(
             "select count(*) from user_fact where batch_id = ?", Integer.class, batchId)).isZero();
         assertThat(pendingQuestion(cafe, "용도")).isNotNull();
-    }
-
-    private void awaitLockWaiter() throws InterruptedException {
-        for (int attempt = 0; attempt < 100; attempt++) {
-            Integer waiting = jdbcTemplate.queryForObject("""
-                select count(*) from pg_stat_activity
-                where datname = current_database() and wait_event_type = 'Lock'
-                """, Integer.class);
-            if (waiting != null && waiting > 0) {
-                return;
-            }
-            Thread.sleep(100);
-        }
-        throw new AssertionError("락을 기다리는 세션이 없다");
     }
 
     private static void await(CountDownLatch latch) {

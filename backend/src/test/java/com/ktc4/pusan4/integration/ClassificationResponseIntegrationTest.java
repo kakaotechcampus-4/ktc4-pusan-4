@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -53,6 +54,9 @@ class ClassificationResponseIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     @Test
     void without_completed_run_classifies_only_and_saves_personal_dictionary() {
@@ -140,6 +144,19 @@ class ClassificationResponseIntegrationTest {
             .containsEntry("judgment_id", jdbcTemplate.queryForObject(
                 "select id from judgment where transaction_id = ?", UUID.class, transactionId))
             .containsEntry("allowed_amount", 11_000L);
+    }
+
+    @Test
+    void answer_takes_the_user_lock_before_the_transaction_lock() throws Exception {
+        UUID userId = newUser();
+        UUID batchId = upload(userId, "hash-lock-order", tx("k-1", "2026-01-05", "성진이네 본점"));
+        newRun(userId, batchId, "940909", 1, "COMPLETED");
+        insertStatutes("소득세법-33-1-5", "소득세법시행령-61-1-1", "소득세법-35-1");
+        List<UUID> reviewIds = reviewIdsOf(userId, "k-1");
+
+        UserLockOrder.assertTakesUserLockFirst(jdbcTemplate, transactionManager, userId,
+            UserLockOrder.TRANSACTION_ROW, idOf(userId, "k-1"),
+            () -> reviewService.answer(userId, reviewIds, "카페"));
     }
 
     @Test

@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -46,6 +47,9 @@ class LimitSettlementIntegrationTest {
 
     @Autowired
     private JudgmentQueryService queryService;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     @Autowired
     private JudgmentOverrideService overrideService;
@@ -145,6 +149,35 @@ class LimitSettlementIntegrationTest {
             "select id from judgment_override where source_judgment_id = ?", UUID.class, january));
         assertThat(allowedByTagged())
             .containsExactly(tuple(10_000_000L, 10_000_000L), tuple(5_000_000L, 2_090_000L));
+    }
+
+    @Test
+    void override_and_its_release_take_the_user_lock_first() throws Exception {
+        UUID meal = transaction("2025-03-02", "AUTO");
+        UUID judgmentId = judgment(meal, "AVAILABLE", ENTERTAINMENT, 50_000L);
+
+        UserLockOrder.assertTakesUserLockFirst(jdbcTemplate, transactionManager, userId,
+            UserLockOrder.TRANSACTION_ROW, meal,
+            () -> overrideService.override(userId, judgmentId, Verdict.UNAVAILABLE, "개인 식사"));
+        UUID overrideId = jdbcTemplate.queryForObject(
+            "select id from judgment_override where source_judgment_id = ?", UUID.class, judgmentId);
+        UserLockOrder.assertTakesUserLockFirst(jdbcTemplate, transactionManager, userId,
+            UserLockOrder.OVERRIDE_ROW, overrideId,
+            () -> {
+                overrideService.release(userId, overrideId);
+                return null;
+            });
+    }
+
+    @Test
+    void excluding_and_including_take_the_user_lock_first() throws Exception {
+        UUID meal = transaction("2025-03-02", "AUTO");
+        judgment(meal, "AVAILABLE", ENTERTAINMENT, 50_000L);
+
+        UserLockOrder.assertTakesUserLockFirst(jdbcTemplate, transactionManager, userId,
+            UserLockOrder.TRANSACTION_ROW, meal, () -> transactionService.exclude(userId, meal));
+        UserLockOrder.assertTakesUserLockFirst(jdbcTemplate, transactionManager, userId,
+            UserLockOrder.TRANSACTION_ROW, meal, () -> transactionService.include(userId, meal));
     }
 
     @Test
