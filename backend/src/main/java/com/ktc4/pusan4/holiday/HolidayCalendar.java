@@ -33,4 +33,17 @@ public class HolidayCalendar {
             .map(holiday -> new PublicHolidayEntity(holiday.date(), holiday.name()))
             .toList());
     }
+
+    /** 그 해 행이 하나도 없을 때만 넣는다. API 로 받은 해를 시드가 덮지 않게 한다. */
+    @Transactional
+    boolean fillYearIfEmpty(int year, List<PublicHoliday> holidays) {
+        repository.lockForReplace();
+        if (repository.existsByHolidayDateBetween(LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31))) {
+            return false;
+        }
+        repository.saveAll(holidays.stream()
+            .map(holiday -> new PublicHolidayEntity(holiday.date(), holiday.name()))
+            .toList());
+        return true;
+    }
 }

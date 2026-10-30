@@ -26,7 +26,7 @@ final class QuestionFixtures {
             List.of("사업", "개인"), status, status == QuestionStatus.ANSWERED ? uuid(900) : null,
             status == QuestionStatus.ANSWERED ? "사업" : null,
             OffsetDateTime.parse("2025-10-09T10:00:00+09:00").plusMinutes(id), null,
-            new JudgedTransaction(approvedAt, "스타벅스 서면점", "스타벅스", "카페", amount, 0), false, false);
+            new JudgedTransaction(approvedAt, "스타벅스 서면점", "스타벅스", "카페", amount, 0), false, false, "CAFE_PURPOSE");
     }
 
     static UUID uuid(int value) {

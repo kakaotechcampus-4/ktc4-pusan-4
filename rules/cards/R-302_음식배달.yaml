@@ -21,6 +21,7 @@ question:
   text: "이 배달 음식은 어떤 용도였나요?"
   fact_type: 용도
   group_by: transaction
+  previous_answer: history
   options:
     - { value: 업무미팅, verdict: 가능, citations: [{ id: 소득세법-35-1, verified: true }], account: 접대비, limit_bucket: 접대비 }
     - { value: 개인, verdict: 불가 }

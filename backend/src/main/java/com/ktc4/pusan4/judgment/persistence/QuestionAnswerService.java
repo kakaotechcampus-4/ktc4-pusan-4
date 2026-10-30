@@ -1,5 +1,6 @@
 package com.ktc4.pusan4.judgment.persistence;
 
+import com.ktc4.pusan4.judgment.domain.AnswerSource;
 import com.ktc4.pusan4.judgment.domain.JudgmentOrigin;
 import com.ktc4.pusan4.judgment.domain.JudgmentOriginType;
 import com.ktc4.pusan4.judgment.domain.UserFact;
@@ -52,7 +53,11 @@ public class QuestionAnswerService {
      * 한 거래라도 재판정에 실패하면 전체가 롤백된다.
      */
     @Transactional
-    public QuestionAnswerResult answer(UUID userId, List<UUID> questionIds, String value) {
+    public QuestionAnswerResult answer(UUID userId, List<UUID> questionIds, String value, AnswerSource source) {
+        // 일괄 응답 출처는 시스템만 쓴다. 지난번 답 불러오기가 약한 근거로 다루는 값이라 사용자가 붙이지 못하게 한다.
+        if (source == AnswerSource.BULK) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "요청 값이 올바르지 않습니다.");
+        }
         List<AnswerTarget> requested = findRequested(userId, questionIds);
         validateAnswerable(requested, value);
         AnswerTarget first = requested.getFirst();
@@ -61,7 +66,7 @@ public class QuestionAnswerService {
 
         // 사용자 락을 잡는다. 아래 재판정이 잡는 거래 락보다 먼저여야 한다(UserFactPersistenceService.nextVersion).
         UUID factId = userFactService.save(userId, first.batchId(),
-            new UserFact(groupKey, factType, Map.of("value", value)));
+            new UserFact(groupKey, factType, Map.of("value", value)), source);
 
         List<AnswerTarget> siblings = questionRepository.findSiblings(first.batchId(), groupKey, factType);
         OffsetDateTime now = OffsetDateTime.now(clock);

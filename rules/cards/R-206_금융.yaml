@@ -26,6 +26,7 @@ question:
   text: "이 결제는 어떤 성격인가요?"
   fact_type: 지출성격
   group_by: merchant_norm
+  previous_answer: carry
   options:
     - { value: 은행 수수료, verdict: 가능, citations: [{ id: 소득세법-27-1, verified: true }], account: 지급수수료 }
     - { value: 카드 연회비, verdict: 가능, citations: [{ id: 소득세법-27-1, verified: true }], account: 지급수수료 }

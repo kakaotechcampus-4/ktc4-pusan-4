@@ -33,6 +33,7 @@ question:
   text: "이 요금이 나오는 공간을 사업 전용으로만 쓰나요?"
   fact_type: 공간전용여부
   group_by: merchant_norm
+  previous_answer: carry
   options:
     - { value: 사업 전용, verdict: 가능, account: 수도광열비 }
     - { value: 자택 겸용 }
