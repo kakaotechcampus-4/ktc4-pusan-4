@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRightIcon, TriangleAlertIcon } from 'lucide-react';
-import type { Judgment, JudgmentOriginType } from '../../types/domain';
+import type { Judgment, JudgmentOriginType, Verdict } from '../../types/domain';
 import { api, ApiRequestError, useApi } from '../../api';
 import { Badge, Button, ChoiceGroup, Input } from '../ui';
 import { VerdictBadge } from '../VerdictBadge';
 import { StatuteCitation } from '../StatuteCitation';
-import { VERDICT_LABEL } from '../../utils/verdict';
+import { VERDICT_LABEL, VERDICT_META } from '../../utils/verdict';
 import { formatDateTime, formatFullDate, formatWon, ro } from '../../utils/format';
 
 /** 2.8 이 revision 이 생긴 직접 원인 */
@@ -33,6 +33,28 @@ const REVIEW_MESSAGE: Record<ReviewState, string> = {
   '답을 반영했지만 규칙만으로는 아직 확정하지 못했습니다. 안분 비율·기간처럼 뒤에서 정할 조건이 남았거나 세무사 판단이 필요한 답입니다.',
   NO_RULE: '판정할 규칙이 없습니다. 근거를 지어내지 않고 확인 필요로 두었습니다.',
   PRESUMED: '추정으로 제외했어요. 업무였다면 질문에 답해 주세요. 답하면 다시 판정합니다.'
+};
+
+/**
+ * 패널 머리를 판정 색으로 칠한다. 이 패널에서 가장 먼저 읽어야 하는 것이 판정인데,
+ * 작은 배지 하나로는 회색 덩어리 안에서 눈에 띄지 않는다.
+ * 상태색은 bg·line·text 를 세트로 쓴다 (DESIGN.md 상태색 규칙)
+ */
+const VERDICT_SKIN: Record<Verdict, string> = {
+  AVAILABLE: 'border-ok-line bg-ok-bg',
+  NEEDS_REVIEW: 'border-warn-line bg-warn-bg',
+  UNAVAILABLE: 'border-deny-line bg-deny-bg'
+};
+const VERDICT_TEXT: Record<Verdict, string> = {
+  AVAILABLE: 'text-ok',
+  NEEDS_REVIEW: 'text-warn',
+  UNAVAILABLE: 'text-deny'
+};
+
+/** attributes 는 규칙 카드가 넣는 값이라 키가 영문이다. 화면에는 우리 말로 적는다 */
+const ATTRIBUTE_LABEL: Record<string, string> = {
+  limit_bucket: '한도 묶음',
+  merchantCategory: '가맹점 업종'
 };
 
 /** 사용자가 바꿀 수 있는 판정. 확인 필요로 되돌리는 수정은 받지 않는다 (#62 논의) */
@@ -212,42 +234,52 @@ export function JudgmentDetailPanel({
   };
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-line bg-surface">
-      <header className="border-b border-line px-5 py-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <VerdictBadge verdict={judgment.verdict} size="md" />
-          {judgment.outOfScope && <Badge tone="warn">판정 범위 밖</Badge>}
-          <Badge>{ORIGIN_LABEL[judgment.origin.type]}</Badge>
-          <span className="text-caption tabular-nums text-muted">
-            rev.{judgment.revision}
+    <div className="overflow-hidden rounded-2xl border border-line bg-sheet">
+      <header className={`border-b px-5 py-4 ${VERDICT_SKIN[judgment.verdict.code]}`}>
+        <div className="flex items-center justify-between gap-3">
+          <p
+            className={`flex items-center gap-2 text-h4 font-bold ${
+            VERDICT_TEXT[judgment.verdict.code]}`
+            }>
+
+            <span aria-hidden="true">{VERDICT_META[judgment.verdict.code].symbol}</span>
+            {judgment.verdict.label}
+          </p>
+          <span className="shrink-0 text-caption tabular-nums text-ink2">
+            {ORIGIN_LABEL[judgment.origin.type]} · rev.{judgment.revision}
           </span>
         </div>
+        {judgment.outOfScope &&
+        <p className="mt-2">
+            <Badge tone="warn">판정 범위 밖</Badge>
+          </p>
+        }
         <h2
           ref={title}
           tabIndex={-1}
-          className="mt-2.5 scroll-mt-24 text-h4 font-bold tracking-tight text-ink outline-none">
+          className="mt-3 scroll-mt-24 text-h3 font-bold tracking-ir-sm text-ink outline-none [word-break:keep-all]">
 
           {transaction.merchantNorm}
         </h2>
-        <p className="mt-1 text-caption tabular-nums text-muted">
+        <p className="mt-1 text-caption tabular-nums text-ink2">
           {formatFullDate(transaction.approvedAt)} · {transaction.merchantRaw}
         </p>
       </header>
 
       <dl className="grid grid-cols-2 gap-px border-b border-line bg-line">
-        <div className="bg-surface px-5 py-3">
+        <div className="bg-sheet px-5 py-4">
           <dt className="text-caption text-muted">승인금액</dt>
-          <dd className="mt-0.5 text-body-lg font-bold tabular-nums text-ink">
+          <dd className="mt-1 text-h3 font-bold tabular-nums tracking-ir-sm text-ink">
             {formatWon(transaction.amount)}
           </dd>
         </div>
-        <div className="bg-surface px-5 py-3">
+        <div className="bg-sheet px-5 py-4">
           {/* 자산은 그해 넣을 수 있는 한도다. 「넣으세요」가 아니라 「까지 넣을 수 있습니다」 (CONTEXT.md G4) */}
           <dt className="text-caption text-muted">
             {asset ? `${transaction.approvedAt.slice(0, 4)}년에 넣을 수 있는 금액` : '필요경비 산입액'}
           </dt>
           <dd
-            className={`mt-0.5 text-body-lg font-bold tabular-nums ${
+            className={`mt-1 text-h3 font-bold tabular-nums tracking-ir-sm ${
             judgment.finalAmount ? 'text-ok' : 'text-muted'}`
             }>
 
@@ -260,7 +292,7 @@ export function JudgmentDetailPanel({
 
       {hasReason &&
       <section className="border-b border-line px-5 py-4">
-        <h3 className="text-small font-bold text-ink">판정 이유</h3>
+        <h3 className="text-body font-bold text-ink">판정 이유</h3>
         {reviewState &&
         <div className="mt-2 rounded-xl border border-line bg-canvas px-3.5 py-3 text-small text-ink2">
             <p>{REVIEW_MESSAGE[reviewState]}</p>
@@ -307,7 +339,7 @@ export function JudgmentDetailPanel({
 
       <section className="border-b border-line px-5 py-4">
         {/* 수정한 판정은 규칙 엔진의 근거를 그대로 들고 있다. 수정의 근거로 읽히지 않게 한다 */}
-        <h3 className="text-small font-bold text-ink">
+        <h3 className="text-body font-bold text-ink">
           {overridden ? '규칙 엔진이 붙인 근거 조문' : '근거 조문'}
         </h3>
         {judgment.citations.length > 0 ?
@@ -337,15 +369,15 @@ export function JudgmentDetailPanel({
         }
       </section>
 
-      <section className="border-b border-line bg-canvas px-5 py-3.5">
-        <dl className="space-y-1 text-caption tabular-nums text-muted">
+      <section className="border-b border-line bg-surface px-5 py-4">
+        <dl className="space-y-2 text-small tabular-nums text-muted">
           <div className="flex justify-between gap-2">
             <dt>계정과목</dt>
             <dd className="text-ink2">{judgment.account ?? '—'}</dd>
           </div>
           {attributes.map(([key, value]) =>
           <div key={key} className="flex justify-between gap-2">
-              <dt>{key}</dt>
+              <dt>{ATTRIBUTE_LABEL[key] ?? key}</dt>
               <dd className="text-ink2">{attributeValue(value)}</dd>
             </div>
           )}
@@ -380,7 +412,7 @@ export function JudgmentDetailPanel({
       </section>
 
       <section className="border-b border-line px-5 py-4">
-        <h3 ref={editHeading} tabIndex={-1} className="text-small font-bold text-ink outline-none">
+        <h3 ref={editHeading} tabIndex={-1} className="text-body font-bold text-ink outline-none">
           판정이 실제와 다르다면
         </h3>
         <p className="mt-1.5 text-caption text-muted">
@@ -455,7 +487,7 @@ export function JudgmentDetailPanel({
       </section>
 
       <section className="px-5 py-4">
-        <h3 className="text-small font-bold text-ink">판정 이력</h3>
+        <h3 className="text-body font-bold text-ink">판정 이력</h3>
         {historyQ.error ?
         <p className="mt-2 text-caption text-muted">
             이력을 불러오지 못했습니다.{' '}
