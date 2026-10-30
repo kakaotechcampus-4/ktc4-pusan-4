@@ -115,7 +115,7 @@ export function Styleguide() {
       <Container className="py-16">
         <SectionHeading
           eyebrow="Design System · 초안"
-          title="경비판정 스타일가이드"
+          title="PreeT 스타일가이드"
           description="화면을 새로 만들 때 이 부품과 토큰만 씁니다. 규칙과 이유는 DESIGN.md에 있습니다." />
 
 

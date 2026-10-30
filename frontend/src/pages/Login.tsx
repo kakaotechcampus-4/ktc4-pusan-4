@@ -63,14 +63,14 @@ export function Login() {
     <div className="flex min-h-full w-full bg-surface">
       {/* 좌측 브랜드 패널 */}
       <aside className="hidden w-[46%] flex-col justify-between bg-ink px-12 py-12 lg:flex">
-        <Link to="/" className="flex items-center gap-2" aria-label="경비판정 홈">
+        <Link to="/" className="flex items-center gap-2" aria-label="PreeT 홈">
           <span aria-hidden="true" className="flex gap-[3px]">
             <span className="block h-5 w-[5px] rounded-sm bg-white" />
             <span className="block h-5 w-[5px] rounded-sm bg-white" />
             <span className="block h-5 w-[5px] rounded-sm bg-accent" />
           </span>
           <span className="text-[17px] font-bold tracking-tight text-white">
-            경비판정
+            PreeT
           </span>
         </Link>
 
@@ -108,7 +108,7 @@ export function Login() {
           <Link
             to="/"
             className="mb-10 flex items-center gap-2 lg:hidden"
-            aria-label="경비판정 홈">
+            aria-label="PreeT 홈">
             
             <span aria-hidden="true" className="flex gap-[3px]">
               <span className="block h-5 w-[5px] rounded-sm bg-ink" />
@@ -116,7 +116,7 @@ export function Login() {
               <span className="block h-5 w-[5px] rounded-sm bg-accent" />
             </span>
             <span className="text-[17px] font-bold tracking-tight text-ink">
-              경비판정
+              PreeT
             </span>
           </Link>
 

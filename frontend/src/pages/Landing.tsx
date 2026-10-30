@@ -187,7 +187,7 @@ export function Landing() {
 
         {/* 주요현황 — 회색 패널(428×241) 3장 + 카드(428×360) 3장 + 알약 */}
         <section id="flow" className={`${SHELL} pt-28`}>
-          <IrHeading>경비판정 주요현황</IrHeading>
+          <IrHeading>PreeT 주요현황</IrHeading>
 
           <div className="mt-10 grid gap-4 md:grid-cols-3">
             {BOARDS.map((board) =>
@@ -267,7 +267,7 @@ export function Landing() {
 
         {/* 지키는 것 — 회색 패널 3장 */}
         <section id="system" className={`${SHELL} pt-28`}>
-          <IrHeading>경비판정이 지키는 것</IrHeading>
+          <IrHeading>PreeT가 지키는 것</IrHeading>
 
           <ul className="mt-10 grid gap-4 md:grid-cols-3">
             {SYSTEM_FEATURES.map((feature) =>
