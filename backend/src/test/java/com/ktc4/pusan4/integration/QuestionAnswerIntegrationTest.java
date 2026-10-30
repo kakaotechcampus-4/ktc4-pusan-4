@@ -2,7 +2,9 @@ package com.ktc4.pusan4.integration;
 
 import com.ktc4.pusan4.judgment.domain.JudgmentOrigin;
 import com.ktc4.pusan4.judgment.domain.JudgmentOriginType;
+import com.ktc4.pusan4.judgment.persistence.BulkAnswerResult;
 import com.ktc4.pusan4.judgment.persistence.JudgmentExecutor;
+import com.ktc4.pusan4.judgment.persistence.QuestionAnswerService;
 import com.ktc4.pusan4.shared.auth.FixedUser;
 import com.ktc4.pusan4.user.domain.BusinessContext;
 import com.ktc4.pusan4.user.persistence.BusinessContextService;
@@ -16,12 +18,19 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -56,6 +65,12 @@ class QuestionAnswerIntegrationTest {
 
     @Autowired
     private BusinessContextService contextService;
+
+    @Autowired
+    private QuestionAnswerService answerService;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     private UUID batchId;
     private BusinessContext context;
@@ -383,6 +398,42 @@ class QuestionAnswerIntegrationTest {
     }
 
     @Test
+    void bulk_answer_waits_for_the_user_lock_before_reading_its_targets() throws Exception {
+        // given: 카페 용도 질문. 다른 응답이 사용자 락을 잡은 채 그 질문을 취소하고 아직 커밋하지 않았다
+        UUID cafe = insertTransaction("카페", "스타벅스");
+        judge(cafe);
+        UUID question = pendingQuestion(cafe, "용도");
+        CountDownLatch canceled = new CountDownLatch(1);
+        CountDownLatch commit = new CountDownLatch(1);
+        ExecutorService threads = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> other = threads.submit(() ->
+                new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+                    jdbcTemplate.queryForList("select id from app_user where id = ? for no key update", USER_ID);
+                    jdbcTemplate.update("update question_queue set status = 'CANCELED' where id = ?", question);
+                    canceled.countDown();
+                    await(commit);
+                }));
+            assertThat(canceled.await(10, TimeUnit.SECONDS)).isTrue();
+
+            // when: 일괄 응답이 락을 기다리는 동안 다른 응답이 커밋한다
+            Future<BulkAnswerResult> bulk = threads.submit(() ->
+                answerService.bulkAnswer(USER_ID, batchId, "용도", "업무미팅"));
+            awaitLockWaiter();
+            commit.countDown();
+            other.get(10, TimeUnit.SECONDS);
+
+            // then: 취소가 반영된 대기 질문을 읽어 답할 대상이 없다
+            assertThat(bulk.get(10, TimeUnit.SECONDS).answeredCount()).isZero();
+        } finally {
+            commit.countDown();
+            threads.shutdownNow();
+        }
+        assertThat(jdbcTemplate.queryForObject(
+            "select count(*) from user_fact where batch_id = ?", Integer.class, batchId)).isZero();
+    }
+
+    @Test
     void invalid_bulk_answers_change_nothing() throws Exception {
         // given: 카페(용도: 업무미팅·개인·혼자작업)
         UUID cafe = insertTransaction("카페", "스타벅스");
@@ -406,6 +457,28 @@ class QuestionAnswerIntegrationTest {
         assertThat(jdbcTemplate.queryForObject(
             "select count(*) from user_fact where batch_id = ?", Integer.class, batchId)).isZero();
         assertThat(pendingQuestion(cafe, "용도")).isNotNull();
+    }
+
+    private void awaitLockWaiter() throws InterruptedException {
+        for (int attempt = 0; attempt < 100; attempt++) {
+            Integer waiting = jdbcTemplate.queryForObject("""
+                select count(*) from pg_stat_activity
+                where datname = current_database() and wait_event_type = 'Lock'
+                """, Integer.class);
+            if (waiting != null && waiting > 0) {
+                return;
+            }
+            Thread.sleep(100);
+        }
+        throw new AssertionError("락을 기다리는 세션이 없다");
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            latch.await(10, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     /** 같은 사용자의 다른 batch 에 생긴 가맹점 질문. */

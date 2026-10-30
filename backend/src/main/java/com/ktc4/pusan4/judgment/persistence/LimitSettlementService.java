@@ -54,7 +54,7 @@ public class LimitSettlementService {
     public void settleProvisional(UUID userId) {
         // 같은 사용자의 집계끼리 limit_bucket_entry 를 동시에 갈아 끼우지 않게 사용자 락을 잡는다.
         // 재판정 쪽은 UserFact 저장에서 이미 잡았다(같은 트랜잭션이라 다시 잡아도 된다).
-        userFactRepository.lockUser(userId).orElseThrow(NoResultException::new);
+        lockUser(userId);
         long annualLimit = EntertainmentLimit.annual(contextService.current(userId).prevYearRevenue());
 
         Map<Integer, List<LimitCandidate>> byYear = new HashMap<>();
@@ -74,5 +74,14 @@ public class LimitSettlementService {
         years.addAll(entryRepository.findTaxYears(userId, EntertainmentLimit.BUCKET));
         years.forEach(year -> limitService.replaceProvisional(userId, year, EntertainmentLimit.BUCKET,
             AnnualLimitAllocator.allocate(annualLimit, byYear.getOrDefault(year, List.of()))));
+    }
+
+    /**
+     * 집계가 잡는 사용자 락. 거래 락을 잡은 뒤 집계하는 쪽은 거래 락보다 먼저 이것을 부른다
+     * (UserFactPersistenceService.nextVersion 의 "사용자 → 거래" 락 순서).
+     */
+    @Transactional
+    public void lockUser(UUID userId) {
+        userFactRepository.lockUser(userId).orElseThrow(NoResultException::new);
     }
 }

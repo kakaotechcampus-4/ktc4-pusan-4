@@ -38,6 +38,7 @@ public class QuestionAnswerService {
     private final UserFactPersistenceService userFactService;
     private final QuestionQueryService queryService;
     private final JudgmentExecutor executor;
+    private final LimitSettlementService limitSettlement;
     private final Clock clock;
 
     public QuestionAnswerService(
@@ -47,6 +48,7 @@ public class QuestionAnswerService {
         UserFactPersistenceService userFactService,
         QuestionQueryService queryService,
         JudgmentExecutor executor,
+        LimitSettlementService limitSettlement,
         Clock clock
     ) {
         this.questionRepository = questionRepository;
@@ -55,6 +57,7 @@ public class QuestionAnswerService {
         this.userFactService = userFactService;
         this.queryService = queryService;
         this.executor = executor;
+        this.limitSettlement = limitSettlement;
         this.clock = clock;
     }
 
@@ -85,6 +88,8 @@ public class QuestionAnswerService {
      */
     @Transactional
     public BulkAnswerResult bulkAnswer(UUID userId, UUID batchId, String factType, String value) {
+        // 대상을 읽기 전에 사용자 락을 잡는다. 락 없이 읽으면 그사이 단건 응답이 대상 질문을 취소해 기록할 질문이 사라진다.
+        limitSettlement.lockUser(userId);
         if (!batchRepository.existsByIdAndUserId(batchId, userId)) {
             throw new ApiException(HttpStatus.NOT_FOUND, "BATCH_NOT_FOUND", "업로드를 찾을 수 없습니다.");
         }
