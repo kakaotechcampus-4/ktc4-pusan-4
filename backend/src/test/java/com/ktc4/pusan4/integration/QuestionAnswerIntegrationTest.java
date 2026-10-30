@@ -345,6 +345,10 @@ class QuestionAnswerIntegrationTest {
             """, UUID.class, batchId)).containsExactlyInAnyOrder(firstCafe, secondCafe);
         assertThat(pendingQuestion(weekend, "용도")).isNotNull();
         assertThat(pendingQuestion(telecom, "전용여부")).isNotNull();
+        // 지난번 답 불러오기가 약한 근거로 다루도록 출처를 일괄 응답으로 남긴다
+        assertThat(jdbcTemplate.queryForList(
+            "select distinct source from user_fact where batch_id = ?", String.class, batchId))
+            .containsExactly("BULK");
     }
 
     @Test

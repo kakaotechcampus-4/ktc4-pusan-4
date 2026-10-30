@@ -71,7 +71,7 @@ public class QuestionAnswerService {
         validateAnswerable(requested, value);
         AnswerTarget first = requested.getFirst();
         Answered answered = record(userId, first.batchId(), first.question().groupKey(),
-            first.question().factType(), value);
+            first.question().factType(), value, source);
         int rejudged = rejudge(userId, List.of(answered));
         return new QuestionAnswerResult(answered.questionCount(), answered.factId(), rejudged);
     }
@@ -107,7 +107,7 @@ public class QuestionAnswerService {
         }
 
         List<Answered> answered = targets.stream()
-            .map(group -> record(userId, batchId, group.groupKey(), factType, value))
+            .map(group -> record(userId, batchId, group.groupKey(), factType, value, AnswerSource.BULK))
             .toList();
         int rejudged = rejudge(userId, answered);
         // 재판정은 다른 revision 의 대기 질문을 bulk update 로 취소한다(DB 에만 반영). 앞에서 읽은 질문 엔티티가
@@ -126,9 +126,12 @@ public class QuestionAnswerService {
     /**
      * 2. UserFact 새 version → 3. 같은 Batch·groupKey·factType 질문을 모두 이 답으로. 재판정할 거래를 모아 돌려준다.
      */
-    private Answered record(UUID userId, UUID batchId, String groupKey, String factType, String value) {
+    private Answered record(
+        UUID userId, UUID batchId, String groupKey, String factType, String value, AnswerSource source
+    ) {
         // 사용자 락을 잡는다. 재판정이 잡는 거래 락보다 먼저여야 한다(UserFactPersistenceService.nextVersion).
-        UUID factId = userFactService.save(userId, batchId, new UserFact(groupKey, factType, Map.of("value", value)));
+        UUID factId = userFactService.save(userId, batchId,
+            new UserFact(groupKey, factType, Map.of("value", value)), source);
 
         List<AnswerTarget> siblings = questionRepository.findSiblings(batchId, groupKey, factType);
         OffsetDateTime now = OffsetDateTime.now(clock);
