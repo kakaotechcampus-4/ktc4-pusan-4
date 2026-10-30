@@ -9,7 +9,6 @@ import com.ktc4.pusan4.transaction.api.SourceStatus;
 import com.ktc4.pusan4.transaction.api.UserInclusion;
 import com.ktc4.pusan4.transaction.domain.TransactionDetail;
 import com.ktc4.pusan4.transaction.domain.TransactionFilter;
-import jakarta.persistence.EntityManager;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
@@ -30,7 +29,6 @@ public class TransactionService {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
-    private final EntityManager entityManager;
     private final TransactionRecordRepository transactionRepository;
     private final TransactionQueryRepository queryRepository;
     private final ClassificationReviewRepository reviewRepository;
@@ -38,14 +36,12 @@ public class TransactionService {
     private final Clock clock;
 
     public TransactionService(
-        EntityManager entityManager,
         TransactionRecordRepository transactionRepository,
         TransactionQueryRepository queryRepository,
         ClassificationReviewRepository reviewRepository,
         UuidGenerator uuidGenerator,
         Clock clock
     ) {
-        this.entityManager = entityManager;
         this.transactionRepository = transactionRepository;
         this.queryRepository = queryRepository;
         this.reviewRepository = reviewRepository;
@@ -91,7 +87,7 @@ public class TransactionService {
         if (ClassificationStatus.NEEDS_REVIEW.name().equals(transaction.classificationStatus())
             && !reviewRepository.existsByTransactionIdAndStatus(transaction.id(), "PENDING")) {
             OffsetDateTime now = OffsetDateTime.now(clock.withZone(KST)).truncatedTo(ChronoUnit.MICROS);
-            entityManager.persist(ClassificationReviewEntity.pending(uuidGenerator.generate(), transaction.id(), now));
+            reviewRepository.save(ClassificationReviewEntity.pending(uuidGenerator.generate(), transaction.id(), now));
         }
         return transaction.toDetail();
     }

@@ -1,6 +1,8 @@
 package com.ktc4.pusan4.shared.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ktc4.pusan4.assistant.AssistantRelayService;
+import com.ktc4.pusan4.assistant.api.ChatResponse;
 import com.ktc4.pusan4.auth.AuthService;
 import com.ktc4.pusan4.auth.TestAuthentication;
 import com.ktc4.pusan4.judgment.api.JudgmentMockData;
@@ -9,12 +11,14 @@ import com.ktc4.pusan4.judgment.domain.JudgmentOrigin;
 import com.ktc4.pusan4.judgment.domain.JudgmentOriginType;
 import com.ktc4.pusan4.judgment.domain.JudgmentRevision;
 import com.ktc4.pusan4.judgment.domain.JudgmentRun;
+import com.ktc4.pusan4.judgment.domain.JudgmentRunFailure;
+import com.ktc4.pusan4.judgment.domain.JudgmentRunStatus;
 import com.ktc4.pusan4.judgment.domain.JudgmentSummary;
 import com.ktc4.pusan4.judgment.domain.PendingTotal;
 import com.ktc4.pusan4.judgment.domain.Question;
 import com.ktc4.pusan4.judgment.domain.QuestionStatus;
-import com.ktc4.pusan4.judgment.domain.JudgmentRunFailure;
-import com.ktc4.pusan4.judgment.domain.JudgmentRunStatus;
+import com.ktc4.pusan4.judgment.domain.RuleCandidate;
+import com.ktc4.pusan4.judgment.domain.RuleCandidateStatus;
 import com.ktc4.pusan4.judgment.domain.StatuteVersion;
 import com.ktc4.pusan4.judgment.domain.Verdict;
 import com.ktc4.pusan4.judgment.persistence.JudgmentOverrideService;
@@ -24,12 +28,11 @@ import com.ktc4.pusan4.judgment.persistence.QuestionAnswerResult;
 import com.ktc4.pusan4.judgment.persistence.QuestionAnswerService;
 import com.ktc4.pusan4.judgment.persistence.QuestionQueryService;
 import com.ktc4.pusan4.judgment.persistence.QuestionSuggestionService;
-import com.ktc4.pusan4.assistant.AssistantRelayService;
-import com.ktc4.pusan4.assistant.api.ChatResponse;
-import com.ktc4.pusan4.progress.domain.NextStep;
-import com.ktc4.pusan4.progress.persistence.ProgressService;
+import com.ktc4.pusan4.judgment.persistence.RuleCandidateReviewService;
 import com.ktc4.pusan4.judgment.persistence.StatuteService;
 import com.ktc4.pusan4.merchant.api.ClassificationReviewStatus;
+import com.ktc4.pusan4.progress.domain.NextStep;
+import com.ktc4.pusan4.progress.persistence.ProgressService;
 import com.ktc4.pusan4.shared.UuidV7Generator;
 import com.ktc4.pusan4.shared.auth.FixedUser;
 import com.ktc4.pusan4.transaction.api.CardIssuer;
@@ -51,6 +54,8 @@ import com.ktc4.pusan4.transaction.persistence.UploadService;
 import com.ktc4.pusan4.user.domain.AppUser;
 import com.ktc4.pusan4.user.domain.BookkeepingDuty;
 import com.ktc4.pusan4.user.domain.BusinessContext;
+import com.ktc4.pusan4.user.domain.UserRole;
+import com.ktc4.pusan4.user.persistence.AdminPolicy;
 import com.ktc4.pusan4.user.persistence.BusinessContextService;
 import com.ktc4.pusan4.user.persistence.UserService;
 import org.junit.jupiter.api.BeforeEach;
@@ -153,6 +158,12 @@ class ApiResponseContractTest {
     @MockitoBean
     private ClassificationReviewService reviewService;
 
+    @MockitoBean
+    private AdminPolicy adminPolicy;
+
+    @MockitoBean
+    private RuleCandidateReviewService ruleCandidateReviewService;
+
     /** 인증 API 의 동작은 AuthIntegrationTest 가 본다. 여기서는 컨텍스트에 컨트롤러가 뜨도록 자리만 채운다. */
     @MockitoBean
     private AuthService authService;
@@ -170,7 +181,7 @@ class ApiResponseContractTest {
         given(reviewService.answer(any(), any(), any())).willReturn(new ClassificationAnswer(1, "해외SaaS", 1));
 
         given(userService.get(any())).willReturn(new AppUser(
-            FixedUser.ID, "demo@example.com",
+            FixedUser.ID, "demo@example.com", UserRole.USER,
             OffsetDateTime.parse("2026-09-01T10:00:00+09:00")));
 
         BusinessContext context = new BusinessContext(UUID.fromString(ID),
@@ -240,6 +251,17 @@ class ApiResponseContractTest {
         given(transactionService.exclude(any(), any())).willReturn(new TransactionDetail(UUID.fromString(ID),
             UUID.fromString(ID), LocalDate.parse("2026-01-03"), "AWS APN1", "Amazon Web Services", "해외SaaS",
             ClassificationStatus.CLASSIFIED, 137_000L, 0, SourceStatus.JUDGEABLE, UserInclusion.EXCLUDED));
+
+        AppUser admin = new AppUser(UUID.fromString(ID), "admin@example.com", UserRole.ADMIN,
+            OffsetDateTime.parse("2026-09-01T10:00:00+09:00"));
+        given(adminPolicy.requireAdmin(any())).willReturn(admin);
+        RuleCandidate candidate = new RuleCandidate(1L, "사무용품", "940909", 3, 7,
+            List.of(new RuleCandidate.SuggestedDoc("소득세법시행령-55-1", "업무와 관련된 비용", "법령")),
+            "법령", "id: R-900", RuleCandidateStatus.PENDING, null, null,
+            OffsetDateTime.parse("2026-10-20T10:00:00+09:00"));
+        given(ruleCandidateReviewService.list(any(), anyInt(), anyInt()))
+            .willReturn(new PageImpl<>(List.of(candidate), PageRequest.of(0, 20), 1));
+        given(ruleCandidateReviewService.review(anyLong(), any(), any())).willReturn(candidate);
     }
 
     static Stream<Arguments> endpoints() {
@@ -295,7 +317,10 @@ class ApiResponseContractTest {
             Arguments.of("POST", "/api/v1/question-responses", """
                 {"questionIds": ["%s"], "answer": {"value": "사업"}}
                 """.formatted(ID), 200),
-            Arguments.of("GET", "/api/v1/statutes/1523", null, 200)
+            Arguments.of("GET", "/api/v1/statutes/1523", null, 200),
+            Arguments.of("GET", "/api/v1/admin/rule-candidates", null, 200),
+            Arguments.of("POST", "/api/v1/admin/rule-candidates/1/approve", null, 200),
+            Arguments.of("POST", "/api/v1/admin/rule-candidates/1/reject", null, 200)
         );
     }
 
@@ -316,7 +341,7 @@ class ApiResponseContractTest {
         mockMvc.perform(request).andExpect(status().is(expectedStatus));
     }
 
-    private static final Set<String> USER_KEYS = Set.of("id", "email", "createdAt");
+    private static final Set<String> USER_KEYS = Set.of("id", "email", "role", "createdAt");
     private static final Set<String> CONTEXT_KEYS = Set.of("id", "userId", "version", "industryCode",
         "prevYearRevenue", "businessOpenDate", "bookkeepingDuty", "hasEmployee", "homeOfficeRatio", "createdAt");
     private static final Set<String> UPLOAD_BATCH_KEYS = Set.of("id", "sourceType", "cardIssuer", "periodStart",
@@ -344,6 +369,10 @@ class ApiResponseContractTest {
     private static final Set<String> CLASSIFICATION_GROUP_TRANSACTION_KEYS =
         withTransactionSummary("reviewId", "transactionId");
     private static final Set<String> UNRESOLVED_KEYS = Set.of("count", "amount");
+    private static final Set<String> RULE_CANDIDATE_KEYS = Set.of("id", "merchantCategory", "industryCode",
+        "distinctUsers", "occurrenceCount", "suggestedDocs", "searchedTier", "draftYaml", "status", "reviewedBy",
+        "reviewedAt", "createdAt");
+    private static final Set<String> RULE_CANDIDATE_DOC_KEYS = Set.of("statuteId", "quote", "tier");
 
     private static Set<String> withTransactionSummary(String... keys) {
         return Stream.concat(Stream.of(keys), TRANSACTION_SUMMARY_KEYS.stream()).collect(Collectors.toSet());
@@ -374,7 +403,9 @@ class ApiResponseContractTest {
             Arguments.of("/api/v1/classification-reviews?grouped=true", "/items/0", CLASSIFICATION_REVIEW_GROUP_KEYS),
             Arguments.of("/api/v1/classification-reviews?grouped=true", "/items/0/transactions/0",
                 CLASSIFICATION_GROUP_TRANSACTION_KEYS),
-            Arguments.of("/api/v1/classification-reviews?grouped=true", "/unresolved", UNRESOLVED_KEYS)
+            Arguments.of("/api/v1/classification-reviews?grouped=true", "/unresolved", UNRESOLVED_KEYS),
+            Arguments.of("/api/v1/admin/rule-candidates", "/items/0", RULE_CANDIDATE_KEYS),
+            Arguments.of("/api/v1/admin/rule-candidates", "/items/0/suggestedDocs/0", RULE_CANDIDATE_DOC_KEYS)
         );
     }
 

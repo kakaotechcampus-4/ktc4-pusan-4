@@ -172,9 +172,19 @@ Question
 ├── question-responses/
 │   └── POST                            확인 질문 응답 및 부분 재판정
 │
-└── statutes/
-    └── {statuteVersionId}/
-        └── GET                         법령 원문 조회
+├── statutes/
+│   └── {statuteVersionId}/
+│       └── GET                         법령 원문 조회
+│
+└── admin/
+    └── rule-candidates/
+        ├── GET                         규칙 후보 목록 (관리자)
+        │
+        └── {candidateId}/
+            ├── approve/
+            │   └── POST                규칙 후보 승인 (관리자)
+            └── reject/
+                └── POST                규칙 후보 기각 (관리자)
 ```
 
 > v2에서는 JudgmentRun SSE API를 사용하지 않는다. Rule Engine은 LLM, 외부 API, 현재 시각, 난수에 의존하지 않는 로컬 결정론적 연산이므로 우선 `GET /judgment-runs/{runId}` polling으로 충분하다고 본다. 실제 성능 측정 후 장시간 실행이 확인되면 SSE를 다시 검토한다.
@@ -285,6 +295,7 @@ ID      "0199c8f2-1a2b-7c3d-8e4f-5a6b7c8d9e0f"
 | --- | --- | --- |
 | 400 | VALIDATION_ERROR | 필수 필드 누락·타입 불일치 등 문서화되지 않은 요청 검증 실패 |
 | 401 | UNAUTHORIZED | `Authorization` 헤더 누락, 토큰이 틀리거나 만료됨 |
+| 403 | FORBIDDEN | 관리자 API 를 관리자가 아닌 사용자가 부름 |
 | 404 | NOT_FOUND | 전용 `*_NOT_FOUND`가 없는 경로의 리소스 없음 |
 | 405 | METHOD_NOT_ALLOWED | 경로는 있으나 지원하지 않는 HTTP 메서드 |
 | 409 | CONFLICT | 전용 코드가 없는 상태 충돌 |
@@ -292,7 +303,7 @@ ID      "0199c8f2-1a2b-7c3d-8e4f-5a6b7c8d9e0f"
 | 422 | UNPROCESSABLE_ENTITY | 전용 코드가 없는 처리 불가 |
 | 500 | INTERNAL_ERROR | 그 외 서버 오류 |
 
-단건 리소스 조회의 404는 리소스별 전용 코드를 쓴다: `BATCH_NOT_FOUND`, `TRANSACTION_NOT_FOUND`, `CONTEXT_NOT_FOUND`, `JUDGMENT_NOT_FOUND`, `JUDGMENT_RUN_NOT_FOUND`, `JUDGMENT_OVERRIDE_NOT_FOUND`, `CLASSIFICATION_REVIEW_NOT_FOUND`, `QUESTION_NOT_FOUND`, `STATUTE_NOT_FOUND`.
+단건 리소스 조회의 404는 리소스별 전용 코드를 쓴다: `BATCH_NOT_FOUND`, `TRANSACTION_NOT_FOUND`, `CONTEXT_NOT_FOUND`, `JUDGMENT_NOT_FOUND`, `JUDGMENT_RUN_NOT_FOUND`, `JUDGMENT_OVERRIDE_NOT_FOUND`, `CLASSIFICATION_REVIEW_NOT_FOUND`, `QUESTION_NOT_FOUND`, `STATUTE_NOT_FOUND`, `RULE_CANDIDATE_NOT_FOUND`.
 
 ---
 
@@ -622,9 +633,12 @@ G6
 {
   "id": "0199c8f2-...",
   "email": "user@example.com",
+  "role": "USER",
   "createdAt": "2026-09-01T10:00:00+09:00"
 }
 ```
+
+`role` 은 `USER` 또는 `ADMIN` 이다. `ADMIN` 이면 관리자 API(3.15)를 쓸 수 있다.
 
 ### `DELETE /api/v1/users/me`
 
@@ -2582,6 +2596,56 @@ Question을 삭제하지 않고 상태를 남겨 판정 이력을 보존한다.
 - AI 서버에는 요청의 `Authorization` 헤더만 함께 넘긴다. AI 서버의 조회 도구는 이 토큰으로 공개 API 를 불러, 사용자 본인 권한 밖을 읽지 못한다.
 - 사용자마다 동시 1턴, 분당 10턴, 하루(한국 시각) 100턴이다. 넘으면 `429 ASSISTANT_RATE_LIMITED`와 `Retry-After`(초)를 준다. AI 서버 전체 한도(8턴)에 걸려도 같다.
 - AI 서버에 닿지 못하거나 응답이 40초를 넘으면 `503 ASSISTANT_UNAVAILABLE`.
+
+---
+
+# 3.15 관리자 — 규칙 후보
+
+규칙 후보는 여러 사용자에게서 판정할 규칙이 없던 업종·카테고리 조합과 그 규칙 카드 초안이다. AI 규칙 후보 파이프라인이 만든다.
+관리자만 부를 수 있고, 아니면 `403 FORBIDDEN` 이다. 관리자는 `app_user.role` 이 `ADMIN` 인 사용자다(`GET /users/me` 의 `role`). 가입하면 `USER` 이고, 관리자는 운영에서 DB 로 지정한다(docs/deployment.md "관리자 지정").
+
+`status` 는 `PENDING`(대기) · `IN_REVIEW`(검토중) · `APPROVED`(승인) · `REJECTED`(기각) · `ON_HOLD`(보류) 이다.
+
+### `GET /api/v1/admin/rule-candidates`
+
+Query: `status`(없으면 전체), `page`, `size`(1.4). 정렬은 `createdAt` DESC, `id` DESC.
+
+```
+{
+  "items": [
+    {
+      "id": 12,
+      "merchantCategory": "사무용품",
+      "industryCode": "940909",
+      "distinctUsers": 3,
+      "occurrenceCount": 7,
+      "suggestedDocs": [
+        { "statuteId": "소득세법시행령-55-1", "quote": "업무와 관련된 비용", "tier": "법령" }
+      ],
+      "searchedTier": "법령",
+      "draftYaml": "id: R-900 ...",
+      "status": { "code": "PENDING", "label": "대기" },
+      "reviewedBy": null,
+      "reviewedAt": null,
+      "createdAt": "2026-10-20T10:00:00+09:00"
+    }
+  ],
+  "page": { ... }
+}
+```
+
+`draftYaml` 은 초안을 만들지 못했으면 `null` 이다(이때 보통 `ON_HOLD`). `tier` 는 인용이 나온 위계이고 못 찾았으면 `null` 이다.
+
+### `POST /api/v1/admin/rule-candidates/{candidateId}/approve`
+### `POST /api/v1/admin/rule-candidates/{candidateId}/reject`
+
+본문 없음. `PENDING`·`IN_REVIEW`·`ON_HOLD` 후보를 `APPROVED`·`REJECTED` 로 바꾸고, `reviewedBy`(관리자 이메일. 이메일이 없는 계정이면 사용자 id)와 `reviewedAt` 을 남긴다.
+응답 `200` 은 바뀐 후보 하나(목록의 항목과 같은 모양)다. 승인해도 규칙 카드를 만들지는 않는다 — 카드 PR 은 사람이 올린다.
+
+```
+404 RULE_CANDIDATE_NOT_FOUND
+409 CONFLICT                   이미 승인·기각한 후보
+```
 
 ---
 

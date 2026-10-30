@@ -22,7 +22,7 @@ public class UserController {
         this.userService = userService;
     }
 
-    @Operation(summary = "내 정보 조회")
+    @Operation(summary = "내 정보 조회", description = "role 이 ADMIN 이면 관리자 API(규칙 후보)를 쓸 수 있다")
     @GetMapping
     public UserResponse me(CurrentUser currentUser) {
         return UserResponse.from(userService.get(currentUser.id()));

@@ -88,6 +88,12 @@ bash ./backend/gradlew -p backend bootRun --args='--spring.profiles.active=local
 
 지금은 고정 사용자(`FixedUser`, `MockFixtures.USER_ID`와 같은 id) 하나만 로그인합니다. `TemporaryUserSeeder`가 기동할 때 그 사용자 행을 만듭니다. 로컬 프로필의 비밀번호는 `demo1234`입니다(`application-local.yml`, 운영은 `docs/deployment.md` 9절).
 
+관리자 API(규칙 후보, `api.md` 3.15)는 `app_user.role`이 `ADMIN`인 사용자만 씁니다. 로컬에서 관리자 화면을 보려면 DB에서 직접 바꿉니다.
+
+```bash
+docker compose exec postgres psql -U ktc4 -d ktc4 -c "update app_user set role = 'ADMIN' where email = 'demo@example.com'"
+```
+
 | 구성요소 | 지금 | 바꿀 때 |
 | --- | --- | --- |
 | `AccessTokens` | JWT 발급·검증(15분) | 그대로 |
