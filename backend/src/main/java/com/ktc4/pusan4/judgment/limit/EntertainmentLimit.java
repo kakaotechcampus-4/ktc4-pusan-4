@@ -9,7 +9,8 @@ public final class EntertainmentLimit {
     /** 카드가 붙이는 limit_bucket 값. */
     public static final String BUCKET = "접대비";
 
-    // 조세특례제한법 §6① 중소기업이면 3,600만원이지만 문진으로 알 수 없어 일반 한도를 쓴다(덜 인정하는 쪽).
+    // 조세특례제한법 §6① 중소기업이면 3,600만원이지만, 면세 인적용역사업자(940909)는 조특법상 중소기업이 아니라
+    // 1,200만원이다(사전-2025-법규소득-0245).
     // 개인의 과세기간은 1.1~12.31 이라 개월 수는 12 다(소득세법 §5①).
     private static final long BASIC_LIMIT = 12_000_000L;
 
