@@ -34,4 +34,17 @@ interface LimitBucketEntryRepository extends Repository<LimitBucketEntryEntity, 
           and entry.bucketCode = :bucketCode
         """)
     List<Integer> findTaxYears(@Param("userId") UUID userId, @Param("bucketCode") String bucketCode);
+
+    /** 판정마다의 한도 인정액. 현재 결과 요약(api.md 3.7)이 이 버킷 판정의 finalAmount 대신 쓴다. */
+    @Query("""
+        select new com.ktc4.pusan4.judgment.persistence.LimitBucketEntryRepository$AllowedAmount(
+            entry.judgmentId, entry.allowedAmount)
+        from LimitBucketEntryEntity entry
+        where entry.userId = :userId
+          and entry.bucketCode = :bucketCode
+        """)
+    List<AllowedAmount> findAllowedAmounts(@Param("userId") UUID userId, @Param("bucketCode") String bucketCode);
+
+    record AllowedAmount(UUID judgmentId, long allowedAmount) {
+    }
 }

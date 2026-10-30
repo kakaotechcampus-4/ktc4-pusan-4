@@ -198,8 +198,10 @@ class JudgmentEntity extends AssignedIdEntity<UUID> {
             computedAt, citations);
     }
 
-    JudgmentSummary.Row toSummaryRow() {
-        return new JudgmentSummary.Row(Verdict.valueOf(verdict), account, finalAmount);
+    /** limitAllowedAmount 가 있으면(한도 항목이 있는 판정) finalAmount 대신 그 금액으로 더한다. */
+    JudgmentSummary.Row toSummaryRow(Long limitAllowedAmount) {
+        return new JudgmentSummary.Row(Verdict.valueOf(verdict), account,
+            limitAllowedAmount == null ? finalAmount : limitAllowedAmount);
     }
 
     private JudgmentOrigin origin() {

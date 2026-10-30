@@ -1,7 +1,9 @@
 package com.ktc4.pusan4.integration;
 
+import com.ktc4.pusan4.judgment.domain.JudgmentSummary;
 import com.ktc4.pusan4.judgment.domain.Verdict;
 import com.ktc4.pusan4.judgment.persistence.JudgmentOverrideService;
+import com.ktc4.pusan4.judgment.persistence.JudgmentQueryService;
 import com.ktc4.pusan4.judgment.persistence.LimitSettlementService;
 import com.ktc4.pusan4.transaction.persistence.TransactionService;
 import com.ktc4.pusan4.transaction.persistence.UploadBatchService;
@@ -41,6 +43,9 @@ class LimitSettlementIntegrationTest {
 
     @Autowired
     private LimitSettlementService settlementService;
+
+    @Autowired
+    private JudgmentQueryService queryService;
 
     @Autowired
     private JudgmentOverrideService overrideService;
@@ -186,6 +191,33 @@ class LimitSettlementIntegrationTest {
 
         // then
         assertThat(allowedByTagged()).containsExactly(tuple(5_000_000L, 5_000_000L));
+    }
+
+    @Test
+    void current_summary_counts_entertainment_by_the_limit_allowed_amount() {
+        // given: 1월 1,000만원 + 3월 500만원 접대비, 한도 1,209만원이라 3월은 209만원만 인정된다
+        accounted(judgment(transaction("2025-01-15", "AUTO"), "AVAILABLE", ENTERTAINMENT, 10_000_000L), "접대비");
+        accounted(judgment(transaction("2025-03-02", "AUTO"), "AVAILABLE", ENTERTAINMENT, 5_000_000L), "접대비");
+        accounted(judgment(transaction("2025-02-01", "AUTO"), "AVAILABLE", "{}", 1_000_000L), "소모품비");
+        settlementService.settleProvisional(userId);
+
+        // when
+        JudgmentSummary byBatch = queryService.summary(userId, batchId, null, null);
+        JudgmentSummary byYear = queryService.summary(userId, null, 2025, null);
+        JudgmentSummary byRun = queryService.summary(userId, null, null, runId);
+
+        // then: 현재 결과는 한도 초과분 291만원을 빼고, 과거 Run 은 그 Run 의 finalAmount 합 그대로다
+        for (JudgmentSummary current : List.of(byBatch, byYear)) {
+            assertThat(current.byVerdict().get(Verdict.AVAILABLE).finalAmount()).isEqualTo(13_090_000L);
+            assertThat(current.byAccount())
+                .extracting(JudgmentSummary.AccountTotal::account, JudgmentSummary.AccountTotal::finalAmount)
+                .containsExactly(tuple("접대비", 12_090_000L), tuple("소모품비", 1_000_000L));
+        }
+        assertThat(byRun.byVerdict().get(Verdict.AVAILABLE).finalAmount()).isEqualTo(16_000_000L);
+    }
+
+    private void accounted(UUID judgmentId, String account) {
+        jdbcTemplate.update("update judgment set account = ? where id = ?", account, judgmentId);
     }
 
     /** (tagged_amount, allowed_amount), 큰 금액 순. */
