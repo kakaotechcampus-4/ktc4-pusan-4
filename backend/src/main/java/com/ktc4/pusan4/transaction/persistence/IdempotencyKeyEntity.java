@@ -1,6 +1,7 @@
 package com.ktc4.pusan4.transaction.persistence;
 
 import com.ktc4.pusan4.transaction.domain.UploadResult;
+import com.ktc4.pusan4.judgment.persistence.AssignedIdEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -16,7 +17,7 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "idempotency_key")
-class IdempotencyKeyEntity {
+class IdempotencyKeyEntity extends AssignedIdEntity<UUID> {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
@@ -60,6 +61,11 @@ class IdempotencyKeyEntity {
         this.id = id;
         this.userId = userId;
         this.key = key;
+    }
+
+    @Override
+    public UUID getId() {
+        return id;
     }
 
     /** 최초 응답을 기록한다. 만료된 키를 새 요청으로 다시 쓸 때도 같은 행에 덮어쓴다(UNIQUE(user_id, key)). */

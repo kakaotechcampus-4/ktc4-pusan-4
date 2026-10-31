@@ -12,6 +12,12 @@ import java.util.UUID;
 
 public interface UploadBatchRepository extends Repository<UploadBatchEntity, UUID> {
 
+    UploadBatchEntity save(UploadBatchEntity batch);
+
+    /** 같은 사용자의 업로드와 batch 삭제를 한 줄로 세운다(UserWriteLock). 사용자가 없으면 빈 값이다. */
+    @Query(value = "select id from app_user where id = :userId for update", nativeQuery = true)
+    Optional<UUID> lockUserForWrite(@Param("userId") UUID userId);
+
     boolean existsByIdAndUserId(UUID id, UUID userId);
 
     Optional<UploadBatchEntity> findById(UUID id);
