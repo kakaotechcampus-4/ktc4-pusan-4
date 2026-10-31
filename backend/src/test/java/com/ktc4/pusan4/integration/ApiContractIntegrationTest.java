@@ -58,6 +58,7 @@ class ApiContractIntegrationTest {
         "GET /api/v1/judgment-runs/{runId}/failures",
         "GET /api/v1/judgments",
         "GET /api/v1/judgments/summary",
+        "GET /api/v1/judgments/export",
         "GET /api/v1/judgments/{judgmentId}",
         "POST /api/v1/judgments/{judgmentId}/override",
         "DELETE /api/v1/judgment-overrides/{overrideId}",
@@ -67,6 +68,8 @@ class ApiContractIntegrationTest {
         "POST /api/v1/assistant/chat",
         "POST /api/v1/questions/bulk-answer",
         "POST /api/v1/question-responses",
+        "GET /api/v1/handoff-notes",
+        "POST /api/v1/handoff-notes",
         "GET /api/v1/statutes/{statuteVersionId}"
     );
 

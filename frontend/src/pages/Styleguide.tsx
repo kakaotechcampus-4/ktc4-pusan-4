@@ -105,7 +105,7 @@ function Block({
 }
 
 export function Styleguide() {
-  const [industry, setIndustry] = useState('62010');
+  const [industry, setIndustry] = useState('940909');
   const [verdictFilter, setVerdictFilter] = useState('ALL');
   const [tablePage, setTablePage] = useState(0);
   const [pickedRow, setPickedRow] = useState<string | null>(null);
@@ -232,9 +232,9 @@ export function Styleguide() {
         <Block title="Field · Input · Select" note="라벨은 body-lg semibold, 힌트는 small muted, 오류는 small deny + role=alert.">
           <div className="grid max-w-xl gap-5">
             <Field label="1. 업종" htmlFor="sg-industry" hint="업종 프로파일과 경비율 조회의 기준이 됩니다.">
-              <Select id="sg-industry" defaultValue="62010">
-                <option value="62010">62010 · 컴퓨터 프로그래밍 서비스업</option>
-                <option value="62021">62021 · 시스템 통합 자문·구축 서비스업</option>
+              <Select id="sg-industry" defaultValue="940909">
+                <option value="940909">940909 · 기타자영업</option>
+                <option value="940926">940926 · 소프트웨어 프리랜서</option>
               </Select>
             </Field>
             <Field label="2. 직전연도 수입금액" htmlFor="sg-revenue">
@@ -255,7 +255,7 @@ export function Styleguide() {
               value={industry}
               onChange={setIndustry}
               options={[
-              { value: '62010', label: 'IT 개발 · 프리랜서', hint: '62010 컴퓨터 프로그래밍' },
+              { value: '940909', label: '프리랜서 · 인적용역', hint: '940909 기타자영업 (컴퓨터 프로그래머 등)' },
               { value: '73203', label: '디자이너', disabled: true },
               { value: '85699', label: '온라인 강사', disabled: true },
               { value: 'ETC', label: '그 외', disabled: true, disabledLabel: '문의' }]

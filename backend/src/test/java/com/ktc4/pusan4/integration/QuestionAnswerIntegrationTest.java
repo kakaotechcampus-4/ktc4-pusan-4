@@ -319,7 +319,7 @@ class QuestionAnswerIntegrationTest {
             "select final_amount from judgment where transaction_id = ?", Long.class, utility)).isZero();
 
         // when
-        answer(List.of(pendingQuestion(utility, "공간전용여부")), "자택 겸용").andExpect(status().isOk());
+        answer(List.of(pendingQuestion(utility, "공간전용여부")), "자택 겸용(작업 공간이 따로 나뉨)").andExpect(status().isOk());
 
         // then: 가능이 되고 금액은 8만원 × 20%
         assertThat(jdbcTemplate.queryForMap(
@@ -498,6 +498,46 @@ class QuestionAnswerIntegrationTest {
         assertThat(jdbcTemplate.queryForObject(
             "select count(*) from user_fact where batch_id = ?", Integer.class, batchId)).isZero();
         assertThat(pendingQuestion(cafe, "용도")).isNotNull();
+    }
+
+    @Test
+    void export_lists_current_judgments_with_answers_and_the_limit_allowed_amount() throws Exception {
+        // given: 통신(전용) 가능, 카페 업무미팅 접대비(한도 인정액을 결제금액보다 작게 둔다), 답하지 않은 카페
+        UUID telecom = insertTransaction("통신", "KT");
+        UUID meeting = insertTransaction("카페", "스타벅스");
+        UUID unanswered = insertTransaction("카페", "이디야");
+        List.of(telecom, meeting, unanswered).forEach(this::judge);
+        answer(List.of(pendingQuestion(telecom, "전용여부")), "전용").andExpect(status().isOk());
+        answer(List.of(pendingQuestion(meeting, "용도")), "업무미팅").andExpect(status().isOk());
+        jdbcTemplate.update("""
+            update limit_bucket_entry set allowed_amount = 3000
+            where judgment_id = (select id from judgment where transaction_id = ? order by revision desc limit 1)
+            """, meeting);
+
+        // when / then: 거래마다 현재 판정 하나, 답한 질문과 답, 한도 반영 인정액
+        mockMvc.perform(get("/api/v1/judgments/export").param("batchId", batchId.toString()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items.length()").value(3))
+            .andExpect(jsonPath("$.items[?(@.judgment.transactionId == '%s')].allowedAmount", meeting).value(3000))
+            .andExpect(jsonPath("$.items[?(@.judgment.transactionId == '%s')].judgment.finalAmount", meeting)
+                .value(6500))
+            .andExpect(jsonPath("$.items[?(@.judgment.transactionId == '%s')].answers[0].answer", meeting)
+                .value("업무미팅"))
+            .andExpect(jsonPath("$.items[?(@.judgment.transactionId == '%s')].answers[0].question", meeting)
+                .isNotEmpty())
+            .andExpect(jsonPath("$.items[?(@.judgment.transactionId == '%s')].allowedAmount", telecom).value(6500))
+            .andExpect(jsonPath("$.items[?(@.judgment.transactionId == '%s')].answers[0].answer", telecom)
+                .value("전용"))
+            .andExpect(jsonPath("$.items[?(@.judgment.transactionId == '%s' && @.answers size 0)]", unanswered)
+                .exists());
+    }
+
+    @Test
+    void export_needs_exactly_one_of_batch_id_and_year() throws Exception {
+        mockMvc.perform(get("/api/v1/judgments/export"))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_EXPORT_SCOPE"));
+        mockMvc.perform(get("/api/v1/judgments/export").param("batchId", batchId.toString()).param("year", "2025"))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_EXPORT_SCOPE"));
     }
 
     private static void await(CountDownLatch latch) {
