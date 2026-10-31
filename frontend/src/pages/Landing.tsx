@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRightIcon } from 'lucide-react';
+import { useSession } from '../contexts/SessionContext';
 import { MarketingHeader } from '../components/MarketingHeader';
 import { MarketingFooter } from '../components/MarketingFooter';
 import { OrbitStage } from '../components/OrbitStage';
@@ -95,7 +96,12 @@ const BOARDS = [
 
 
 export function Landing() {
+  const { status } = useSession();
   const [ok, ask] = HERO_SUMMARY.distribution;
+
+  /* 로그인 뒤에는 메인으로 오므로, CTA 가 로그인 폼으로 되돌아가면 막힌다 */
+  const signedIn = status === 'signedIn';
+  const startTo = signedIn ? '/upload' : '/login';
 
   return (
     <div className="min-h-full bg-canvas">
@@ -125,10 +131,10 @@ export function Landing() {
               {/* 왼쪽 아래 모서리를 바탕색으로 베어 내고 그 자리에 링크를 둔다 */}
               <div className="absolute bottom-0 left-0 flex h-[72px] items-center rounded-tr-[20px] bg-canvas pr-7 pt-2">
                 <Link
-                  to="/login"
+                  to={startTo}
                   className="flex items-center gap-3 text-ir-lead font-normal tracking-ir-xs text-ink">
 
-                  무료로 판정해보기
+                  {signedIn ? '카드내역 올리기' : '무료로 판정해보기'}
                   <ArrowDot />
                 </Link>
               </div>
@@ -227,7 +233,7 @@ export function Landing() {
 
           <div className="mt-10 flex justify-center">
             <Link
-              to="/login"
+              to={startTo}
               className="inline-flex h-[79px] items-center gap-4 rounded-full bg-surface px-10 text-ir-lead font-normal tracking-ir-xs text-ink transition-colors hover:bg-accent-line">
 
               판정 흐름 전체보기
