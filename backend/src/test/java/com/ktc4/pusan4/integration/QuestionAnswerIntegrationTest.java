@@ -319,7 +319,7 @@ class QuestionAnswerIntegrationTest {
             "select final_amount from judgment where transaction_id = ?", Long.class, utility)).isZero();
 
         // when
-        answer(List.of(pendingQuestion(utility, "공간전용여부")), "자택 겸용").andExpect(status().isOk());
+        answer(List.of(pendingQuestion(utility, "공간전용여부")), "자택 겸용(작업 공간이 따로 나뉨)").andExpect(status().isOk());
 
         // then: 가능이 되고 금액은 8만원 × 20%
         assertThat(jdbcTemplate.queryForMap(

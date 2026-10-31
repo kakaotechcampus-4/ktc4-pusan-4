@@ -2537,7 +2537,7 @@ Question을 삭제하지 않고 상태를 남겨 판정 이력을 보존한다.
     { "groupKey": "merchant:한국전력", "factType": "공간전용여부", "code": "UTILITY_DEDICATION",
       "tier": "A", "conflict": true,
       "history": [
-        { "value": "자택 겸용", "sourceLabel": "8월 업로드(국민)", "bulk": false },
+        { "value": "자택 겸용(작업 공간이 따로 나뉨)", "sourceLabel": "8월 업로드(국민)", "bulk": false },
         { "value": "사업 전용", "sourceLabel": "7월 업로드(국민)", "bulk": false }
       ] },
     { "groupKey": "transaction:0199f1...", "factType": "용도", "code": "CAFE_PURPOSE",
