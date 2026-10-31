@@ -62,7 +62,7 @@ export function Confirm() {
 
   const contextRows = context ?
   [
-  { term: '업종', value: `${context.industryCode} · 컴퓨터 프로그래밍` },
+  { term: '업종', value: `${context.industryCode} · 기타자영업 (컴퓨터 프로그래머 등)` },
   {
     term: '직전연도 수입금액',
     value: `${formatNumber(context.prevYearRevenue)}원`
