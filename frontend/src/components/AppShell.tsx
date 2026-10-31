@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { CheckIcon, UserIcon } from 'lucide-react';
 import { DisclaimerBar } from './DisclaimerBar';
+import { Button } from './ui';
 import { BugReportButton } from './BugReport';
 
 import { useSession } from '../contexts/SessionContext';
@@ -90,8 +91,8 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
             <span className="text-h4 font-bold tracking-tight text-ink">
               PreeT
             </span>
-            <span aria-hidden="true" className="h-3.5 w-px bg-accent-line" />
-            <span className="text-body text-ink2">판정</span>
+            <span aria-hidden="true" className="hidden h-3.5 w-px bg-accent-line sm:block" />
+            <span className="hidden text-body text-ink2 sm:block">판정</span>
           </Link>
 
           {showSteps && currentIndex >= 0 &&
@@ -166,13 +167,13 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
 
               {accountLabel(email)}
             </Link>
-            {/* 이메일을 줄인 폭에서도 내 정보로 갈 수 있게 한다 */}
+            {/* 이메일을 줄인 폭에서도 내 정보로 갈 수 있게 한다. 640px 보다 좁아도 숨기지 않는다 */}
             <Link
               to="/account"
               aria-current={pathname.startsWith('/account') ? 'page' : undefined}
               aria-label={`내 정보 (${accountLabel(email)})`}
               title={accountLabel(email)}
-              className={`hidden shrink-0 rounded-full p-2 transition-colors duration-150 ease-snap sm:inline-flex lg:hidden ${
+              className={`inline-flex shrink-0 rounded-full p-2 transition-colors duration-150 ease-snap lg:hidden ${
               pathname.startsWith('/account') ?
               'bg-accent text-white' :
               'hover:bg-surface hover:text-ink'}`
@@ -180,16 +181,18 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
 
               <UserIcon className="h-4 w-4" aria-hidden="true" />
             </Link>
-            <button
-              type="button"
+            {/* 랜딩 머리말의 로그인 버튼과 같은 자리(맨 오른쪽)·같은 모양이다 */}
+            <Button
+              variant="secondary"
+              size="sm"
+              className="shrink-0"
               onClick={() => {
                 signOut();
                 navigate('/');
-              }}
-              className="shrink-0 rounded-full border border-accent-line px-3 py-1.5 text-caption font-bold text-ink transition-colors duration-150 ease-snap hover:border-ink">
+              }}>
               
               로그아웃
-            </button>
+            </Button>
           </div>
         </div>
       </header>

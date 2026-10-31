@@ -4,7 +4,8 @@ import { CheckIcon, PlayIcon, ShieldCheckIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { useSession } from '../contexts/SessionContext';
 import { api, ApiRequestError, useApi } from '../api';
-import { formatFullDate, formatNumber, formatPeriod } from '../utils/format';
+import { formatNumber, formatPeriod } from '../utils/format';
+import { contextRows } from '../utils/context';
 
 export function Confirm() {
   const navigate = useNavigate();
@@ -59,26 +60,7 @@ export function Confirm() {
   [];
 
 
-  const contextRows = context ?
-  [
-  { term: '업종', value: `${context.industryCode} · 기타자영업 (컴퓨터 프로그래머 등)` },
-  {
-    term: '직전연도 수입금액',
-    value: `${formatNumber(context.prevYearRevenue)}원`
-  },
-  { term: '개업일', value: formatFullDate(context.businessOpenDate) },
-  { term: '기장의무', value: context.bookkeepingDuty },
-  { term: '직원', value: context.hasEmployee ? '있음' : '없음 (1인)' },
-  {
-    term: '자택 작업 비율',
-    value:
-    context.homeOfficeRatio === null ?
-    '입력 안 함' :
-    context.homeOfficeRatio > 0 ?
-    `${context.homeOfficeRatio}%` :
-    '해당 없음'
-  }] :
-  [];
+  const contextList = context ? contextRows(context) : [];
 
 
   return (
@@ -131,12 +113,12 @@ export function Confirm() {
             사업자 문진{contextRef && ` · 버전 ${contextRef.version}`}
           </h2>
           <dl className="divide-y divide-line2">
-            {contextRows.length === 0 &&
+            {contextList.length === 0 &&
             <div className="px-5 py-3">
                 <p className="text-small text-muted">아직 문진을 마치지 않았습니다.</p>
               </div>
             }
-            {contextRows.map((row) =>
+            {contextList.map((row) =>
             <div key={row.term} className="flex gap-4 px-5 py-3">
                 <dt className="w-36 shrink-0 text-small text-muted">
                   {row.term}
