@@ -23,6 +23,15 @@ class Settings(BaseSettings):
     assistant_base_url: str | None = None
     assistant_api_key: str | None = None
     assistant_reasoning_effort: str | None = None
+    # 가맹점 업종 분류(/v1/decisions). AGENT_*·ASSISTANT_* 와 따로 둔다. 키나 주소가 없으면 503 으로 답한다.
+    # 주소는 게이트웨이 base URL 이다. 끝의 /v1 은 있어도 없어도 된다.
+    classify_api_key: str | None = None
+    classify_base_url: str | None = None
+    classify_model: str = "openai/gpt-6-luna"
+    # 동시 호출 수, 호출 하나의 타임아웃(초), 요청 전체 마감(초). 마감까지 못 받은 가맹점은 null 로 준다.
+    classify_concurrency: int = 8
+    classify_call_timeout: float = 4.0
+    classify_deadline: float = 8.0
     # 비서 도구가 사용자 토큰으로 부르는 백엔드 공개 API.
     backend_base_url: str = "http://localhost:8080/api/v1"
     embedding_api_key: str | None = None

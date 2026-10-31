@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from app.config import settings
 from assistant import agent
+from classify import decisions
 
 app = FastAPI(title="ktc4-pusan4-ai")
 # 도구가 백엔드 경로에 넣는 값이다. 경로를 벗어나는 문자를 막는다.
@@ -64,3 +65,23 @@ def assistant_chat(req: ChatRequest, authorization: str | None = Header(None)):
     finally:
         assistant_slots.release()
     return {k: out[k] for k in ("answer", "proposals", "traceId")}
+
+
+class MerchantItem(BaseModel):
+    merchantNorm: str = Field(max_length=200)
+    merchantRaw: str = Field(max_length=200)
+
+
+class ClassifyRequest(BaseModel):
+    items: list[MerchantItem] = Field(min_length=1, max_length=200)
+
+
+@app.post("/classify/merchants")
+def classify_merchants(req: ClassifyRequest):
+    """내부 전용. 백엔드가 업로드 트랜잭션 전에 규칙으로 못 정한 가맹점을 보낸다.
+
+    숫자만 돌려주고 확정은 백엔드가 임계값으로 정한다. results 는 요청 순서이고, 실패하거나 마감을 넘긴 항목은 null 이다.
+    """
+    if not settings.classify_api_key or not settings.classify_base_url:
+        raise HTTPException(status_code=503, detail="CLASSIFY_UNAVAILABLE")
+    return {"model": settings.classify_model, "results": decisions.classify_all([i.model_dump() for i in req.items])}
