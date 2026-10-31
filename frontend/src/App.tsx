@@ -6,6 +6,7 @@ import { Assistant } from './components/assistant/Assistant';
 import { AssistantProvider } from './components/assistant/AssistantProvider';
 import { Landing } from './pages/Landing';
 import { Faq } from './pages/Faq';
+import { BugReport } from './pages/BugReport';
 import { Login } from './pages/Login';
 import { Upload } from './pages/Upload';
 import { Interview } from './pages/Interview';
@@ -67,6 +68,7 @@ export function App() {
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/faq" element={<Faq />} />
+            <Route path="/bug-report" element={<BugReport />} />
             <Route path="/styleguide" element={<Styleguide />} />
             <Route element={<SignedIn />}>
               {PROTECTED.map((route) =>
