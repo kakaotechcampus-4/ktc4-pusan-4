@@ -3,7 +3,9 @@ package com.ktc4.pusan4.judgment.persistence;
 import com.ktc4.pusan4.judgment.domain.JudgmentRevision;
 import com.ktc4.pusan4.judgment.domain.JudgmentRevision.CitedStatute;
 import com.ktc4.pusan4.judgment.domain.JudgmentSummary;
+import com.ktc4.pusan4.judgment.limit.EntertainmentLimit;
 import com.ktc4.pusan4.judgment.persistence.JudgmentCitationRepository.CitationRow;
+import com.ktc4.pusan4.judgment.persistence.LimitBucketEntryRepository.AllowedAmount;
 import com.ktc4.pusan4.shared.api.ApiException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -29,15 +31,18 @@ public class JudgmentQueryService {
     private final JudgmentRepository judgmentRepository;
     private final TransactionRecordRepository transactionRepository;
     private final JudgmentCitationRepository citationRepository;
+    private final LimitBucketEntryRepository entryRepository;
 
     public JudgmentQueryService(
         JudgmentRepository judgmentRepository,
         TransactionRecordRepository transactionRepository,
-        JudgmentCitationRepository citationRepository
+        JudgmentCitationRepository citationRepository,
+        LimitBucketEntryRepository entryRepository
     ) {
         this.judgmentRepository = judgmentRepository;
         this.transactionRepository = transactionRepository;
         this.citationRepository = citationRepository;
+        this.entryRepository = entryRepository;
     }
 
     @Transactional(readOnly = true)
@@ -56,12 +61,17 @@ public class JudgmentQueryService {
     /**
      * batchId·year·runId 중 하나로 집계한다. 대상은 같은 조건의 목록과 같다
      * (batchId·year 는 현재 판정, runId 는 그 Run 이 만든 판정).
+     * 현재 결과의 접대비 판정은 finalAmount 대신 한도 인정액으로 더한다(소득세법 §35③ 초과분 불산입).
+     * 과거 Run 은 finalAmount 그대로다. 한도 항목은 지금 상태만 남아 그 Run 시점의 인정액이 아니다.
      */
     @Transactional(readOnly = true)
     public JudgmentSummary summary(UUID userId, UUID batchId, Integer year, UUID runId) {
         JudgmentListQuery query = new JudgmentListQuery(null, batchId, year, null, true, runId);
+        Map<UUID, Long> limitAllowed = runId != null ? Map.of() : entryRepository
+            .findAllowedAmounts(userId, EntertainmentLimit.BUCKET).stream()
+            .collect(Collectors.toMap(AllowedAmount::judgmentId, AllowedAmount::allowedAmount));
         return JudgmentSummary.of(find(userId, query, Pageable.unpaged()).stream()
-            .map(JudgmentEntity::toSummaryRow)
+            .map(judgment -> judgment.toSummaryRow(limitAllowed.get(judgment.id())))
             .toList());
     }
 

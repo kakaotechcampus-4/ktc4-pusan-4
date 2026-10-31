@@ -54,7 +54,7 @@ class UploadServiceIntegrationTest {
             tx("k-3", "성진이네 본점"));
 
         // when
-        UploadResult result = uploadService.upload(userId, input);
+        UploadResult result = uploadService.upload(userId, key(), input);
 
         // then
         assertThat(result.transactionCount()).isEqualTo(3);
@@ -91,7 +91,7 @@ class UploadServiceIntegrationTest {
     void unclassified_canceled_offset_and_excluded_transactions_get_no_classification_review() {
         // given: 셋 다 미분류. 판정에 들어가는 JUDGEABLE 만 분류 검토를 받는다
         UUID userId = newUser();
-        UploadResult result = uploadService.upload(userId, batch("hash-skip",
+        UploadResult result = uploadService.upload(userId, key(), batch("hash-skip",
             tx("k-judgeable", "성진이네 본점"),
             tx("k-canceled", "성진이네 본점", SourceStatus.CANCELED_OFFSET),
             tx("k-excluded", "성진이네 본점", SourceStatus.EXCLUDED)));
@@ -114,7 +114,7 @@ class UploadServiceIntegrationTest {
         NewTransaction full = new NewTransaction(LocalDate.parse("2026-01-03"), "스타벅스코리아 서면점", 11_000L, "k-full",
             SourceStatus.CANCELED_OFFSET, 3, "78968731", "1234567890", "서면점", "", "메모", true, true, "부분취소", "kb");
 
-        UploadResult result = uploadService.upload(newUser(), batch("hash-full", full, tx("k-min", "성진이네 본점")));
+        UploadResult result = uploadService.upload(newUser(), key(), batch("hash-full", full, tx("k-min", "성진이네 본점")));
 
         Map<String, Object> stored = jdbcTemplate.queryForMap(
             "select * from transaction where batch_id = ? and natural_key = 'k-full'", result.id());
@@ -137,10 +137,10 @@ class UploadServiceIntegrationTest {
     void skips_natural_keys_already_uploaded_and_repeated_in_same_request() {
         // given: 첫 파일에 k-1, k-2
         UUID userId = newUser();
-        uploadService.upload(userId, batch("hash-a", tx("k-1", "스타벅스코리아 서면점"), tx("k-2", "성진이네 본점")));
+        uploadService.upload(userId, key(), batch("hash-a", tx("k-1", "스타벅스코리아 서면점"), tx("k-2", "성진이네 본점")));
 
         // when: 다른 파일에 k-2(기존 중복), k-3, k-3(같은 요청 안의 반복)
-        UploadResult second = uploadService.upload(userId,
+        UploadResult second = uploadService.upload(userId, key(),
             batch("hash-b", tx("k-2", "성진이네 본점"), tx("k-3", "스타벅스코리아 서면점"), tx("k-3", "스타벅스코리아 서면점")));
 
         // then: 저장 1, 건너뜀 2. 건너뛴 거래는 분류 검토도 만들지 않는다
@@ -153,9 +153,9 @@ class UploadServiceIntegrationTest {
 
     @Test
     void same_natural_key_from_another_user_is_not_a_duplicate() {
-        uploadService.upload(newUser(), batch("hash-x", tx("shared-key", "스타벅스코리아 서면점")));
+        uploadService.upload(newUser(), key(), batch("hash-x", tx("shared-key", "스타벅스코리아 서면점")));
 
-        UploadResult other = uploadService.upload(newUser(), batch("hash-x", tx("shared-key", "스타벅스코리아 서면점")));
+        UploadResult other = uploadService.upload(newUser(), key(), batch("hash-x", tx("shared-key", "스타벅스코리아 서면점")));
 
         assertThat(other.transactionCount()).isEqualTo(1);
         assertThat(other.skippedDuplicateCount()).isZero();
@@ -165,9 +165,9 @@ class UploadServiceIntegrationTest {
     void all_duplicates_still_creates_an_empty_batch() {
         // 계약상 naturalKey 중복은 batch 실패 사유가 아니다. 거래 0건 batch 가 남는다
         UUID userId = newUser();
-        uploadService.upload(userId, batch("hash-1", tx("k-1", "스타벅스코리아 서면점")));
+        uploadService.upload(userId, key(), batch("hash-1", tx("k-1", "스타벅스코리아 서면점")));
 
-        UploadResult again = uploadService.upload(userId, batch("hash-2", tx("k-1", "스타벅스코리아 서면점")));
+        UploadResult again = uploadService.upload(userId, key(), batch("hash-2", tx("k-1", "스타벅스코리아 서면점")));
 
         assertThat(again.transactionCount()).isZero();
         assertThat(again.skippedDuplicateCount()).isEqualTo(1);
@@ -178,9 +178,9 @@ class UploadServiceIntegrationTest {
     @Test
     void same_file_hash_is_duplicate_file_and_saves_nothing() {
         UUID userId = newUser();
-        uploadService.upload(userId, batch("hash-dup", tx("k-1", "스타벅스코리아 서면점")));
+        uploadService.upload(userId, key(), batch("hash-dup", tx("k-1", "스타벅스코리아 서면점")));
 
-        assertThatThrownBy(() -> uploadService.upload(userId, batch("hash-dup", tx("k-9", "스타벅스코리아 서면점"))))
+        assertThatThrownBy(() -> uploadService.upload(userId, key(), batch("hash-dup", tx("k-9", "스타벅스코리아 서면점"))))
             .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("DUPLICATE_FILE"));
         assertThat(jdbcTemplate.queryForObject(
             "select count(*) from transaction where user_id = ? and natural_key = 'k-9'", Integer.class, userId)).isZero();
@@ -188,7 +188,7 @@ class UploadServiceIntegrationTest {
 
     @Test
     void unknown_user_is_unauthorized() {
-        assertThatThrownBy(() -> uploadService.upload(UUID.randomUUID(), batch("h", tx("k", "스타벅스코리아 서면점"))))
+        assertThatThrownBy(() -> uploadService.upload(UUID.randomUUID(), key(), batch("h", tx("k", "스타벅스코리아 서면점"))))
             .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("UNAUTHORIZED"));
     }
 
@@ -216,10 +216,14 @@ class UploadServiceIntegrationTest {
     private Object uploadAfter(CountDownLatch start, UUID userId) throws InterruptedException {
         start.await();
         try {
-            return uploadService.upload(userId, batch("hash-race", tx("race-1", "스타벅스코리아 서면점")));
+            return uploadService.upload(userId, key(), batch("hash-race", tx("race-1", "스타벅스코리아 서면점")));
         } catch (ApiException e) {
             return e;
         }
+    }
+
+    private static String key() {
+        return UUID.randomUUID().toString();
     }
 
     private UUID newUser() {

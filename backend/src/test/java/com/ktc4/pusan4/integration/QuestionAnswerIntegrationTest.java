@@ -1,9 +1,12 @@
 package com.ktc4.pusan4.integration;
 
+import com.ktc4.pusan4.judgment.domain.AnswerSource;
 import com.ktc4.pusan4.judgment.domain.JudgmentOrigin;
 import com.ktc4.pusan4.judgment.domain.JudgmentOriginType;
+import com.ktc4.pusan4.judgment.persistence.BulkAnswerResult;
 import com.ktc4.pusan4.judgment.persistence.JudgmentExecutor;
-import com.ktc4.pusan4.shared.auth.TemporaryCurrentUserProvider;
+import com.ktc4.pusan4.judgment.persistence.QuestionAnswerService;
+import com.ktc4.pusan4.shared.auth.FixedUser;
 import com.ktc4.pusan4.user.domain.BusinessContext;
 import com.ktc4.pusan4.user.persistence.BusinessContextService;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,21 +19,30 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * 확인 질문 응답과 부분 재판정 (api.md 3.10). 실제 규칙 카드(../rules)로 판정한다.
+ * 확인 질문 응답과 부분 재판정 (api.md 3.10), 일괄 응답 (api.md 3.11). 실제 규칙 카드(../rules)로 판정한다.
  * 통신(R-205)은 가맹점 단위(merchant_norm)로 「전용여부」를, 카페(R-300)는 거래 단위로 「용도」를 묻는다.
+ * 주말 음식점(R-311)은 불가로 추정하고 「용도」로 소명을 받는다(소명 대기).
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -41,7 +53,7 @@ class QuestionAnswerIntegrationTest {
     @ServiceConnection
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17-alpine");
 
-    private static final UUID USER_ID = TemporaryCurrentUserProvider.TEMPORARY_USER_ID;
+    private static final UUID USER_ID = FixedUser.ID;
 
     @Autowired
     private MockMvc mockMvc;
@@ -55,6 +67,12 @@ class QuestionAnswerIntegrationTest {
     @Autowired
     private BusinessContextService contextService;
 
+    @Autowired
+    private QuestionAnswerService answerService;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+
     private UUID batchId;
     private BusinessContext context;
     private UUID runId;
@@ -62,7 +80,7 @@ class QuestionAnswerIntegrationTest {
     @BeforeEach
     void setUp() {
         for (String statuteId : List.of("소득세법-33-1-5", "소득세법시행령-61-1-1", "소득세법-27-1", "소득세법-35-1",
-            "소득세법-160의2-2", "소득세법시행령-208의2-1-1", "소득세법-81의6-1")) {
+            "소득세법-160의2-2", "소득세법시행령-208의2-1-1", "소득세법-81의6-1", "소득세법시행령-61-1")) {
             jdbcTemplate.update("""
                 insert into statute_version(
                     statute_id, doc_type, hierarchy, effective_from, body, body_hash,
@@ -134,6 +152,48 @@ class QuestionAnswerIntegrationTest {
             join judgment on judgment.id = question.judgment_id
             where judgment.transaction_id = ? and question.status = 'PENDING'
             """, Integer.class, household)).isZero();
+    }
+
+    @Test
+    void answer_keeps_its_source_and_exposes_the_question_code() throws Exception {
+        // given
+        UUID cafe = insertTransaction("카페", "스타벅스");
+        UUID telecom = insertTransaction("통신", "KT");
+        judge(cafe);
+        judge(telecom);
+        UUID cafeQuestion = pendingQuestion(cafe, "용도");
+        mockMvc.perform(get("/api/v1/questions").param("transactionId", cafe.toString()))
+            .andExpect(jsonPath("$.items[0].code").value("CAFE_PURPOSE"));
+
+        // when: 출처를 적은 답과 적지 않은 답
+        mockMvc.perform(post("/api/v1/question-responses")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"questionIds": ["%s"], "answer": {"value": "업무미팅"}, "source": "PREVIOUS_ANSWER"}
+                    """.formatted(cafeQuestion)))
+            .andExpect(status().isOk());
+        answer(List.of(pendingQuestion(telecom, "전용여부")), "전용").andExpect(status().isOk());
+
+        // then
+        assertThat(jdbcTemplate.queryForList(
+            "select source from user_fact where batch_id = ? order by scope_key", String.class, batchId))
+            .containsExactly("USER", "PREVIOUS_ANSWER");
+    }
+
+    @Test
+    void clients_cannot_claim_a_bulk_answer_source() throws Exception {
+        UUID cafe = insertTransaction("카페", "스타벅스");
+        judge(cafe);
+
+        mockMvc.perform(post("/api/v1/question-responses")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"questionIds": ["%s"], "answer": {"value": "업무미팅"}, "source": "BULK"}
+                    """.formatted(pendingQuestion(cafe, "용도"))))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+        assertThat(jdbcTemplate.queryForObject(
+            "select count(*) from user_fact where batch_id = ?", Integer.class, batchId)).isZero();
     }
 
     @Test
@@ -228,6 +288,226 @@ class QuestionAnswerIntegrationTest {
             .isOne();
     }
 
+    @Test
+    void answer_that_makes_an_entertainment_expense_settles_the_limit() throws Exception {
+        // given
+        UUID cafe = insertTransaction("카페", "스타벅스");
+        judge(cafe);
+
+        // when: 업무미팅 → 가능(접대비)
+        answer(List.of(pendingQuestion(cafe, "용도")), "업무미팅").andExpect(status().isOk());
+
+        // then: 재판정한 revision 이 한도 항목에 들어간다
+        assertThat(jdbcTemplate.queryForMap("""
+            select entry.judgment_id, entry.allowed_amount
+            from limit_bucket_entry entry
+            join judgment on judgment.id = entry.judgment_id
+            where judgment.transaction_id = ?
+            """, cafe))
+            .containsEntry("judgment_id", jdbcTemplate.queryForObject(
+                "select id from judgment where transaction_id = ? order by revision desc limit 1", UUID.class, cafe))
+            .containsEntry("allowed_amount", 6_500L);
+    }
+
+    @Test
+    void home_office_answer_saves_the_amount_apportioned_by_the_context_ratio() throws Exception {
+        // given: 문진 작업공간 비율 20%, 전기요금 8만원(R-103 공간전용여부)
+        jdbcTemplate.update("update user_context set home_office_ratio = 20 where id = ?", context.id());
+        UUID utility = insertTransaction("수도광열", "한국전력공사", 80_000L);
+        judge(utility);
+        assertThat(jdbcTemplate.queryForObject(
+            "select final_amount from judgment where transaction_id = ?", Long.class, utility)).isZero();
+
+        // when
+        answer(List.of(pendingQuestion(utility, "공간전용여부")), "자택 겸용").andExpect(status().isOk());
+
+        // then: 가능이 되고 금액은 8만원 × 20%
+        assertThat(jdbcTemplate.queryForMap(
+            "select verdict, final_amount from judgment where transaction_id = ? order by revision desc limit 1",
+            utility)).containsEntry("verdict", "AVAILABLE").containsEntry("final_amount", 16_000L);
+    }
+
+    @Test
+    void bulk_answer_closes_pending_questions_of_the_fact_type_except_awaiting_explanation() throws Exception {
+        // given: 카페 둘(용도), 주말 음식점(용도, 소명 대기), 통신(전용여부)
+        UUID firstCafe = insertTransaction("카페", "스타벅스");
+        UUID secondCafe = insertTransaction("카페", "이디야");
+        UUID weekend = insertTransaction("음식점", "김밥천국", 6_500L, "2025-10-11");
+        UUID telecom = insertTransaction("통신", "KT");
+        List.of(firstCafe, secondCafe, weekend, telecom).forEach(this::judge);
+
+        // when: 「혼자작업」은 카페만 받는 값이다. 소명 대기 질문은 허용 검사에도 넣지 않는다
+        bulkAnswer(batchId, "용도", "혼자작업")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.answeredCount").value(2))
+            .andExpect(jsonPath("$.skippedCount").value(1))
+            .andExpect(jsonPath("$.excludedCount").value(1))
+            .andExpect(jsonPath("$.factIds.length()").value(2))
+            .andExpect(jsonPath("$.rejudgedTransactionCount").value(2))
+            .andExpect(jsonPath("$.unresolved.count").value(2))
+            .andExpect(jsonPath("$.unresolved.amount").value(13_000));
+
+        // then: 거래 단위 질문이라 그룹마다 UserFact 가 하나씩 생기고, 카페만 그 답으로 한 번씩 재판정된다
+        assertThat(jdbcTemplate.queryForObject(
+            "select count(*) from user_fact where batch_id = ? and fact_type = '용도'", Integer.class, batchId))
+            .isEqualTo(2);
+        assertThat(latestVerdict(firstCafe)).isEqualTo("UNAVAILABLE");
+        assertThat(latestVerdict(secondCafe)).isEqualTo("UNAVAILABLE");
+        assertThat(jdbcTemplate.queryForList("""
+            select judgment.transaction_id
+            from judgment
+            join transaction on transaction.id = judgment.transaction_id
+            where transaction.batch_id = ? and judgment.trigger_user_fact_id is not null
+            """, UUID.class, batchId)).containsExactlyInAnyOrder(firstCafe, secondCafe);
+        assertThat(pendingQuestion(weekend, "용도")).isNotNull();
+        assertThat(pendingQuestion(telecom, "전용여부")).isNotNull();
+        // 지난번 답 불러오기가 약한 근거로 다루도록 출처를 일괄 응답으로 남긴다
+        assertThat(jdbcTemplate.queryForList(
+            "select distinct source from user_fact where batch_id = ?", String.class, batchId))
+            .containsExactly("BULK");
+    }
+
+    @Test
+    void bulk_answer_reports_unresolved_after_the_rejudge_canceled_other_questions() throws Exception {
+        // given: 4만원 카페는 용도와 증빙유무를 함께 묻는다
+        UUID cafe = insertTransaction("카페", "스타벅스", 40_000L);
+        judge(cafe);
+        assertThat(pendingQuestion(cafe, "증빙유무")).isNotNull();
+
+        // when / then: 「개인」이면 불가로 확정되어 증빙유무 질문도 취소된다. 남은 질문은 없다
+        bulkAnswer(batchId, "용도", "개인")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.answeredCount").value(1))
+            .andExpect(jsonPath("$.unresolved.count").value(0))
+            .andExpect(jsonPath("$.unresolved.amount").value(0));
+    }
+
+    @Test
+    void bulk_answer_counts_only_questions_it_turned_from_pending() throws Exception {
+        // given: 같은 가맹점 질문 둘 중 하나만 대기다. 나머지는 이미 답했다(상태는 직접 만든다)
+        UUID first = insertTransaction("통신", "KT");
+        UUID second = insertTransaction("통신", "KT");
+        judge(first);
+        judge(second);
+        UUID secondQuestion = pendingQuestion(second, "전용여부");
+        answer(List.of(pendingQuestion(first, "전용여부")), "전용").andExpect(status().isOk());
+        jdbcTemplate.update("""
+            update question_queue set status = 'PENDING', answered_fact_id = null, answered_at = null where id = ?
+            """, secondQuestion);
+
+        // when / then: 이미 ANSWERED 였던 형제 질문은 세지 않는다 (api.md 3.11 answeredCount)
+        bulkAnswer(batchId, "전용여부", "개인")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.answeredCount").value(1));
+    }
+
+    @Test
+    void bulk_answer_with_only_excluded_targets_answers_nothing() throws Exception {
+        // given: 「용도」 질문은 소명 대기 거래에만 있다
+        UUID weekend = insertTransaction("음식점", "김밥천국", 6_500L, "2025-10-11");
+        judge(weekend);
+
+        // when / then: 이력이 있으니 에러가 아니다
+        bulkAnswer(batchId, "용도", "업무미팅")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.answeredCount").value(0))
+            .andExpect(jsonPath("$.excludedCount").value(1))
+            .andExpect(jsonPath("$.factIds.length()").value(0))
+            .andExpect(jsonPath("$.rejudgedTransactionCount").value(0));
+        assertThat(latestVerdict(weekend)).isEqualTo("UNAVAILABLE");
+    }
+
+    @Test
+    void bulk_answer_waits_for_the_user_lock_before_reading_its_targets() throws Exception {
+        // given: 카페 용도 질문. 다른 응답이 사용자 락을 잡은 채 그 질문을 취소하고 아직 커밋하지 않았다
+        UUID cafe = insertTransaction("카페", "스타벅스");
+        judge(cafe);
+        UUID question = pendingQuestion(cafe, "용도");
+        CountDownLatch canceled = new CountDownLatch(1);
+        CountDownLatch commit = new CountDownLatch(1);
+        ExecutorService threads = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> other = threads.submit(() ->
+                new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+                    jdbcTemplate.queryForList("select id from app_user where id = ? for no key update", USER_ID);
+                    jdbcTemplate.update("update question_queue set status = 'CANCELED' where id = ?", question);
+                    canceled.countDown();
+                    await(commit);
+                }));
+            assertThat(canceled.await(10, TimeUnit.SECONDS)).isTrue();
+
+            // when: 일괄 응답이 락을 기다리는 동안 다른 응답이 커밋한다
+            Future<BulkAnswerResult> bulk = threads.submit(() ->
+                answerService.bulkAnswer(USER_ID, batchId, "용도", "업무미팅"));
+            UserLockOrder.awaitLockWaiter(jdbcTemplate);
+            commit.countDown();
+            other.get(10, TimeUnit.SECONDS);
+
+            // then: 취소가 반영된 대기 질문을 읽어 답할 대상이 없다
+            assertThat(bulk.get(10, TimeUnit.SECONDS).answeredCount()).isZero();
+        } finally {
+            commit.countDown();
+            threads.shutdownNow();
+        }
+        assertThat(jdbcTemplate.queryForObject(
+            "select count(*) from user_fact where batch_id = ?", Integer.class, batchId)).isZero();
+    }
+
+    @Test
+    void answer_takes_the_user_lock_before_the_transaction_lock() throws Exception {
+        UUID cafe = insertTransaction("카페", "스타벅스");
+        judge(cafe);
+        UUID question = pendingQuestion(cafe, "용도");
+
+        UserLockOrder.assertTakesUserLockFirst(jdbcTemplate, transactionManager, USER_ID,
+            UserLockOrder.TRANSACTION_ROW, cafe,
+            () -> answerService.answer(USER_ID, List.of(question), "업무미팅", AnswerSource.USER));
+    }
+
+    @Test
+    void bulk_answer_takes_the_user_lock_before_the_transaction_lock() throws Exception {
+        UUID cafe = insertTransaction("카페", "스타벅스");
+        judge(cafe);
+
+        UserLockOrder.assertTakesUserLockFirst(jdbcTemplate, transactionManager, USER_ID,
+            UserLockOrder.TRANSACTION_ROW, cafe,
+            () -> answerService.bulkAnswer(USER_ID, batchId, "용도", "업무미팅"));
+    }
+
+    @Test
+    void invalid_bulk_answers_change_nothing() throws Exception {
+        // given: 카페(용도: 업무미팅·개인·혼자작업)
+        UUID cafe = insertTransaction("카페", "스타벅스");
+        judge(cafe);
+
+        // when / then
+        bulkAnswer(UUID.randomUUID(), "용도", "개인")
+            .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("BATCH_NOT_FOUND"));
+        bulkAnswer(batchId, "자산여부", "개인")
+            .andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("UNKNOWN_FACT_TYPE"));
+        bulkAnswer(batchId, "용도", "전용")
+            .andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("INVALID_ANSWER_VALUE"));
+        mockMvc.perform(post("/api/v1/questions/bulk-answer")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"batchId": "%s", "factType": "용도"}
+                    """.formatted(batchId)))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+
+        // then
+        assertThat(jdbcTemplate.queryForObject(
+            "select count(*) from user_fact where batch_id = ?", Integer.class, batchId)).isZero();
+        assertThat(pendingQuestion(cafe, "용도")).isNotNull();
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            latch.await(10, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     /** 같은 사용자의 다른 batch 에 생긴 가맹점 질문. */
     private UUID otherBatchQuestion() {
         UUID mainBatchId = batchId;
@@ -245,6 +525,14 @@ class QuestionAnswerIntegrationTest {
             .content("""
                 {"questionIds": ["%s"], "answer": {"value": "%s"}}
                 """.formatted(ids, value)));
+    }
+
+    private ResultActions bulkAnswer(UUID targetBatchId, String factType, String value) throws Exception {
+        return mockMvc.perform(post("/api/v1/questions/bulk-answer")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"batchId": "%s", "factType": "%s", "answer": {"value": "%s"}}
+                """.formatted(targetBatchId, factType, value)));
     }
 
     private void judge(UUID transactionId) {
@@ -301,13 +589,17 @@ class QuestionAnswerIntegrationTest {
     }
 
     private UUID insertTransaction(String category, String merchantNorm, long amount) {
+        return insertTransaction(category, merchantNorm, amount, "2025-10-08");
+    }
+
+    private UUID insertTransaction(String category, String merchantNorm, long amount, String approvedAt) {
         UUID id = UUID.randomUUID();
         jdbcTemplate.update("""
             insert into transaction(
                 id, batch_id, user_id, approved_at, merchant_raw, merchant_norm, merchant_category,
                 amount, natural_key, source_status, user_inclusion, classification_status
-            ) values (?, ?, ?, '2025-10-08', ?, ?, ?, ?, ?, 'JUDGEABLE', 'AUTO', 'CLASSIFIED')
-            """, id, batchId, USER_ID, merchantNorm, merchantNorm, category, amount, id.toString());
+            ) values (?, ?, ?, ?::date, ?, ?, ?, ?, ?, 'JUDGEABLE', 'AUTO', 'CLASSIFIED')
+            """, id, batchId, USER_ID, approvedAt, merchantNorm, merchantNorm, category, amount, id.toString());
         return id;
     }
 }

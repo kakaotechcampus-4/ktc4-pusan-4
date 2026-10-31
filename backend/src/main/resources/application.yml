@@ -18,12 +18,47 @@ app:
   rules:
     dir: ../rules
     commit-sha: local
+  # 판정 run 실행 풀 (JudgmentRunExecutorConfiguration). 운영(EC2 t3.medium, 2 vCPU 를 DB·AI 와 함께 씀) 값이다.
+  # 로컬 개발 값은 application-local.yml 에 따로 둔다.
+  # - workers: 동시에 도는 run 수. 하나가 DB 커넥션(Hikari 기본 10개)을 하나 쓴다.
+  #   백엔드·DB 에 CPU 를 1개씩만 준 측정에서 처리량이 1개 157, 2개 254(1.6배), 4개 265건/초(1.7배)였다.
+  #   4개는 처리량이 늘지 않고 진행률 GET 이 최대 175ms 로 느려져 2개로 둔다.
+  # - queue-capacity: 기다릴 수 있는 run 수. 멈춘 run 정리(진행 없음 5분)는 QUEUED 도 끝내므로,
+  #   queue-capacity × run 하나 시간 / workers 가 5분보다 짧아야 한다. 워커 하나가 초당 약 127건이라 1,200건 run 이
+  #   약 9.4초이고 상한은 약 64다. EBS·CPU 크레딧은 측정에 없어 50 으로 둔다.
+  # - await-termination: 서버가 종료될 때(배포) 돌던 run 과 대기열의 run 을 기다리는 최대 시간.
+  #   이 설정이 없으면 Spring 종료 단계 제한(30s)이 지나자 run 이 도는 중에 DB 커넥션 풀을 닫았다(CPU 1개씩, 6,000건 run).
+  #   같은 조건에서 3,000건 run 이 약 28초, 6,000건이 약 47초라 60s 로 둔다.
+  #   deploy/compose.yaml 의 stop_grace_period 는 이것보다 길어야 한다.
+  judgment-run:
+    workers: 2
+    queue-capacity: 50
+    await-termination: 60s
+  # 비서 AI 서버 (api.md 3.14, docs/agent-secretary.md 9장). 내부망에만 있다. 운영은 http://ai:8000 (deploy/compose.yaml).
+  # read-timeout 은 AI 서버의 한 턴 상한(30초)보다 길게 둔다.
+  assistant:
+    base-url: ${ASSISTANT_SERVER_URL:http://localhost:8000}
+    connect-timeout: 3s
+    read-timeout: 40s
+  # 인증 (api.md 1.1). 고정 사용자 하나만 로그인한다 — 실제 계정은 B9b. 리프레시 토큰은 Redis 에 둔다.
+  # jwt-secret 이 비면 기동할 때마다 임시 키를 만든다(재기동하면 로그인이 풀린다). 넣는다면 32바이트 이상.
+  # demo-password 가 비면 아무도 로그인할 수 없다.
+  auth:
+    jwt-secret: ${APP_AUTH_JWT_SECRET:}
+    demo-password: ${APP_AUTH_DEMO_PASSWORD:}
+    access-token-ttl: 15m
+    refresh-token-ttl: 14d
+    cookie-secure: ${APP_AUTH_COOKIE_SECURE:true}
 
 management:
   endpoints:
     web:
       exposure:
         include: health
+  # Redis 는 리프레시 토큰만 맡는다. Redis 가 내려가도 백엔드 전체를 unhealthy 로 만들어 배포를 멈추지 않게 health 에서 뺀다.
+  health:
+    redis:
+      enabled: false
 
 # 스웨거는 기본으로 닫는다. 로컬(application-local.yml)에서만 연다.
 # 프로필을 빠뜨려도 운영에 노출되지 않는 쪽으로 떨어지게 하기 위해서다.

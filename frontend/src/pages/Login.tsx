@@ -23,7 +23,7 @@ export function Login() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const from = (location.state as LocationState | null)?.from ?? '/upload';
+  const from = (location.state as LocationState | null)?.from ?? '/';
 
   // 서버 문장은 그대로 띄우지 않는다. 상태 코드로 고른다
   const complete = async (nextEmail: string, nextPassword: string) => {
@@ -63,14 +63,14 @@ export function Login() {
     <div className="flex min-h-full w-full bg-surface">
       {/* 좌측 브랜드 패널 */}
       <aside className="hidden w-[46%] flex-col justify-between bg-ink px-12 py-12 lg:flex">
-        <Link to="/" className="flex items-center gap-2" aria-label="경비판정 홈">
+        <Link to="/" className="flex items-center gap-2" aria-label="PreeT 홈">
           <span aria-hidden="true" className="flex gap-[3px]">
             <span className="block h-5 w-[5px] rounded-sm bg-white" />
             <span className="block h-5 w-[5px] rounded-sm bg-white" />
             <span className="block h-5 w-[5px] rounded-sm bg-accent" />
           </span>
           <span className="text-[17px] font-bold tracking-tight text-white">
-            경비판정
+            PreeT
           </span>
         </Link>
 
@@ -108,7 +108,7 @@ export function Login() {
           <Link
             to="/"
             className="mb-10 flex items-center gap-2 lg:hidden"
-            aria-label="경비판정 홈">
+            aria-label="PreeT 홈">
             
             <span aria-hidden="true" className="flex gap-[3px]">
               <span className="block h-5 w-[5px] rounded-sm bg-ink" />
@@ -116,7 +116,7 @@ export function Login() {
               <span className="block h-5 w-[5px] rounded-sm bg-accent" />
             </span>
             <span className="text-[17px] font-bold tracking-tight text-ink">
-              경비판정
+              PreeT
             </span>
           </Link>
 
@@ -134,7 +134,7 @@ export function Login() {
               type="button"
               disabled={busy}
               onClick={() => void complete('kakao-user@kakao.com', mockPassword ?? '')}
-              className="mt-8 flex w-full items-center justify-center gap-2 rounded-xl bg-[#FEE500] px-4 py-3 text-[15px] font-semibold text-[#191600] transition-opacity duration-150 ease-snap hover:opacity-90">
+              className="mt-8 flex w-full items-center justify-center gap-2 rounded-xl bg-[#FEE500] px-4 py-3 text-[15px] font-bold text-[#191600] transition-opacity duration-150 ease-snap hover:opacity-90">
 
                 <MessageCircleIcon className="h-4 w-4" aria-hidden="true" />
                 카카오로 계속하기
@@ -153,7 +153,7 @@ export function Login() {
               <div>
                 <label
                   htmlFor="email"
-                  className="block text-[13px] font-medium text-ink2">
+                  className="block text-[13px] font-normal text-ink2">
                   
                   이메일
                 </label>
@@ -171,7 +171,7 @@ export function Login() {
               <div>
                 <label
                   htmlFor="password"
-                  className="block text-[13px] font-medium text-ink2">
+                  className="block text-[13px] font-normal text-ink2">
                   
                   비밀번호
                 </label>
@@ -197,7 +197,7 @@ export function Login() {
             <button
               type="submit"
               disabled={busy}
-              className="mt-5 w-full rounded-xl bg-accent px-4 py-3 text-[15px] font-semibold text-white transition-colors duration-150 ease-snap hover:bg-accent-hover disabled:opacity-60">
+              className="mt-5 w-full rounded-xl bg-accent px-4 py-3 text-[15px] font-bold text-white transition-colors duration-150 ease-snap hover:bg-accent-hover disabled:opacity-60">
 
               {busy ? '로그인 중…' : '로그인'}
             </button>
@@ -208,7 +208,7 @@ export function Login() {
             type="button"
             disabled={busy}
             onClick={() => void complete('demo@expense-verdict.kr', mockPassword ?? '')}
-            className="mt-3 w-full rounded-xl border border-line px-4 py-3 text-[14px] font-semibold text-ink transition-colors duration-150 ease-snap hover:bg-canvas">
+            className="mt-3 w-full rounded-xl border border-line px-4 py-3 text-[14px] font-bold text-ink transition-colors duration-150 ease-snap hover:bg-canvas">
 
               샘플 계정으로 둘러보기
             </button>

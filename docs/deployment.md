@@ -59,9 +59,11 @@ sudo docker ps --filter name=ktc4
 curl -I "https://<도메인>/"
 ```
 
-`docker compose ps`에서 PostgreSQL·백엔드·AI가 healthy이고 웹 컨테이너가 running이어야 한다. 브라우저에서 `/`, `/upload`를 새로고침해 SPA 라우팅을 확인한다. 백엔드 `/actuator/health`와 AI `/health/db`는 컨테이너 내부 검사로 확인하며 외부에 공개하지 않는다. `docker stats`와 `df -h`로 4GB 메모리·50GB 디스크 사용량을 확인한다.
+`docker compose ps`에서 PostgreSQL·Redis·백엔드·AI가 healthy이고 웹 컨테이너가 running이어야 한다. 브라우저에서 `/`, `/upload`를 새로고침해 SPA 라우팅을 확인한다. 백엔드 `/actuator/health`와 AI `/health/db`는 컨테이너 내부 검사로 확인하며 외부에 공개하지 않는다. `docker stats`와 `df -h`로 4GB 메모리·50GB 디스크 사용량을 확인한다.
 
 Compose는 기존 백엔드를 내린 뒤 새 백엔드를 띄우고, 새 백엔드가 부팅하면서 Flyway를 실행한다. 마이그레이션이 실패하면 그 시점부터 서비스가 멈추므로 5절의 롤백 명령으로 이전 SHA를 다시 배포한다. 마이그레이션 작성 규칙은 `db/README.md`를 따른다.
+
+기존 백엔드는 내려가기 전에 새 요청을 받지 않고, 돌던 판정 run과 대기열의 run을 최대 60초(`app.judgment-run.await-termination`)까지 마저 처리한다. 그래서 판정이 도는 중에 배포하면 백엔드가 멈춰 있는 시간이 그만큼 길어진다. Compose의 `stop_grace_period`(100초)가 이보다 짧으면 그 전에 강제로 꺼진다. 60초 안에 못 끝낸 run은 새 백엔드의 멈춘 run 정리가 5분 뒤 `RUN_INTERRUPTED`로 끝내고, 사용자가 다시 실행한다.
 
 ### PostgreSQL이 다시 시작되는 변경
 
@@ -120,10 +122,58 @@ systemctl list-timers ktc4-corpus.timer
 
 실패하면 서비스가 failed로 남고 `journalctl`에 원인이 있다. 세 단계 모두 멱등이라 원인을 고친 뒤 `systemctl start ktc4-corpus.service`로 다시 돌리면 된다. 운영 postgres는 메모리 1GB라 결과는 행 수 수준의 가벼운 쿼리로만 확인한다.
 
+### 지난 시행판 채우기 (1회)
+
+주간 동기화는 현행판만 받는다. 처음 적재한 날 현행판의 시행일이 모든 조문의 `effective_from`이 되므로,
+그보다 이른 날짜의 거래(예: 2026-10-01 시행 시행령으로 적재한 DB에서 2026년 1월 거래)는 인용할 조문 판이 없어
+판정이 `RULE_PROCESSING_FAILED`로 실패한다. 이 기능이 들어간 커밋을 배포한 뒤, 현행 적재가 끝난 DB에 한 번 돌린다.
+이미지 태그는 `deploy/corpus-sync.sh`와 같은 방식으로 정한다.
+
+```bash
+sudo -i
+repo=/opt/ktc4/repo; sha=$(cat /opt/ktc4/current-sha)
+set -a; source /etc/ktc4/production.env; set +a
+export IMAGE_TAG=$sha POSTGRES_TAG=$(git -C "$repo" rev-parse "$sha:docker/postgres" | cut -c1-12)
+docker compose --env-file /etc/ktc4/production.env -f "$repo/deploy/compose.yaml" run --rm --no-deps -T ai \
+  python -m pipeline.law_sync --target law --law 001565 --law 003956 --history-since 2024-01-01 --dry-run
+# 행 수를 보고 --dry-run 을 빼서 다시 돌린다
+```
+
+- `--history-since` 날짜에 시행 중이던 판부터, DB에 이미 있는 가장 이른 판 직전까지를 닫힌 행(`is_superseded = true`)으로 넣는다. 현행 행은 건드리지 않는다.
+- 다시 돌려도 아무것도 넣지 않는다. 더 이른 날짜로 넓힐 때만 그 앞을 채운다.
+- 닫힌 행은 `reindex`가 색인하지 않으므로 RAG 검색 결과는 바뀌지 않는다.
+- `--law`를 빼면 `LAWS` 12개 전부다. 판정 카드가 인용하는 건 지금 소득세법과 시행령뿐이다.
+
 ## 7. 공휴일 동기화
 
 판정에 쓸 평일 공휴일(대체·임시공휴일 포함)을 `public_holiday` 표에 둔다. 판정은 API 를 직접 부르지 않고 이 표만 읽는다. 백엔드가 기동할 때와 매일 04:00 KST에 공공데이터포털 「한국천문연구원_특일 정보」(`getRestDeInfo`)에서 올해 앞뒤 1년씩 받아 연도별로 표를 교체한다.
 
 - `/etc/ktc4/production.env`의 `HOLIDAY_API_KEY`에는 포털의 **Decoding** 키를 넣는다. Encoding 키를 넣으면 한 번 더 인코딩되어 `SERVICE_KEY_IS_NOT_REGISTERED_ERROR`가 난다.
 - 키가 없거나 호출이 실패하면 그 해는 기존 행을 그대로 둔다. 발표 전이라 빈 응답이 온 해도 마찬가지다. 판정은 표에 있는 값으로 계속 돈다.
+- 호출이 실패했거나 빈 응답이 왔는데 표에 그 해 행이 하나도 없으면 `backend/src/main/resources/holiday/seed/{연도}.json`(2025~2027)으로 채운다. 이 파일은 같은 API 응답을 그대로 저장한 것이라 API 로 받을 때와 같은 규칙으로 읽는다. 이미 행이 있는 해는 시드가 덮지 않고, 다음에 API 로 받으면 시드 행도 API 응답으로 교체된다. 키가 없을 때는 시드도 넣지 않는다. 동기화 범위(올해 앞뒤 1년)가 2027년을 넘기 전에 다음 해 응답을 받아 `seed/{연도}.json` 으로 저장한다.
 - 반영 결과는 백엔드 로그의 `년 공휴일 N건을 반영했다`로 확인한다.
+
+## 8. Redis
+
+리프레시 토큰 저장소다(B9c). `redis:7.4-alpine`을 compose 내부망에서만 쓰고 포트는 열지 않는다. 백엔드는 `SPRING_DATA_REDIS_HOST=redis`로 붙고, Redis가 healthy가 된 뒤에 뜬다. 백엔드 `/actuator/health`는 Redis를 보지 않는다. Redis가 내려가도 백엔드는 healthy로 남고, 로그인·토큰 재발급·로그아웃만 실패한다(이미 받은 액세스 토큰으로 부르는 API는 15분 동안 그대로 된다).
+
+- `--appendonly yes`로 AOF를 켜서 재시작해도 로그인이 유지된다. 데이터는 `redis-data` 볼륨에 남는다.
+- `--maxmemory 128mb --maxmemory-policy volatile-lru`다. 토큰은 모두 TTL이 있어 메모리가 차면 오래 안 쓴 토큰부터 지워지고, 그 사용자는 다시 로그인한다. 컨테이너는 `mem_limit: 192m`이다.
+- Redis를 비우면(`FLUSHALL`, 볼륨 삭제) 모든 사용자가 로그아웃된다. 데이터 손실은 없다.
+- 비서 사용자별 한도(`assistant:*` 키, 10장)도 여기서 센다. 키마다 TTL이 있다. Redis가 내려가면 비서 대화만 503 `ASSISTANT_UNAVAILABLE`이다.
+
+## 9. 로그인 (고정 사용자)
+
+실제 계정이 생기기 전까지는 고정 사용자 `demo@example.com` 하나만 로그인한다(api.md 1.1). 새 값을 넣은 뒤 백엔드를 다시 배포해야 반영된다.
+
+- `/etc/ktc4/production.env`의 `APP_AUTH_JWT_SECRET`에는 `openssl rand -hex 32`로 만든 값을 넣는다. 비우면 백엔드가 기동할 때마다 임시 키를 만들어, 재배포할 때마다 모든 로그인이 풀린다. 32바이트보다 짧으면 백엔드가 뜨지 않는다.
+- `APP_AUTH_DEMO_PASSWORD`에는 시연용 비밀번호를 넣는다. 비우면 아무도 로그인할 수 없다(로그인 API가 401 `INVALID_CREDENTIALS`).
+- 리프레시 토큰 쿠키는 `Secure`라 HTTPS(Caddy)로만 저장된다. 로컬 프로필은 http라 `Secure`를 끈다.
+
+## 10. 비서 중계
+
+백엔드 `POST /api/v1/assistant/chat`이 AI 서버(`http://ai:8000/assistant/chat`)로 대화를 넘긴다(api.md 3.14). AI 서버는 compose 내부망에만 있고 포트를 열지 않는다(agent-secretary.md C-8).
+
+- 주소는 `ASSISTANT_SERVER_URL`이다. `deploy/compose.yaml`이 `http://ai:8000`으로 넣고, 로컬 기본값은 `http://localhost:8000`이다.
+- 읽기 타임아웃은 40초로, AI 서버의 한 턴 상한(30초)보다 길다. AI 서버가 응답하지 않거나 오류를 내면 503 `ASSISTANT_UNAVAILABLE`, AI 서버 전체 한도(8턴)에 걸리면 429 `ASSISTANT_RATE_LIMITED`다.
+- 사용자별 한도(동시 1, 분당 10, 하루 100)는 Redis에 센다(8장).

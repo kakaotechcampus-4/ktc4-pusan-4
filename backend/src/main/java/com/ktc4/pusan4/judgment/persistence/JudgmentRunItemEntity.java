@@ -19,7 +19,7 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "judgment_run_item")
-class JudgmentRunItemEntity {
+class JudgmentRunItemEntity extends AssignedIdEntity<JudgmentRunItemEntity.Key> {
 
     @EmbeddedId
     private Key key;
@@ -43,6 +43,11 @@ class JudgmentRunItemEntity {
     JudgmentRunItemEntity(UUID runId, UUID transactionId) {
         this.key = new Key(runId, transactionId);
         this.status = "PENDING";
+    }
+
+    @Override
+    public Key getId() {
+        return key;
     }
 
     void succeed(OffsetDateTime now) {

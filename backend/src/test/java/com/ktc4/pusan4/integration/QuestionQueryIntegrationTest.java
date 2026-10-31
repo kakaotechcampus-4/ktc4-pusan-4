@@ -1,6 +1,6 @@
 package com.ktc4.pusan4.integration;
 
-import com.ktc4.pusan4.shared.auth.TemporaryCurrentUserProvider;
+import com.ktc4.pusan4.shared.auth.FixedUser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,7 +32,7 @@ class QuestionQueryIntegrationTest {
     @ServiceConnection
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17-alpine");
 
-    private static final UUID USER_ID = TemporaryCurrentUserProvider.TEMPORARY_USER_ID;
+    private static final UUID USER_ID = FixedUser.ID;
 
     @Autowired
     private MockMvc mockMvc;
@@ -120,6 +120,7 @@ class QuestionQueryIntegrationTest {
             .andExpect(jsonPath("$.items[0].count").value(2))
             .andExpect(jsonPath("$.items[0].totalAmount").value(13_000))
             .andExpect(jsonPath("$.items[0].bulkAnswerable").value(true))
+            .andExpect(jsonPath("$.items[0].code").value("Q-TEST"))
             .andExpect(jsonPath("$.items[0].transactions[0].transactionId").value(overridden.toString()))
             .andExpect(jsonPath("$.items[0].transactions[0].overridden").value(true))
             .andExpect(jsonPath("$.items[0].transactions[1].overridden").value(false))

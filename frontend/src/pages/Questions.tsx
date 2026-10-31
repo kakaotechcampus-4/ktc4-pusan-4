@@ -204,7 +204,7 @@ export function Questions() {
   const header =
   <header className="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <p className="text-small font-semibold text-accent">사람 게이트 ②</p>
+        <p className="text-small font-bold text-accent">사람 게이트 ②</p>
         <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
           확인이 필요한 것만 물어봅니다
         </h1>
@@ -261,14 +261,14 @@ export function Questions() {
         <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-xl border border-line bg-surface px-4 py-3 text-small tabular-nums">
           <span className="text-muted">
             남은 질문{' '}
-            <strong className="font-semibold text-ink">
+            <strong className="font-bold text-ink">
               {pendingQ.data ? `${formatNumber(pendingTotal)}개` : '—'}
             </strong>
           </span>
           {unresolved &&
           <span className="text-muted">
               질문이 걸린 금액{' '}
-              <strong className={`font-semibold ${unresolved.count > 0 ? 'text-warn' : 'text-ink'}`}>
+              <strong className={`font-bold ${unresolved.count > 0 ? 'text-warn' : 'text-ink'}`}>
                 {formatWon(unresolved.amount)}
               </strong>
             </span>
@@ -304,7 +304,7 @@ export function Questions() {
 
         {carryOver.length >= 2 &&
         <section className="mt-4 rounded-2xl border border-line bg-surface p-5">
-            <h2 className="text-body font-semibold text-ink">지난번 답 한 번에 적용</h2>
+            <h2 className="text-body font-bold text-ink">지난번 답 한 번에 적용</h2>
             <p className="mt-1 text-small text-muted">
               다른 업로드에서 같은 질문에 한 답입니다. 확인하고 고른 것만 적용합니다. 적용한 뒤에도 질문마다 바꿀 수
               있습니다.
@@ -323,7 +323,7 @@ export function Questions() {
                       onChange={(event) => setSkipped((prev) => ({ ...prev, [key]: !event.target.checked }))} />
 
                       <span>
-                        <span className="font-medium text-ink">
+                        <span className="font-normal text-ink">
                           {group.transactions[0]?.merchantNorm} · {group.questionText}
                         </span>
                         <span className="block text-muted">{text}</span>
@@ -377,7 +377,7 @@ export function Questions() {
 
                     <section className="overflow-hidden rounded-2xl border border-line bg-surface">
                       <header className="flex items-start gap-3 border-b border-line2 px-5 py-4">
-                        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-canvas text-caption font-semibold tabular-nums text-ink2">
+                        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-canvas text-caption font-bold tabular-nums text-ink2">
                           {shownPage * BATCH_SIZE + index + 1}
                         </span>
                         <div className="min-w-0 flex-1">
@@ -393,7 +393,7 @@ export function Questions() {
                               {formatNumber(group.count)}건 · {formatWon(group.totalAmount)}
                             </span>
                           </div>
-                          <h2 className="mt-2 text-h4 font-semibold text-ink">{group.questionText}</h2>
+                          <h2 className="mt-2 text-h4 font-bold text-ink">{group.questionText}</h2>
                           {rows.length > 0 &&
                         <ul className="mt-2 space-y-0.5 text-small tabular-nums text-muted">
                               {rows.slice(0, SHOWN_TRANSACTIONS).map((row) =>
@@ -467,7 +467,7 @@ export function Questions() {
 
         {(bulkTargets.length > 0 || heldBack.length > 0) &&
         <section className="mt-6 rounded-2xl border border-line bg-surface p-5">
-            <h2 className="text-body font-semibold text-ink">남은 질문 한 번에 답하기</h2>
+            <h2 className="text-body font-bold text-ink">남은 질문 한 번에 답하기</h2>
             <p className="mt-1 text-small text-muted">
               같은 종류의 질문에 같은 답을 한 번에 보냅니다. 한 번에 답한 뒤에도 질문마다 다시
               바꿀 수 있습니다.
@@ -481,7 +481,7 @@ export function Questions() {
             <div className="mt-4 space-y-5">
               {bulkTargets.map((target) =>
             <div key={target.factType}>
-                  <p className="text-small font-semibold text-ink">
+                  <p className="text-small font-bold text-ink">
                     「{target.factType}」 질문 {formatNumber(target.groups.length)}개 ·{' '}
                     {formatNumber(target.groups.reduce((sum, group) => sum + group.count, 0))}건
                   </p>
@@ -528,7 +528,7 @@ export function Questions() {
         {answeredQ.error &&
         <p role="alert" className="mt-6 rounded-xl border border-deny-line bg-deny-bg px-4 py-3 text-small text-deny">
             답한 질문을 불러오지 못해 답을 바꿀 수 없습니다.{' '}
-            <button type="button" onClick={answeredQ.reload} className="font-semibold underline">
+            <button type="button" onClick={answeredQ.reload} className="font-bold underline">
               다시 시도
             </button>
           </p>
@@ -536,7 +536,7 @@ export function Questions() {
 
         {!answeredQ.error && answered.length > 0 &&
         <section className="mt-6">
-            <h2 className="text-body font-semibold text-ink">
+            <h2 className="text-body font-bold text-ink">
               답한 질문 <span className="tabular-nums text-muted">{formatNumber(answeredTotal)}개</span>
               {answeredTotal > answered.length &&
             <span className="ml-2 text-small font-normal text-muted">
@@ -553,7 +553,7 @@ export function Questions() {
                 <li key={key} className="px-5 py-3.5">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="min-w-0 flex-1">
-                        <p className="text-small font-medium text-ink">{group.questionText}</p>
+                        <p className="text-small font-normal text-ink">{group.questionText}</p>
                         <p className="mt-0.5 text-caption tabular-nums text-muted">
                           {value ? `「${value}」${ro(value)} 답함` : '답함'} ·{' '}
                           {formatNumber(group.count)}건 · {formatWon(group.totalAmount)}

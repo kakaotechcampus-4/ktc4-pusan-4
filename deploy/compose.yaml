@@ -18,6 +18,22 @@ services:
       retries: 12
     mem_limit: 1g
 
+  # 리프레시 토큰 저장소(B9c). 포트는 열지 않고 compose 내부망으로만 쓴다.
+  # 토큰은 모두 TTL 이 있어 메모리가 차면 오래 안 쓴 토큰부터 지운다(volatile-lru). 지워진 사용자는 다시 로그인한다.
+  # AOF 로 재시작해도 로그인이 유지된다.
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "128mb", "--maxmemory-policy", "volatile-lru"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    mem_limit: 192m
+
   backend:
     image: ${ECR_REPOSITORY}:backend-${IMAGE_TAG}
     restart: unless-stopped
@@ -25,10 +41,17 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME}
       SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      ASSISTANT_SERVER_URL: http://ai:8000
       HOLIDAY_API_KEY: ${HOLIDAY_API_KEY:-}
+      APP_AUTH_JWT_SECRET: ${APP_AUTH_JWT_SECRET:-}
+      APP_AUTH_DEMO_PASSWORD: ${APP_AUTH_DEMO_PASSWORD:-}
       JAVA_TOOL_OPTIONS: -Xms128m -Xmx768m
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
@@ -37,6 +60,9 @@ services:
       retries: 12
       start_period: 30s
     mem_limit: 1200m
+    # 종료할 때 판정 run 을 app.judgment-run.await-termination(60s)까지 기다린다(application.yml).
+    # Docker 기본값(10s)이면 그 전에 SIGKILL 로 꺼진다. 웹 요청 종료 대기(최대 30s) 뒤에 이어지므로 합 90s 에 10s 를 더 둔다.
+    stop_grace_period: 100s
 
   ai:
     image: ${ECR_REPOSITORY}:ai-${IMAGE_TAG}
@@ -87,5 +113,6 @@ services:
 
 volumes:
   postgres-data:
+  redis-data:
   caddy-data:
   caddy-config:

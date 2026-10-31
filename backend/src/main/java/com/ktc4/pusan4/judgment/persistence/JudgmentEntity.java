@@ -25,7 +25,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "judgment")
-class JudgmentEntity {
+class JudgmentEntity extends AssignedIdEntity<UUID> {
 
     @Id
     private UUID id;
@@ -80,8 +80,8 @@ class JudgmentEntity {
     @Column(name = "input_facts", nullable = false, columnDefinition = "jsonb")
     private List<UserFact> inputFacts;
 
-    // 금액 계산(A6) 전이라 저장하지 않는다. 비어 있다.
-    @Column(name = "final_amount", insertable = false, updatable = false)
+    // 안분·상각까지 반영한 인정 금액(AmountCalculator). 한도는 limit_bucket_entry 에 따로 둔다.
+    @Column(name = "final_amount")
     private Long finalAmount;
 
     @Column(name = "computed_at", nullable = false, insertable = false, updatable = false)
@@ -126,6 +126,7 @@ class JudgmentEntity {
         this.attributes = judgment.attributes();
         this.appliedRuleIds = judgment.appliedRuleIds();
         this.inputFacts = command.inputFacts();
+        this.finalAmount = command.finalAmount();
         JudgmentOrigin origin = command.origin();
         switch (origin.type()) {
             case RUN -> this.runId = origin.id();
@@ -135,12 +136,56 @@ class JudgmentEntity {
         }
     }
 
+    /**
+     * 사용자 수정 revision (api.md 3.8). verdict 만 바꾸고 나머지는 이 판정에서 이어받는다.
+     * 대상 밖 표시는 확인 필요에만 붙으므로(judgment_out_of_scope_needs_review) 끈다. 수정은 확인 필요로 가지 않는다.
+     * 금액은 바뀐 verdict 로 다시 계산한 값을 받는다.
+     */
+    JudgmentEntity overriddenAs(
+        UUID revisionId, int nextRevision, Verdict toVerdict, UUID overrideId, long recalculatedAmount
+    ) {
+        JudgmentEntity revision = new JudgmentEntity();
+        revision.id = revisionId;
+        revision.transactionId = transactionId;
+        revision.revision = nextRevision;
+        revision.ruleCardId = ruleCardId;
+        revision.ruleCardVersion = ruleCardVersion;
+        revision.rulesCommitSha = rulesCommitSha;
+        revision.userContextVersion = userContextVersion;
+        revision.taxYear = taxYear;
+        revision.verdict = toVerdict.name();
+        revision.blockedAtGate = blockedAtGate;
+        revision.inference = inference;
+        revision.unmatchedReason = unmatchedReason;
+        revision.outOfScope = false;
+        revision.account = account;
+        revision.attributes = attributes;
+        revision.appliedRuleIds = appliedRuleIds;
+        revision.inputFacts = inputFacts;
+        revision.finalAmount = recalculatedAmount;
+        revision.judgmentOverrideId = overrideId;
+        return revision;
+    }
+
     UUID id() {
+        return id;
+    }
+
+    @Override
+    public UUID getId() {
         return id;
     }
 
     UUID transactionId() {
         return transactionId;
+    }
+
+    int userContextVersion() {
+        return userContextVersion;
+    }
+
+    Map<String, Object> attributes() {
+        return attributes;
     }
 
     JudgmentRevision toDomain(JudgedTransaction transaction, List<CitedStatute> citations) {
@@ -153,8 +198,10 @@ class JudgmentEntity {
             computedAt, citations);
     }
 
-    JudgmentSummary.Row toSummaryRow() {
-        return new JudgmentSummary.Row(Verdict.valueOf(verdict), account, finalAmount);
+    /** limitAllowedAmount 가 있으면(한도 항목이 있는 판정) finalAmount 대신 그 금액으로 더한다. */
+    JudgmentSummary.Row toSummaryRow(Long limitAllowedAmount) {
+        return new JudgmentSummary.Row(Verdict.valueOf(verdict), account,
+            limitAllowedAmount == null ? finalAmount : limitAllowedAmount);
     }
 
     private JudgmentOrigin origin() {

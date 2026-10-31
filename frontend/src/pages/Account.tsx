@@ -74,7 +74,7 @@ export function Account() {
             {rows.map((row) =>
             <div key={row.term} className="flex gap-4 px-5 py-3">
                 <dt className="w-32 shrink-0 text-small text-muted">{row.term}</dt>
-                <dd className="text-small font-medium text-ink">{row.value}</dd>
+                <dd className="text-small font-normal text-ink">{row.value}</dd>
               </div>
             )}
           </dl>

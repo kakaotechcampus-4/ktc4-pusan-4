@@ -38,6 +38,8 @@ bash ./backend/gradlew -p backend bootRun --args='--spring.profiles.active=local
 
 로컬 프로필을 사용하지 않는 환경에서는 Spring 표준 환경 변수인 `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`를 주입합니다.
 
+`HOLIDAY_API_KEY` 없이 실행하면 공휴일 동기화를 건너뛰고 시드도 넣지 않아, 새 DB의 `public_holiday` 표가 비어 있습니다. 이때는 공휴일 거래가 평일로 판정됩니다. 공휴일 판정을 확인하거나 데모 데이터를 만들 때는 공공데이터포털 「한국천문연구원_특일 정보」의 Decoding 키를 `HOLIDAY_API_KEY` 환경 변수로 넣고 실행합니다(`docs/deployment.md` 7절).
+
 ## 테스트
 
 모든 테스트는 Gradle 표준 경로인 `src/test/java`에 둡니다. 실행 속도와 외부 인프라 의존성을 기준으로 실행 명령만 분리합니다.
@@ -68,7 +70,7 @@ bash ./backend/gradlew -p backend bootRun --args='--spring.profiles.active=local
 
 ## 목 응답
 
-서비스 레이어가 구현되기 전의 API는 기능별 `*MockData` Bean(`TransactionMockData`, `ClassificationMockData`, `JudgmentMockData`)이 만든 고정 응답을 반환합니다. 입력과 id에 상관없이 같은 값이고, 상태를 저장하지 않습니다. 이런 API에는 `@MockResponse`가 붙어 있고 스웨거 설명이 `[목 응답]`으로 시작합니다.
+서비스 레이어가 구현되기 전의 API는 기능별 `*MockData` Bean이 만든 고정 응답을 반환합니다. 입력과 id에 상관없이 같은 값이고, 상태를 저장하지 않습니다. 이런 API에는 `@MockResponse`가 붙어 있고 스웨거 설명이 `[목 응답]`으로 시작합니다. 지금은 남은 `*MockData` Bean이 없습니다.
 
 서비스를 구현하면 엔드포인트 단위로 다음을 바꿉니다.
 
@@ -80,7 +82,26 @@ bash ./backend/gradlew -p backend bootRun --args='--spring.profiles.active=local
 
 서비스는 userId를 요청 본문이나 경로에서 받지 않습니다. 컨트롤러 메서드에 `CurrentUser` 인자를 두면 `CurrentUserArgumentResolver`가 채우고, 서비스에는 `currentUser.id()`를 넘깁니다(`UserController.me` 참고). 스웨거에는 노출되지 않습니다.
 
-인증 도입 전에는 `TemporaryCurrentUserProvider`가 요청과 상관없이 고정 사용자(`MockFixtures.USER_ID`와 같은 id)를 돌려주고, `TemporaryUserSeeder`가 기동할 때 그 사용자 행을 만듭니다. 인증 도입(B9b) 때는 `CurrentUserProvider` 구현체만 Bearer 토큰 검증으로 바꾸고 두 임시 클래스를 지웁니다.
+`CurrentUserProvider` 구현체는 `auth.BearerCurrentUserProvider`이고, `Authorization: Bearer {accessToken}`의 사용자를 돌려줍니다. `/api/v1/auth/**`를 뺀 모든 API는 `CurrentUserWebConfig`의 인터셉터가 이를 확인해, 토큰이 없으면 `CurrentUser` 인자가 없는 API(목 응답 등)도 401 `UNAUTHORIZED`입니다. 계약은 `docs/api.md` 1.1에 있습니다.
+
+### 인증 (`auth`)
+
+지금은 고정 사용자(`FixedUser`, `MockFixtures.USER_ID`와 같은 id) 하나만 로그인합니다. `TemporaryUserSeeder`가 기동할 때 그 사용자 행을 만듭니다. 로컬 프로필의 비밀번호는 `demo1234`입니다(`application-local.yml`, 운영은 `docs/deployment.md` 9절).
+
+| 구성요소 | 지금 | 바꿀 때 |
+| --- | --- | --- |
+| `AccessTokens` | JWT 발급·검증(15분) | 그대로 |
+| `RefreshTokenStore` | `RedisRefreshTokenStore` — 로그인 단위(family)로 토큰 해시를 Redis에 둔다. 재발급 때 교체, 이미 쓴 토큰이 오면 그 로그인 폐기, 로그아웃은 그 로그인만, 탈퇴는 전체 폐기 | 그대로 |
+| `CredentialVerifier` | `FixedUserCredentialVerifier` — `FixedUser` + `APP_AUTH_DEMO_PASSWORD` | B9b: 실제 계정·카카오 구현으로 교체, `FixedUser`·`TemporaryUserSeeder` 삭제 |
+
+`AuthService`와 `AuthController`는 위 인터페이스만 보므로 교체해도 바뀌지 않습니다.
+
+### 테스트에서 인증
+
+자동 구성 MockMvc(`@AutoConfigureMockMvc`, `@WebMvcTest`)의 요청에는 고정 사용자의 액세스 토큰이 기본으로 실립니다(`DefaultBearerTokenContextCustomizerFactory`, `src/test/resources/META-INF/spring.factories`로 모든 테스트 컨텍스트에 붙음). 그래서 API를 부르는 테스트는 `Authorization`을 넣지 않아도 됩니다. 직접 넣으면 그 값을 씁니다.
+
+- `@WebMvcTest`는 인증 빈이 올라오지 않으므로 `@Import(TestAuthentication.class)`를 붙입니다(`ApiResponseContractTest` 참고).
+- 인증 실패를 보는 테스트는 기본 토큰이 없는 MockMvc를 `MockMvcBuilders.webAppContextSetup`으로 직접 만듭니다(`AuthIntegrationTest` 참고).
 
 목을 서비스로 바꾼 API는 `ApiResponseContractTest`에서 서비스를 `@MockitoBean`으로 대신해 DB 없이 계약만 봅니다.
 

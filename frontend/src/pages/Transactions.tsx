@@ -99,7 +99,7 @@ export function Transactions() {
     header: '가맹점',
     cell: (row) =>
     <span className="block min-w-0">
-          <span className="block truncate font-medium text-ink">{row.merchantNorm}</span>
+          <span className="block truncate font-normal text-ink">{row.merchantNorm}</span>
           <span className="block truncate text-small text-muted">{row.merchantRaw}</span>
           {/* 분류 열은 좁은 화면에서 숨기므로, 그 정보를 여기로 옮긴다 */}
           <span className="mt-1 block md:hidden">
@@ -126,7 +126,7 @@ export function Transactions() {
     width: 'w-32',
     cell: (row) =>
     <span className="block">
-          <span className="font-semibold text-ink">{formatWon(row.amount)}</span>
+          <span className="font-bold text-ink">{formatWon(row.amount)}</span>
           {row.installmentMonths > 0 &&
       <span className="block text-caption text-muted">
               {row.installmentMonths}개월 할부
@@ -167,7 +167,7 @@ export function Transactions() {
     <AppShell>
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-small font-semibold text-accent">거래</p>
+          <p className="text-small font-bold text-accent">거래</p>
           <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
             올린 카드내역
           </h1>

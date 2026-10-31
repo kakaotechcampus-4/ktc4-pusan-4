@@ -13,6 +13,10 @@ import java.util.Set;
 
 public final class JudgmentEngine {
 
+    /** 안분 속성. 값이 HOME_OFFICE_RATIO 면 결제금액을 문진의 작업공간 비율로 나눈다(자택 겸용). */
+    static final String APPORTIONMENT = "안분";
+    static final String HOME_OFFICE_RATIO = "작업공간비율";
+
     private JudgmentEngine() {
     }
 
@@ -144,8 +148,10 @@ public final class JudgmentEngine {
         // 미해소 질문이 결과를 바꿀 수 있을 때만 검토로 전환한다. 가산세 플래그만 세우는
         // G5 증빙 질문은 판정을 끌어내리지 않는다 — 경비 인정 여부는 앞 관문이 이미 확정했다.
         // 질문 자체는 그대로 실어 보내므로 화면은 여전히 되묻는다.
+        // 자택 겸용 안분(#65)은 문진의 작업공간 비율로 금액을 나눈다. 비율이 없으면 금액을 정할 수 없다.
         boolean review = questions.stream().anyMatch(JudgmentEngine::changesOutcome)
-            || answeredAccountConflict;
+            || answeredAccountConflict
+            || HOME_OFFICE_RATIO.equals(attributes.get(APPORTIONMENT)) && context.homeOfficeRatio() == null;
         Verdict verdict = review
             ? moreRestrictive(resolvedVerdict, Verdict.NEEDS_REVIEW)
             : resolvedVerdict;
@@ -261,7 +267,8 @@ public final class JudgmentEngine {
             question.factType(),
             scopeKey(question.groupBy(), transaction),
             question.options(),
-            question.effects()
+            question.effects(),
+            question.previousAnswer()
         );
     }
 

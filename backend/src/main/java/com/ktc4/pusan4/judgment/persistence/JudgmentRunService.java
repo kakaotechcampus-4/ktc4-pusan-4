@@ -13,6 +13,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
@@ -41,6 +42,7 @@ public class JudgmentRunService {
     private final TransactionRecordRepository transactionRepository;
     private final BusinessContextService contextService;
     private final JudgmentExecutor executor;
+    private final LimitSettlementService limitSettlement;
     private final ApplicationEventPublisher eventPublisher;
     private final UuidGenerator uuidGenerator;
     private final Clock clock;
@@ -52,6 +54,7 @@ public class JudgmentRunService {
         TransactionRecordRepository transactionRepository,
         BusinessContextService contextService,
         JudgmentExecutor executor,
+        LimitSettlementService limitSettlement,
         ApplicationEventPublisher eventPublisher,
         UuidGenerator uuidGenerator,
         Clock clock
@@ -62,6 +65,7 @@ public class JudgmentRunService {
         this.transactionRepository = transactionRepository;
         this.contextService = contextService;
         this.executor = executor;
+        this.limitSettlement = limitSettlement;
         this.eventPublisher = eventPublisher;
         this.uuidGenerator = uuidGenerator;
         this.clock = clock;
@@ -115,7 +119,9 @@ public class JudgmentRunService {
         UUID userId = batchRepository.findById(run.batchId()).orElseThrow().userId();
         BusinessContext context = contextService.find(userId, run.contextId());
         run.start(now());
-        return Optional.of(new RunStart(context, itemRepository.findPendingTransactionIds(runId)));
+        return Optional.of(new RunStart(
+            context, itemRepository.findPendingTransactionIds(runId), executor.references()
+        ));
     }
 
     /**
@@ -123,12 +129,12 @@ public class JudgmentRunService {
      * run 이 이미 끝났으면 판정하지 않고 false 를 돌려준다. 실행기는 거기서 멈춘다.
      */
     @Transactional
-    boolean judgeItem(UUID runId, UUID transactionId, BusinessContext context) {
+    boolean judgeItem(UUID runId, UUID transactionId, BusinessContext context, JudgmentReferences references) {
         JudgmentRunEntity run = lock(runId);
         if (!run.isRunning()) {
             return false;
         }
-        executor.judge(transactionId, context, new JudgmentOrigin(JudgmentOriginType.RUN, runId));
+        executor.judge(transactionId, context, new JudgmentOrigin(JudgmentOriginType.RUN, runId), references);
         item(runId, transactionId).succeed(now());
         run.recordSuccess(now());
         return true;
@@ -144,16 +150,22 @@ public class JudgmentRunService {
         run.recordFailure(now());
     }
 
+    /** 끝나면 한도를 다시 집계한다. 같은 트랜잭션이라 COMPLETED 로 보이는 run 은 한도도 반영돼 있다. */
     @Transactional
     void complete(UUID runId) {
         JudgmentRunEntity run = lock(runId);
         if (run.isRunning()) {
             run.complete(now());
+            limitSettlement.settleProvisional(batchRepository.findById(run.batchId()).orElseThrow().userId());
         }
     }
 
-    /** run 을 시작하지 못했다. 남은 PENDING 항목은 RUN_START_FAILED 실패가 되어 실패 목록에 보인다. */
-    @Transactional
+    /**
+     * run 을 시작하지 못했다(Context 를 읽지 못함, 판정 대기열이 가득 참 등). 남은 PENDING 항목은 RUN_START_FAILED 실패가 되어 실패 목록에 보인다.
+     * 대기열이 찬 경우는 run 을 만든 트랜잭션의 커밋 뒤(AFTER_COMMIT)에 불린다. 그때 REQUIRED 로 들어가면 이미 끝난
+     * 트랜잭션에 참여해 바꾼 내용이 커밋되지 않으므로 새 트랜잭션을 연다.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     void fail(UUID runId) {
         JudgmentRunEntity run = lock(runId);
         if (run.isQueued() || run.isRunning()) {
@@ -198,6 +210,6 @@ public class JudgmentRunService {
         return OffsetDateTime.now(clock);
     }
 
-    record RunStart(BusinessContext context, List<UUID> transactionIds) {
+    record RunStart(BusinessContext context, List<UUID> transactionIds, JudgmentReferences references) {
     }
 }
