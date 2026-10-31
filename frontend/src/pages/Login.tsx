@@ -23,7 +23,7 @@ export function Login() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const from = (location.state as LocationState | null)?.from ?? '/upload';
+  const from = (location.state as LocationState | null)?.from ?? '/';
 
   // 서버 문장은 그대로 띄우지 않는다. 상태 코드로 고른다
   const complete = async (nextEmail: string, nextPassword: string) => {
