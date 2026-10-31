@@ -36,3 +36,11 @@
 - 내보내기는 요약처럼 현재 판정을 엔티티로 다 읽는다. `input_facts` 가 큰 batch 에서는 요약과 같은 만큼 메모리를 쓴다.
 - V18 이 V15~17 보다 먼저 배포되면 Flyway 순서 검증에 걸린다. 머지 순서를 맞춰야 한다.
 - #152(업종 940909)는 `feature/auth-admin` 에만 있다. develop 의 FE 는 62010 을 보내 940909 카드 20장이 실제 서버에서 걸리지 않는다.
+
+## 02:30 업종코드 940909 (#152) 를 이 PR 로 가져옴
+
+- 커밋: 335ab9d 를 cherry-pick (1개)
+- #152 는 develop 이 아니라 `feature/auth-admin` 에 머지돼 있어, develop 의 문진은 62010 을 보내고 940909 만 매칭하는 카드 20장이 실제 서버에서 걸리지 않았다. 인증 스택을 기다리지 않고 이 PR 에 넣었다(사용자 결정).
+- 충돌은 `ApiResponseContractTest` 한 곳이었다. develop 쪽 `FixedUser.ID` 를 두고 업종만 940909 로 바꿨다.
+- 확인: FE `tsc` 오류 0, `vitest` 158 통과, `npm run build` 통과, lint 오류 0(경고 10건은 기존). 백엔드 `ApiResponseContractTest` 통과. 백엔드 변경은 스웨거 예시값과 계약 테스트 값뿐이라 전체 check 는 다시 돌리지 않았다.
+- 인증 스택이 나중에 develop 에 들어올 때 같은 변경이 겹친다. 같은 내용이라 충돌은 없을 것으로 보지만 확인하지 않았다.
