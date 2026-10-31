@@ -7,7 +7,13 @@ import React, {
   useRef,
   useState } from
 'react';
-import type { BusinessContext, BusinessContextRef, StoredBusinessContext, User } from '../types/domain';
+import type {
+  BusinessContext,
+  BusinessContextRef,
+  SignupRequest,
+  StoredBusinessContext,
+  User } from
+'../types/domain';
 import { api, seedSession } from '../api';
 
 /** 업종은 프리랜서·인적용역(국세청 업종코드 940909) 고정 */
@@ -30,11 +36,18 @@ export type AuthStatus = 'restoring' | 'anonymous' | 'signedIn';
 interface SessionValue {
   status: AuthStatus;
   isAuthenticated: boolean;
+  /** 로그인한 사용자 id. 계정이 바뀌면 바뀐다 */
+  userId: string | null;
+  /** 카카오 계정이면 로그인해도 null 이다 */
   email: string | null;
   /** users/me 의 역할 (가정. backend_api_plan.md 관리자 판별은 10/26 결정) */
   isAdmin: boolean;
   /** 로그인하고 내 정보를 읽는다. 실패하면 ApiRequestError 를 던진다 */
   signIn: (email: string, password: string) => Promise<void>;
+  /** 가입하고 바로 로그인한다. 실패하면 ApiRequestError 를 던진다 */
+  signUp: (body: SignupRequest) => Promise<void>;
+  /** 카카오 인가 코드로 로그인한다. 실패하면 ApiRequestError 를 던진다 */
+  signInWithKakao: (code: string) => Promise<void>;
   /** 이 브라우저의 로그인을 바로 지우고, 서버 로그아웃은 기다리지 않는다 */
   signOut: () => void;
   /** 서버에 저장된 배치 id */
@@ -52,6 +65,7 @@ const SessionContext = createContext<SessionValue | null>(null);
 export function SessionProvider({ children }: {children: React.ReactNode;}) {
   const [status, setStatus] = useState<AuthStatus>('restoring');
   const [user, setUser] = useState<User | null>(null);
+  const userId = user?.id ?? null;
   const email = user?.email ?? null;
   const [batchId, setBatchId] = useState<string | null>(seedSession?.batchId ?? null);
   const [context, setContext] = useState<BusinessContext | StoredBusinessContext | null>(null);
@@ -116,12 +130,13 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
   // 재발급까지 실패했다. 서버 로그아웃은 부르지 않는다 — 이미 풀린 세션이고, 부르면 다시 401 이 난다
   useEffect(() => api.auth.onLost(clear), [clear]);
 
-  const signIn = useCallback(async (nextEmail: string, password: string) => {
+  /** 로그인·가입·카카오 로그인이 같이 쓴다. 토큰을 받고 나서 내 정보를 읽어야 로그인한 것이다 */
+  const enter = useCallback(async (authenticate: () => Promise<void>) => {
     // 로그인한 채로 /login 에서 다른 계정으로 들어오면 앞 사람의 배치·문진·실행이 남는다.
     // start 는 이미 있는 배치를 덮지 않고, 문진 효과는 서버에 문진이 없으면 그대로 둔다 (#142 리뷰)
     clear();
     const startedAt = epoch.current;
-    await api.auth.login({ email: nextEmail, password });
+    await authenticate();
     try {
       const me = await api.users.me();
       // 그사이 로그아웃했거나 다시 로그인했다
@@ -133,13 +148,21 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
     }
   }, [clear, start]);
 
+  const signIn = useCallback(
+    (nextEmail: string, password: string) => enter(() => api.auth.login({ email: nextEmail, password })),
+    [enter]
+  );
+  const signUp = useCallback((body: SignupRequest) => enter(() => api.auth.signup(body)), [enter]);
+  const signInWithKakao = useCallback((code: string) => enter(() => api.auth.kakao({ code })), [enter]);
+
   /**
    * 3.2 — 서버에 이미 문진이 있으면 그것을 쓴다. 저장만 하고 다시 읽지 않으면
    * 새로고침할 때마다 「사업자 문진을 먼저 마쳐 주세요」로 돌아간다.
    * 문진 전이면 404 이고 http 구현이 null 로 바꿔 준다.
    */
   useEffect(() => {
-    if (email === null) return;
+    // 카카오 계정은 email 이 null 이라 사용자 id 로 본다
+    if (userId === null) return;
     let cancelled = false;
     void api.contexts.
     current().
@@ -154,7 +177,7 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
     return () => {
       cancelled = true;
     };
-  }, [email]);
+  }, [userId]);
 
   const signOut = useCallback(() => {
     void api.auth.logout().catch(() => undefined);
@@ -165,9 +188,12 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
     () => ({
       status,
       isAuthenticated: status === 'signedIn',
+      userId,
       email,
       isAdmin: user?.role === 'ADMIN',
       signIn,
+      signUp,
+      signInWithKakao,
       signOut,
       batchId,
       setBatchId,
@@ -176,7 +202,7 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
       contextRef,
       setContextRef
     }),
-    [status, email, user, signIn, signOut, batchId, context, contextRef]
+    [status, userId, email, user, signIn, signUp, signInWithKakao, signOut, batchId, context, contextRef]
   );
 
   return (

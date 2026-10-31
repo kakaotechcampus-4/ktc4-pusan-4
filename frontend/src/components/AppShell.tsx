@@ -4,6 +4,7 @@ import { CheckIcon, UserIcon } from 'lucide-react';
 import { DisclaimerBar } from './DisclaimerBar';
 
 import { useSession } from '../contexts/SessionContext';
+import { accountLabel } from '../utils/account';
 
 /**
  * 진행 단계. 순서는 PM 확정 흐름을 따른다:
@@ -162,14 +163,14 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
               'hover:bg-surface hover:text-ink'}`
               }>
 
-              {email}
+              {accountLabel(email)}
             </Link>
             {/* 이메일을 줄인 폭에서도 내 정보로 갈 수 있게 한다 */}
             <Link
               to="/account"
               aria-current={pathname.startsWith('/account') ? 'page' : undefined}
-              aria-label={`내 정보 (${email ?? ''})`}
-              title={email ?? undefined}
+              aria-label={`내 정보 (${accountLabel(email)})`}
+              title={accountLabel(email)}
               className={`hidden shrink-0 rounded-full p-2 transition-colors duration-150 ease-snap sm:inline-flex lg:hidden ${
               pathname.startsWith('/account') ?
               'bg-accent text-white' :

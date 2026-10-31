@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowRightIcon, InfoIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { DEFAULT_CONTEXT, useSession } from '../contexts/SessionContext';
@@ -46,12 +46,22 @@ saved ?
 } :
 DEFAULT_CONTEXT;
 
+/** 가입 직후에 왔다(Signup.tsx). from 은 로그인 전에 가려던 곳이다 */
+interface LocationState {
+  welcome?: boolean;
+  from?: string;
+}
+
 const cardClass = 'rounded-2xl border border-line bg-surface p-5';
 const labelClass = 'text-[14px] font-bold text-ink';
 const hintClass = 'mt-1 text-[13px] leading-6 text-muted';
 
 export function Interview() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const welcome = (location.state as LocationState | null)?.welcome === true;
+  /** 가입 직후에는 올린 카드내역이 없어 판정 확인으로 가도 막힌다. 카드내역부터 올리게 한다 */
+  const afterWelcome = (location.state as LocationState | null)?.from ?? '/upload';
   const { context, setContext, setContextRef } = useSession();
   const [form, setForm] = useState<BusinessContext>(() => formFrom(context));
   const [saving, setSaving] = useState(false);
@@ -95,7 +105,7 @@ export function Interview() {
       const ref = await api.contexts.create(form);
       setContext(form);
       setContextRef(ref);
-      navigate('/confirm');
+      navigate(welcome ? afterWelcome : '/confirm', { replace: welcome });
     } catch (caught) {
       setError(
         caught instanceof ApiRequestError ?
@@ -120,6 +130,16 @@ export function Interview() {
               저장되고, 판정 결과에는 어떤 버전으로 판단했는지 기록됩니다.
             </p>
           </header>
+
+          {welcome &&
+          <p
+            role="status"
+            className="mt-5 rounded-xl border border-accent-line bg-accent-soft px-4 py-3 text-[14px] leading-6 text-ink2">
+
+              가입을 마쳤습니다. 판정에 쓸 사업자 정보를 먼저 알려 주세요. 지금 하지 않아도 되고,
+              판정을 시작하기 전에만 마치면 됩니다.
+            </p>
+          }
 
           <div className="mt-6 space-y-4">
             <section className={cardClass}>
@@ -275,10 +295,10 @@ export function Interview() {
             </button>
             <button
               type="button"
-              onClick={() => navigate('/upload')}
+              onClick={() => welcome ? navigate(afterWelcome, { replace: true }) : navigate('/upload')}
               className="text-[13px] font-normal text-muted transition-colors duration-150 hover:text-ink">
               
-              이전 단계
+              {welcome ? '나중에 하기' : '이전 단계'}
             </button>
           </div>
         </form>

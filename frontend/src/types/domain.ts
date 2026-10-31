@@ -83,7 +83,8 @@ export interface Page<T> {
 
 export interface User {
   id: string;
-  email: string;
+  /** 카카오 계정이면 null 이다. 같은 이메일이어도 이메일 계정과 카카오 계정은 따로다 (api.md 1.1, #176) */
+  email: string | null;
   createdAt: string;
   /**
    * 관리자 판별. api.md 에는 아직 없다 — 관리자 판별 방식은 10/26 에 정한다(backend_api_plan.md).
@@ -92,10 +93,38 @@ export interface User {
   role?: 'USER' | 'ADMIN';
 }
 
-/** 로그인 요청. 인증 계약은 아직 api.md 에 없다(#139) */
+/** 로그인 요청 (api.md 1.1) */
 export interface LoginRequest {
   email: string;
   password: string;
+}
+
+/** 가입 인증 코드 요청 (#193) */
+export interface EmailVerificationRequest {
+  email: string;
+}
+
+/** 메일로 받은 6자리 코드 확인 (#193) */
+export interface EmailVerificationConfirmRequest {
+  email: string;
+  code: string;
+}
+
+/** 가입에 쓸 토큰. 30분 동안 그 이메일의 가입에만 쓸 수 있다 */
+export interface EmailVerificationConfirmed {
+  verificationToken: string;
+}
+
+/** 이메일 가입 (#193). password 는 8자 이상, UTF-8 72바이트 이하 */
+export interface SignupRequest {
+  email: string;
+  password: string;
+  verificationToken: string;
+}
+
+/** 카카오가 콜백 주소로 넘긴 인가 코드 (#176). 한 번만 쓸 수 있다 */
+export interface KakaoLoginRequest {
+  code: string;
 }
 
 // ── 3.2 사업자 Context ──────────────────────────────

@@ -5,6 +5,9 @@ import type {
   BulkAnswerResult,
   BusinessContext,
   BusinessContextRef,
+  EmailVerificationConfirmRequest,
+  EmailVerificationConfirmed,
+  EmailVerificationRequest,
   ClassificationResponseRequest,
   ClassificationResponseResult,
   ClassificationReview,
@@ -18,6 +21,7 @@ import type {
   JudgmentRunCreated,
   JudgmentRunFailure,
   JudgmentSummary,
+  KakaoLoginRequest,
   LoginRequest,
   OverrideRequest,
   Page,
@@ -33,6 +37,7 @@ import type {
   ReviewStatus,
   RuleCandidate,
   RuleCandidateStatus,
+  SignupRequest,
   Statute,
   StoredBusinessContext,
   Transaction,
@@ -97,12 +102,20 @@ export interface RuleCandidateQuery extends PageQuery {
 
 export interface Api {
   /**
-   * 인증. 계약이 아직 api.md 에 없어 #139 에 적은 대로 가정한다 — 액세스 토큰은 Authorization 헤더(메모리),
-   * 리프레시 토큰은 httpOnly 쿠키. 토큰은 이 층 안에만 있고 화면은 보지 않는다
+   * 인증 (api.md 1.1). 액세스 토큰은 Authorization 헤더(메모리), 리프레시 토큰은 httpOnly 쿠키.
+   * 토큰은 이 층 안에만 있고 화면은 보지 않는다
    */
   auth: {
     /** 성공하면 이후 요청에 토큰이 붙는다. 이메일·비밀번호가 틀리면 401 */
     login(body: LoginRequest): Promise<void>;
+    /** 가입 인증 코드를 메일로 보낸다 (#193). 코드는 5분 동안 쓸 수 있고, 다시 받기는 60초에 한 번이다 */
+    requestEmailVerification(body: EmailVerificationRequest): Promise<void>;
+    /** 코드를 확인하고 가입에 쓸 토큰을 받는다 */
+    confirmEmailVerification(body: EmailVerificationConfirmRequest): Promise<EmailVerificationConfirmed>;
+    /** 가입하고 바로 로그인한다. 성공하면 login 과 같다 */
+    signup(body: SignupRequest): Promise<void>;
+    /** 카카오 인가 코드로 로그인한다 (#176). 처음 온 회원이면 서버가 계정을 만든다 */
+    kakao(body: KakaoLoginRequest): Promise<void>;
     /** 새로고침 뒤 리프레시 쿠키로 로그인을 이어 간다. 이어 갈 수 없으면 false */
     restore(): Promise<boolean>;
     /** 이 브라우저의 토큰은 부르는 즉시 지운다. 서버 응답은 기다리지 않아도 된다 */

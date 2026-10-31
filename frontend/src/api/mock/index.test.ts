@@ -381,3 +381,56 @@ describe('로그인·관리자 (목업)', () => {
     await expect(api.admin.ruleCandidates.reject(items[0].id)).rejects.toMatchObject({ status: 409 });
   });
 });
+
+describe('가입·카카오 로그인 (목업, #193·#176)', () => {
+  it('코드 받기 → 확인 → 가입하면 바로 로그인되고, 그 비밀번호로 다시 들어온다', async () => {
+    await api.auth.requestEmailVerification({ email: ' New@Example.com ' });
+    const { verificationToken } = await api.auth.confirmEmailVerification({ email: 'new@example.com', code: '123456' });
+    await api.auth.signup({ email: 'new@example.com', password: 'longenough', verificationToken });
+    expect(await api.users.me()).toMatchObject({ email: 'new@example.com' });
+
+    await api.auth.logout();
+    await api.auth.login({ email: 'NEW@example.com', password: 'longenough' });
+    expect((await api.users.me()).email).toBe('new@example.com');
+    // 가입한 이메일은 코드를 다시 받을 수 없다
+    await expect(api.auth.requestEmailVerification({ email: 'new@example.com' })).rejects.toMatchObject({
+      status: 409,
+      code: 'EMAIL_ALREADY_EXISTS'
+    });
+  });
+
+  it('60초 안에 다시 받으면 429 이고 남은 초를 message 에 담는다', async () => {
+    await api.auth.requestEmailVerification({ email: 'a@example.com' });
+    const caught = await api.auth.requestEmailVerification({ email: 'a@example.com' }).catch((error: unknown) => error);
+    expect(caught).toMatchObject({ status: 429, code: 'VERIFICATION_RESEND_TOO_SOON' });
+    expect((caught as Error).message).toMatch(/\d+초/);
+  });
+
+  it('틀린 코드는 400 INVALID 이고, 5번 틀리면 맞는 코드도 EXPIRED 다', async () => {
+    await api.auth.requestEmailVerification({ email: 'b@example.com' });
+    for (let i = 0; i < 5; i += 1)
+    await expect(api.auth.confirmEmailVerification({ email: 'b@example.com', code: '000000' })).rejects.toMatchObject({
+      code: 'INVALID_VERIFICATION_CODE'
+    });
+    await expect(api.auth.confirmEmailVerification({ email: 'b@example.com', code: '123456' })).rejects.toMatchObject({
+      code: 'VERIFICATION_CODE_EXPIRED'
+    });
+  });
+
+  it('다른 이메일의 토큰이나 짧은 비밀번호로는 가입하지 못한다', async () => {
+    await api.auth.requestEmailVerification({ email: 'c@example.com' });
+    const { verificationToken } = await api.auth.confirmEmailVerification({ email: 'c@example.com', code: '123456' });
+    await expect(
+      api.auth.signup({ email: 'd@example.com', password: 'longenough', verificationToken })
+    ).rejects.toMatchObject({ code: 'EMAIL_NOT_VERIFIED' });
+    await expect(
+      api.auth.signup({ email: 'c@example.com', password: 'short', verificationToken })
+    ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    await expect(api.users.me()).rejects.toMatchObject({ status: 401 });
+  });
+
+  it('카카오 계정은 email 이 null 이다', async () => {
+    await api.auth.kakao({ code: 'any-code' });
+    expect(await api.users.me()).toMatchObject({ email: null, role: 'USER' });
+  });
+});

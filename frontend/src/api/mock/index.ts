@@ -203,8 +203,16 @@ const store = {
   failures: new Map<string, JudgmentRunFailure[]>(),
   /** 다음 업로드를 이 오류로 실패시킨다 (개발용) */
   failUpload: null as ApiRequestError | null,
-  /** 로그인한 이메일. 로그아웃하면 null 이고, 그때 users.me 는 401 이다 */
+  /** 로그인했는가. 로그아웃하면 false 이고, 그때 users.me 는 401 이다 */
+  signedIn: false,
+  /** 로그인한 이메일. 카카오 계정이면 null 이다 */
   email: null as string | null,
+  /** 목업에서 가입한 계정. 이메일 → 비밀번호 */
+  accounts: new Map<string, string>(),
+  /** 이메일 → 보낸 인증 코드의 상태 (#193) */
+  verifications: new Map<string, { sentAt: number; sentToday: number; attempts: number; used: boolean }>(),
+  /** 가입 토큰 → 인증한 이메일 */
+  verificationTokens: new Map<string, string>(),
   ruleCandidates: RULE_CANDIDATES.map((c) => ({ ...c })) as RuleCandidate[],
   /** 다음 비서 요청을 이 오류로 실패시킨다 (개발용) */
   failAssistant: null as ApiRequestError | null,
@@ -216,6 +224,23 @@ const store = {
  * 로그인 화면의 목업 전용 버튼과 안내도 이 값을 쓴다(Login.tsx)
  */
 export const MOCK_PASSWORD = 'demo1234';
+
+/** 목업 인증 코드. 메일을 보내지 않으므로 늘 이 값이다. 가입 화면의 목업 안내가 쓴다 */
+export const MOCK_VERIFICATION_CODE = '123456';
+
+/** 서버와 같은 규칙으로 이메일을 맞춘다 — 앞뒤 공백을 빼고 소문자 (api.md 1.1) */
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const CODE_TTL_MS = 5 * 60_000;
+const RESEND_MS = 60_000;
+
+const reject = (status: number, code: string, message: string) =>
+Promise.reject(new ApiRequestError(status, code, message));
+
+const signInAs = (email: string | null) => {
+  store.signedIn = true;
+  store.email = email;
+};
 
 /** 목업에서 관리자 화면을 보려면 admin@… 으로 로그인한다 */
 const isAdminEmail = (email: string | null) => email?.split('@')[0] === 'admin';
@@ -659,17 +684,66 @@ const mockChat = async ({ message, context }: AssistantChatRequest): Promise<Ass
 
 export const mockApi: Api = {
   auth: {
+    // 목업 비밀번호면 어떤 이메일이든 들어간다. 목업에서 가입한 계정은 그 비밀번호로도 들어간다
     login: ({ email, password }) => {
-      if (password !== MOCK_PASSWORD)
-      return Promise.reject(
-        new ApiRequestError(401, 'INVALID_CREDENTIALS', '이메일 또는 비밀번호가 올바르지 않습니다.')
-      );
-      store.email = email;
+      const key = normalizeEmail(email);
+      if (password !== MOCK_PASSWORD && store.accounts.get(key) !== password)
+      return reject(401, 'INVALID_CREDENTIALS', '이메일 또는 비밀번호가 올바르지 않습니다.');
+      signInAs(key);
+      return delay(undefined);
+    },
+    requestEmailVerification: ({ email }) => {
+      const key = normalizeEmail(email);
+      if (!EMAIL_PATTERN.test(key)) return reject(400, 'VALIDATION_ERROR', '이메일 형식이 아닙니다.');
+      if (store.accounts.has(key)) return reject(409, 'EMAIL_ALREADY_EXISTS', '이미 가입한 이메일입니다.');
+      const previous = store.verifications.get(key);
+      const at = Date.now();
+      if (previous && at - previous.sentAt < RESEND_MS) {
+        const left = Math.ceil((RESEND_MS - (at - previous.sentAt)) / 1000);
+        return reject(429, 'VERIFICATION_RESEND_TOO_SOON', `${left}초 뒤에 다시 요청할 수 있습니다.`);
+      }
+      if (previous && previous.sentToday >= 5)
+      return reject(429, 'VERIFICATION_DAILY_LIMIT', '오늘은 더 보낼 수 없습니다.');
+      store.verifications.set(key, { sentAt: at, sentToday: (previous?.sentToday ?? 0) + 1, attempts: 0, used: false });
+      return delay(undefined);
+    },
+    confirmEmailVerification: ({ email, code }) => {
+      const key = normalizeEmail(email);
+      if (!/^\d{6}$/.test(code)) return reject(400, 'VALIDATION_ERROR', '코드는 숫자 6자리입니다.');
+      const sent = store.verifications.get(key);
+      if (!sent || sent.used || sent.attempts >= 5 || Date.now() - sent.sentAt > CODE_TTL_MS)
+      return reject(400, 'VERIFICATION_CODE_EXPIRED', '코드를 다시 받아 주세요.');
+      if (code !== MOCK_VERIFICATION_CODE) {
+        sent.attempts += 1;
+        return reject(400, 'INVALID_VERIFICATION_CODE', '코드가 맞지 않습니다.');
+      }
+      sent.used = true;
+      const verificationToken = `mock-verification-${++seq}`;
+      store.verificationTokens.set(verificationToken, key);
+      return delay({ verificationToken });
+    },
+    signup: ({ email, password, verificationToken }) => {
+      const key = normalizeEmail(email);
+      if (password.length < 8 || new TextEncoder().encode(password).length > 72)
+      return reject(400, 'VALIDATION_ERROR', '비밀번호는 8자 이상, 72바이트 이하입니다.');
+      if (store.verificationTokens.get(verificationToken) !== key)
+      return reject(400, 'EMAIL_NOT_VERIFIED', '이메일 인증을 다시 해 주세요.');
+      if (store.accounts.has(key)) return reject(409, 'EMAIL_ALREADY_EXISTS', '이미 가입한 이메일입니다.');
+      store.verificationTokens.delete(verificationToken);
+      store.accounts.set(key, password);
+      signInAs(key);
+      return delay(undefined);
+    },
+    // 목업은 카카오에 다녀오지 않는다. 코드가 비어 있지 않으면 카카오 계정(이메일 없음)으로 들어간다
+    kakao: ({ code }) => {
+      if (!code) return reject(401, 'INVALID_KAKAO_CODE', '카카오 로그인을 다시 해 주세요.');
+      signInAs(null);
       return delay(undefined);
     },
     // 목업은 새로고침하면 상태가 사라지므로 이어 갈 로그인이 없다
     restore: () => delay(false),
     logout: () => {
+      store.signedIn = false;
       store.email = null;
       return delay(undefined);
     },
@@ -679,7 +753,7 @@ export const mockApi: Api = {
 
   users: {
     me: () =>
-    store.email === null ?
+    !store.signedIn ?
     Promise.reject(new ApiRequestError(401, 'UNAUTHORIZED', '로그인이 필요합니다.')) :
     delay({
       id: USER_ID,
