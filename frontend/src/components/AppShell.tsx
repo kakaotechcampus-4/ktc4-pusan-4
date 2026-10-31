@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { CheckIcon, UserIcon } from 'lucide-react';
 import { DisclaimerBar } from './DisclaimerBar';
+import { BugReportButton } from './BugReport';
 
 import { useSession } from '../contexts/SessionContext';
 import { accountLabel } from '../utils/account';
@@ -226,6 +227,14 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
           </p>
           <p className="tabular-nums">잠정 집계 · 당해연도 수입 확정 후 확정</p>
         </div>
+        <nav aria-label="도움말과 약관" className="mx-auto max-w-page px-6 pb-8 text-caption text-muted">
+          <ul className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <li><Link to="/faq" className="hover:text-ink hover:underline underline-offset-4">자주 묻는 질문</Link></li>
+            <li><Link to="/terms" className="hover:text-ink hover:underline underline-offset-4">이용약관</Link></li>
+            <li><Link to="/privacy" className="font-bold hover:text-ink hover:underline underline-offset-4">개인정보처리방침</Link></li>
+            <li><BugReportButton /></li>
+          </ul>
+        </nav>
       </footer>
     </div>);
 

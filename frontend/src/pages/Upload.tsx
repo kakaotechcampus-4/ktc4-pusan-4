@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   AlertTriangleIcon,
   ArrowRightIcon,
@@ -23,7 +24,12 @@ import type {
 '../parser';
 import type { UploadBatchCreated } from '../types/domain';
 import { formatNumber, formatPeriod, formatWon } from '../utils/format';
-import { APPROVAL_EXPORT_STEPS, ASSISTANT_DOES_NOT_SEND, ASSISTANT_SENDS } from '../components/assistant/help';
+import {
+  APPROVAL_EXPORT_STEPS,
+  ASSISTANT_DESTINATION,
+  ASSISTANT_DOES_NOT_SEND,
+  ASSISTANT_SENDS } from
+'../components/assistant/help';
 
 /** 실제 파일은 25–103KB 다. 5MB 면 몇 년치라 브라우저에서 바로 읽어도 느리지 않다 */
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -693,6 +699,10 @@ function DataBoundary() {
           <p className="font-bold text-ink">비서 Really 에게 물을 때 외부 모델로 보내는 것</p>
           <p className="mt-0.5 text-muted">{ASSISTANT_SENDS}</p>
           <p className="mt-1.5 text-caption text-muted">{ASSISTANT_DOES_NOT_SEND} 묻지 않으면 보내지 않습니다.</p>
+          <p className="mt-1.5 text-caption text-muted">
+            {ASSISTANT_DESTINATION}{' '}
+            <Link to="/privacy" className="underline underline-offset-4 hover:text-ink">개인정보처리방침</Link>
+          </p>
         </div>
       </div>
     </aside>);

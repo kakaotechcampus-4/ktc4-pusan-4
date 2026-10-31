@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Outlet, Route, Routes } from 'react-router-dom';
 import { SessionProvider, useSession } from './contexts/SessionContext';
 import { RequireAuth } from './components/RequireAuth';
 import { Assistant } from './components/assistant/Assistant';
@@ -11,6 +11,8 @@ import { Signup } from './pages/Signup';
 import { KakaoCallback } from './pages/KakaoCallback';
 import { Terms } from './pages/public/Terms';
 import { Privacy } from './pages/public/Privacy';
+import { NotFound } from './pages/public/NotFound';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { KAKAO_CALLBACK_PATH } from './auth/kakao';
 import { Upload } from './pages/Upload';
 import { Interview } from './pages/Interview';
@@ -69,6 +71,7 @@ export function App() {
     <SessionProvider>
       <BrowserRouter>
         <AssistantRoot>
+          <ErrorBoundary>
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
@@ -83,8 +86,9 @@ export function App() {
               <Route key={route.path} path={route.path} element={route.element} />
               )}
             </Route>
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<NotFound />} />
           </Routes>
+          </ErrorBoundary>
         </AssistantRoot>
       </BrowserRouter>
     </SessionProvider>);
