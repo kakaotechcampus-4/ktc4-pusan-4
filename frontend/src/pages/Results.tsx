@@ -196,9 +196,11 @@ export function Results() {
           }
               <span className="truncate">{transaction.merchantNorm}</span>
             </span>
+            {/* 승인일 열은 좁은 화면에서 숨기므로 여기로 옮긴다. 가맹점명 줄에 붙이면 말줄임에 같이 잘린다 */}
+            <span className="block whitespace-nowrap text-small tabular-nums text-muted sm:hidden">
+              {formatFullDate(transaction.approvedAt)}
+            </span>
             <span className="block truncate text-small text-muted">
-              {/* 승인일 열은 좁은 화면에서 숨기므로, 그 정보를 여기로 옮긴다 */}
-              <span className="sm:hidden">{formatFullDate(transaction.approvedAt)} · </span>
               {transaction.merchantRaw} · {transaction.merchantCategory}
               {transaction.installmentMonths > 0 &&
             ` · ${transaction.installmentMonths}개월 할부`}

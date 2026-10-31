@@ -89,6 +89,8 @@ export function Transactions() {
   {
     header: '승인일',
     width: 'w-[7.5rem]',
+    // 좁은 화면에서는 표가 옆으로 밀려 「제외하기」가 화면 밖으로 나간다. 날짜는 가맹점 칸으로 옮긴다
+    hideBelow: 'sm',
     cell: (row) =>
     <span className="whitespace-nowrap tabular-nums text-ink2">
           {formatFullDate(row.approvedAt)}
@@ -97,9 +99,13 @@ export function Transactions() {
   },
   {
     header: '가맹점',
+    width: 'w-full max-w-0',
     cell: (row) =>
     <span className="block min-w-0">
           <span className="block truncate font-normal text-ink">{row.merchantNorm}</span>
+          <span className="block whitespace-nowrap text-small tabular-nums text-muted sm:hidden">
+            {formatFullDate(row.approvedAt)}
+          </span>
           <span className="block truncate text-small text-muted">{row.merchantRaw}</span>
           {/* 분류 열은 좁은 화면에서 숨기므로, 그 정보를 여기로 옮긴다 */}
           <span className="mt-1 block md:hidden">
