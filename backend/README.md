@@ -91,7 +91,7 @@ bash ./backend/gradlew -p backend bootRun --args='--spring.profiles.active=local
 | 구성요소 | 지금 | 바꿀 때 |
 | --- | --- | --- |
 | `AccessTokens` | JWT 발급·검증(15분) | 그대로 |
-| `RefreshTokenStore` | `StatelessRefreshTokenStore` — 서명만 확인, 저장 없음. `revoke`·`revokeAll`은 아무것도 하지 않는다 | B9c: Redis 구현으로 빈만 교체(교체·폐기·탈퇴 시 전체 폐기) |
+| `RefreshTokenStore` | `RedisRefreshTokenStore` — 로그인 단위(family)로 토큰 해시를 Redis에 둔다. 재발급 때 교체, 이미 쓴 토큰이 오면 그 로그인 폐기, 로그아웃은 그 로그인만, 탈퇴는 전체 폐기 | 그대로 |
 | `CredentialVerifier` | `FixedUserCredentialVerifier` — `FixedUser` + `APP_AUTH_DEMO_PASSWORD` | B9b: 실제 계정·카카오 구현으로 교체, `FixedUser`·`TemporaryUserSeeder` 삭제 |
 
 `AuthService`와 `AuthController`는 위 인터페이스만 보므로 교체해도 바뀌지 않습니다.
