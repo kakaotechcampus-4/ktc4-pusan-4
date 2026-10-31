@@ -6,6 +6,7 @@ import { Assistant } from './components/assistant/Assistant';
 import { AssistantProvider } from './components/assistant/AssistantProvider';
 import { Landing } from './pages/Landing';
 import { Faq } from './pages/Faq';
+import { BugReport } from './pages/BugReport';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
 import { KakaoCallback } from './pages/KakaoCallback';
@@ -100,6 +101,7 @@ export function App() {
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/faq" element={<Faq />} />
+            <Route path="/bug-report" element={<BugReport />} />
             <Route path="/signup" element={<Signup />} />
             <Route path={KAKAO_CALLBACK_PATH} element={<KakaoCallback />} />
             <Route path="/terms" element={<Terms />} />
