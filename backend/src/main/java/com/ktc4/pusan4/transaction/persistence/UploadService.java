@@ -136,7 +136,9 @@ public class UploadService {
             .map(transaction -> new ClassificationInput(transaction.merchantRaw(), transaction.bizNo()))
             .toList());
 
-        int pending = 0;
+        // 분류 검토는 모아 두었다가 거래를 다 저장한 뒤 저장한다. 거래·검토 insert 가 번갈아 나가면
+        // JDBC 배치(hibernate.jdbc.batch_size)가 테이블이 바뀔 때마다 끊긴다. 부모(거래)가 먼저라 FK 순서도 지킨다.
+        List<ClassificationReviewEntity> reviews = new ArrayList<>();
         for (int i = 0; i < fresh.size(); i++) {
             ClassificationResult result = results.get(i);
             ClassificationStatus status = result.classified()
@@ -147,12 +149,12 @@ public class UploadService {
                 result.merchantNorm(), result.merchantCategory(), status, now);
             transactionRepository.save(transaction);
             if (status == ClassificationStatus.NEEDS_REVIEW && fresh.get(i).status() == SourceStatus.JUDGEABLE) {
-                reviewRepository.save(ClassificationReviewEntity.pending(uuidGenerator.generate(), transaction.id(), now));
-                pending++;
+                reviews.add(ClassificationReviewEntity.pending(uuidGenerator.generate(), transaction.id(), now));
             }
         }
+        reviews.forEach(reviewRepository::save);
 
-        return new UploadResult(batch.id(), fresh.size(), skipped, pending, now);
+        return new UploadResult(batch.id(), fresh.size(), skipped, reviews.size(), now);
     }
 
     /**
