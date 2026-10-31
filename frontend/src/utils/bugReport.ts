@@ -14,14 +14,20 @@ interface BugContext {
   userId: string | null;
 }
 
+/**
+ * 신고에 적어 주면 좋은 것 (#211). /bug-report 화면이 보여 주고, 메일 본문도 앞 셋을 칸으로 둔다.
+ * 「언제」는 메일 본문에 자동으로 채운다
+ */
+export const WHAT_TO_WRITE = [
+{ term: '무엇을 하려다', detail: '어느 화면에서 어떤 버튼을 눌렀는지' },
+{ term: '무엇을 봤는지', detail: '화면에 뜬 문구 그대로. 숫자가 안 맞으면 양쪽 숫자를 함께' },
+{ term: '무엇을 기대했는지', detail: '대신 어떻게 나왔어야 하는지' },
+{ term: '언제', detail: '날짜와 대략의 시각' }];
+
+
 const body = (context: BugContext, userAgent: string) =>
 [
-'무엇을 하다가 문제가 생겼나요?',
-'',
-'',
-'어떻게 되기를 기대했나요?',
-'',
-'',
+...WHAT_TO_WRITE.slice(0, 3).flatMap((item) => [`${item.term}:`, '', '']),
 '---',
 '아래는 자동으로 채운 정보입니다. 지워도 됩니다.',
 `화면: ${context.path}`,

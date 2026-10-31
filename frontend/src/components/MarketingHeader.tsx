@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useSession } from '../contexts/SessionContext';
 import { Button, Container } from './ui';
+import { BugReportButton } from './BugReport';
 
 /**
  * 랜딩·FAQ 같은 공개 화면의 머리. 랜딩 안 앵커 대신 별도 페이지로 간다.
@@ -8,9 +9,8 @@ import { Button, Container } from './ui';
  * 로그인 상태에 따라 오른쪽이 통째로 갈린다. 로그인을 이어 가는 동안은
  * 비워 두어, 로그인 버튼이 잠깐 보였다 바뀌지 않게 한다.
  */
-const NAV = [
-{ to: '/faq', label: 'FAQ' },
-{ to: '/bug-report', label: '버그 신고' }];
+const NAV = [{ to: '/faq', label: 'FAQ' }];
+const NAV_LINK = 'whitespace-nowrap text-body font-normal text-ink2 transition-colors duration-150 hover:text-ink';
 
 
 export function MarketingHeader() {
@@ -35,14 +35,15 @@ export function MarketingHeader() {
           <ul className="flex items-center gap-8">
             {NAV.map((item) =>
             <li key={item.to}>
-                <Link
-                to={item.to}
-                className="whitespace-nowrap text-body font-normal text-ink2 transition-colors duration-150 hover:text-ink">
-
+                <Link to={item.to} className={NAV_LINK}>
                   {item.label}
                 </Link>
               </li>
             )}
+            {/* 페이지로 옮기지 않고 창으로 띄운다(#211). /bug-report 는 꼬리말 링크와 직접 들어올 때 쓴다 */}
+            <li>
+              <BugReportButton className={NAV_LINK} icon={false} />
+            </li>
           </ul>
         </nav>
 
@@ -67,7 +68,7 @@ export function MarketingHeader() {
               <Button to="/login" variant="secondary" size="sm">
                 로그인
               </Button>
-              <Button to="/login" variant="soft" size="sm">
+              <Button to="/signup" variant="soft" size="sm">
                 회원가입
               </Button>
             </>

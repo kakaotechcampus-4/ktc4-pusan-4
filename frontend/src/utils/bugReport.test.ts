@@ -16,6 +16,8 @@ describe('bugReportMailto', () => {
     const params = new URLSearchParams(href.slice(href.indexOf('?') + 1));
     expect(params.get('subject')).toBe('[PreeT 버그 신고] /results');
     const text = params.get('body') ?? '';
+    expect(text).toContain('무엇을 하려다:');
+    expect(text).toContain('무엇을 기대했는지:');
     expect(text).toContain('화면: /results');
     expect(text).toContain('시각: 2026-10-31 20:40 (KST)');
     expect(text).toContain('계정 id: u-1');
