@@ -23,19 +23,19 @@
 | 이름 | 값 | 용도 |
 |---|---|---|
 | `canvas` | #FFFFFF | 페이지 바탕 |
-| `surface` | #F5F6F8 | 패널, 카드 |
-| `surface2` | #FFE600 | 첫 화면 큰 판 (한 곳뿐) |
+| `surface` | #F3F5F7 | 패널, 카드 |
+| `surface2` | #122E55 | 첫 화면 큰 판과 그 옆 숫자 카드. 위에 올리는 글자·그림은 흰색 |
 | `sheet` | #FFFFFF | 패널 위에서 흰 바탕이 필요할 때, 표 |
-| `line` / `line2` | #ECEEF1 / #F5F6F8 | 테두리·행 괘선 / 약한 구분선 |
-| `rule` | #1A1A1A | 표 머리 위 굵은 괘선 |
-| `ink` / `ink2` / `muted` | #0A0A0A / #2B2B2B / #5D6670 | 제목·강조 / 본문 / 보조 |
-| `accent` | #0A0A0A | 주된 동작, 지금 자리 알약 |
-| `accent-hover` / `accent-soft` / `accent-line` | #2B2B2B / #F5F6F8 | primary hover / 연한 채움 / 테두리 버튼·패널 안 구분선 (#DDE1E6) |
-| `link` | #1A6DFF | 문장 속 링크 |
+| `line` / `line2` | #E8ECF0 / #F3F5F7 | 테두리·행 괘선 / 약한 구분선 |
+| `rule` | #16181D | 표 머리 위 굵은 괘선 |
+| `ink` / `ink2` / `muted` | #16181D / #30363F / #67707E | 제목·강조 / 본문 / 보조 |
+| `accent` | #16181D | 주된 동작, 지금 자리 알약 |
+| `accent-hover` / `accent-soft` / `accent-line` | #30363F / #F3F5F7 | primary hover / 연한 채움 / 테두리 버튼·패널 안 구분선 (#DCE1E8) |
+| `link` | #1B64DA | 문장 속 링크 |
 | `highlight` | #FFE600 | 한 화면에 한 번만 쓰는 강조 |
-| `ok` / `ok-bg` / `ok-line` / `ok-bar` | #00703D / #E6F8F0 / #A8E6C9 / #12B76A | 가능 |
-| `warn` / `warn-bg` / `warn-line` / `warn-bar` | #955A00 / #FFF6E0 / #FFD98A / #F7A51B | 확인 필요 |
-| `deny` / `deny-bg` / `deny-line` / `deny-bar` | #C92A2A / #FFEDED / #FFC4C4 / #FF5A5A | 불가 |
+| `ok` / `ok-bg` / `ok-line` / `ok-bar` | #00703D / #E8F6F0 / #B2E3CE / #12B76A | 가능 |
+| `warn` / `warn-bg` / `warn-line` / `warn-bar` | #8A5A10 / #FDF3E3 / #EFD7A4 / #F7A51B | 확인 필요 |
+| `deny` / `deny-bg` / `deny-line` / `deny-bar` | #C5283D / #FDEDEF / #F7CDD4 / #FF5A5A | 불가 |
 
 **상태색 규칙**
 - `ok·warn·deny`는 `bg + line + text` 세 개를 항상 세트로 쓴다. 글자만 빨갛게 하지 않는다.
@@ -164,6 +164,8 @@
 
 ### OrbitStage
 - 첫 화면 큰 판 안에서만 쓴다. 동심원 위를 그림이 돌고 가운데 문구가 바뀐다.
+- 바탕이 `surface2`(남색)라 그림은 흰 바탕 + 먹색 획으로 그린다. 외곽선은 두지
+  않는다 — 남색 바탕이 이미 테두리 역할을 한다.
 - 바깥 테 52초(시계) / 안쪽 테 78초(반시계). 테가 도는 만큼 그림에 **역회전을 같은 주기로** 걸어야 그림이 안 뒤집힌다.
 - 궤도는 **정사각 판 안에서** 돈다. 가로·세로 %를 따로 쓰면 원이 아니라 타원이 되어 그림이 좌우 끝으로 밀린다.
 - 그림이 제목·가운데 문구를 덮지 않도록 중심을 오른쪽(66%)으로 비키고 안쪽 반지름을 34% 이상으로 둔다.
