@@ -2,7 +2,7 @@
 
 카테캠 팀 계정의 Ubuntu 24.04 EC2 한 대에 `deploy/compose.yaml`을 실행한다. 배포 코드는 별도 worktree의 `feat/aws-deploy`에서 작성해 `develop`으로 머지한다. 첫 `release`는 이 설정이 포함된 `develop` 커밋에서 만들고, 이후 `develop → release` PR의 push가 자동 배포를 시작한다. 기존 `develop → main` 멘토 리뷰 흐름은 유지한다.
 
-현재 프런트엔드는 목업 데이터로 동작하며 주요 백엔드 API는 501을 반환한다. 이 배포의 완료 기준은 전체 스택의 정상 기동이다. 실제 카드 데이터로 시험하기 전에는 인증과 API 연동을 완료해야 한다.
+프런트엔드는 백엔드 API를 HTTP로 호출하고, 백엔드는 목 응답 없이 실제 서비스로 답한다. 로그인은 9절, 배포 뒤 확인은 각 절의 헬스체크를 따른다.
 
 ## 1. AWS와 DNS 준비
 
