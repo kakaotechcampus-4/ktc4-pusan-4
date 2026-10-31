@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- 머리말 로고의 막대 셋(AppShell·MarketingHeader)과 같은 모양·색이다. 로고가 정해지면 바꾼다 -->
+  <rect x="6" y="5" width="5" height="22" rx="1.5" fill="#16181D"/>
+  <rect x="13.5" y="5" width="5" height="22" rx="1.5" fill="#16181D"/>
+  <rect x="21" y="5" width="5" height="22" rx="1.5" fill="#FFE600"/>
+</svg>

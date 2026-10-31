@@ -108,6 +108,21 @@ describe('분류 확인 (3.5)', () => {
     await api.classificationReviews.respond({ reviewIds: group.reviewIds, merchantCategory: '카페' });
     expect((await api.uploads.get(batchId)).classificationPendingCount).toBe(before - group.count);
   });
+
+  it('제외한 거래의 분류 확인은 목록과 대기 수에서 빠지고, 다시 넣으면 돌아온다', async () => {
+    const { items } = await api.classificationReviews.list({ batchId, status: 'PENDING' });
+    const target = items[0];
+    const before = (await api.uploads.get(batchId)).classificationPendingCount;
+
+    await api.transactions.exclude(target.transactionId);
+    expect((await api.uploads.get(batchId)).classificationPendingCount).toBe(before - 1);
+    const after = await api.classificationReviews.list({ batchId, status: 'PENDING' });
+    expect(after.items.some((r) => r.id === target.id)).toBe(false);
+    expect(after.unresolved.count).toBe(before - 1);
+
+    await api.transactions.include(target.transactionId);
+    expect((await api.uploads.get(batchId)).classificationPendingCount).toBe(before);
+  });
 });
 
 describe('업로드 (3.3) — 올린 거래가 실제로 남는가', () => {

@@ -1,9 +1,11 @@
 import React from 'react';
 import { MarketingHeader } from './MarketingHeader';
 import { MarketingFooter } from './MarketingFooter';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 /** 로그인 없이 보는 안내 화면(약관·처리방침·FAQ·없는 주소). 랜딩과 같은 머리말·꼬리말을 쓴다 */
-export function PublicLayout({ children }: {children: React.ReactNode;}) {
+export function PublicLayout({ title, children }: {title: string;children: React.ReactNode;}) {
+  useDocumentTitle(title);
   return (
     <div className="flex min-h-full flex-col bg-canvas">
       <MarketingHeader />

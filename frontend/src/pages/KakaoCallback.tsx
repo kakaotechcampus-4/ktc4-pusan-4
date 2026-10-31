@@ -62,7 +62,7 @@ export function KakaoCallback() {
   }, [navigate, signInWithKakao]);
 
   return (
-    <AuthLayout>
+    <AuthLayout title="카카오 로그인">
       {error ?
       <>
           <h1 className="text-[26px] font-bold tracking-tight text-ink">

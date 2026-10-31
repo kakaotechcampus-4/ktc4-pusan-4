@@ -1,4 +1,5 @@
 import React from 'react';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { CheckIcon, UserIcon } from 'lucide-react';
 import { DisclaimerBar } from './DisclaimerBar';
@@ -17,8 +18,12 @@ const STEPS = [
 { path: '/upload', label: '카드내역' },
 { path: '/preview', label: '분류 확인' },
 { path: '/interview', label: '사업자 문진' },
-{ path: '/run', label: '판정' },
+// 판정 진행은 실행 id 가 주소에 있어야 한다(/run/:runId). 단계를 누르면 판정 전 확인으로 간다
+{ path: '/run', to: '/confirm', label: '판정' },
 { path: '/results', label: '결과' }];
+
+/** /upload 가 /uploads 에도 걸리지 않게 경로 조각 단위로 맞춘다 */
+const under = (pathname: string, prefix: string) => pathname === prefix || pathname.startsWith(`${prefix}/`);
 
 /** 빵부스러기에 쓸 이름. [무리, 화면] */
 const CRUMB: Record<string, [string, string]> = {
@@ -32,7 +37,8 @@ const CRUMB: Record<string, [string, string]> = {
   '/results': ['판정', '판정 결과'],
   '/questions': ['판정', '되묻기'],
   '/summary': ['판정', '세무사 전달 요약'],
-  '/account': ['내 정보', '내 정보']
+  '/account': ['내 정보', '내 정보'],
+  '/admin': ['관리자', '규칙 후보']
 };
 
 /** 흐름의 단계가 아니라 언제든 들러보는 자료 화면 */
@@ -63,16 +69,11 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
   const navigate = useNavigate();
   const { email, isAdmin, signOut } = useSession();
   const refs = isAdmin ? [...REFS, ADMIN_REF] : REFS;
-  const activeIndex = STEPS.findIndex((step) =>
-  pathname.startsWith(step.path)
-  );
-  const alias = Object.entries(STEP_ALIAS).find(([prefix]) =>
-  pathname.startsWith(prefix)
-  );
+  const activeIndex = STEPS.findIndex((step) => under(pathname, step.path));
+  const alias = Object.entries(STEP_ALIAS).find(([prefix]) => under(pathname, prefix));
   const currentIndex = alias ? alias[1] : activeIndex;
-  const crumb = Object.entries(CRUMB).find(([prefix]) =>
-  pathname.startsWith(prefix)
-  )?.[1];
+  const crumb = Object.entries(CRUMB).find(([prefix]) => under(pathname, prefix))?.[1];
+  useDocumentTitle(crumb?.[1]);
 
   return (
     <div className="flex min-h-full w-full flex-col bg-canvas">
@@ -95,7 +96,8 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
             <span className="hidden text-body text-ink2 sm:block">판정</span>
           </Link>
 
-          {showSteps && currentIndex >= 0 &&
+          {/* 자료 화면(거래·업로드 이력·내 정보)에서도 보여 결과로 돌아올 수 있게 한다 */}
+          {showSteps &&
           <nav aria-label="진행 단계" className="hidden shrink-0 md:block">
               <ol className="flex items-center gap-1.5">
                 {STEPS.map((step, index) => {
@@ -103,15 +105,16 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
                 const active = index === currentIndex;
                 return (
                   <li key={step.path}>
-                      <span
+                      <Link
+                      to={step.to ?? step.path}
                       aria-current={active ? 'step' : undefined}
                       title={active ? undefined : step.label}
-                      className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-small ${
+                      className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-small transition-colors duration-150 ease-snap ${
                       active ?
                       'bg-accent font-bold text-white' :
                       done ?
-                      'text-ink2' :
-                      'text-muted'}`
+                      'text-ink2 hover:bg-surface' :
+                      'text-muted hover:bg-surface hover:text-ink2'}`
                       }>
                       
                         {done ?
@@ -125,7 +128,7 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
                           </span>
                       }
                         {step.label}
-                      </span>
+                      </Link>
                     </li>);
 
               })}
@@ -136,7 +139,7 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
           <div className="flex min-w-0 items-center gap-3 text-small text-muted">
             <nav aria-label="자료" className="flex shrink-0 items-center gap-1.5">
               {refs.map((ref) => {
-                const active = pathname.startsWith(ref.path);
+                const active = under(pathname, ref.path);
                 return (
                   <Link
                     key={ref.path}

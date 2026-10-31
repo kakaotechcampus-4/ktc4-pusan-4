@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 const PRINCIPLES = [
 '판정마다 조문의 시행 버전을 붙입니다',
@@ -8,7 +9,8 @@ const PRINCIPLES = [
 
 
 /** 로그인·가입·카카오 콜백이 같이 쓰는 틀. 왼쪽은 브랜드 패널(lg 이상), 오른쪽은 폼 */
-export function AuthLayout({ children }: {children: React.ReactNode;}) {
+export function AuthLayout({ title, children }: {title: string;children: React.ReactNode;}) {
+  useDocumentTitle(title);
   return (
     <div className="flex min-h-full w-full bg-surface">
       {/* 좌측 브랜드 패널 */}

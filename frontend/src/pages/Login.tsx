@@ -67,7 +67,7 @@ export function Login() {
   };
 
   return (
-    <AuthLayout>
+    <AuthLayout title="로그인">
       <h1 className="text-[26px] font-bold tracking-tight text-ink">
         로그인
       </h1>

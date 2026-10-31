@@ -52,6 +52,13 @@ interface LocationState {
   from?: string;
 }
 
+/** 인적용역(940909)은 직전연도 수입 7,500만 원부터 복식부기 의무다. 화면 힌트와 같은 기준이다 */
+const DOUBLE_ENTRY_FROM = 75_000_000;
+const dutyFor = (revenue: number): BookkeepingDuty => revenue >= DOUBLE_ENTRY_FROM ? '복식부기' : '간편장부';
+
+/** 오늘(한국 시각) 날짜. 개업일은 오늘을 넘길 수 없다 */
+const todayKst = () => new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
+
 const cardClass = 'rounded-2xl border border-line bg-surface p-5';
 const labelClass = 'text-[14px] font-bold text-ink';
 const hintClass = 'mt-1 text-[13px] leading-6 text-muted';
@@ -68,6 +75,9 @@ export function Interview() {
   const [error, setError] = useState<string | null>(null);
   /** 한 번이라도 고쳤으면 늦게 온 저장 문진으로 덮지 않는다 */
   const edited = useRef(false);
+  /** 기장의무를 직접 골랐으면 수입금액이 바뀌어도 바꾸지 않는다. 고르기 전에는 수입금액을 따라간다 */
+  const dutyChosen = useRef(false);
+  const today = todayKst();
 
   // 새로고침 직후에는 저장된 문진(3.2)이 화면보다 늦게 온다
   useEffect(() => {
@@ -83,7 +93,8 @@ export function Interview() {
   };
 
   const bookkeeping =
-  form.prevYearRevenue >= 75_000_000 ? '복식부기 의무자' : '간편장부 대상자';
+  dutyFor(form.prevYearRevenue) === '복식부기' ? '복식부기 의무자' : '간편장부 대상자';
+  const futureOpen = form.businessOpenDate > today;
   const homeOffice = form.homeOfficeRatio > 0;
 
   const impacts = [
@@ -99,6 +110,10 @@ export function Interview() {
     event.preventDefault();
     // 두 번 누르면 같은 문진이 버전 두 개로 저장된다
     if (saving) return;
+    if (futureOpen) {
+      setError('개업일이 오늘보다 뒤입니다. 날짜를 확인해 주세요.');
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -121,7 +136,7 @@ export function Interview() {
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
         <form onSubmit={(event) => void submit(event)}>
           <header>
-            <p className="text-[13px] font-bold text-accent">1단계 · 인식</p>
+            <p className="text-[13px] font-bold text-accent">3단계 · 사업자 문진</p>
             <h1 className="mt-1.5 text-[28px] font-bold tracking-tight text-ink">
               사업자 문진
             </h1>
@@ -169,9 +184,11 @@ export function Interview() {
                   type="number"
                   min={0}
                   value={form.prevYearRevenue}
-                  onChange={(event) =>
-                  update('prevYearRevenue', Number(event.target.value))
-                  }
+                  onChange={(event) => {
+                    const revenue = Number(event.target.value);
+                    update('prevYearRevenue', revenue);
+                    if (!dutyChosen.current) update('bookkeepingDuty', dutyFor(revenue));
+                  }}
                   className="w-56 rounded-xl border border-line px-3.5 py-2.5 text-[14px] tabular-nums text-ink" />
                 
                 <span className="text-[13px] tabular-nums text-muted">
@@ -189,10 +206,15 @@ export function Interview() {
                 id="openDate"
                 type="date"
                 value={form.businessOpenDate}
+                max={today}
+                aria-invalid={futureOpen}
                 onChange={(event) =>
                 update('businessOpenDate', event.target.value)
                 }
                 className="mt-3 rounded-xl border border-line px-3.5 py-2.5 text-[14px] tabular-nums text-ink" />
+              {futureOpen &&
+              <p role="alert" className="mt-2 text-small text-deny">개업일은 오늘이나 그 전이어야 합니다.</p>
+              }
               
             </section>
 
@@ -205,7 +227,10 @@ export function Interview() {
                 className="mt-3"
                 name="기장의무"
                 value={form.bookkeepingDuty}
-                onChange={(value) => update('bookkeepingDuty', value)}
+                onChange={(value) => {
+                  dutyChosen.current = true;
+                  update('bookkeepingDuty', value);
+                }}
                 options={BOOKKEEPING} />
               
             </section>

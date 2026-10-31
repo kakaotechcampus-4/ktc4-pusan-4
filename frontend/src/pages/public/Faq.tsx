@@ -116,7 +116,7 @@ const GROUPS: {title: string;items: Item[];}[] = [
 /** 자주 묻는 질문. 랜딩에서 거는 링크는 재성 몫이다 */
 export function Faq() {
   return (
-    <PublicLayout>
+    <PublicLayout title="자주 묻는 질문">
       <header>
         <p className="text-small font-bold text-accent">PreeT</p>
         <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">자주 묻는 질문</h1>

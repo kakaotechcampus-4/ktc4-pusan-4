@@ -495,7 +495,9 @@ function PreviewCard({
   { header: '이유', cell: (u) => <span className="whitespace-nowrap">{UNSENT_REASON[u.code]}</span> }];
 
 
-  const head = rows.slice(0, 10);
+  // 보내지 않는 행은 위 표에 따로 있다. 여기에는 서버로 갈 행만 보인다
+  const unsentIndex = new Set(unsendable.map((u) => u.index));
+  const head = rows.filter((_, index) => !unsentIndex.has(index)).slice(0, 10);
   const rowColumns: Column<ParsedRow>[] = [
   { header: '승인일', cell: (r) => <span className="whitespace-nowrap tabular-nums">{r.approvedAt || '—'}</span> },
   { header: '가맹점명', cell: (r) => r.rawMerchant || '—' },
@@ -558,11 +560,11 @@ function PreviewCard({
       {head.length > 0 &&
       <div className="mt-6">
           <h3 className="text-body font-bold text-ink">
-            처음 {formatNumber(head.length)}행
+            보낼 거래 중 처음 {formatNumber(head.length)}건
           </h3>
           <Table
           className="mt-3"
-          caption={`읽은 행 중 처음 ${head.length}행`}
+          caption={`보낼 거래 중 처음 ${head.length}건`}
           columns={rowColumns}
           rows={head}
           rowKey={(r) => String(rows.indexOf(r))} />

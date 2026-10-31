@@ -195,7 +195,7 @@ export function Signup() {
 
 
   return (
-    <AuthLayout>
+    <AuthLayout title="이메일로 가입">
       <h1 className="text-[26px] font-bold tracking-tight text-ink">
         이메일로 가입
       </h1>

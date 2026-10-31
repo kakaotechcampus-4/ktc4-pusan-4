@@ -14,19 +14,39 @@ import { Privacy } from './pages/public/Privacy';
 import { NotFound } from './pages/public/NotFound';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { KAKAO_CALLBACK_PATH } from './auth/kakao';
-import { Upload } from './pages/Upload';
-import { Interview } from './pages/Interview';
-import { Confirm } from './pages/Confirm';
-import { Run, RunEntry } from './pages/Run';
-import { Results } from './pages/Results';
-import { Questions } from './pages/Questions';
-import { Summary } from './pages/Summary';
-import { Styleguide } from './pages/Styleguide';
-import { ClassificationPreview } from './pages/ClassificationPreview';
-import { Uploads } from './pages/Uploads';
-import { Transactions } from './pages/Transactions';
-import { Account } from './pages/Account';
-import { Admin } from './pages/Admin';
+import { Loader2Icon } from 'lucide-react';
+
+/**
+ * 로그인 뒤 화면은 들어갈 때 읽는다. 한 덩어리로 묶으면 첫 화면(랜딩·로그인)이 판정 화면 코드까지 받아
+ * 번들이 500kB 를 넘는다. 화면들은 이름으로 내보내므로 default 로 바꿔 넘긴다
+ */
+const page = <K extends string,>(load: () => Promise<Record<K, React.ComponentType>>, name: K) =>
+React.lazy(() => load().then((module) => ({ default: module[name] })));
+
+const Upload = page(() => import('./pages/Upload'), 'Upload');
+const Interview = page(() => import('./pages/Interview'), 'Interview');
+const Confirm = page(() => import('./pages/Confirm'), 'Confirm');
+const Run = page(() => import('./pages/Run'), 'Run');
+const RunEntry = page(() => import('./pages/Run'), 'RunEntry');
+const Results = page(() => import('./pages/Results'), 'Results');
+const Questions = page(() => import('./pages/Questions'), 'Questions');
+const Summary = page(() => import('./pages/Summary'), 'Summary');
+/** 개발용 화면이다. 배포 빌드에는 넣지 않는다 */
+const Styleguide = import.meta.env.DEV ? page(() => import('./pages/Styleguide'), 'Styleguide') : null;
+const ClassificationPreview = page(() => import('./pages/ClassificationPreview'), 'ClassificationPreview');
+const Uploads = page(() => import('./pages/Uploads'), 'Uploads');
+const Transactions = page(() => import('./pages/Transactions'), 'Transactions');
+const Account = page(() => import('./pages/Account'), 'Account');
+const Admin = page(() => import('./pages/Admin'), 'Admin');
+
+function PageLoading() {
+  return (
+    <p role="status" className="flex min-h-full items-center justify-center gap-2 bg-canvas text-body text-muted">
+      <Loader2Icon className="h-4 w-4 animate-spin text-accent" aria-hidden="true" />
+      화면을 불러오고 있습니다…
+    </p>);
+
+}
 
 /** 로그인 필요 라우트 */
 const PROTECTED: { path: string; element: React.ReactElement }[] = [
@@ -75,6 +95,7 @@ export function App() {
       <BrowserRouter>
         <AssistantRoot>
           <ErrorBoundary>
+          <React.Suspense fallback={<PageLoading />}>
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
@@ -83,7 +104,7 @@ export function App() {
             <Route path={KAKAO_CALLBACK_PATH} element={<KakaoCallback />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />
-            <Route path="/styleguide" element={<Styleguide />} />
+            {Styleguide && <Route path="/styleguide" element={<Styleguide />} />}
             <Route element={<SignedIn />}>
               {PROTECTED.map((route) =>
               <Route key={route.path} path={route.path} element={route.element} />
@@ -91,6 +112,7 @@ export function App() {
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </React.Suspense>
           </ErrorBoundary>
         </AssistantRoot>
       </BrowserRouter>

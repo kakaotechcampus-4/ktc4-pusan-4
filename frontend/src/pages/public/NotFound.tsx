@@ -6,7 +6,7 @@ import { Button } from '../../components/ui';
 export function NotFound() {
   const { isAuthenticated } = useSession();
   return (
-    <PublicLayout>
+    <PublicLayout title="찾는 화면이 없습니다">
       <div className="py-16 text-center">
         <p className="text-small font-bold tabular-nums text-accent">404</p>
         <h1 className="mt-2 text-h2 font-bold tracking-tight text-ink">찾는 화면이 없습니다</h1>

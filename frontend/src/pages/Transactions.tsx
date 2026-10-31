@@ -207,10 +207,11 @@ export function Transactions() {
         </div>
       </div>
 
-      {/* 비어 있어도 DOM 에 남아 있어야 바뀐 내용을 읽는다 */}
-      <div role="status">
+      {/* 비어 있어도 DOM 에 남아 있어야 바뀐 내용을 읽는다.
+          아래쪽 행에서 다시 넣으면 안내가 화면 밖에 생겨 보이지 않으므로 머리말 아래에 붙여 둔다 */}
+      <div role="status" className="sticky top-[76px] z-20">
         {rerunNeeded &&
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn-line bg-warn-bg px-4 py-3">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn-line bg-warn-bg px-4 py-3 shadow-panel">
             <p className="text-small leading-6 text-ink2">
               {rerunNeeded === 'classify' ?
             '분류가 안 된 거래가 있습니다. 분류 확인을 마친 뒤 판정을 새로 실행해야 결과에 반영됩니다.' :

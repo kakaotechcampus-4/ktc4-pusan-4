@@ -5,7 +5,7 @@ import { SUPPORT_EMAIL } from '../../utils/contact';
 /** 이용약관. 가입 화면의 [필수] 동의가 이 문서를 가리킨다 */
 export function Terms() {
   return (
-    <PublicLayout>
+    <PublicLayout title="이용약관">
       <LegalHeader title="이용약관" effective="2026년 11월 6일" />
 
       <LegalSection title="1. 서비스">

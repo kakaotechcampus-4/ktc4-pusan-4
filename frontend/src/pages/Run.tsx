@@ -27,14 +27,21 @@ const FAILURE_TEXT: Record<string, { label: string; detail: string }> = {
 };
 const UNKNOWN_FAILURE = { label: '실패', detail: '처리하지 못했습니다.' };
 
+/** 실패한 거래는 이만큼만 이름과 함께 보이고, 나머지는 「외 N건」으로 센다 */
+const FAILURES_SHOWN = 5;
+
+/**
+ * 판정 엔진의 단계(G0~G6). 사용자가 읽는 화면이라 엔진 용어(불산입 열거·버킷·안분) 대신 하는 일을 적는다.
+ * 단계 id 는 판정 상세의 「막힌 단계」와 맞춰 보도록 남긴다
+ */
 const GATES = [
-{ id: 'G0', label: '형식 검증', detail: '승인내역 여부 · 필수 컬럼 · 중복 키' },
-{ id: 'G1', label: '불산입 열거', detail: '소득세법 제33조 각 호 필터' },
-{ id: 'G2', label: '통상성', detail: '제27조 · 업종 프로파일 940909' },
-{ id: 'G3', label: '속성 추출', detail: '자산 · 안분율 · 기간 · 한도버킷' },
-{ id: 'G4', label: '금액 산정', detail: '안분 후 절사 · 상각범위액' },
-{ id: 'G5', label: '한도 누적', detail: '접대비 · 기부금 버킷' },
-{ id: 'G6', label: '근거 부착 검증', detail: '조문 ID 실재 확인 · 0건이면 저장 거부' }];
+{ id: 'G0', label: '파일 확인', detail: '승인내역인지, 필요한 칸과 중복을 봅니다' },
+{ id: 'G1', label: '법에서 막은 지출 거르기', detail: '소득세법 제33조에 적힌 항목' },
+{ id: 'G2', label: '업종에 맞는 지출인지', detail: '제27조 · 업종 940909 기준' },
+{ id: 'G3', label: '지출 성격 정하기', detail: '자산인지, 업무 비율·기간·한도가 있는지' },
+{ id: 'G4', label: '인정 금액 계산', detail: '업무 비율만큼 나누고, 자산은 한 해 몫만' },
+{ id: 'G5', label: '한도 확인', detail: '접대비·기부금 한도를 넘는지' },
+{ id: 'G6', label: '근거 조문 붙이기', detail: '조문이 없으면 결과를 저장하지 않습니다' }];
 
 
 
@@ -131,12 +138,15 @@ export function Run() {
 
         if (next.failedCount > 0) {
           void api.runs.
-          failures(id, { size: 100 }).
+          failures(id, { size: FAILURES_SHOWN }).
           then(async (page) => {
             setFailures(page.items);
-            // 실패 목록은 transactionId 만 준다. 사람이 알아볼 이름을 붙인다
-            const list = await api.transactions.list({ batchId: next.batchId, size: 100 });
-            setFailedTx(new Map(list.items.map((t) => [t.id, t])));
+            // 실패 목록은 transactionId 만 준다. 보여 줄 거래만 따로 읽어 이름을 붙인다.
+            // 배치 거래를 앞에서부터 읽으면 뒤쪽 거래의 이름이 빠진다
+            const found = await Promise.all(
+              page.items.map((failure) => api.transactions.get(failure.transactionId).catch(() => null))
+            );
+            setFailedTx(new Map(found.filter((t): t is Transaction => t !== null).map((t) => [t.id, t])));
           }).
           catch(() => setLoadError('실패한 거래 목록을 읽지 못했습니다.'));
         }
@@ -182,7 +192,7 @@ export function Run() {
       <div className="mx-auto max-w-3xl">
         <header className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-small font-bold text-accent">2단계 · 계획</p>
+            <p className="text-small font-bold text-accent">4단계 · 판정</p>
             <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
               {loadError && !run ?
               '판정 상태를 확인할 수 없습니다' :
@@ -197,7 +207,7 @@ export function Run() {
           </div>
           <p className="flex items-center gap-1.5 text-caption tabular-nums text-muted">
             <RadioIcon className="h-3.5 w-3.5" aria-hidden="true" />
-            {runId ? `run ${runId.slice(0, 13)}` : '실행 없음'}
+            {runId ? `실행 ${runId.slice(0, 8)}` : '실행 없음'}
             {runId && !loadError && ' · 새로고침해도 이어집니다'}
           </p>
         </header>
@@ -365,7 +375,7 @@ export function Run() {
             }
             {failures && failures.length > 0 &&
             <ul className="mt-4 divide-y divide-line2 rounded-xl border border-line2 bg-canvas">
-              {failures.slice(0, 5).map((failure) => {
+              {failures.slice(0, FAILURES_SHOWN).map((failure) => {
               const transaction = failedTx.get(failure.transactionId);
               const text = FAILURE_TEXT[failure.errorCode] ?? UNKNOWN_FAILURE;
               return (
@@ -392,9 +402,9 @@ export function Run() {
                   </li>);
 
             })}
-              {run && run.failedCount > 5 &&
+              {run && run.failedCount > FAILURES_SHOWN &&
             <li className="px-3.5 py-2 text-caption text-muted">
-                  외 {formatNumber(run.failedCount - 5)}건
+                  외 {formatNumber(run.failedCount - FAILURES_SHOWN)}건
                 </li>
             }
             </ul>

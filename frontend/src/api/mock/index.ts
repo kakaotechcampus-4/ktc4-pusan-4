@@ -478,8 +478,17 @@ const pendingGroups = (status?: string, batchId?: string) => {
 const byImpact = (a: QuestionGroup, b: QuestionGroup) =>
 b.count - a.count || b.totalAmount - a.totalAmount || a.questionIds[0].localeCompare(b.questionIds[0]);
 
+/**
+ * 지금 판정 대상(JUDGEABLE)인 거래의 Review 만 센다(api.md 3.5). 거래를 제외하면 목록과 미해소 집계에서
+ * 빠지고, 다시 넣으면 돌아온다. 업로드 배치의 classificationPendingCount 도 같은 기준이다
+ */
 const filterReviews = (status?: string, batchId?: string) =>
-store.reviews.filter((r) => (!status || r.status.code === status) && (!batchId || r.batchId === batchId));
+store.reviews.filter(
+  (r) =>
+  (!status || r.status.code === status) &&
+  (!batchId || r.batchId === batchId) &&
+  transactionOf(r.transactionId)?.effectiveStatus.code === 'JUDGEABLE'
+);
 
 const pendingReviewCount = (batchId: string) => filterReviews('PENDING', batchId).length;
 
