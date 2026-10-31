@@ -66,7 +66,7 @@ bash ./backend/gradlew -p backend bootRun --args='--spring.profiles.active=local
 2. `/actuator/health`가 `UP`을 반환하는지
 3. Flyway가 `flyway_schema_history` 테이블을 생성하는지
 
-`integrationTest`와 `check`를 실행하기 전에는 Docker가 실행 중이어야 합니다. CI는 `test` 다음 `integrationTest`를 실행하며, 특정 클래스를 지정하지 않으므로 이후 추가되는 `*IntegrationTest`도 자동으로 포함합니다. 현재는 도메인 단위 테스트가 없어 `test`가 `NO-SOURCE`로 완료됩니다.
+`integrationTest`와 `check`를 실행하기 전에는 Docker가 실행 중이어야 합니다. CI는 `test` 다음 `integrationTest`를 실행하며, 특정 클래스를 지정하지 않으므로 이후 추가되는 `*IntegrationTest`도 자동으로 포함합니다. 클래스명이 `*IntegrationTest`가 아닌 단위 테스트(`AccessTokensTest`, `HolidaySyncTest` 등)는 Docker 없이 `test`에서 실행됩니다.
 
 ## 목 응답
 

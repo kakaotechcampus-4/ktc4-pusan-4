@@ -271,7 +271,7 @@ flowchart LR
 | B8 | B | 10/26 → 10/18 (#156, #158) | `GET /classification-reviews`와 `POST /classification-responses`를 구현한다. 사용자 응답은 개인 scope의 `merchant_dict`에 저장한다. 해당 batch에 완료된 run이 없으면 분류만 확정하고 `judgedCount=0`으로 응답한다. 완료된 run이 있으면 최근 run의 Context로 `rejudge`한다(api.md "판정 처리" 절). |
 | B9a | B | 10/27 | Redis 인프라를 추가한다. 로컬 `compose.yaml`, `deploy/compose.yaml`(`maxmemory` 128MB, AOF 켜기), `deploy/deploy.sh` 헬스체크, `spring-boot-starter-data-redis`, Testcontainers Redis 설정을 포함한다. |
 | B9b | B | 10/28, 일부 10/18 (#154, #155) | 인증을 도입한다. 확정한 인증 API 계약에 따라 로그인과 액세스 토큰(JWT) 발급을 구현한다. `CurrentUser` 리졸버 구현체는 Bearer 토큰 검증 방식으로 교체한다. **중간 발표(10/22) 때문에 일부를 먼저 올렸다(#154, #155, 머지 대기)**: 계약(api.md 1.1), 액세스 토큰, Bearer 검증, 로그인·재발급·로그아웃 API 를 구현했고, 고정 사용자 하나만 로그인한다. 남은 일은 `CredentialVerifier` 를 실제 계정·카카오 구현으로 바꾸고 `FixedUser`·`TemporaryUserSeeder` 를 지우는 것이다. |
-| B9c | B | 10/29, 일부 10/18 (#155) | 리프레시 토큰 재발급과 로그아웃을 구현한다. 저장 규칙은 [저장소 결정](#저장소-결정)을 따른다. 탈퇴하면 해당 사용자의 토큰을 모두 삭제한다. 재발급·로그아웃 API 는 B9b 와 함께 먼저 올렸다(#155, 머지 대기). 지금 `StatelessRefreshTokenStore` 는 서명만 확인해 `revoke`·`revokeAll` 이 아무것도 하지 않는다. 남은 일은 `RefreshTokenStore` 의 Redis 구현(교체 시 이전 토큰 폐기, 로그아웃 폐기, 탈퇴 시 `revokeAll`)을 빈으로 바꿔 끼우는 것이다. |
+| B9c | B | 10/29, 일부 10/18 (#155) | 리프레시 토큰 재발급과 로그아웃을 구현한다. 저장 규칙은 `docs/architecture.md` "저장소 결정"을 따른다. 탈퇴하면 해당 사용자의 토큰을 모두 삭제한다. 재발급·로그아웃 API 는 B9b 와 함께 먼저 올렸다(#155, 머지 대기). 지금 `StatelessRefreshTokenStore` 는 서명만 확인해 `revoke`·`revokeAll` 이 아무것도 하지 않는다. 남은 일은 `RefreshTokenStore` 의 Redis 구현(교체 시 이전 토큰 폐기, 로그아웃 폐기, 탈퇴 시 `revokeAll`)을 빈으로 바꿔 끼우는 것이다. |
 | M1 | B | 10/30 | 규칙 후보 관리자 API. [발표 준비](#발표-준비)를 참고한다. B10보다 먼저 진행한다. 버퍼가 줄어서 발표에 필요한 M1을 먼저 확보한다. |
 
 ### 4주차 (11/2~11/5): 발표 기능과 버퍼
@@ -296,20 +296,7 @@ flowchart LR
 
 ## 저장소 결정
 
-| 데이터 | 저장소 | 이유 |
-| --- | --- | --- |
-| Idempotency-Key와 최초 응답 | Postgres (`idempotency_key` 테이블) | 업로드의 부작용(batch·거래 저장)은 같은 Postgres 안에서 발생한다. 키 기록을 같은 트랜잭션으로 묶으면 "키는 남았는데 batch는 없다"와 같은 불일치가 생기지 않는다. batch를 삭제할 때 키를 `DELETED`로 변경하는 작업도 같은 트랜잭션에서 처리한다. |
-| 리프레시 토큰 | Redis | 업무 데이터와 트랜잭션으로 묶을 필요가 없다. TTL로 만료된 토큰을 자동 정리하므로 별도 삭제 작업이 필요 없다. 데이터가 유실되어도 재로그인으로 해결할 수 있어 Redis를 처음 도입할 때의 위험이 작다. |
-
-리프레시 토큰 저장 규칙:
-
-- 리프레시 토큰은 userId와 로그인 세션 식별자(familyId)를 담은 JWT로 발급한다. Redis에서 키가 삭제된 뒤에도 누구의 토큰인지 알 수 있어야 하기 때문이다.
-- 키 구조
-  - `refresh:{familyId}` → `{ userId, tokenHash }`. TTL은 리프레시 토큰 만료 기간과 같다.
-  - `user:{userId}:families` → 해당 사용자의 familyId Set. 탈퇴(`DELETE /users/me`)나 전체 로그아웃 시 한 번에 삭제하는 데 사용한다. 로그인할 때마다 Set의 TTL을 리프레시 토큰 만료 기간으로 갱신해 오래된 Set이 남지 않도록 한다.
-- 토큰 원문 대신 해시를 저장한다.
-- 재발급(rotation)은 Lua 스크립트 하나로 원자적으로 처리한다. 저장된 tokenHash와 전달된 토큰이 같으면 새 토큰의 해시로 변경한다. 다르면 이미 사용된 토큰을 재사용한 것으로 판단해 해당 family를 삭제한다(해당 기기만 로그아웃).
-- AOF를 켜서 재배포 시 모든 사용자가 로그아웃되지 않도록 한다. EC2 메모리가 4GB이므로 `maxmemory`를 128MB로 제한한다.
+`docs/architecture.md` "저장소 결정"으로 옮겼다.
 
 ## 발표 준비
 
@@ -362,7 +349,7 @@ gantt
   - `backend/README.md` "단위 테스트 NO-SOURCE"
   - `docs/deployment.md` "501"
 - 설계 맥락을 설명해야 하는 비자명한 결정은 해당 PR에서 `docs/`에 기록한다.
-  - 저장소 결정(위 절의 내용을 `docs/architecture.md`로 옮긴다)
+  - 저장소 결정(`docs/architecture.md`로 옮겼다)
   - run 비동기 방식
   - 삭제 정책
   - 금액 계산 규칙
