@@ -81,12 +81,15 @@ interface JudgmentDetailPanelProps {
   focusKey?: number;
   /** 수정·해제로 현재 판정이 바뀌었을 때 */
   onChanged: () => void;
+  /** 이 거래를 판정 대상에서 뺐을 때. 가맹점 이름을 넘긴다 */
+  onExcluded?: (merchant: string) => void;
 }
 
 export function JudgmentDetailPanel({
   judgment,
   focusKey = 0,
-  onChanged
+  onChanged,
+  onExcluded
 }: JudgmentDetailPanelProps) {
   const transaction = judgment.transaction;
   const [target, setTarget] = useState<Target | null>(null);
@@ -223,12 +226,27 @@ export function JudgmentDetailPanel({
     setError(null);
     try {
       await api.judgments.removeOverride(judgment.origin.id);
-      setDone('수정을 되돌렸습니다. 규칙 엔진의 판정을 다시 씁니다.');
+      // 되돌리면 직접 바꾸기 전의 현재 판정으로 돌아간다. 그 판정은 답변 반영이나 분류 확인 반영일 수도 있다
+      setDone('수정을 되돌렸습니다. 직접 바꾸기 전의 판정을 다시 씁니다.');
       editHeading.current?.focus();
       onChanged();
     } catch (caught) {
       setError(errorMessage(caught, '수정을 되돌리지 못했습니다. 잠시 후 다시 시도해 주세요.'));
     } finally {
+      setBusy(false);
+    }
+  };
+
+  /** 회의의 「결제 내역 삭제」. 거래를 지우지 않고 판정 대상에서 뺀다(3.4). 거래 화면에서 다시 넣을 수 있다 */
+  const exclude = async () => {
+    if (busy || !onExcluded) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.transactions.exclude(judgment.transactionId);
+      onExcluded(transaction.merchantNorm);
+    } catch (caught) {
+      setError(errorMessage(caught, '판정 대상에서 빼지 못했습니다. 잠시 후 다시 시도해 주세요.'));
       setBusy(false);
     }
   };
@@ -485,6 +503,19 @@ export function JudgmentDetailPanel({
           </p>
         }
       </section>
+
+      {onExcluded &&
+      <section className="border-b border-line px-5 py-4">
+          <h3 className="text-body font-bold text-ink">판정할 필요가 없는 거래라면</h3>
+          <p className="mt-1.5 text-caption text-muted">
+            판정 대상에서 빼면 결과와 합계에서 사라집니다. 경비가 아니라는 뜻이면 위에서 불가로 바꿔 주세요.
+            거래는 지우지 않아서 거래 화면에서 다시 넣을 수 있습니다.
+          </p>
+          <Button variant="secondary" size="sm" className="mt-3" disabled={busy} onClick={() => void exclude()}>
+            판정 대상에서 빼기
+          </Button>
+        </section>
+      }
 
       <section className="px-5 py-4">
         <h3 className="text-body font-bold text-ink">판정 이력</h3>

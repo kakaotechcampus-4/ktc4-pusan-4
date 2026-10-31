@@ -27,3 +27,16 @@ body {
 ::selection {
   background: #ffe600;
 }
+
+/* 요약을 PDF 로 저장할 때(Summary.tsx 「PDF로 저장」). 비서 패널이 준 오른쪽 여백과 배경색을 빼고 본문만 찍는다 */
+@media print {
+  @page {
+    margin: 14mm;
+  }
+  body {
+    padding-right: 0 !important;
+    background: #fff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

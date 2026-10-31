@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRightIcon, CopyCheckIcon, CopyIcon, SearchXIcon } from 'lucide-react';
+import { ArrowRightIcon, CopyCheckIcon, CopyIcon, PrinterIcon, SearchXIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { Button, Empty, Table, type Column } from '../components/ui';
 import { useSession } from '../contexts/SessionContext';
@@ -117,11 +117,20 @@ export function Summary() {
   const period = batchQ.data ? periodLabel(batchQ.data) : null;
 
   const header =
-  <header>
-      <p className="text-small font-bold text-accent">4단계 · 반영</p>
-      <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
-        {period ? `${period} 요약` : '판정 요약'}
-      </h1>
+  <header className="flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <p className="text-small font-bold text-accent">4단계 · 반영</p>
+        <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
+          {period ? `${period} 요약` : '판정 요약'}
+        </h1>
+      </div>
+      {/* PDF 는 서버에서 만들지 않는다. 인쇄용 스타일(index.css)로 화면 틀을 빼고 브라우저 인쇄로 저장한다 */}
+      {summary && summary.totalCount > 0 &&
+    <Button variant="secondary" size="sm" className="print:hidden" onClick={() => window.print()}>
+          <PrinterIcon className="h-4 w-4" aria-hidden="true" />
+          PDF로 저장
+        </Button>
+    }
     </header>;
 
 
@@ -356,7 +365,7 @@ export function Summary() {
             불러오지 못해 문장에서 뺀 것: {omitted.join(', ')}. 새로고침한 뒤 다시 복사해 주세요.
           </p>
         }
-        <div className="mt-4 flex flex-wrap items-center gap-3">
+        <div className="mt-4 flex flex-wrap items-center gap-3 print:hidden">
           <Button variant="secondary" size="sm" disabled={!text || settling} onClick={() => void copyText()}>
             {copy === 'done' ?
             <CopyCheckIcon className="h-4 w-4" aria-hidden="true" /> :

@@ -75,7 +75,7 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
 
   return (
     <div className="flex min-h-full w-full flex-col bg-canvas">
-      <header className="sticky top-0 z-30 bg-canvas/95 backdrop-blur">
+      <header className="sticky top-0 z-30 bg-canvas/95 backdrop-blur print:hidden">
         {/*
           한 줄을 넘기면 한글이 음절 단위로 꺾인다. 줄바꿈을 막고, 폭이 모자라면 덜 중요한 것부터 접는다:
           xl 미만 — 지금 단계가 아닌 단계 이름 · lg 미만 — 귀속 연도, 이메일(아이콘으로) · md 미만 — 단계 표시
@@ -199,7 +199,7 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
       {crumb &&
       <nav
         aria-label="현재 위치"
-        className="mx-auto w-full max-w-page px-6 pt-8 text-caption text-muted">
+        className="mx-auto w-full max-w-page px-6 pt-8 text-caption text-muted print:hidden">
 
           <ol className="flex items-center gap-2">
             <li>
@@ -219,7 +219,7 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
         {children}
       </main>
 
-      <footer className="mt-10 bg-surface">
+      <footer className="mt-10 bg-surface print:hidden">
         <div className="mx-auto flex max-w-page flex-col gap-1 px-6 py-8 text-caption text-muted sm:flex-row sm:items-center sm:justify-between">
           <p>
             카드내역 원본은 서버에 저장하지 않습니다. 카드번호·계좌번호는 브라우저

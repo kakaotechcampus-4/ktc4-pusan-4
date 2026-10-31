@@ -60,7 +60,10 @@ function SignedIn() {
     <RequireAuth>
       <>
         <Outlet />
-        <Assistant />
+        {/* 요약을 PDF 로 인쇄할 때 떠 있는 비서 버튼·패널이 찍히지 않게 한다 */}
+        <div className="print:hidden">
+          <Assistant />
+        </div>
       </>
     </RequireAuth>);
 
