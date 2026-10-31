@@ -193,12 +193,13 @@ export interface Api {
     respond(body: QuestionResponseRequest): Promise<QuestionResponseResult>;
     /** 남은 꼬리 질문을 factType 단위로 한 번에 닫는다 */
     bulkAnswer(body: BulkAnswerRequest): Promise<BulkAnswerResult>;
-    /** 다른 업로드에서 같은 질문에 한 답 (명세 3.1). 아직 백엔드 일정에 없다 */
+    /** 다른 업로드에서 같은 질문에 한 답 (명세 3.1, api.md GET /questions/suggestions) */
     suggestions(batchId: string): Promise<{items: QuestionSuggestion[];}>;
   };
   /**
-   * 비서 Really (docs/agent-secretary.md 9·10장). 중계·진행 상황·세무대리인 질문 API 는 아직 백엔드 일정에 없다.
-   * 오류는 중계가 1.3 형식으로 바꿔 준다. 429 는 Retry-After(ApiRequestError.retryAfter)
+   * 비서 Really (docs/agent-secretary.md 9·10장). 중계는 api.md POST /assistant/chat.
+   * 검증 실패는 400, 맥락의 업로드·거래가 없거나 남의 것이면 404 BATCH_NOT_FOUND·TRANSACTION_NOT_FOUND,
+   * 한도는 429 ASSISTANT_RATE_LIMITED + Retry-After(ApiRequestError.retryAfter), AI 서버 장애는 503
    */
   assistant: {
     chat(body: AssistantChatRequest): Promise<AssistantChatResponse>;

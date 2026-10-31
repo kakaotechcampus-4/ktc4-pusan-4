@@ -338,7 +338,7 @@ export const httpApi: Api = {
     suggestions: (batchId) => get('/questions/suggestions', { batchId })
   },
 
-  // 아래 경로는 명세 10장의 이름을 따른 가정이다. 백엔드가 정하면 맞춘다
+  // 경로는 api.md 와 같다. 세무대리인 질문(/handoff-notes)만 아직 서버에 없다
   assistant: {
     chat: (body) => post('/assistant/chat', body)
   },

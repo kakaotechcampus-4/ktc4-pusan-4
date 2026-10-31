@@ -520,8 +520,8 @@ export interface RuleCandidate {
 }
 
 // ── 비서 Really (docs/agent-secretary.md 9·10장) ────
-// 중계·진행 상황·지난번 답·세무대리인 질문 API 는 아직 백엔드 일정에 없다.
-// 모양은 비서 도구 코드(ai/assistant/tools.py, ai/eval/assistant_fake.py)를 따른다 — 실제 모양이 있는 곳이 여기뿐이다
+// 중계·진행 상황·지난번 답은 #185 로 서버에 들어왔다(api.md). 세무대리인 질문 API 만 아직 없다 —
+// 그 모양은 비서 도구 코드(ai/assistant/tools.py)를 따른다
 
 export interface AssistantMessage {
   role: 'user' | 'assistant';
@@ -562,15 +562,21 @@ export interface AssistantChatResponse {
   traceId: string | null;
 }
 
+/** 다음 할 일. 아래 순서로 처음 맞는 것 하나다. 마지막 실행이 FAILED 면 CONFIRM 이다 (api.md GET /progress) */
+export type NextStep = 'CLASSIFY' | 'INTERVIEW' | 'CONFIRM' | 'QUESTIONS' | 'RESULTS';
+
 /** GET /progress?batchId. 비서 도구 get_status 가 읽는 필드 */
 export interface Progress {
-  batch: { label: string; transactionCount: number } | null;
+  /** label 은 「국민 · 2026-09」, 여러 달이면 「국민 · 2026-01~2026-03」 */
+  batch: { id: string; label: string; transactionCount: number };
   /** 수입·이름·이메일은 담지 않는다 */
   context: { version: number; bookkeeping: BookkeepingDuty; hasEmployee: boolean } | null;
   classification: { pendingCount: number; pendingAmount: number };
-  run: { status: RunStatus } | null;
+  /** 이 업로드의 최근 판정 실행. 실행한 적 없으면 null */
+  run: { id: string; status: Coded<RunStatus> } | null;
   questions: { pendingCount: number; pendingAmount: number; fillableFromPrevious: number };
-  next: { step: string; route: string; label: string } | null;
+  /** route 와 label 은 서버 값을 그대로 쓴다 */
+  next: { step: NextStep; route: string; label: string };
 }
 
 /**
@@ -580,11 +586,15 @@ export interface Progress {
 export interface QuestionSuggestion {
   groupKey: string;
   factType: string;
+  /** 규칙 카드 질문 코드 */
+  code?: string;
   tier: 'A' | 'B' | 'C';
   value?: string | null;
+  /** 「9월 업로드(국민)」. 연도는 없고, 여러 달이면 「7~9월 업로드(국민)」 */
   sourceLabel?: string;
   conflict?: boolean;
-  history?: { value: string; sourceLabel: string }[];
+  /** 충돌했거나 가장 최근 답이 일괄 응답(bulk)이면 값 대신 이것을 준다 */
+  history?: { value: string; sourceLabel: string; bulk?: boolean }[];
   historyCounts?: Record<string, number>;
   reason?: string;
 }

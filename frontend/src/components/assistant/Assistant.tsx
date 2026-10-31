@@ -1,102 +1,95 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MessageCircleIcon, SendIcon, XIcon } from 'lucide-react';
+import { BotIcon, ChevronDownIcon, SendIcon, XIcon } from 'lucide-react';
 import { Badge, Button, Input, cn } from '../ui';
 import { useAssistant } from './context';
 import type { ChatEntry } from './context';
 import { HELP_TOPICS } from './help';
 import { blockedReason, MESSAGE_CHARS, PROPOSAL_LABEL } from './logic';
 
-/** 패널 자리(right-5 + w-[25rem])에 화면과의 사이 1.5rem 을 더한 폭 */
-const PANEL_SPACE = '27.75rem';
-/** 패널을 비켜도 화면이 남는 폭. 이보다 좁으면 패널이 화면 위에 뜬다 */
-const WIDE = '(min-width: 1024px)';
-
 /**
  * 비서 Really. 로그인 뒤 모든 화면 오른쪽 아래의 버튼과 대화 패널 (FR-1).
  * 비서는 제안 카드만 만들고, 바꾸는 일은 사용자가 [적용]을 눌러야 기존 API 로 일어난다.
- * 패널은 화면을 가리지 않는 대화창이라 Modal 이 아니다 — 열어 둔 채로 화면을 쓸 수 있다
+ * 패널은 화면 위에 떠 있는 대화창이다(Modal 이 아니다). 화면을 밀지 않고 덮기 때문에 버튼은 늘 두고,
+ * 다시 누르면 접는다 — 질문 카드를 가리면 바로 접고 답할 수 있게 (#143 리뷰)
  */
 export function Assistant() {
-  const { open, setOpen, nudge, dismissNudge } = useAssistant();
+  const { open, setOpen, nudge, dismissNudge, toast } = useAssistant();
   const navigate = useNavigate();
   const button = useRef<HTMLButtonElement>(null);
   const wasOpen = useRef(false);
 
-  // 닫으면 버튼으로 초점을 돌려준다
+  // 접으면 버튼으로 초점을 돌려준다
   useEffect(() => {
     if (wasOpen.current && !open) button.current?.focus();
     wasOpen.current = open;
   }, [open]);
 
-  // 넓은 화면에서 패널을 열면 오른쪽에 패널 폭만큼 여백을 준다. 가운데 놓인 화면이 왼쪽으로 비켜,
-  // 열어 둔 채로 답할 선택지를 가리지 않는다
-  useEffect(() => {
-    if (!open) return;
-    const wide = window.matchMedia(WIDE);
-    const place = () => {
-      document.body.style.paddingRight = wide.matches ? PANEL_SPACE : '';
-    };
-    place();
-    wide.addEventListener('change', place);
-    return () => {
-      wide.removeEventListener('change', place);
-      document.body.style.paddingRight = '';
-    };
-  }, [open]);
-
-  if (open) return <Panel onClose={() => setOpen(false)} />;
-
   return (
-    <div className="fixed bottom-5 right-5 z-40 flex flex-col items-end gap-2">
-      {nudge &&
-      <div
+    <>
+      {open && <Panel onClose={() => setOpen(false)} />}
+      {/* 적용 결과는 왼쪽 아래에 띄운다. 오른쪽은 패널과 버튼이 차지한다 */}
+      {toast &&
+      <p
         role="status"
-        className="w-72 rounded-2xl border border-line bg-surface p-4 text-small text-ink2 shadow-panel motion-safe:animate-rise">
+        className="fixed bottom-5 left-5 z-50 max-w-[calc(100vw-2.5rem)] rounded-2xl bg-ink px-4 py-3 text-small leading-6 text-white shadow-panel motion-safe:animate-rise sm:max-w-sm">
 
-          <div className="flex items-start gap-2">
-            <p className="flex-1 leading-6">{nudge.text}</p>
-            <button
-            type="button"
-            aria-label="알림 닫기"
-            onClick={dismissNudge}
-            className="shrink-0 rounded-lg p-1 text-muted hover:bg-canvas hover:text-ink">
-
-              <XIcon className="h-4 w-4" aria-hidden="true" />
-            </button>
-          </div>
-          {nudge.route &&
-        <Button
-          size="sm"
-          variant="secondary"
-          className="mt-3"
-          onClick={() => {
-            if (nudge.route) navigate(nudge.route);
-            dismissNudge();
-          }}>
-
-              {nudge.actionLabel ?? '보기'}
-            </Button>
-        }
-        </div>
+          {toast}
+        </p>
       }
-      <button
-        ref={button}
-        type="button"
-        onClick={() => setOpen(true)}
-        className="flex items-center gap-2 rounded-full bg-ink px-4 py-3 text-body font-bold text-white shadow-panel transition-transform duration-150 ease-snap hover:-translate-y-0.5">
+      {/* 좁은 화면에서는 패널이 화면을 다 덮으므로 버튼을 패널 안의 「접기」로 대신한다 */}
+      <div className={cn('fixed bottom-5 right-5 z-40 flex flex-col items-end gap-2', open && 'max-sm:hidden')}>
+        {nudge && !open &&
+        <div
+          role="status"
+          className="w-72 rounded-2xl border border-line bg-surface p-4 text-small text-ink2 shadow-panel motion-safe:animate-rise">
 
-        <MessageCircleIcon className="h-5 w-5" aria-hidden="true" />
-        Really
-        <span className="sr-only">비서에게 묻기</span>
-      </button>
-    </div>);
+            <div className="flex items-start gap-2">
+              <p className="flex-1 leading-6">{nudge.text}</p>
+              <button
+              type="button"
+              aria-label="알림 닫기"
+              onClick={dismissNudge}
+              className="shrink-0 rounded-lg p-1 text-muted hover:bg-canvas hover:text-ink">
+
+                <XIcon className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
+            {nudge.route &&
+          <Button
+            size="sm"
+            variant="secondary"
+            className="mt-3"
+            onClick={() => {
+              if (nudge.route) navigate(nudge.route);
+              dismissNudge();
+            }}>
+
+                {nudge.actionLabel ?? '보기'}
+              </Button>
+          }
+          </div>
+        }
+        <button
+          ref={button}
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen(!open)}
+          className="flex items-center gap-2 rounded-full bg-ink px-4 py-3 text-body font-bold text-white shadow-panel transition-transform duration-150 ease-snap hover:-translate-y-0.5">
+
+          {open ?
+          <ChevronDownIcon className="h-5 w-5" aria-hidden="true" /> :
+          <BotIcon className="h-5 w-5" aria-hidden="true" />}
+          Really
+          <span className="sr-only">{open ? '비서 접기' : '비서에게 묻기'}</span>
+        </button>
+      </div>
+    </>);
 
 }
 
 function Panel({ onClose }: {onClose: () => void;}) {
   const { entries, pending, error, draft, setDraft, send, showHelp, showNext } = useAssistant();
-  const [helpOpen, setHelpOpen] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const end = useRef<HTMLDivElement>(null);
 
@@ -119,9 +112,10 @@ function Panel({ onClose }: {onClose: () => void;}) {
     void send(draft);
   };
 
+  // 다음에 물을 말을 늘 보인다 (#143 리뷰). 길면 가로로 넘긴다.
   // 답을 기다리는 동안에는 막는다. 그사이 붙은 문답이 기다리던 답보다 먼저 와 질문과 답이 엇갈린다
   const topics =
-  <div className="flex flex-wrap gap-1.5 [&>button:disabled]:cursor-not-allowed [&>button:disabled]:opacity-50">
+  <div className="flex gap-1.5 overflow-x-auto pb-1 [&>button:disabled]:cursor-not-allowed [&>button:disabled]:opacity-50 [&>button]:shrink-0">
       <button
       type="button"
       disabled={pending}
@@ -149,7 +143,7 @@ function Panel({ onClose }: {onClose: () => void;}) {
       role="dialog"
       aria-label="비서 Really"
       onKeyDown={onKeyDown}
-      className="fixed inset-0 z-40 flex flex-col bg-surface sm:inset-auto sm:bottom-5 sm:right-5 sm:h-[min(40rem,calc(100vh-6rem))] sm:w-[25rem] sm:rounded-2xl sm:border sm:border-line sm:shadow-panel">
+      className="fixed inset-0 z-40 flex flex-col bg-surface sm:inset-auto sm:bottom-20 sm:right-5 sm:h-[min(38rem,calc(100vh-8rem))] sm:w-[25rem] sm:rounded-2xl sm:border sm:border-line sm:shadow-panel">
 
       <header className="flex items-start gap-3 border-b border-line px-5 py-4">
         <div className="min-w-0 flex-1">
@@ -158,27 +152,16 @@ function Panel({ onClose }: {onClose: () => void;}) {
             지금 화면을 보고 답합니다. 바꾸는 일은 카드의 [적용]을 눌러야 됩니다.
           </p>
         </div>
+        {/* 접어도 대화는 남는다. 다시 열면 이어서 묻는다 */}
         <button
           type="button"
-          aria-expanded={helpOpen}
-          onClick={() => setHelpOpen((value) => !value)}
-          className="shrink-0 rounded-lg px-2 py-1 text-caption font-bold text-ink2 hover:bg-canvas">
-
-          도움말
-        </button>
-        <button
-          type="button"
-          aria-label="비서 닫기"
+          aria-label="비서 접기"
           onClick={onClose}
           className="shrink-0 rounded-lg p-1 text-muted hover:bg-canvas hover:text-ink">
 
-          <XIcon className="h-5 w-5" aria-hidden="true" />
+          <ChevronDownIcon className="h-5 w-5" aria-hidden="true" />
         </button>
       </header>
-
-      {helpOpen && entries.length > 0 &&
-      <div className="border-b border-line bg-canvas px-5 py-3">{topics}</div>
-      }
 
       <div role="log" aria-live="polite" className="flex-1 space-y-3 overflow-y-auto bg-canvas px-5 py-4">
         {entries.length === 0 &&
@@ -186,7 +169,6 @@ function Panel({ onClose }: {onClose: () => void;}) {
             <p className="text-small leading-6 text-ink2">
               거래·판정·질문에 대해 물어보세요. 예: 「토요일 스타벅스는 미팅이었어」, 「3월에 카페 얼마 썼어?」
             </p>
-            {topics}
           </div>
         }
         {entries.map((entry) => <Message key={entry.id} entry={entry} />)}
@@ -195,6 +177,7 @@ function Panel({ onClose }: {onClose: () => void;}) {
       </div>
 
       <form onSubmit={submit} className="border-t border-line px-4 py-3">
+        <div className="mb-2">{topics}</div>
         {error &&
         <p role="alert" className="mb-2 text-small text-deny">
             {error}
@@ -235,6 +218,13 @@ function Message({ entry }: {entry: ChatEntry;}) {
       </p>
       {entry.proposals.map((item, index) => {
         const blocked = blockedReason(item.proposal);
+        // 적용한 카드는 한 줄로 접는다. 무엇을 했는지만 남긴다 (#143 리뷰)
+        if (item.state === 'done')
+        return (
+          <p key={item.key} className="w-full rounded-xl border border-line2 bg-surface px-3.5 py-2 text-caption text-muted">
+                <Badge>{PROPOSAL_LABEL[item.proposal.kind]}</Badge> <span className="ml-1">적용함 · {item.result}</span>
+              </p>);
+
         return (
           <div key={item.key} className="w-full rounded-2xl border border-line bg-surface p-3.5">
             <Badge>{PROPOSAL_LABEL[item.proposal.kind]}</Badge>
@@ -246,11 +236,10 @@ function Message({ entry }: {entry: ChatEntry;}) {
                 <Button
                 size="sm"
                 className="shrink-0"
-                variant={item.state === 'done' ? 'secondary' : 'primary'}
-                disabled={item.state === 'busy' || item.state === 'done'}
+                disabled={item.state === 'busy'}
                 onClick={() => void apply(entry.id, index)}>
 
-                  {item.state === 'busy' ? '적용 중…' : item.state === 'done' ? '적용함' : '적용'}
+                  {item.state === 'busy' ? '적용 중…' : '적용'}
                 </Button>
                 {item.result &&
               <p

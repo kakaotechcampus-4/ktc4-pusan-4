@@ -12,6 +12,7 @@ import type {
   JudgmentRun,
   JudgmentRunFailure,
   Page,
+  Progress,
   Question,
   QuestionGroup,
   QuestionPage,
@@ -583,6 +584,13 @@ const mockChat = async ({ message, context }: AssistantChatRequest): Promise<Ass
     proposals,
     traceId: nextId('mock-trace')
   });
+  // 중계가 먼저 보는 것 (api.md POST /assistant/chat)
+  if (message.length < 1 || message.length > 1000)
+  return Promise.reject(new ApiRequestError(400, 'VALIDATION_ERROR', '요청을 확인해 주세요.'));
+  if (context.batchId && !store.batches.some((b) => b.id === context.batchId))
+  return Promise.reject(new ApiRequestError(404, 'BATCH_NOT_FOUND', '업로드를 찾을 수 없습니다.'));
+  if (context.transactionId && !transactionOf(context.transactionId))
+  return Promise.reject(new ApiRequestError(404, 'TRANSACTION_NOT_FOUND', '거래를 찾을 수 없습니다.'));
   const batchId = context.batchId ?? undefined;
 
   if (/세무사|세무대리인|비율|세액/.test(message)) {
@@ -1415,19 +1423,23 @@ export const mockApi: Api = {
       const reviews = filterReviews('PENDING', batchId);
       const run = [...store.runs.values()].filter((r) => r.batchId === batchId).at(-1);
       const questions = unresolvedIn(batchId);
-      const next =
+      // 순서·경로·문구는 서버(NextStep.java)와 같다. 마지막 실행이 실패했으면 다시 판정 확인으로 보낸다
+      const next: Progress['next'] =
       reviews.length > 0 ?
-      { step: 'CLASSIFICATION', route: '/preview', label: '분류 확인하기' } :
+      { step: 'CLASSIFY', route: '/preview', label: '분류 확인하기' } :
       !context ?
-      { step: 'INTERVIEW', route: '/interview', label: '사업자 문진 하기' } :
-      !run ?
-      { step: 'RUN', route: '/confirm', label: '판정 전 확인하기' } :
+      { step: 'INTERVIEW', route: '/interview', label: '사업자 문진 작성하기' } :
+      !run || run.status.code === 'FAILED' ?
+      { step: 'CONFIRM', route: '/confirm', label: '판정 시작하기' } :
       questions.count > 0 ?
       { step: 'QUESTIONS', route: '/questions', label: '질문에 답하기' } :
-      { step: 'SUMMARY', route: '/summary', label: '요약 보기' };
+      { step: 'RESULTS', route: '/results', label: '결과 보기' };
+      const start = batch.periodStart.slice(0, 7);
+      const end = batch.periodEnd.slice(0, 7);
       return delay({
         batch: {
-          label: `${batch.cardIssuer} · ${batch.periodStart.slice(0, 7)}`,
+          id: batch.id,
+          label: `${batch.cardIssuer} · ${start === end ? start : `${start}~${end}`}`,
           transactionCount: store.transactions.filter((t) => t.batchId === batchId).length
         },
         context: context ?
@@ -1437,7 +1449,7 @@ export const mockApi: Api = {
           pendingCount: reviews.length,
           pendingAmount: reviews.reduce((sum, r) => sum + (transactionOf(r.transactionId)?.amount ?? 0), 0)
         },
-        run: run ? { status: run.status.code } : null,
+        run: run ? { id: run.id, status: { ...run.status } } : null,
         questions: { pendingCount: questions.count, pendingAmount: questions.amount, fillableFromPrevious: fillableIn(batchId) },
         next
       });
@@ -1484,12 +1496,19 @@ export const mockControls = {
       error.traceId
     );
   },
-  /** 다음 비서 요청 한 번을 실패시킨다. 429 는 Retry-After 5초 (AI 서버의 ASSISTANT_BUSY) */
-  failNextAssistant(status: 422 | 429) {
+  /**
+   * 다음 비서 요청 한 번을 실패시킨다. 서버(AssistantRateLimiter)처럼 429 는 ASSISTANT_RATE_LIMITED 다.
+   * 'daily' 는 하루 한도라 Retry-After 가 자정까지다
+   */
+  failNextAssistant(kind: 400 | 429 | 'daily' | 503) {
     store.failAssistant =
-    status === 429 ?
-    new ApiRequestError(429, 'ASSISTANT_BUSY', '이전 질문에 답하는 중입니다.', '', 5) :
-    new ApiRequestError(422, 'VALIDATION_ERROR', '요청을 확인해 주세요.');
+    kind === 429 ?
+    new ApiRequestError(429, 'ASSISTANT_RATE_LIMITED', '잠시 뒤 다시 물어봐 주세요.', '', 5) :
+    kind === 'daily' ?
+    new ApiRequestError(429, 'ASSISTANT_RATE_LIMITED', '오늘은 더 물어볼 수 없습니다.', '', 6 * 3600) :
+    kind === 503 ?
+    new ApiRequestError(503, 'ASSISTANT_UNAVAILABLE', '비서가 답하지 못했습니다.') :
+    new ApiRequestError(400, 'VALIDATION_ERROR', '요청을 확인해 주세요.');
   }
 };
 

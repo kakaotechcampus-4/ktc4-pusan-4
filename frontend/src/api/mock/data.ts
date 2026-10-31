@@ -1970,8 +1970,8 @@ export const RULE_CANDIDATES: RuleCandidate[] = [
  * 고정비(통신·수도광열)는 A 이어받기, 건별 용도와 해외 SaaS 기간은 B 이력만, 소명 대기는 C 다
  */
 export const QUESTION_SUGGESTIONS: QuestionSuggestion[] = [
-{ groupKey: 'merchant:SK텔레콤', factType: '전용여부', tier: 'A', value: '전용', sourceLabel: '2025년 12월 업로드(국민)' },
-{ groupKey: 'merchant:자택 관리비', factType: '공간전용여부', tier: 'A', value: '자택 겸용', sourceLabel: '2025년 12월 업로드(국민)' },
+{ groupKey: 'merchant:SK텔레콤', factType: '전용여부', tier: 'A', value: '전용', sourceLabel: '12월 업로드(국민)' },
+{ groupKey: 'merchant:자택 관리비', factType: '공간전용여부', tier: 'A', value: '자택 겸용', sourceLabel: '12월 업로드(국민)' },
 {
   groupKey: 'transaction:0199c8f2-0000-7000-8000-00000000001004',
   factType: '기간',
