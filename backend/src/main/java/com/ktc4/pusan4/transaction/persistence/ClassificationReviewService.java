@@ -9,6 +9,7 @@ import com.ktc4.pusan4.merchant.MerchantCategoryVocabulary;
 import com.ktc4.pusan4.merchant.MerchantDictionaryRepository;
 import com.ktc4.pusan4.merchant.api.ClassificationReviewStatus;
 import com.ktc4.pusan4.merchant.classify.ClassificationResult;
+import com.ktc4.pusan4.merchant.classify.SuggestionPolicy;
 import com.ktc4.pusan4.shared.api.ApiException;
 import com.ktc4.pusan4.transaction.api.SourceStatus;
 import com.ktc4.pusan4.transaction.domain.ClassificationAnswer;
@@ -57,6 +58,8 @@ public class ClassificationReviewService {
         .thenComparing(item -> item.transactionId().toString());
 
     private final ClassificationReviewRepository reviewRepository;
+    private final MerchantModelDecisionRepository decisionRepository;
+    private final SuggestionPolicy suggestionPolicy;
     private final TransactionRecordRepository transactionRepository;
     private final MerchantDictionaryRepository dictionaryRepository;
     private final MerchantCategoryVocabulary vocabulary;
@@ -66,6 +69,8 @@ public class ClassificationReviewService {
 
     public ClassificationReviewService(
         ClassificationReviewRepository reviewRepository,
+        MerchantModelDecisionRepository decisionRepository,
+        SuggestionPolicy suggestionPolicy,
         TransactionRecordRepository transactionRepository,
         MerchantDictionaryRepository dictionaryRepository,
         MerchantCategoryVocabulary vocabulary,
@@ -74,6 +79,8 @@ public class ClassificationReviewService {
         Clock clock
     ) {
         this.reviewRepository = reviewRepository;
+        this.decisionRepository = decisionRepository;
+        this.suggestionPolicy = suggestionPolicy;
         this.transactionRepository = transactionRepository;
         this.dictionaryRepository = dictionaryRepository;
         this.vocabulary = vocabulary;
@@ -183,7 +190,14 @@ public class ClassificationReviewService {
         List<ReviewRow> rows = batchId == null
             ? reviewRepository.findRows(userId)
             : reviewRepository.findRows(userId, batchId);
-        return rows.stream().map(ClassificationReviewService::toItem).toList();
+        // 모델 답은 거래마다 남아 있다. 포함(include)으로 나중에 생긴 요청도 같은 후보를 받는다
+        Map<UUID, List<String>> suggestions = new HashMap<>();
+        decisionRepository.findByTransactionIdIn(rows.stream().map(ReviewRow::transactionId).toList())
+            .forEach(decision -> suggestions.put(decision.transactionId(),
+                suggestionPolicy.suggestions(decision.refused(), decision.suggestions())));
+        return rows.stream()
+            .map(row -> toItem(row, suggestions.getOrDefault(row.transactionId(), List.of())))
+            .toList();
     }
 
     private static List<ClassificationReviewItem> filter(
@@ -206,11 +220,11 @@ public class ClassificationReviewService {
     }
 
     /** DB 에서 읽은 timestamptz 는 UTC 로 오므로 api.md 1.2 의 KST 표기로 되돌린다. */
-    private static ClassificationReviewItem toItem(ReviewRow row) {
+    private static ClassificationReviewItem toItem(ReviewRow row, List<String> suggestedCategories) {
         return new ClassificationReviewItem(row.reviewId(), row.batchId(), row.transactionId(),
             ClassificationReviewStatus.valueOf(row.status()), row.createdAt().atZoneSameInstant(KST).toOffsetDateTime(),
             row.resolvedAt() == null ? null : row.resolvedAt().atZoneSameInstant(KST).toOffsetDateTime(),
             row.approvedAt(), row.merchantRaw(), row.merchantNorm(), row.merchantCategory(), row.amount(),
-            row.installmentMonths());
+            row.installmentMonths(), suggestedCategories);
     }
 }

@@ -47,7 +47,7 @@ import com.ktc4.pusan4.transaction.domain.UploadResult;
 import com.ktc4.pusan4.transaction.persistence.ClassificationReviewService;
 import com.ktc4.pusan4.transaction.persistence.TransactionService;
 import com.ktc4.pusan4.transaction.persistence.UploadBatchService;
-import com.ktc4.pusan4.transaction.persistence.UploadService;
+import com.ktc4.pusan4.transaction.persistence.UploadFacade;
 import com.ktc4.pusan4.user.domain.AppUser;
 import com.ktc4.pusan4.user.domain.BookkeepingDuty;
 import com.ktc4.pusan4.user.domain.BusinessContext;
@@ -142,7 +142,7 @@ class ApiResponseContractTest {
     private StatuteService statuteService;
 
     @MockitoBean
-    private UploadService uploadService;
+    private UploadFacade uploadFacade;
 
     @MockitoBean
     private UploadBatchService batchService;
@@ -161,7 +161,8 @@ class ApiResponseContractTest {
     void stubServices() {
         ClassificationReviewItem review = new ClassificationReviewItem(UUID.fromString(ID), UUID.fromString(ID),
             UUID.fromString(ID), ClassificationReviewStatus.PENDING, OffsetDateTime.parse("2026-09-18T01:10:00+09:00"),
-            null, LocalDate.parse("2026-01-03"), "XYZ PAYMENTS", "XYZ PAYMENTS", "미분류", 47_000L, 0);
+            null, LocalDate.parse("2026-01-03"), "XYZ PAYMENTS", "XYZ PAYMENTS", "미분류", 47_000L, 0,
+            List.of("해외SaaS"));
         given(reviewService.list(any(), any(), any(), anyInt(), anyInt())).willReturn(new ClassificationReviewResult<>(
             new PageImpl<>(List.of(review), PageRequest.of(0, 20), 1), 1, 47_000L));
         given(reviewService.groups(any(), any(), any(), anyInt(), anyInt())).willReturn(new ClassificationReviewResult<>(
@@ -220,7 +221,7 @@ class ApiResponseContractTest {
         given(statuteService.get(anyLong())).willReturn(new StatuteVersion(1523, "소득세법시행령-67-4",
             "소득세법 시행령 제67조 제4항", "시행령", LocalDate.parse("2026-01-01"), null, "https://www.law.go.kr/", "..."));
 
-        given(uploadService.upload(any(), any(), any())).willReturn(new UploadResult(UUID.fromString(ID), 1, 0, 0,
+        given(uploadFacade.upload(any(), any(), any())).willReturn(new UploadResult(UUID.fromString(ID), 1, 0, 0,
             OffsetDateTime.parse("2026-09-18T01:10:00+09:00")));
 
         UploadBatchSummary batch = new UploadBatchSummary(UUID.fromString(ID), SourceType.승인내역, CardIssuer.국민,

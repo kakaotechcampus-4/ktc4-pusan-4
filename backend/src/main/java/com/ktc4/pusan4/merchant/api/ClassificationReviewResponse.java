@@ -16,17 +16,15 @@ public record ClassificationReviewResponse(
     String merchantRaw,
     String merchantNorm,
     Coded<ClassificationReviewStatus> status,
-    @Schema(description = "제안할 카테고리. 제안 근거가 아직 없어 빈 배열이다") List<String> suggestedCategories,
+    @Schema(description = "분류 모델이 고른 후보 카테고리. 최대 3개이고 기타·PG_미상은 없다. 모델이 꺼져 있거나 실패하면 빈 배열이다")
+    List<String> suggestedCategories,
     OffsetDateTime createdAt,
     OffsetDateTime resolvedAt
 ) {
 
-    // 분류기가 제안 근거를 남기지 않는다. 분류 AI(B10)가 붙으면 채운다.
-    static final List<String> NO_SUGGESTIONS = List.of();
-
     static ClassificationReviewResponse from(ClassificationReviewItem review) {
         return new ClassificationReviewResponse(review.id(), review.batchId(), review.transactionId(),
-            review.merchantRaw(), review.merchantNorm(), status(review.status()), NO_SUGGESTIONS,
+            review.merchantRaw(), review.merchantNorm(), status(review.status()), review.suggestedCategories(),
             review.createdAt(), review.resolvedAt());
     }
 

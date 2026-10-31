@@ -19,7 +19,8 @@ public record ClassificationReviewGroupResponse(
     @Schema(description = "항상 reviewIds.length, transactions.length 와 같다") int count,
     @Schema(description = "transactions[].amount 의 합") long totalAmount,
     @Schema(description = "그룹 대표 표기. transactions 의 첫 거래 표기다") String merchantRaw,
-    @Schema(description = "제안할 카테고리. 제안 근거가 아직 없어 빈 배열이다") List<String> suggestedCategories,
+    @Schema(description = "분류 모델이 고른 후보 카테고리. 첫 Review 의 후보다(같은 merchantNorm). 최대 3개, 없으면 빈 배열")
+    List<String> suggestedCategories,
     @Schema(description = "Review 마다 거래 요약 하나. 잘라내지 않는다. 정렬: approvedAt ASC, transactionId ASC")
     List<ReviewTransaction> transactions
 ) {
@@ -28,8 +29,8 @@ public record ClassificationReviewGroupResponse(
         List<ReviewTransaction> transactions = group.reviews().stream().map(ReviewTransaction::from).toList();
         return new ClassificationReviewGroupResponse(group.groupKey(), group.merchantNorm(),
             group.reviews().stream().map(ClassificationReviewItem::id).toList(), transactions.size(),
-            group.totalAmount(), transactions.getFirst().merchantRaw(), ClassificationReviewResponse.NO_SUGGESTIONS,
-            transactions);
+            group.totalAmount(), transactions.getFirst().merchantRaw(),
+            group.reviews().getFirst().suggestedCategories(), transactions);
     }
 
     @Schema(description = "Review 와 그 거래 요약. 거래 요약 필드는 api.md 3.4 와 같다")
