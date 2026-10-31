@@ -55,7 +55,8 @@ export default {content: [
         /** 첫 화면 큰 판. 어두운 남색이라 글자·그림은 흰색으로 올린다 */
         surface2: '#122E55',
         line: '#E8ECF0',
-        line2: '#F3F5F7',
+        /** surface 위에서도 보여야 한다. surface 와 같은 값이면 회색 패널 안의 구분선이 사라진다 */
+        line2: '#EBEEF2',
         /** 괘선 중 굵은 것 — 표 머리 위에 긋는다 */
         rule: '#16181D',
         ink: '#16181D',
@@ -65,7 +66,8 @@ export default {content: [
         accent: {
           DEFAULT: '#16181D',
           hover: '#30363F',
-          soft: '#F3F5F7',
+          /** 고른 선택지·진행 중인 단계의 바탕. surface 패널 위에서도 구별돼야 한다 */
+          soft: '#E6ECF4',
           line: '#DCE1E8',
         },
         link: '#1B64DA',

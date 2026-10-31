@@ -26,11 +26,11 @@
 | `surface` | #F3F5F7 | 패널, 카드 |
 | `surface2` | #122E55 | 첫 화면 큰 판과 그 옆 숫자 카드. 위에 올리는 글자·그림은 흰색 |
 | `sheet` | #FFFFFF | 패널 위에서 흰 바탕이 필요할 때, 표 |
-| `line` / `line2` | #E8ECF0 / #F3F5F7 | 테두리·행 괘선 / 약한 구분선 |
+| `line` / `line2` | #E8ECF0 / #EBEEF2 | 테두리·행 괘선 / 약한 구분선. `line2` 는 `surface` 패널 위에서도 보여야 해서 `surface` 보다 진하다 |
 | `rule` | #16181D | 표 머리 위 굵은 괘선 |
 | `ink` / `ink2` / `muted` | #16181D / #30363F / #67707E | 제목·강조 / 본문 / 보조 |
 | `accent` | #16181D | 주된 동작, 지금 자리 알약 |
-| `accent-hover` / `accent-soft` / `accent-line` | #30363F / #F3F5F7 | primary hover / 연한 채움 / 테두리 버튼·패널 안 구분선 (#DCE1E8) |
+| `accent-hover` / `accent-soft` / `accent-line` | #30363F / #E6ECF4 | primary hover / 연한 채움(고른 선택지·진행 중 단계, `surface` 위에서도 구별) / 테두리 버튼·패널 안 구분선 (#DCE1E8) |
 | `link` | #1B64DA | 문장 속 링크 |
 | `highlight` | #FFE600 | 한 화면에 한 번만 쓰는 강조 |
 | `ok` / `ok-bg` / `ok-line` / `ok-bar` | #00703D / #E8F6F0 / #B2E3CE / #12B76A | 가능 |
