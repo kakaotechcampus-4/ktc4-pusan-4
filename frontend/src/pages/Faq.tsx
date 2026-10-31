@@ -2,6 +2,7 @@ import { MarketingHeader } from '../components/MarketingHeader';
 import { MarketingFooter } from '../components/MarketingFooter';
 import { Button, SectionHeading } from '../components/ui';
 import { FAQ_GROUPS } from '../mock/faq';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 /**
  * 자주 묻는 질문. 답은 접었다 편다.
@@ -10,6 +11,7 @@ import { FAQ_GROUPS } from '../mock/faq';
  * 브라우저에 이미 있어서, 직접 만들면 그만큼 잃는다.
  */
 export function Faq() {
+  useDocumentTitle('자주 묻는 질문');
   return (
     <div className="min-h-full bg-canvas">
       <MarketingHeader />
