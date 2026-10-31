@@ -126,7 +126,7 @@ function sendErrorView(error: ApiRequestError): SendErrorView {
  * 파일은 이 브라우저 안에서 읽고(src/parser), 판정에 필요한 항목만 POST /upload-batches 로 보낸다.
  */
 export function Upload() {
-  const { setBatchId, setRunId } = useSession();
+  const { setBatchId } = useSession();
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
   /** 새 파일·초기화·화면 이탈마다 올린다. 늦게 끝난 읽기·업로드 결과는 버린다 */
   const seq = useRef(0);
@@ -195,11 +195,7 @@ export function Upload() {
       const created = await api.uploads.create(request, key);
       if (mine !== seq.current) return;
       // 모두 중복이면 거래 없는 배치다. 세션을 바꾸지 않고 업로드 이력으로 안내한다
-      if (created.transactionCount > 0) {
-        setBatchId(created.id);
-        // 이전 배치의 실행을 들고 있으면 /run 이 그 실행을 계속 폴링한다
-        setRunId(null);
-      }
+      if (created.transactionCount > 0) setBatchId(created.id);
       setPhase({ kind: 'ready', file, outcome, created });
     } catch (caught) {
       if (mine !== seq.current) return;

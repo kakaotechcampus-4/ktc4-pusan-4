@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   ArrowRightIcon,
@@ -8,7 +8,6 @@ import {
   RadioIcon } from
 'lucide-react';
 import { AppShell } from '../components/AppShell';
-import { useSession } from '../contexts/SessionContext';
 import { useAssistant } from '../components/assistant/context';
 import { api, ApiRequestError } from '../api';
 import type { JudgmentRun, JudgmentRunFailure, Transaction } from '../types/domain';
@@ -40,9 +39,18 @@ const GATES = [
 
 
 
+/** runId 없이 들어오면 확인 화면으로 보낸다. 판정 실행은 확인 화면에서만 만든다 (#187) */
+export function RunEntry() {
+  return <Navigate to="/confirm" replace />;
+}
+
+/**
+ * 판정 진행. runId 는 주소(`/run/:runId`)에서 읽는다 — 새로고침해도 같은 실행을 이어서 보고,
+ * 새 실행을 만들지 않는다 (#187)
+ */
 export function Run() {
   const navigate = useNavigate();
-  const { runId, batchId, contextRef, setRunId } = useSession();
+  const { runId = null } = useParams<{ runId: string }>();
   const { showNudge } = useAssistant();
   const [run, setRun] = useState<JudgmentRun | null>(null);
   const [counts, setCounts] = useState({ available: 0, needsReview: 0, unavailable: 0 });
@@ -52,14 +60,6 @@ export function Run() {
   const [retrying, setRetrying] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const timer = useRef<number | null>(null);
-
-  // runId 가 없으면 여기서 실행을 만든다 (확인 화면을 거치지 않고 진입한 경우)
-  useEffect(() => {
-    if (runId || !batchId || !contextRef) return;
-    void api.runs.create({ batchId, contextId: contextRef.id }).
-    then((created) => setRunId(created.id)).
-    catch(() => setLoadError('판정을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.'));
-  }, [runId, batchId, contextRef, setRunId]);
 
   // 1초 폴링. SSE 토큰 방식이 정해지면 교체 (명세 4.3 #9)
   useEffect(() => {
@@ -148,8 +148,6 @@ export function Run() {
     return stop;
   }, [runId, showNudge]);
 
-  // runId 도 없고 만들 재료(batchId·문진)도 없으면 영원히 "판정하고 있습니다"로 남는다
-  const waiting = !runId && (!batchId || !contextRef);
   const total = run?.totalCount ?? 0;
   const processed = run?.processedCount ?? 0;
   const progress = total ? Math.round(processed / total * 100) : 0;
@@ -167,7 +165,7 @@ export function Run() {
       const created = await api.runs.create({ batchId: run.batchId, contextId: run.contextId });
       setFailures(null);
       setRun(null);
-      setRunId(created.id);
+      navigate(`/run/${created.id}`);
     } catch {
       setLoadError('다시 판정하지 못했습니다. 잠시 후 시도해 주세요.');
     } finally {
@@ -194,8 +192,6 @@ export function Run() {
               '일부를 판정하지 못했습니다' :
               done ?
               '판정을 마쳤습니다' :
-              waiting ?
-              '판정할 준비가 되지 않았습니다' :
               '판정하고 있습니다'}
             </h1>
           </div>
@@ -216,22 +212,7 @@ export function Run() {
           </Card>
         }
 
-        {waiting &&
-        <Card as="section" padding="md" className="mt-6">
-            <p className="text-body text-ink2">
-              판정에 필요한 것이 아직 없습니다.{' '}
-              {!batchId ? '카드내역을 먼저 올려 주세요.' : '사업자 문진을 먼저 마쳐 주세요.'}
-            </p>
-            <div className="mt-4 flex gap-2">
-              <Button to={!batchId ? '/upload' : '/interview'} size="sm">
-                {!batchId ? '카드내역 올리기' : '문진 하러 가기'}
-              </Button>
-              <Button to="/uploads" variant="secondary" size="sm">업로드 이력</Button>
-            </div>
-          </Card>
-        }
-
-        {!loadError && !waiting &&
+        {!loadError &&
         <>
         <section className="mt-6 rounded-2xl border border-line bg-surface p-6">
           <div className="flex items-end justify-between gap-4">

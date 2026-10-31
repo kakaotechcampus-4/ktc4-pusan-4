@@ -21,7 +21,6 @@ export const isMock = !useHttp;
 export const seedSession: {
   batchId: string;
   contextRef: { id: string; version: number };
-  runId: string;
 } | null = useHttp ? null : mockSeedSession;
 
 /** 목업 로그인 비밀번호. 목업일 때만 값이 있다. 로그인 화면의 목업 전용 버튼과 안내가 쓴다 */

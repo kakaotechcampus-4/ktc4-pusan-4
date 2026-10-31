@@ -8,7 +8,7 @@ import { formatFullDate, formatNumber, formatPeriod } from '../utils/format';
 
 export function Confirm() {
   const navigate = useNavigate();
-  const { batchId, context, contextRef, setRunId } = useSession();
+  const { batchId, context, contextRef } = useSession();
   // 업로드 이력에서 고르고 들어올 수도 있으므로 세션의 파싱 결과가 아니라 서버에서 읽는다
   const batchQ = useApi(
     () => batchId ? api.uploads.get(batchId) : Promise.resolve(null),
@@ -32,8 +32,7 @@ export function Confirm() {
     setError(null);
     try {
       const created = await api.runs.create({ batchId, contextId: contextRef.id });
-      setRunId(created.id);
-      navigate('/run');
+      navigate(`/run/${created.id}`);
     } catch (caught) {
       setError(
         caught instanceof ApiRequestError ?

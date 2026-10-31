@@ -24,7 +24,7 @@ export const DEFAULT_CONTEXT: BusinessContext = {
 export type AuthStatus = 'restoring' | 'anonymous' | 'signedIn';
 
 /**
- * 클라이언트 세션. 로그인 상태와 "지금 어느 배치·문진·실행을 보고 있는지"만 든다.
+ * 클라이언트 세션. 로그인 상태와 "지금 어느 배치·문진을 보고 있는지"만 든다. 판정 실행은 주소에 싣는다(`/run/:runId`).
  * 판정·질문 같은 서버 상태는 여기 두지 않고 api.* 로 읽는다. 토큰은 api 층 안에만 있다.
  */
 interface SessionValue {
@@ -45,9 +45,6 @@ interface SessionValue {
   setContext: (context: BusinessContext | StoredBusinessContext) => void;
   contextRef: BusinessContextRef | null;
   setContextRef: (ref: BusinessContextRef | null) => void;
-  /** 현재 판정 실행 */
-  runId: string | null;
-  setRunId: (id: string | null) => void;
 }
 
 const SessionContext = createContext<SessionValue | null>(null);
@@ -59,7 +56,6 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
   const [batchId, setBatchId] = useState<string | null>(seedSession?.batchId ?? null);
   const [context, setContext] = useState<BusinessContext | StoredBusinessContext | null>(null);
   const [contextRef, setContextRef] = useState<BusinessContextRef | null>(seedSession?.contextRef ?? null);
-  const [runId, setRunId] = useState<string | null>(seedSession?.runId ?? null);
 
   /**
    * 로그인·로그아웃·풀림마다 올린다. 그 전에 시작한 이어 가기·내 정보·최근 업로드 응답이 늦게 와도
@@ -75,7 +71,6 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
     setBatchId(seedSession?.batchId ?? null);
     setContext(null);
     setContextRef(seedSession?.contextRef ?? null);
-    setRunId(seedSession?.runId ?? null);
   }, []);
 
   /**
@@ -179,11 +174,9 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
       context,
       setContext,
       contextRef,
-      setContextRef,
-      runId,
-      setRunId
+      setContextRef
     }),
-    [status, email, user, signIn, signOut, batchId, context, contextRef, runId]
+    [status, email, user, signIn, signOut, batchId, context, contextRef]
   );
 
   return (

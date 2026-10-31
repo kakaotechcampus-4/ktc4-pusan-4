@@ -1421,6 +1421,5 @@ export const mockControls = {
 
 export const mockSeedSession = {
   batchId: UPLOAD_BATCH.id,
-  contextRef: { id: '0199d3a1-0000-7000-8000-000000000001', version: 4 },
-  runId: JUDGMENT_RUN.id
+  contextRef: { id: '0199d3a1-0000-7000-8000-000000000001', version: 4 }
 };

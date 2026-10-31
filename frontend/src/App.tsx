@@ -10,7 +10,7 @@ import { Login } from './pages/Login';
 import { Upload } from './pages/Upload';
 import { Interview } from './pages/Interview';
 import { Confirm } from './pages/Confirm';
-import { Run } from './pages/Run';
+import { Run, RunEntry } from './pages/Run';
 import { Results } from './pages/Results';
 import { Questions } from './pages/Questions';
 import { Summary } from './pages/Summary';
@@ -29,7 +29,8 @@ const PROTECTED: { path: string; element: React.ReactElement }[] = [
 { path: '/transactions', element: <Transactions /> },
 { path: '/interview', element: <Interview /> },
 { path: '/confirm', element: <Confirm /> },
-{ path: '/run', element: <Run /> },
+{ path: '/run', element: <RunEntry /> },
+{ path: '/run/:runId', element: <Run /> },
 { path: '/results', element: <Results /> },
 { path: '/questions', element: <Questions /> },
 { path: '/summary', element: <Summary /> },
