@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { Container } from './ui';
 
 export function MarketingFooter() {
@@ -36,7 +37,18 @@ export function MarketingFooter() {
 
         <div className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t border-line2 pt-6 text-caption text-muted">
           <p>© 2026 PreeT. 무자격 세무대리를 하지 않습니다.</p>
-          <ul className="flex gap-5">
+          <ul className="flex flex-wrap items-center gap-5">
+            <li>
+              <Link to="/faq" className="transition-colors hover:text-ink">
+                자주 묻는 질문
+              </Link>
+            </li>
+            <li>
+              <Link to="/bug-report" className="transition-colors hover:text-ink">
+                버그 신고
+              </Link>
+            </li>
+            <li aria-hidden="true" className="h-3 w-px bg-accent-line" />
             <li>이용약관</li>
             <li>개인정보처리방침</li>
             <li>데이터 경계 안내</li>

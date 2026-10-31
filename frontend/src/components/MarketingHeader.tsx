@@ -8,7 +8,10 @@ import { Button, Container } from './ui';
  * 로그인 상태에 따라 오른쪽이 통째로 갈린다. 로그인을 이어 가는 동안은
  * 비워 두어, 로그인 버튼이 잠깐 보였다 바뀌지 않게 한다.
  */
-const NAV = [{ to: '/faq', label: 'FAQ' }];
+const NAV = [
+{ to: '/faq', label: 'FAQ' },
+{ to: '/bug-report', label: '버그 신고' }];
+
 
 export function MarketingHeader() {
   const { status, signOut } = useSession();
@@ -27,8 +30,8 @@ export function MarketingHeader() {
           </span>
         </Link>
 
-        {/* 좁은 폭에서도 남긴다. 푸터에 FAQ 로 가는 길이 따로 없다 */}
-        <nav aria-label="주요 메뉴">
+        {/* 좁은 폭에서는 접는다. 같은 두 링크를 푸터에 두었다 */}
+        <nav aria-label="주요 메뉴" className="hidden sm:block">
           <ul className="flex items-center gap-8">
             {NAV.map((item) =>
             <li key={item.to}>
