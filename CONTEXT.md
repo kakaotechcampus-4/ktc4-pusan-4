@@ -665,7 +665,7 @@ js = settleLimits(js, ctx, Mode.잠정);
 [사람] 관리자 페이지
    후보 검토 → 수정 → 승인 / 기각
         ↓
-[반자동] 승인 시 GitHub API로 PR 자동 생성
+[반자동] 승인 후보를 주 1회 모아 GitHub API로 PR 자동 생성 (pipeline/promote.py)
    rules/cards/R-089_온라인교육.yaml 커밋 → PR
         ↓ CI 자동
    평가셋 전건 회귀 + 매칭 충돌 검사
@@ -689,15 +689,15 @@ js = settleLimits(js, ctx, Mode.잠정);
 - Kang → PR에서 CI 확인 후 머지 (기술 판단)
 
 ```python
-def approve_candidate(candidate_id, reviewer):
-    c = db.get(candidate_id)
-    yaml_text = render_rule_card(c)
-    branch = f"rule/{c.rule_id}"
-    github.create_branch(branch)
-    github.commit(branch, f"rules/cards/{c.rule_id}.yaml", yaml_text)
-    pr = github.create_pr(branch, title=f"[규칙] {c.merchant_category}")
-    db.update(candidate_id, status="승인", pr_url=pr.url, reviewed_by=reviewer)
-    return pr.url
+# 승인(관리자 API)은 status 만 바꾼다. PR 은 주 1회 배치가 모아서 만든다.
+def promote_weekly():
+    sync_closed_prs()                     # 닫힌 PR: develop 에 카드가 있으면 promoted_rule_id, 없으면 대기로
+    rows = db.approved_without_pr()       # status='승인' AND pr_url IS NULL
+    files = {f"rules/cards/R-C{c.id}_{c.merchant_category}.yaml":
+             finalize(c.draft_yaml, id=f"R-C{c.id}", start=c.reviewed_at.date())  # 소급 없음
+             for c in rows}
+    pr = github.create_pr(f"feature/rule-candidates-{today}", files)
+    db.update(rows, pr_url=pr.url)        # reviewed_by(이메일)는 공개 레포에 쓰지 않는다
 ```
 
 ### 디렉터리 구조
@@ -1429,7 +1429,7 @@ WHERE statute_id = :id
 | **참조데이터 적재** | 1회성 + 연 1회 | 수동 | Kang |
 | **카드내역 정규화** | 온디맨드 | 사용자 업로드 | 프론트+백엔드 |
 | **평가 회귀 하네스** | CI | PR마다 | Kang |
-| **규칙 후보 추출** | 배치 | GH Actions cron 주 1회 | Kang |
+| **규칙 후보 추출** | 배치 | EC2 systemd timer 주 1회 (일 05:00 KST) | Kang |
 
 ### 1. 법령 동기화 → 재색인
 
@@ -1557,7 +1557,7 @@ chunking 전략 변경(**10월에 반드시 겪음**), 임베딩 모델 교체 �
 **⚠️ 분류기 자체는 여기서 빠진다.** 별도 평가셋으로 CI 밖에서 주기 측정.
 **⚠️ 속성 관문 순서 무관 property test**를 넣으면 N-01이 구조적으로 검증된다.
 
-**⭐ 규칙 카드 승인 시에도 이 하네스가 돈다.** 관리자 페이지 승인 → PR 자동 생성 → CI 회귀 → 통과해야 머지.
+**⭐ 규칙 카드 승인 시에도 이 하네스가 돈다.** 관리자 페이지 승인 → 주 1회 모아 PR 자동 생성 → CI 회귀 → 통과해야 머지.
 
 ### 5. 규칙 후보 추출 ⭐ 에이전트
 
@@ -1592,7 +1592,7 @@ chunking 전략 변경(**10월에 반드시 겪음**), 임베딩 모델 교체 �
 
 [6] rule_candidate INSERT (status: 대기 | 보류, draft_yaml)
 ────────── 여기까지 자동 ──────────
-[7] 관리자 페이지 → 세무 검수 승인 → PR 자동 생성 → CI → Kang 머지
+[7] 관리자 페이지 → 세무 검수 승인 → 주 1회 모아 PR 자동 생성 → CI → Kang 머지
 ```
 
 **후보당 LLM 호출은 정확히 3회다.** 조기 종료 판정이 없어 가변 구간이 사라졌다.
@@ -1681,7 +1681,7 @@ def needs_review(ev: Evidence, tier_of: dict[str, str]) -> bool:
 | 다단계·분기 | 질의 → 근거 선택 → 초안. 근거가 없거나 하위뿐이면 보류로 빠진다 |
 | 상태 변화 | 규칙이 늘어 다음 주 판정이 달라짐 |
 
-**절대 자동화하지 않을 것:** 승격은 사람을 거친다. **승인 시점에 `effective_period.start`를 박고 기본값은 "소급 적용 안 함".**
+**절대 자동화하지 않을 것:** 승격은 사람을 거친다. **`effective_period.start`는 승인일로 박는다. 소급 적용하지 않는다.**
 
 ### 데이터 흐름
 
@@ -1893,7 +1893,7 @@ id: E-021
 | **LLM** | **OpenAI API** |
 | **임베딩** | **text-embedding-3-small (1536차원)** |
 | 배포 | **AWS EC2 1대 + docker compose + RDS** |
-| CI·스케줄 | GitHub Actions (CI·배포) · EC2 systemd timer (코퍼스 동기화) |
+| CI·스케줄 | GitHub Actions (CI·배포) · EC2 systemd timer (코퍼스 동기화 · 규칙 후보) |
 | 관측 | Langfuse (LLM 호출 추적) |
 
 ### RDS 확장 지원 (확인 완료)
@@ -1949,7 +1949,7 @@ docker-compose.yml
 | 5 | **G2 매칭 실패 시 에이전트 개입 없음.** (b)안 폐기 |
 | 6 | **조문 append-only + 스냅샷 3필드** (컬럼 추가 완료) |
 | 7 | **규칙 후보는 DB(`rule_candidate`), 확정 카드는 git(`rules/cards/*.yaml`)** |
-| 8 | 승인 시 **GitHub API로 PR 자동 생성** → CI 회귀 → 수동 머지 |
+| 8 | 승인 후보를 주 1회 모아 **GitHub API로 PR 자동 생성** → CI 회귀 → 수동 머지 |
 | 9 | **RDS PostgreSQL 17 + pgvector + pg_bigm** |
 | 10 | **LLM·임베딩은 OpenAI.** text-embedding-3-small (1536) |
 | 11 | **AWS EC2 + docker compose + RDS.** 백엔드 Java, AI Python 별도 서버 |

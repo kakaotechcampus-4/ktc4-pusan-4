@@ -1,0 +1,9 @@
+[Unit]
+Description=Weekly ktc4 rule candidates (Sun 05:00 KST)
+
+[Timer]
+OnCalendar=Sat *-*-* 20:00:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target

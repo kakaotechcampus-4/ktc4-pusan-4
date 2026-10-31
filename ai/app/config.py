@@ -32,5 +32,8 @@ class Settings(BaseSettings):
     langfuse_base_url: str = "https://jp.cloud.langfuse.com"
     law_api_oc: str = "test"
     team_discord_webhook: str | None = None
+    # 승인한 규칙 후보를 카드 PR 로 올린다(pipeline.promote). 포크로 시험할 때만 repo 를 덮는다.
+    rules_pr_token: str | None = None
+    rules_pr_repo: str = "kakaotechcampus-4/ktc4-pusan-4"
 
 settings = Settings()

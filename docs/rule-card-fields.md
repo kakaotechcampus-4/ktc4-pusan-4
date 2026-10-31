@@ -16,7 +16,7 @@
 
 | 필드 | 타입 | 필수 | 뜻 |
 |---|---|:---:|---|
-| `id` | string | ✅ | 유니크. 예 `R-070` |
+| `id` | string | ✅ | 유니크. 예 `R-070`. 규칙 후보에서 승격한 카드는 `R-C<후보 id>`(`pipeline/promote.py`) |
 | `version` | int | ✅ | 카드를 고칠 때 올린다. 판정 이력에 같이 저장된다 |
 | `gate` | enum `G0`~`G6` | ✅ | 관문 |
 | `priority` | int | ✅ | **401 이상만.** 400 이하는 학습룰 대역이라 로딩 거부 |
@@ -28,7 +28,7 @@
 | `citations` | list | 조건부 | 확정 verdict(`가능`·`불가`)면 필수 |
 | `attributes` | map | | `match`만으로 확정되는 속성 |
 | `question` | object | | 되묻기. 아래 **question** 참고 |
-| `review` | `{by, date}` | ✅ | 검토자·검토일 |
+| `review` | `{by, date}` | ✅ | 검토자·검토일. 승격 카드는 `by: 관리자`, `date`는 승인일이다. 레포가 공개라 이메일을 쓰지 않는다 |
 
 ---
 
