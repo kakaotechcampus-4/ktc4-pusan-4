@@ -449,3 +449,30 @@ describe('가입·카카오 로그인 (목업, #193·#176)', () => {
     expect(await api.users.me()).toMatchObject({ email: null, role: 'USER' });
   });
 });
+
+describe('내보내기 (#214)', () => {
+  it('현재 판정 전부와 답한 내용을 주고, 스코프가 하나가 아니면 400 이다', async () => {
+    const group = await groupOf(tx('1005'));
+    await api.questions.respond({ questionIds: group.questionIds, answer: { value: '업무미팅' } });
+
+    const { items } = await api.judgments.export({ batchId });
+    const summary = await api.judgments.summary({ batchId });
+    expect(items).toHaveLength(summary.totalCount);
+    const row = items.find((item) => item.judgment.transactionId === tx('1005'));
+    expect(row?.answers).toEqual([{ question: group.questionText, answer: '업무미팅' }]);
+    expect(row?.allowedAmount).toBe(row?.judgment.finalAmount ?? 0);
+
+    await expect(api.judgments.export({} as never)).rejects.toMatchObject({ status: 400, code: 'INVALID_EXPORT_SCOPE' });
+  });
+
+  it('자택 관리비는 작업 공간이 따로 나뉜다고 답하면 문진의 면적 비율만큼 인정한다 (R-103 v3)', async () => {
+    const group = await groupOf(tx('1008'));
+    expect(group.options).toEqual(['사업 전용', '자택 겸용(작업 공간이 따로 나뉨)', '자택 겸용(따로 나뉘지 않음)']);
+    await api.questions.respond({ questionIds: group.questionIds, answer: { value: '자택 겸용(작업 공간이 따로 나뉨)' } });
+    const judgment = await currentOf(tx('1008'));
+    const amount = (await api.transactions.get(tx('1008'))).amount;
+    expect(judgment.verdict.code).toBe('AVAILABLE');
+    // 시드 문진의 면적 비율은 20% 다
+    expect(judgment.finalAmount).toBe(Math.floor(amount * 20 / 100));
+  });
+});

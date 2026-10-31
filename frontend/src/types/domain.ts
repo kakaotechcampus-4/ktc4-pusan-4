@@ -136,8 +136,8 @@ export interface BusinessContext {
   businessOpenDate: string;
   bookkeepingDuty: BookkeepingDuty;
   hasEmployee: boolean;
-  /** 자택 작업공간 면적 비율(%). 0이면 해당 없음 */
-  homeOfficeRatio: number;
+  /** 자택 작업 공간 면적 비율(%). 0이면 자택에서 일하지 않음, null 이면 미입력 (api.md 3.2) */
+  homeOfficeRatio: number | null;
 }
 
 export interface BusinessContextRef {
@@ -146,10 +146,8 @@ export interface BusinessContextRef {
 }
 
 /** 저장된 Context 한 버전 (contexts/current·list 응답) */
-export interface StoredBusinessContext extends Omit<BusinessContext, 'homeOfficeRatio'>, BusinessContextRef {
+export interface StoredBusinessContext extends BusinessContext, BusinessContextRef {
   userId: string;
-  /** 미입력이면 null */
-  homeOfficeRatio: number | null;
   createdAt: string;
 }
 
@@ -354,6 +352,17 @@ export interface Judgment {
   explanation: string | null;
   computedAt: string;
   citations: Citation[];
+}
+
+/**
+ * GET /judgments/export 한 줄 (#214). 세무사에게 넘길 CSV 의 데이터다. 파일 변환은 FE 가 한다.
+ * allowedAmount 는 접대비 한도까지 반영한 인정 금액이라 judgment.finalAmount 와 다를 수 있다
+ */
+export interface JudgmentExportRow {
+  judgment: Judgment;
+  allowedAmount: number;
+  /** 이 거래에 답한 질문 문구와 답. 없으면 빈 배열 */
+  answers: { question: string; answer: string }[];
 }
 
 export interface VerdictSummary {

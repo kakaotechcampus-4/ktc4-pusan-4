@@ -23,7 +23,8 @@ export const DEFAULT_CONTEXT: BusinessContext = {
   businessOpenDate: '2024-03-01',
   bookkeepingDuty: '복식부기',
   hasEmployee: false,
-  homeOfficeRatio: 20
+  // 정해 두지 않는다. 그냥 두면 그 값으로 자택 경비 금액이 계산된다(#214). 문진에서 직접 고른다
+  homeOfficeRatio: null
 };
 
 /** restoring: 새로고침 뒤 리프레시 쿠키로 로그인을 이어 가는 중. 이때는 로그인 화면으로 보내지 않는다 */

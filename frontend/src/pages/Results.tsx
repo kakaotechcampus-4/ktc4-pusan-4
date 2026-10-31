@@ -15,15 +15,15 @@ import {
 '../components/ui';
 import { useSession } from '../contexts/SessionContext';
 import { useAssistantSubject } from '../components/assistant/context';
-import { api, useApi } from '../api';
+import { api, ApiRequestError, useApi } from '../api';
 import type { Judgment, Verdict } from '../types/domain';
 import { formatFullDate, formatNumber, formatPeriod, formatWon } from '../utils/format';
-import { download, judgmentsCsv } from '../utils/csv';
+import { download, exportRowOf, judgmentsCsv } from '../utils/csv';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 
 type Filter = 'ALL' | Verdict;
 
-/** CSV 는 목록을 끝까지 읽어 만든다. 서버가 한 번에 주는 양이 정해져 있어 페이지를 넘긴다 */
+/** 내보내기 API(#214)가 아직 없는 서버는 판정 목록을 끝까지 읽어 같은 모양을 만든다 */
 const readAllJudgments = async (batchId: string) => {
   const all: Judgment[] = [];
   for (let page = 0;; page += 1) {
@@ -32,6 +32,16 @@ const readAllJudgments = async (batchId: string) => {
     if (!result.page.hasNext || page + 1 >= result.page.totalPages) return all;
   }
 };
+
+/** 세무사에게 넘길 내보내기. 한도 반영 인정 금액과 답한 내용이 함께 온다 */
+const readExport = (batchId: string) =>
+api.judgments.
+export({ batchId }).
+then((result) => result.items).
+catch(async (caught: unknown) => {
+  if (!(caught instanceof ApiRequestError && caught.status === 404)) throw caught;
+  return (await readAllJudgments(batchId)).map(exportRowOf);
+});
 
 /**
  * 3.7 판정 결과.
@@ -148,7 +158,7 @@ export function Results() {
     setExporting(true);
     setNotice(null);
     try {
-      const all = await readAllJudgments(batchId);
+      const all = await readExport(batchId);
       const batch = batchQ.data;
       const period = batch ? `${batch.periodStart}_${batch.periodEnd}` : batchId.slice(0, 8);
       download(`PreeT-판정결과-${period}.csv`, judgmentsCsv(all));

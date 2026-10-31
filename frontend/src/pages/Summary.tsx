@@ -15,6 +15,13 @@ import { formatNumber, formatPeriod, formatWon } from '../utils/format';
 
 type AccountRow = JudgmentSummary['byAccount'][number];
 
+/**
+ * 한도가 있는 계정과목(접대비). 요약은 한도 인정액으로 더하고(#184), 확정 기능이 없어 늘 잠정이다.
+ * 한도는 최신 문진의 직전연도 수입금액으로 잡는다(CONTEXT.md A6b)
+ */
+const LIMITED_ACCOUNT = '접대비';
+const PROVISIONAL_NOTE = '잠정 · 직전연도 수입금액 기준';
+
 /** 한 달 배치면 「2026년 1월」, 아니면 기간 그대로 */
 const periodLabel = (batch: UploadBatch) => {
   const [startYear, startMonth] = batch.periodStart.split('-');
@@ -40,6 +47,11 @@ context: StoredBusinessContext | null | undefined) =>
   const lines = [
   `${period ? `${period} ` : ''}카드내역 중 판정한 ${formatNumber(summary.totalCount)}건의 결과입니다. 직접 수정한 판정은 수정한 값으로 셉니다.`,
   `필요경비로 볼 수 있는 것 ${formatNumber(AVAILABLE.count)}건(${formatWon(AVAILABLE.finalAmount)}), 볼 수 없는 것 ${formatNumber(UNAVAILABLE.count)}건, 근거를 확정하지 못한 것 ${formatNumber(NEEDS_REVIEW.count)}건입니다.`];
+  const limited = summary.byAccount.find((row) => row.account === LIMITED_ACCOUNT);
+  if (limited)
+  lines.push(
+    `이 중 접대비(${formatWon(limited.finalAmount)})는 연간 한도를 직전연도 수입금액으로 잠정 계산해 반영한 금액입니다.`
+  );
 
   if (unclassified > 0)
   lines.push(`가맹점을 분류하지 못한 ${formatNumber(unclassified)}건은 아직 판정하지 않았습니다.`);
@@ -51,7 +63,7 @@ context: StoredBusinessContext | null | undefined) =>
   if (context)
   lines.push(
     `현재 문진(v${context.version}) 응답: 업종코드 ${context.industryCode}, ${context.bookkeepingDuty} 대상, 직원 ${
-    context.hasEmployee ? '있음' : '없음'}, 자택 작업공간 비율 ${
+    context.hasEmployee ? '있음' : '없음'}, 작업 공간 면적 비율 ${
     context.homeOfficeRatio === null ?
     '입력 안 함' :
     context.homeOfficeRatio ?
@@ -207,7 +219,16 @@ export function Summary() {
   const accountColumns: Column<AccountRow>[] = [
   {
     header: '계정과목',
-    cell: (row) => <span className="font-normal text-ink">{row.account}</span>
+    cell: (row) =>
+    <span className="block">
+          <span className="font-normal text-ink">{row.account}</span>
+          {row.account === LIMITED_ACCOUNT &&
+      <span className="mt-0.5 block text-caption text-muted">
+              {PROVISIONAL_NOTE} 한도 인정액이라 결과 목록의 합과 다를 수 있습니다.
+            </span>
+      }
+        </span>
+
   },
   {
     header: '건수',

@@ -19,7 +19,7 @@ export const contextRows = (context: BusinessContext | StoredBusinessContext) =>
 { term: '기장의무', value: context.bookkeepingDuty },
 { term: '직원', value: context.hasEmployee ? '있음' : '없음 (1인)' },
 {
-  term: '자택 작업 비율',
+  term: '작업 공간 면적 비율',
   value:
   context.homeOfficeRatio === null ?
   '입력 안 함' :

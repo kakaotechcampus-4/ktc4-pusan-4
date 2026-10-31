@@ -327,7 +327,10 @@ const rejudge = (transactionId: string, groupKey: string, answer: string) => {
   // 질문을 낸 카드의 선택지대로 규칙 카드·계정과목·근거를 붙인다
   const card = QUESTION_CARDS[groupKey];
   const option = card?.options[answer];
-  const ratio = ratioOf(answer);
+  // 작업 공간 면적으로 안분하는 선택지(R-103·R-210 v3+)는 최신 문진의 비율을 쓴다.
+  // 서버처럼 문진에 비율이 없으면 안분하지 않는다(api.md 3.8)
+  const areaRatio = option?.attributes?.['안분'] === '작업공간비율' ? store.contexts.at(-1)?.homeOfficeRatio ?? null : null;
+  const ratio = ratioOf(answer) ?? areaRatio;
   const amount = transactionOf(transactionId)?.amount ?? 0;
   const next: JudgmentSeed = {
     ...prev,
@@ -352,7 +355,9 @@ const rejudge = (transactionId: string, groupKey: string, answer: string) => {
     explanation:
     verdict === 'AVAILABLE' ?
     ratio !== null ?
-    `사용자 응답으로 업무 사용 비율 ${ratio}%를 적용해 구분되는 금액만 산입합니다.` :
+    areaRatio !== null ?
+    `작업 공간이 따로 나뉜다는 응답과 문진의 작업 공간 면적 비율 ${ratio}%로 그만큼만 산입합니다.` :
+    `사용자 응답으로 비율 ${ratio}%를 적용해 구분되는 금액만 산입합니다.` :
     '사용자 응답을 반영해 카드의 선택지대로 필요경비로 판정했습니다.' :
     verdict === 'UNAVAILABLE' ?
     '사용자 응답에 따라 개인 목적 지출로 확정되어 필요경비에 산입하지 않습니다.' :
@@ -1120,6 +1125,30 @@ export const mockApi: Api = {
       const j = store.judgments.find((x) => x.id === id);
       const out = j && withTransaction(j);
       return out ? delay(out) : notFound('JUDGMENT_NOT_FOUND', '판정을 찾을 수 없습니다.');
+    },
+    // 대상은 같은 조건의 현재 판정이고 페이지가 없다(#214). 목업은 한도를 두지 않아 인정 금액이 finalAmount 다
+    export: (scope) => {
+      if ((scope.batchId === undefined) === (scope.year === undefined))
+      return Promise.reject(new ApiRequestError(400, 'INVALID_EXPORT_SCOPE', 'batchId·year 중 하나만 지정해야 합니다.'));
+      const answersOf = (transactionId: string) =>
+      liveGroups().
+      filter((g) => g.pairs.some((p) => p.transaction.id === transactionId) && store.answers.has(g.seed.groupKey)).
+      map((g) => ({ question: g.seed.questionText, answer: store.answers.get(g.seed.groupKey)?.value ?? '' }));
+      const items = currentAll().
+      filter((j) => {
+        const t = transactionOf(j.transactionId);
+        if (!t || !isJudgeable(t)) return false;
+        return scope.batchId ? t.batchId === scope.batchId : t.approvedAt.startsWith(String(scope.year));
+      }).
+      map(withTransaction).
+      filter((j): j is Judgment => j !== null).
+      sort((a, b) => a.transaction.approvedAt.localeCompare(b.transaction.approvedAt)).
+      map((judgment) => ({
+        judgment,
+        allowedAmount: judgment.verdict.code === 'AVAILABLE' ? judgment.finalAmount ?? 0 : 0,
+        answers: answersOf(judgment.transactionId)
+      }));
+      return delay({ items });
     },
     // 목업은 Idempotency-Key 재사용을 흉내 내지 않는다 (업로드와 같다)
     override: (id, body) => {

@@ -42,9 +42,14 @@ saved ?
   businessOpenDate: saved.businessOpenDate,
   bookkeepingDuty: saved.bookkeepingDuty,
   hasEmployee: saved.hasEmployee,
-  homeOfficeRatio: saved.homeOfficeRatio ?? DEFAULT_CONTEXT.homeOfficeRatio
+  homeOfficeRatio: saved.homeOfficeRatio
 } :
 DEFAULT_CONTEXT;
+
+/** 6번 「자택에서 작업하나요?」. 빈 값은 아직 고르지 않음이다 */
+type HomeAnswer = 'yes' | 'no' | '';
+const homeAnswerOf = (ratio: number | null): HomeAnswer => ratio === null ? '' : ratio > 0 ? 'yes' : 'no';
+const ratioTextOf = (ratio: number | null) => ratio !== null && ratio > 0 ? String(ratio) : '';
 
 /** 가입 직후에 왔다(Signup.tsx). from 은 로그인 전에 가려던 곳이다 */
 interface LocationState {
@@ -71,6 +76,12 @@ export function Interview() {
   const afterWelcome = (location.state as LocationState | null)?.from ?? '/upload';
   const { context, setContext, setContextRef } = useSession();
   const [form, setForm] = useState<BusinessContext>(() => formFrom(context));
+  /**
+   * 자택 작업 여부와 면적 비율은 폼과 따로 든다. 비율을 미리 채워 두지 않으므로(#214) 「예」를 고르고
+   * 아직 적지 않은 상태가 있다. 저장할 때 homeOfficeRatio 로 합친다
+   */
+  const [home, setHome] = useState<HomeAnswer>(() => homeAnswerOf(formFrom(context).homeOfficeRatio));
+  const [ratioText, setRatioText] = useState(() => ratioTextOf(formFrom(context).homeOfficeRatio));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** 한 번이라도 고쳤으면 늦게 온 저장 문진으로 덮지 않는다 */
@@ -81,7 +92,11 @@ export function Interview() {
 
   // 새로고침 직후에는 저장된 문진(3.2)이 화면보다 늦게 온다
   useEffect(() => {
-    if (!edited.current) setForm(formFrom(context));
+    if (edited.current) return;
+    const next = formFrom(context);
+    setForm(next);
+    setHome(homeAnswerOf(next.homeOfficeRatio));
+    setRatioText(ratioTextOf(next.homeOfficeRatio));
   }, [context]);
 
   const update = <K extends keyof BusinessContext,>(
@@ -95,15 +110,18 @@ export function Interview() {
   const bookkeeping =
   dutyFor(form.prevYearRevenue) === '복식부기' ? '복식부기 의무자' : '간편장부 대상자';
   const futureOpen = form.businessOpenDate > today;
-  const homeOffice = form.homeOfficeRatio > 0;
+  const ratio = /^\d{1,3}$/.test(ratioText) ? Number(ratioText) : NaN;
+  const ratioValid = ratio >= 1 && ratio <= 100;
 
   const impacts = [
   form.hasEmployee ?
   '직원이 있어 복리후생비·급여 관련 판정 분기가 켜집니다.' :
   '직원이 없어 회식·복리후생 성격의 지출은 가사 관련 경비로 봅니다.',
-  homeOffice ?
-  `자택 겸용이라 공간 관련 경비를 ${form.homeOfficeRatio}% 기준으로 안분합니다.` :
-  '자택 작업 비율이 없어 통신비·관리비 안분 판정을 하지 않습니다.'];
+  home === 'no' ?
+  '자택에서 일하지 않아 월세·관리비·공과금을 나누어 보지 않습니다.' :
+  home === 'yes' && ratioValid ?
+  `작업 공간이 따로 나뉜 자택의 월세·관리비·공과금은 ${ratio}%만 경비로 봅니다. 나뉘지 않으면 세무사 확인으로 넘깁니다.` :
+  '작업 공간 면적 비율을 적으면 자택의 월세·관리비·공과금을 그 비율만큼 경비로 봅니다.'];
 
 
   const submit = async (event: React.FormEvent) => {
@@ -114,11 +132,20 @@ export function Interview() {
       setError('개업일이 오늘보다 뒤입니다. 날짜를 확인해 주세요.');
       return;
     }
+    if (home === '') {
+      setError('6번, 자택에서 작업하는지 골라 주세요.');
+      return;
+    }
+    if (home === 'yes' && !ratioValid) {
+      setError('작업 공간 면적 비율을 1~100 사이 숫자로 적어 주세요.');
+      return;
+    }
+    const body: BusinessContext = { ...form, homeOfficeRatio: home === 'yes' ? ratio : 0 };
     setSaving(true);
     setError(null);
     try {
-      const ref = await api.contexts.create(form);
-      setContext(form);
+      const ref = await api.contexts.create(body);
+      setContext(body);
       setContextRef(ref);
       navigate(welcome ? afterWelcome : '/confirm', { replace: welcome });
     } catch (caught) {
@@ -256,45 +283,48 @@ export function Interview() {
             <section className={cardClass}>
               <span className={labelClass}>6. 자택에서 작업하나요?</span>
               <p className={hintClass}>
-                자택 겸용이면 통신비·관리비를 업무 사용 비율로 안분합니다.
+                자택 안에 작업 공간이 따로 나뉘어 있으면, 월세·관리비·전기·수도·가스를 그 면적 비율만큼
+                경비로 봅니다. 따로 나뉘는지는 해당 거래의 질문에서 다시 묻습니다.
               </p>
-              <ChoiceGroup
+              <ChoiceGroup<HomeAnswer>
                 className="mt-3"
                 name="자택 작업 여부"
-                value={homeOffice}
-                onChange={(value) =>
-                update('homeOfficeRatio', value ? 20 : 0)
-                }
+                value={home}
+                onChange={(value) => {
+                  edited.current = true;
+                  setHome(value);
+                }}
                 options={[
-                { value: false, label: '아니오', hint: '별도 사무실 · 고정 작업장 없음' },
-                { value: true, label: '예', hint: '가사 관련 경비 안분이 필요합니다' }]
+                { value: 'no', label: '아니오', hint: '자택에서 일하지 않음' },
+                { value: 'yes', label: '예', hint: '작업 공간 면적 비율을 적습니다' }]
                 } />
               
-              {homeOffice &&
+              {home === 'yes' &&
               <div className="mt-4 rounded-xl bg-canvas p-4">
                   <label
                   htmlFor="ratio"
                   className="text-[13px] font-bold text-ink">
                   
-                    자택에서 작업공간이 차지하는 면적 비율
+                    집 전체 면적에서 작업 공간이 차지하는 비율
                   </label>
-                  <div className="mt-2.5 flex items-center gap-3">
+                  <div className="mt-2.5 flex items-center gap-2">
                     <input
                     id="ratio"
-                    type="range"
-                    min={0}
-                    max={100}
-                    step={5}
-                    value={form.homeOfficeRatio}
-                    onChange={(event) =>
-                    update('homeOfficeRatio', Number(event.target.value))
-                    }
-                    className="h-1.5 flex-1 accent-accent" />
+                    inputMode="numeric"
+                    value={ratioText}
+                    placeholder="예: 25"
+                    aria-invalid={ratioText !== '' && !ratioValid}
+                    onChange={(event) => {
+                      edited.current = true;
+                      setRatioText(event.target.value.replace(/\D/g, '').slice(0, 3));
+                    }}
+                    className="w-24 rounded-xl border border-line px-3.5 py-2.5 text-[14px] tabular-nums text-ink" />
                   
-                    <span className="w-12 text-right text-[14px] font-bold tabular-nums text-ink">
-                      {form.homeOfficeRatio}%
-                    </span>
+                    <span className="text-[14px] font-bold text-ink">%</span>
                   </div>
+                  <p className="mt-2 text-[12px] leading-5 text-muted">
+                    미리 채워 두지 않습니다. 대략이라도 실제 면적으로 적어 주세요. 예: 방 네 칸 중 한 칸을 작업실로 쓰면 25%.
+                  </p>
                 </div>
               }
             </section>

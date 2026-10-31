@@ -308,6 +308,7 @@ export const httpApi: Api = {
       latestOnly: query?.latestOnly
     }),
     get: (judgmentId) => get(`/judgments/${judgmentId}`),
+    export: (scope) => get('/judgments/export', { batchId: scope.batchId, year: scope.year }),
     override: (judgmentId, body, idempotencyKey) =>
     post(`/judgments/${judgmentId}/override`, body, idempotencyKey),
     removeOverride: (overrideId) => del(`/judgment-overrides/${overrideId}`)

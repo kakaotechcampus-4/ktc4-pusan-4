@@ -2,7 +2,7 @@ import type { Api } from './contract';
 import { httpApi } from './http';
 import { MOCK_PASSWORD, MOCK_VERIFICATION_CODE, mockApi, mockSeedSession } from './mock';
 
-export type { Api, PageQuery, TransactionQuery, JudgmentQuery, QuestionQuery } from './contract';
+export type { Api, ExportScope, PageQuery, TransactionQuery, JudgmentQuery, QuestionQuery } from './contract';
 export { ApiRequestError } from './contract';
 
 /**

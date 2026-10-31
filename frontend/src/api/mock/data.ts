@@ -1678,7 +1678,8 @@ export const QUESTION_GROUPS: QuestionGroupSeed[] = [
     count: 1,
     totalAmount: 0,
     questionText: '이 요금이 나오는 공간을 사업 전용으로만 쓰나요?',
-    options: ['사업 전용', '자택 겸용']
+    // R-103 v3 (#214). 자택은 작업 공간이 따로 나뉘는지까지 묻는다
+    options: ['사업 전용', '자택 겸용(작업 공간이 따로 나뉨)', '자택 겸용(따로 나뉘지 않음)']
   },
   {
     // R-311_주말음식점. 불가인데 질문이 남는 소명 대기다. 일괄 답변 대상에서 빼야 한다(rule-card-fields.md)
@@ -1723,7 +1724,12 @@ export const QUESTION_ANSWER_VERDICT: Record<string, Record<string, Verdict>> = 
   'transaction:0199c8f2-0000-7000-8000-00000000001017': { 업무용: 'AVAILABLE', 개인: 'UNAVAILABLE' },
   'transaction:0199c8f2-0000-7000-8000-00000000001006': { 업무출장: 'AVAILABLE', 개인: 'UNAVAILABLE' },
   'merchant:SK텔레콤': { 전용: 'AVAILABLE', 공용: 'NEEDS_REVIEW', 개인: 'UNAVAILABLE' },
-  'merchant:자택 관리비': { '사업 전용': 'AVAILABLE', '자택 겸용': 'NEEDS_REVIEW' },
+  // 나뉘면 가능 + 문진의 작업 공간 면적 비율로 안분, 나뉘지 않으면 세무사 판단(확인 필요)
+  'merchant:자택 관리비': {
+    '사업 전용': 'AVAILABLE',
+    '자택 겸용(작업 공간이 따로 나뉨)': 'AVAILABLE',
+    '자택 겸용(따로 나뉘지 않음)': 'NEEDS_REVIEW'
+  },
   'transaction:0199c8f2-0000-7000-8000-00000000001016': { 업무미팅: 'AVAILABLE', 개인: 'UNAVAILABLE' },
   'transaction:0199c8f2-0000-7000-8000-00000000001004': { '월 단위 결제': 'AVAILABLE', '연간 일시불': 'NEEDS_REVIEW' }
 };
@@ -1776,9 +1782,12 @@ export const QUESTION_CARDS: Record<string, QuestionCard> = {
   },
   'merchant:자택 관리비': {
     ruleCardId: 'R-103',
-    ruleCardVersion: 1,
+    ruleCardVersion: 3,
     citations: [1418, 1435],
-    options: { '사업 전용': { account: '수도광열비' } }
+    options: {
+      '사업 전용': { account: '수도광열비' },
+      '자택 겸용(작업 공간이 따로 나뉨)': { account: '수도광열비', attributes: { 안분: '작업공간비율' } }
+    }
   },
   'transaction:0199c8f2-0000-7000-8000-00000000001004': {
     ruleCardId: 'R-107',
@@ -1971,7 +1980,7 @@ export const RULE_CANDIDATES: RuleCandidate[] = [
  */
 export const QUESTION_SUGGESTIONS: QuestionSuggestion[] = [
 { groupKey: 'merchant:SK텔레콤', factType: '전용여부', tier: 'A', value: '전용', sourceLabel: '12월 업로드(국민)' },
-{ groupKey: 'merchant:자택 관리비', factType: '공간전용여부', tier: 'A', value: '자택 겸용', sourceLabel: '12월 업로드(국민)' },
+{ groupKey: 'merchant:자택 관리비', factType: '공간전용여부', tier: 'A', value: '자택 겸용(작업 공간이 따로 나뉨)', sourceLabel: '12월 업로드(국민)' },
 {
   groupKey: 'transaction:0199c8f2-0000-7000-8000-00000000001004',
   factType: '기간',

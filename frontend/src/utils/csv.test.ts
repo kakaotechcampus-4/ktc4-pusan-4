@@ -18,8 +18,7 @@ describe('toCsv', () => {
 describe('judgmentsCsv', () => {
   it('엑셀이 한글을 읽도록 BOM 으로 시작하고, 승인일은 ISO 날짜다', async () => {
     const { judgmentsCsv } = await import('./csv');
-    const text = judgmentsCsv([
-    {
+    const judgment = {
       transaction: {
         approvedAt: '2026-01-31T09:00:00+09:00',
         merchantNorm: '가게',
@@ -33,9 +32,12 @@ describe('judgmentsCsv', () => {
       origin: { type: 'RUN', id: 'r' },
       outOfScope: false,
       citations: [{ statuteVersionId: 1, statuteId: '소득세법-27-1' }]
-    } as unknown as import('../types/domain').Judgment]
+    } as unknown as import('../types/domain').Judgment;
+    const text = judgmentsCsv([
+    { judgment, allowedAmount: 800, answers: [{ question: '용도는?', answer: '업무미팅' }] }]
     );
     expect(text.charCodeAt(0)).toBe(0xfeff);
-    expect(text.split('\r\n')[1]).toBe('2026-01-31,가게,가게 본점,식비,1000,0,가능,1000,,,소득세법-27-1');
+    // 인정 금액은 finalAmount 가 아니라 한도까지 반영한 allowedAmount 다
+    expect(text.split('\r\n')[1]).toBe('2026-01-31,가게,가게 본점,식비,1000,0,가능,800,,,소득세법-27-1,용도는? → 업무미팅');
   });
 });
