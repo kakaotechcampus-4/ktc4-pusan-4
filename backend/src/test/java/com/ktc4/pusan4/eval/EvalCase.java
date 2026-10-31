@@ -39,7 +39,8 @@ record EvalCase(
         List<String> citationsIncluded,
         List<String> citationsExcluded,
         Boolean inference,
-        Map<String, Object> attributes
+        Map<String, Object> attributes,
+        Long amount
     ) {
     }
 
@@ -92,6 +93,7 @@ record EvalCase(
         JsonNode exp = p.node(root, "기대");
         JsonNode gate = exp.get("걸린게이트");
         JsonNode inference = exp.get("is_inference");
+        JsonNode amount = exp.get("금액");
         Expectation expected = new Expectation(
             p.verdict(p.text(exp, "판정")),
             gate != null,
@@ -101,7 +103,8 @@ record EvalCase(
             inference == null || inference.isNull() ? null : inference.asBoolean(),
             exp.path("속성").isObject()
                 ? MAPPER.convertValue(exp.path("속성"), new TypeReference<Map<String, Object>>() { })
-                : Map.of()
+                : Map.of(),
+            amount == null || amount.isNull() ? null : amount.longValue()
         );
 
         JsonNode scoring = root.path("채점");
