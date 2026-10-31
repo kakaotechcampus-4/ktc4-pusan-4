@@ -8,6 +8,8 @@ import com.ktc4.pusan4.judgment.domain.RuleCard;
 import com.ktc4.pusan4.judgment.domain.Verdict;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -219,9 +221,56 @@ class RuleCardLoaderTest {
             .containsExactly("ASSET_OR_EXPENSE", "자산여부", "transaction");
         assertThat(card.questions().getFirst().effects())
             .containsEntry("자산", new QuestionEffect(
-                Verdict.NEEDS_REVIEW, null, Map.of("자산", true, "내용연수", 5)))
+                Verdict.NEEDS_REVIEW, null, Map.of("자산", true, "내용연수", 5, "상각방법", "정률법")))
             .containsEntry("당기비용", new QuestionEffect(
                 Verdict.AVAILABLE, "소모품비", Map.of()));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "자산: true, 내용연수: 5",
+        "자산: true, 상각방법: 정률법",
+        "자산: true, 내용연수: 4, 상각방법: 정률법",
+        "자산: true, 내용연수: 5, 상각방법: 생산량비례법"
+    })
+    void rejects_asset_option_without_a_known_depreciation_rate(String attributes) throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("cards/R-051.yaml"), assetCardYaml("", attributes));
+
+        assertThatThrownBy(() -> new RuleCardLoader().load(root))
+            .isInstanceOf(RuleCardValidationException.class)
+            .hasMessageContaining("R-051")
+            .hasMessageContaining("상각방법");
+    }
+
+    @Test
+    void rejects_asset_card_attributes_without_a_known_depreciation_rate() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("cards/R-051.yaml"), assetCardYaml("attributes: { 자산: true }\n", "즉시상각: true"));
+
+        assertThatThrownBy(() -> new RuleCardLoader().load(root))
+            .isInstanceOf(RuleCardValidationException.class)
+            .hasMessageContaining("R-051");
+    }
+
+    private static String assetCardYaml(String cardAttributes, String optionAttributes) {
+        return """
+            id: R-051
+            version: 1
+            gate: G4
+            priority: 500
+            effective_period: { start: 2025-01-01, end: null }
+            match:
+              amount_min: 1000001
+            question:
+              code: ASSET_OR_EXPENSE
+              text: 자산으로 처리할까요?
+              fact_type: 자산여부
+              group_by: transaction
+              options:
+                - { value: 자산, %s }
+            review: { by: 외부자문, date: 2026-09-05 }
+            """.formatted(optionAttributes) + cardAttributes;
     }
 
     @Test
@@ -397,6 +446,8 @@ class RuleCardLoaderTest {
               exclude_category: [카페, 음식점]
             attributes:
               자산: true
+              내용연수: 5
+              상각방법: 정률법
             review: { by: 외부자문, date: 2026-09-05 }
             """);
 

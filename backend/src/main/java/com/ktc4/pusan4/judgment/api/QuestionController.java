@@ -9,7 +9,6 @@ import com.ktc4.pusan4.judgment.persistence.QuestionAnswerService;
 import com.ktc4.pusan4.judgment.persistence.QuestionQueryService;
 import com.ktc4.pusan4.judgment.persistence.QuestionSuggestionService;
 import com.ktc4.pusan4.shared.api.ErrorResponse;
-import com.ktc4.pusan4.shared.api.MockResponse;
 import com.ktc4.pusan4.shared.api.PageResponse;
 import com.ktc4.pusan4.shared.auth.CurrentUser;
 import io.swagger.v3.oas.annotations.Operation;
@@ -36,18 +35,15 @@ import java.util.UUID;
 @RestController
 public class QuestionController {
 
-    private final JudgmentMockData mockData;
     private final QuestionQueryService queryService;
     private final QuestionAnswerService answerService;
     private final QuestionSuggestionService suggestionService;
 
     public QuestionController(
-        JudgmentMockData mockData,
         QuestionQueryService queryService,
         QuestionAnswerService answerService,
         QuestionSuggestionService suggestionService
     ) {
-        this.mockData = mockData;
         this.queryService = queryService;
         this.answerService = answerService;
         this.suggestionService = suggestionService;
@@ -123,16 +119,18 @@ public class QuestionController {
         );
     }
 
-    @MockResponse
     @Operation(summary = "미해소 질문 일괄 응답",
-        description = "batchId·PENDING·factType 이 모두 일치하는 질문을 한 번에 닫는다. 대상 중 하나라도 "
-            + "answer.value 를 허용하지 않으면 아무것도 바꾸지 않는다. 대상이 0건이면 answeredCount = 0 (에러 아님)")
+        description = "batchId·PENDING·factType 이 모두 일치하는 질문을 한 번에 닫는다. 소명 대기 거래의 질문이 섞인 "
+            + "그룹은 빼고 excludedCount 로 센다. 대상 중 하나라도 answer.value 를 허용하지 않으면 아무것도 바꾸지 않는다. "
+            + "그룹(groupKey)마다 UserFact 를 만들고 영향받는 거래는 한 번씩만 재판정한다. "
+            + "Batch 의 질문 이력에 없는 factType 이면 UNKNOWN_FACT_TYPE, 이력이 있는데 대상이 0건이면 answeredCount = 0 (에러 아님)")
     @ApiResponse(responseCode = "404", description = "BATCH_NOT_FOUND",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @ApiResponse(responseCode = "422", description = "INVALID_ANSWER_VALUE, UNKNOWN_FACT_TYPE",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @PostMapping("/questions/bulk-answer")
-    public BulkAnswerResponse bulkAnswer(@RequestBody BulkAnswerRequest request) {
-        return mockData.bulkAnswer();
+    public BulkAnswerResponse bulkAnswer(CurrentUser currentUser, @Valid @RequestBody BulkAnswerRequest request) {
+        return BulkAnswerResponse.from(answerService.bulkAnswer(
+            currentUser.id(), request.batchId(), request.factType(), request.answer().value()));
     }
 }

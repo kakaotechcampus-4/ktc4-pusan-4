@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -53,6 +54,9 @@ class ClassificationResponseIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     @Test
     void without_completed_run_classifies_only_and_saves_personal_dictionary() {
@@ -112,6 +116,47 @@ class ClassificationResponseIntegrationTest {
         assertThat(judgment).containsEntry("classification_review_id", reviewIds.getFirst())
             .containsEntry("user_context_version", 1);
         assertThat(judgmentCount(idOf(userId, "k-2"))).isZero();
+    }
+
+    @Test
+    void rejudge_that_makes_an_entertainment_expense_settles_the_limit() {
+        // given: 미분류 거래. 그 거래에 「업무미팅」 용도 답이 이미 있다(상태는 직접 만든다)
+        UUID userId = newUser();
+        UUID batchId = upload(userId, "hash-limit", tx("k-1", "2026-01-05", "성진이네 본점"));
+        newRun(userId, batchId, "940909", 1, "COMPLETED");
+        insertStatutes("소득세법-33-1-5", "소득세법시행령-61-1-1", "소득세법-35-1");
+        UUID transactionId = idOf(userId, "k-1");
+        jdbcTemplate.update("""
+            insert into user_fact(id, user_id, batch_id, scope_key, fact_type, value, version)
+            values (?, ?, ?, ?, '용도', '{"value": "업무미팅"}', 1)
+            """, UUID.randomUUID(), userId, batchId, "transaction:" + transactionId);
+
+        // when: 카페로 분류하면 재판정이 접대비 가능으로 바뀐다(R-300)
+        reviewService.answer(userId, reviewIdsOf(userId, "k-1"), "카페");
+
+        // then: 재판정한 판정이 한도 항목에 들어간다
+        assertThat(jdbcTemplate.queryForMap("""
+            select entry.judgment_id, entry.allowed_amount
+            from limit_bucket_entry entry
+            join judgment on judgment.id = entry.judgment_id
+            where judgment.transaction_id = ?
+            """, transactionId))
+            .containsEntry("judgment_id", jdbcTemplate.queryForObject(
+                "select id from judgment where transaction_id = ?", UUID.class, transactionId))
+            .containsEntry("allowed_amount", 11_000L);
+    }
+
+    @Test
+    void answer_takes_the_user_lock_before_the_transaction_lock() throws Exception {
+        UUID userId = newUser();
+        UUID batchId = upload(userId, "hash-lock-order", tx("k-1", "2026-01-05", "성진이네 본점"));
+        newRun(userId, batchId, "940909", 1, "COMPLETED");
+        insertStatutes("소득세법-33-1-5", "소득세법시행령-61-1-1", "소득세법-35-1");
+        List<UUID> reviewIds = reviewIdsOf(userId, "k-1");
+
+        UserLockOrder.assertTakesUserLockFirst(jdbcTemplate, transactionManager, userId,
+            UserLockOrder.TRANSACTION_ROW, idOf(userId, "k-1"),
+            () -> reviewService.answer(userId, reviewIds, "카페"));
     }
 
     @Test
@@ -194,6 +239,18 @@ class ClassificationResponseIntegrationTest {
             insert into judgment_run(id, batch_id, context_id, context_version, status, total_count)
             values (?, ?, ?, ?, ?, 1)
             """, UUID.randomUUID(), batchId, contextId, version, status);
+    }
+
+    private void insertStatutes(String... statuteIds) {
+        for (String statuteId : statuteIds) {
+            jdbcTemplate.update("""
+                insert into statute_version(
+                    statute_id, doc_type, hierarchy, effective_from, body, body_hash,
+                    doc_id, unit_level, title, source_url
+                ) values (?, '법령', '법률', '2024-01-01', '원문', 'hash', 'DOC', '호', ?, 'https://law.go.kr/test')
+                on conflict do nothing
+                """, statuteId, statuteId);
+        }
     }
 
     private UUID idOf(UUID userId, String naturalKey) {

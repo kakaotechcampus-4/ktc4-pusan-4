@@ -1,8 +1,12 @@
 package com.ktc4.pusan4.judgment.persistence;
 
+import com.ktc4.pusan4.judgment.domain.AmountCalculator;
+import com.ktc4.pusan4.judgment.domain.UserContext;
 import com.ktc4.pusan4.judgment.domain.Verdict;
 import com.ktc4.pusan4.shared.UuidGenerator;
 import com.ktc4.pusan4.shared.api.ApiException;
+import com.ktc4.pusan4.user.domain.BusinessContext;
+import com.ktc4.pusan4.user.persistence.BusinessContextService;
 import jakarta.persistence.NoResultException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
@@ -24,6 +28,8 @@ public class JudgmentOverrideService {
     private final JudgmentOverrideRepository overrideRepository;
     private final JudgmentCitationRepository citationRepository;
     private final TransactionRecordRepository transactionRepository;
+    private final BusinessContextService contextService;
+    private final LimitSettlementService limitSettlement;
     private final UuidGenerator uuidGenerator;
     private final Clock clock;
 
@@ -32,6 +38,8 @@ public class JudgmentOverrideService {
         JudgmentOverrideRepository overrideRepository,
         JudgmentCitationRepository citationRepository,
         TransactionRecordRepository transactionRepository,
+        BusinessContextService contextService,
+        LimitSettlementService limitSettlement,
         UuidGenerator uuidGenerator,
         Clock clock
     ) {
@@ -39,12 +47,15 @@ public class JudgmentOverrideService {
         this.overrideRepository = overrideRepository;
         this.citationRepository = citationRepository;
         this.transactionRepository = transactionRepository;
+        this.contextService = contextService;
+        this.limitSettlement = limitSettlement;
         this.uuidGenerator = uuidGenerator;
         this.clock = clock;
     }
 
     /**
      * 판정을 그대로 두고 verdict 만 바꾼 새 revision 을 만든다. 같은 거래의 이전 활성 수정은 해제된다.
+     * 현재 판정이 바뀌므로 접대비 한도를 다시 집계한다.
      *
      * @return 새 revision 의 판정 id
      */
@@ -56,6 +67,8 @@ public class JudgmentOverrideService {
         if (toVerdict == Verdict.NEEDS_REVIEW) {
             throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "UNPROCESSABLE_ENTITY", "확인 필요로는 바꿀 수 없습니다.");
         }
+        // 끝의 한도 집계가 사용자 락을 잡는다. 아래 거래 락보다 먼저 잡아 "사용자 → 거래" 순서를 지킨다.
+        limitSettlement.lockUser(userId);
         // 재판정(JudgmentService.nextRevision)과 같은 거래 락이다. 그사이 현재 판정이 바뀌지 않게 먼저 잡는다.
         TransactionRecordEntity transaction = transactionRepository.findByIdForUpdate(source.transactionId())
             .orElseThrow(NoResultException::new);
@@ -69,25 +82,35 @@ public class JudgmentOverrideService {
         overrideRepository.save(new JudgmentOverrideEntity(
             overrideId, transaction.id(), judgmentId, toVerdict, reason, now));
 
+        // 판정할 때의 문진 버전으로 다시 계산한다(안분 비율).
+        BusinessContext context = contextService.version(userId, source.userContextVersion());
+        long amount = AmountCalculator.finalAmount(toVerdict, source.attributes(), transaction.toInput(),
+            new UserContext(context.industryCode(), context.hasEmployee(), context.homeOfficeRatio()));
         UUID revisionId = uuidGenerator.generate();
         judgmentRepository.save(source.overriddenAs(
-            revisionId, judgmentRepository.findNextRevision(transaction.id()), toVerdict, overrideId));
+            revisionId, judgmentRepository.findNextRevision(transaction.id()), toVerdict, overrideId, amount));
         List<Long> versionIds = citationRepository.findRows(List.of(judgmentId)).stream()
             .map(JudgmentCitationRepository.CitationRow::statuteVersionId)
             .toList();
         if (!versionIds.isEmpty()) {
             citationRepository.insertAll(revisionId, versionIds);
         }
+        limitSettlement.settleProvisional(userId);
         return revisionId;
     }
 
-    /** 이미 해제한 수정도 그대로 성공이다. 수정 revision 은 지우지 않는다. */
+    /**
+     * 이미 해제한 수정도 그대로 성공이다. 수정 revision 은 지우지 않는다. 현재 판정이 바뀌므로 한도를 다시 집계한다.
+     * 수정(override)이 사용자 락 다음에 수정 행을 고치므로, 여기서도 사용자 락을 먼저 잡는다.
+     */
     @Transactional
     public void release(UUID userId, UUID overrideId) {
+        limitSettlement.lockUser(userId);
         overrideRepository.findForUser(overrideId, userId)
             .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "JUDGMENT_OVERRIDE_NOT_FOUND",
                 "사용자 수정을 찾을 수 없습니다."))
             .release(OffsetDateTime.now(clock));
+        limitSettlement.settleProvisional(userId);
     }
 
     /** 현재 판정(api.md §5). 판정 목록의 "현재 판정" 조건을 그대로 쓴다. */
