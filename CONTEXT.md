@@ -9,6 +9,8 @@
 > 필드 상세의 단일 원본은 [`docs/rule-card-fields.md`](docs/rule-card-fields.md) (§6 필수 요소).
 >
 > 2026-10-15 · 보고서(핸드오프 문서) 생성을 없앴다. 에이전트 자리는 규칙 카드 생성과 에이전트 비서 Really 두 곳이다.
+> 없앤 것은 AI 가 쓰는 PDF 보고서다. 세무사에게 넘기는 CSV(2026-10-05 협업 미팅 결정)는 그대로 두고,
+> 백엔드는 내보내기 API(`GET /judgments/export`)로 데이터만 주고 파일 변환은 FE 가 한다(2026-11-01).
 > 비서 명세의 단일 원본은 [`docs/agent-secretary.md`](docs/agent-secretary.md).
 
 ---

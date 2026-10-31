@@ -154,6 +154,9 @@ Question
 │   ├── summary/
 │   │   └── GET                         판정 결과 요약
 │   │
+│   ├── export/
+│   │   └── GET                         세무사에게 넘길 내보내기
+│   │
 │   └── {judgmentId}/
 │       ├── GET                         판정 상세
 │       │
@@ -171,6 +174,10 @@ Question
 │
 ├── question-responses/
 │   └── POST                            확인 질문 응답 및 부분 재판정
+│
+├── handoff-notes/
+│   ├── GET                             세무대리인 질문 목록
+│   └── POST                            세무대리인 질문 저장
 │
 └── statutes/
     └── {statuteVersionId}/
@@ -1753,6 +1760,40 @@ GET /api/v1/judgments/summary?runId=R1
 
 ---
 
+## `GET /api/v1/judgments/export`
+
+세무사에게 넘길 CSV 의 데이터다(2026-10-05 협업 미팅 결정). 백엔드는 데이터만 주고 파일 변환(CSV, 엑셀이 읽는 BOM·수식 막기)은 FE 가 한다.
+
+Query: `batchId` 또는 `year` 중 정확히 하나. 0개거나 2개면 `400 INVALID_EXPORT_SCOPE`.
+
+대상은 같은 조건의 `GET /judgments`(현재 Judgment)와 같고, 페이지 없이 전부 준다.
+
+```json
+{
+  "items": [
+    {
+      "judgment": { "id": "0199f1c3-...", "transaction": { "approvedAt": "2026-01-12", "merchantRaw": "스타벅스코리아 서면점", "amount": 12800 }, "verdict": { "code": "AVAILABLE", "label": "가능" }, "account": "기업업무추진비", "finalAmount": 12800, "citations": [{ "statuteVersionId": 1418, "statuteId": "소득세법-35-1" }] },
+      "allowedAmount": 12800,
+      "answers": [
+        { "question": "이 가맹점에서 사용한 비용은 주로 어떤 목적으로 지출하셨나요?", "answer": "업무미팅" }
+      ]
+    }
+  ]
+}
+```
+
+| 필드 | 설명 |
+| --- | --- |
+| judgment | 거래의 현재 Judgment. `GET /judgments/{judgmentId}` 응답과 같은 모양이다 |
+| allowedAmount | 한도까지 반영한 인정 금액. 한도 항목이 있는 Judgment(접대비)는 한도 인정액, 아니면 `finalAmount`다. 위 summary 와 같은 기준이다 |
+| answers | 이 거래에 답한 질문 문구와 답. 같은 사실(`factType`)은 하나만 둔다. 답한 것이 없으면 빈 배열 |
+
+- 2026-10-05 에 정한 CSV 칸(상품 이름, 판정 결과, 근거 조문, 사용 목적, 사용 날짜)은 `transaction.merchantRaw`, `verdict.label`, `citations[].statuteId`, `answers`, `transaction.approvedAt` 에서 채운다.
+- 확인 필요(혼용처럼 세무사 판단이 필요한 답)는 `allowedAmount` 가 0이고, 사용자가 무엇이라고 답했는지는 `answers` 로 넘어간다.
+- 다른 사용자의 `batchId`를 넘기면 404가 아니라 빈 목록이다.
+
+---
+
 ## `GET /api/v1/judgments/{judgmentId}`
 
 ```
@@ -2594,6 +2635,42 @@ Question을 삭제하지 않고 상태를 남겨 판정 이력을 보존한다.
 - AI 서버에는 요청의 `Authorization` 헤더만 함께 넘긴다. AI 서버의 조회 도구는 이 토큰으로 공개 API 를 불러, 사용자 본인 권한 밖을 읽지 못한다.
 - 사용자마다 동시 1턴, 분당 10턴, 하루(한국 시각) 100턴이다. 넘으면 `429 ASSISTANT_RATE_LIMITED`와 `Retry-After`(초)를 준다. AI 서버 전체 한도(8턴)에 걸려도 같다.
 - AI 서버에 닿지 못하거나 응답이 40초를 넘으면 `503 ASSISTANT_UNAVAILABLE`.
+
+---
+
+## `GET /api/v1/handoff-notes`
+
+세무대리인에게 물을 질문(agent-secretary.md FR-16). 요약 화면의 "세무대리인에게 넘길 문장" 끝에 붙는다.
+본인 질문 전부를 넣은 순서(`createdAt ASC`)로 준다. 페이지 없음.
+
+```json
+[
+  {
+    "id": "019a1b2c-...",
+    "text": "휴대폰 요금의 업무 비중을 어떻게 잡으면 될까요?",
+    "transactionIds": ["0199f1..."],
+    "createdAt": "2026-11-01T14:05:00Z"
+  }
+]
+```
+
+## `POST /api/v1/handoff-notes`
+
+비서가 제안한 세무대리인 질문(`handoff_note` 카드)을 사용자가 [적용]하면 저장한다.
+
+```json
+{ "text": "휴대폰 요금의 업무 비중을 어떻게 잡으면 될까요?", "transactionIds": ["0199f1..."] }
+```
+
+| 필드 | 규칙 |
+| --- | --- |
+| text | 1~300자 |
+| transactionIds | 50개 이하. 없으면 빈 배열. 같은 거래를 두 번 적으면 한 번만 남긴다 |
+
+응답 `201`은 목록 항목과 같은 모양이다.
+
+- 붙인 거래가 없거나 다른 사용자의 것이면 `404 TRANSACTION_NOT_FOUND`.
+- 사용자 소유라 탈퇴하면 함께 지운다. 업로드를 지워도 질문은 남는다(거래 id 는 참고용).
 
 ---
 
