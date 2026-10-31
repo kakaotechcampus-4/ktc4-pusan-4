@@ -301,7 +301,8 @@ export function JudgmentDetailPanel({
             judgment.finalAmount ? 'text-ok' : 'text-muted'}`
             }>
 
-            {judgment.finalAmount !== null ?
+            {/* 서버는 가능이 아니면 0 을 준다(#184). 「0원」은 확인 필요를 금액이 정해진 것처럼 보이게 해 비워 둔다 */}
+            {judgment.verdict.code === 'AVAILABLE' && judgment.finalAmount !== null ?
             `${formatWon(judgment.finalAmount)}${asset ? '까지' : ''}` :
             '—'}
           </dd>
