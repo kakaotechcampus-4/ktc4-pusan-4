@@ -1,7 +1,7 @@
 package com.ktc4.pusan4.integration;
 
 import com.ktc4.pusan4.auth.AccessTokens;
-import com.ktc4.pusan4.shared.auth.FixedUser;
+import com.ktc4.pusan4.auth.TestUser;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -87,12 +87,12 @@ class AssistantRelayIntegrationTest {
         if (keys != null && !keys.isEmpty()) {
             redis.delete(keys);
         }
-        batchId = insertBatch(FixedUser.ID);
+        batchId = insertBatch(TestUser.ID);
     }
 
     @Test
     void relays_the_turn_with_only_the_users_own_token() throws Exception {
-        String token = "Bearer " + accessTokens.issue(FixedUser.ID);
+        String token = "Bearer " + accessTokens.issue(TestUser.ID);
 
         chat(token, """
             {"message": "토요일 스타벅스는 미팅이었어", "history": [{"role": "user", "content": "안녕"}],

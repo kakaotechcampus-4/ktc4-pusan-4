@@ -97,6 +97,8 @@ Question
 /api/v1
 │
 ├── auth/                               (Authorization 없이 부른다)
+│   ├── signup/
+│   │   └── POST                        이메일 회원가입
 │   ├── login/
 │   │   └── POST                        로그인
 │   ├── refresh/
@@ -208,17 +210,37 @@ refresh_token={token}; Path=/api/v1/auth; Max-Age=1209600; HttpOnly; Secure; Sam
 - `Domain` 은 붙이지 않는다. 배포는 Caddy 뒤 같은 오리진이다.
 - 로컬 프로필(http)에서만 `Secure` 를 뺀다.
 
-> 지금은 실제 계정이 없어 고정 사용자 `demo@example.com` 하나만 로그인한다. 비밀번호는 서버 설정(`APP_AUTH_DEMO_PASSWORD`)이다.
-> 실제 계정은 B9b 에서 붙이며 아래 계약은 바뀌지 않는다.
+계정은 이메일 가입으로 만든다. 이메일은 앞뒤 공백을 빼고 소문자로 저장하고, 로그인할 때도 같은 규칙으로 찾는다. 메일 인증은 아직 없다.
 
 리프레시 토큰은 서버(Redis)가 로그인 단위로 기억한다. 재발급하면 이전 토큰은 쓸 수 없고, 로그아웃하면 그 로그인만 끊긴다(다른 기기는 그대로).
 이미 쓴 리프레시 토큰을 다시 보내면 탈취로 보고 그 로그인을 끊는다. 그래서 프론트는 재발급 요청을 한 번에 하나만 보낸다.
+
+### `POST /api/v1/auth/signup`
+
+```
+{
+  "email": "user@example.com",
+  "password": "..."
+}
+```
+
+| 필드 | 제약 |
+| --- | --- |
+| email | 이메일 형식, 최대 320자 |
+| password | 8자 이상, UTF-8 72바이트 이하 |
+
+가입하고 바로 로그인한다. 응답은 로그인과 같고 상태만 `201` 이다.
+
+```
+400 VALIDATION_ERROR       형식·길이가 맞지 않음
+409 EMAIL_ALREADY_EXISTS   이미 가입한 이메일
+```
 
 ### `POST /api/v1/auth/login`
 
 ```
 {
-  "email": "demo@example.com",
+  "email": "user@example.com",
   "password": "..."
 }
 ```

@@ -1,20 +1,26 @@
 package com.ktc4.pusan4.user.persistence;
 
+import com.ktc4.pusan4.shared.UuidGenerator;
 import com.ktc4.pusan4.shared.api.ApiException;
 import com.ktc4.pusan4.user.domain.AppUser;
+import com.ktc4.pusan4.user.domain.EmailCredential;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
 public class UserService {
 
     private final AppUserRepository userRepository;
+    private final UuidGenerator uuidGenerator;
 
-    public UserService(AppUserRepository userRepository) {
+    public UserService(AppUserRepository userRepository, UuidGenerator uuidGenerator) {
         this.userRepository = userRepository;
+        this.uuidGenerator = uuidGenerator;
     }
 
     /**
@@ -38,6 +44,29 @@ public class UserService {
         if (userRepository.deleteUser(userId) == 0) {
             throw userNotFound();
         }
+    }
+
+    /**
+     * 이메일 계정을 만든다(api.md 1.1 회원가입). 이메일은 앞뒤 공백을 빼고 소문자로 저장한다.
+     *
+     * @param passwordHash BCrypt 해시. 원문을 넘기지 않는다
+     * @return 새 사용자 id. 이미 가입한 이메일이면 empty
+     */
+    @Transactional
+    public Optional<UUID> registerEmailAccount(String email, String passwordHash) {
+        UUID id = uuidGenerator.generate();
+        int inserted = userRepository.insertEmailAccount(id, normalizeEmail(email), passwordHash);
+        return inserted == 1 ? Optional.of(id) : Optional.empty();
+    }
+
+    /** 이메일 로그인용. 없는 이메일이거나 비밀번호가 없는 계정이면 empty 다. */
+    @Transactional(readOnly = true)
+    public Optional<EmailCredential> findEmailCredential(String email) {
+        return userRepository.findByEmail(normalizeEmail(email)).flatMap(AppUserEntity::emailCredential);
+    }
+
+    private static String normalizeEmail(String email) {
+        return email.trim().toLowerCase(Locale.ROOT);
     }
 
     static ApiException userNotFound() {

@@ -3,6 +3,7 @@ package com.ktc4.pusan4.shared.api;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ktc4.pusan4.auth.AuthService;
 import com.ktc4.pusan4.auth.TestAuthentication;
+import com.ktc4.pusan4.auth.TestUser;
 import com.ktc4.pusan4.judgment.api.JudgmentMockData;
 import com.ktc4.pusan4.judgment.domain.Gate;
 import com.ktc4.pusan4.judgment.domain.JudgmentOrigin;
@@ -31,7 +32,6 @@ import com.ktc4.pusan4.progress.persistence.ProgressService;
 import com.ktc4.pusan4.judgment.persistence.StatuteService;
 import com.ktc4.pusan4.merchant.api.ClassificationReviewStatus;
 import com.ktc4.pusan4.shared.UuidV7Generator;
-import com.ktc4.pusan4.shared.auth.FixedUser;
 import com.ktc4.pusan4.transaction.api.CardIssuer;
 import com.ktc4.pusan4.transaction.api.ClassificationStatus;
 import com.ktc4.pusan4.transaction.api.SourceStatus;
@@ -172,11 +172,11 @@ class ApiResponseContractTest {
         given(reviewService.answer(any(), any(), any())).willReturn(new ClassificationAnswer(1, "해외SaaS", 1));
 
         given(userService.get(any())).willReturn(new AppUser(
-            FixedUser.ID, "demo@example.com",
+            TestUser.ID, "demo@example.com",
             OffsetDateTime.parse("2026-09-01T10:00:00+09:00")));
 
         BusinessContext context = new BusinessContext(UUID.fromString(ID),
-            FixedUser.ID, 1, "62010", 82_000_000L, LocalDate.parse("2024-03-15"),
+            TestUser.ID, 1, "62010", 82_000_000L, LocalDate.parse("2024-03-15"),
             BookkeepingDuty.간편장부, false, 20, OffsetDateTime.parse("2026-09-01T10:05:00+09:00"));
         given(contextService.create(any(), any())).willReturn(context);
         given(contextService.current(any())).willReturn(context);
@@ -401,7 +401,7 @@ class ApiResponseContractTest {
         mockMvc.perform(get("/api/v1/users/me")).andExpect(status().isOk());
 
         // then: 요청 값이 아니라 CurrentUserProvider 가 정한 사용자로 조회한다
-        verify(userService).get(FixedUser.ID);
+        verify(userService).get(TestUser.ID);
     }
 
     @Test
@@ -411,8 +411,8 @@ class ApiResponseContractTest {
 
         // then: 로그인을 먼저 끊어야 Redis 가 실패했을 때 지워진 사용자의 토큰이 남지 않는다
         InOrder order = inOrder(authService, userService);
-        order.verify(authService).logoutEverywhere(FixedUser.ID);
-        order.verify(userService).delete(FixedUser.ID);
+        order.verify(authService).logoutEverywhere(TestUser.ID);
+        order.verify(userService).delete(TestUser.ID);
     }
 
     @Test
