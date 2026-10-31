@@ -1,6 +1,6 @@
 # frontend
 
-경비판정 웹 프론트엔드. Vite + React 18 + TypeScript + Tailwind CSS.
+PreeT 웹 프론트엔드. Vite + React 18 + TypeScript + Tailwind CSS.
 
 ## 실행
 

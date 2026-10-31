@@ -15,14 +15,14 @@ export function MarketingHeader() {
   return (
     <header className="sticky top-0 z-30 bg-canvas/95 backdrop-blur">
       <Container className="flex h-[72px] items-center gap-6 lg:gap-10">
-        <Link to="/" className="flex shrink-0 items-center gap-2.5 whitespace-nowrap" aria-label="경비판정 홈">
+        <Link to="/" className="flex shrink-0 items-center gap-2.5 whitespace-nowrap" aria-label="PreeT 홈">
           <span aria-hidden="true" className="flex gap-[3px]">
             <span className="block h-5 w-[5px] rounded-sm bg-ink" />
             <span className="block h-5 w-[5px] rounded-sm bg-ink" />
             <span className="block h-5 w-[5px] rounded-sm bg-highlight" />
           </span>
           <span className="text-h4 font-bold tracking-tight text-ink">
-            경비판정
+            PreeT
           </span>
           <span aria-hidden="true" className="hidden h-3.5 w-px bg-accent-line sm:block" />
           <span className="hidden text-body text-ink2 sm:block">판정 안내</span>
