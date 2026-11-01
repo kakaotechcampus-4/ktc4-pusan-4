@@ -116,7 +116,8 @@ def sync(conn: psycopg.Connection) -> None:
             print(f"  #{r['id']} {card_id(r['id'])} develop 반영")
         else:
             conn.execute(_REVERT, (r["id"],))
-            print(f"  #{r['id']} {r['merchant_category']} PR 이 닫혔는데 카드가 없어 대기로 되돌림")
+            # pr_url 을 지우므로 어느 PR 에서 빠졌는지는 이 로그로만 남는다
+            print(f"  #{r['id']} {r['merchant_category']} {r['pr_url']} 이 닫혔는데 카드가 없어 대기로 되돌림")
 
 
 def open_pr(files: dict[int, tuple[str, str]], title: str, body: str) -> str:
@@ -145,6 +146,7 @@ def main() -> int:
     with psycopg.connect(settings.database_url, row_factory=dict_row) as conn:
         if not args.dry_run:
             sync(conn)
+            conn.commit()  # 아래 PR 생성이 실패해도 정리 결과는 남긴다
 
         files, rows = {}, []
         for r in conn.execute(_APPROVED).fetchall():
