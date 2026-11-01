@@ -57,8 +57,7 @@ class AccessTokensTest {
 
     @Test
     void refresh_token_is_not_an_access_token() {
-        String refresh = new StatelessRefreshTokenStore(tokens, Clock.fixed(NOW, ZoneOffset.UTC), Duration.ofDays(14))
-            .issue(USER_ID).value();
+        String refresh = tokens.issue(USER_ID, RedisRefreshTokenStore.TYPE, NOW, NOW.plus(Duration.ofDays(14)));
 
         assertThat(accessTokensAt(NOW).verify(refresh)).isEmpty();
     }

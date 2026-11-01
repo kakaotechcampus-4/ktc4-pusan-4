@@ -81,10 +81,11 @@ class JudgmentExecutorIntegrationTest {
         UUID judgmentId = executor.judge(transactionId, contextService.version(userId, 1), runOrigin(runId));
 
         assertThat(jdbcTemplate.queryForMap("""
-            select verdict, rule_card_id, run_id, user_context_version, rules_commit_sha, tax_year
+            select verdict, rule_card_id, run_id, user_context_version, rules_commit_sha, tax_year, final_amount
             from judgment where id = ?
             """, judgmentId))
             .containsEntry("verdict", "NEEDS_REVIEW")
+            .containsEntry("final_amount", 0L)
             .containsEntry("rule_card_id", "R-300")
             .containsEntry("run_id", runId)
             .containsEntry("user_context_version", 1)
@@ -159,12 +160,12 @@ class JudgmentExecutorIntegrationTest {
         insertContext(2);
         UUID runId = insertRun();
 
-        executor.rejudge(userId, List.of(transactionId), runOrigin(runId), 1);
+        executor.rejudge(userId, Map.of(transactionId, runOrigin(runId)), 1);
 
         assertThat(jdbcTemplate.queryForObject(
             "select user_context_version from judgment where transaction_id = ?", Integer.class, transactionId
         )).isEqualTo(1);
-        assertThatThrownBy(() -> executor.rejudge(userId, List.of(transactionId), runOrigin(runId), 9))
+        assertThatThrownBy(() -> executor.rejudge(userId, Map.of(transactionId, runOrigin(runId)), 9))
             .isInstanceOf(ApiException.class)
             .hasMessageContaining("9");
     }
