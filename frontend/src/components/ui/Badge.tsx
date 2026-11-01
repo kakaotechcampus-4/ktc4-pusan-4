@@ -9,7 +9,7 @@ const TONE: Record<BadgeTone, string> = {
   ok: 'border-ok-line bg-ok-bg text-ok',
   warn: 'border-warn-line bg-warn-bg text-warn',
   deny: 'border-deny-line bg-deny-bg text-deny',
-  neutral: 'border-line bg-surface text-muted',
+  neutral: 'border-accent-line bg-sheet text-ink2',
   ink: 'border-ink bg-ink text-white',
   inverse: 'border-white/25 bg-transparent text-white'
 };
@@ -37,7 +37,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border font-semibold',
+        'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border font-bold',
         TONE[tone],
         SIZE[size],
         className

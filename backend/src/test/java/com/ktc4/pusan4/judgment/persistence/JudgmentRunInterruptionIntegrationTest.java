@@ -38,6 +38,9 @@ class JudgmentRunInterruptionIntegrationTest {
     @Autowired
     private BusinessContextService contextService;
 
+    @Autowired
+    private JudgmentExecutor executor;
+
     private UUID userId;
     private UUID batchId;
     private UUID contextId;
@@ -127,7 +130,7 @@ class JudgmentRunInterruptionIntegrationTest {
         BusinessContext context = contextService.find(userId, contextId);
         runService.interruptStale();
 
-        boolean judged = runService.judgeItem(runId, left, context);
+        boolean judged = runService.judgeItem(runId, left, context, executor.references());
         runService.recordFailure(runId, left);
         runService.complete(runId);
 
@@ -156,7 +159,9 @@ class JudgmentRunInterruptionIntegrationTest {
         UUID runId = insertRun("RUNNING", "10 minutes");
         UUID left = insertItem(runId, "PENDING");
 
-        boolean judged = runService.judgeItem(runId, left, contextService.find(userId, contextId));
+        boolean judged = runService.judgeItem(
+            runId, left, contextService.find(userId, contextId), executor.references()
+        );
         runService.interruptStale();
 
         assertThat(judged).isTrue();

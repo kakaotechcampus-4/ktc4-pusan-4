@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -41,8 +42,15 @@ public class JudgmentService {
         this.uuidGenerator = uuidGenerator;
     }
 
+    /** 한 건만 저장하므로 조문 버전은 인용한 조문만 그때 읽는다. */
     @Transactional
     public UUID save(SaveJudgmentCommand command) {
+        return save(command, statuteVersions(Set.of()));
+    }
+
+    /** 여러 건을 저장하는 쪽은 statuteVersions 를 한 번 만들어 넘겨 조문 버전을 건마다 다시 읽지 않는다. */
+    @Transactional
+    UUID save(SaveJudgmentCommand command, StatuteVersions statuteVersions) {
         Judgment judgment = command.judgment();
         UUID judgmentId = uuidGenerator.generate();
         judgmentRepository.save(new JudgmentEntity(
@@ -51,7 +59,7 @@ public class JudgmentService {
             nextRevision(command.transactionId())
         ));
 
-        saveCitations(judgmentId, judgment.citations(), command.statuteEffectiveDate());
+        saveCitations(judgmentId, judgment.citations(), command.statuteEffectiveDate(), statuteVersions);
         judgment.questions().forEach(question ->
             questionRepository.save(new QuestionQueueEntity(
                 uuidGenerator.generate(), judgmentId, question
@@ -72,17 +80,19 @@ public class JudgmentService {
         return judgmentRepository.findNextRevision(transactionId);
     }
 
-    private void saveCitations(UUID judgmentId, List<Citation> citations, LocalDate effectiveDate) {
-        for (Citation citation : citations) {
-            List<Long> versionIds = statuteVersionRepository.findEffectiveVersionIds(
-                citation.statuteId(), effectiveDate
-            );
-            if (versionIds.size() != 1) {
-                throw new IllegalStateException(
-                    "Expected one effective statute version for " + citation.statuteId()
-                );
-            }
-            citationRepository.save(new JudgmentCitationEntity(judgmentId, versionIds.getFirst()));
+    /** statuteIds 의 버전 기간을 지금 한 번에 읽어 둔다. 목록에 없는 조문은 인용할 때 읽는다. */
+    StatuteVersions statuteVersions(Set<String> statuteIds) {
+        return new StatuteVersions(statuteVersionRepository, statuteIds);
+    }
+
+    private void saveCitations(
+        UUID judgmentId, List<Citation> citations, LocalDate effectiveDate, StatuteVersions statuteVersions
+    ) {
+        List<Long> versionIds = citations.stream()
+            .map(citation -> statuteVersions.effectiveVersionId(citation.statuteId(), effectiveDate))
+            .toList();
+        if (!versionIds.isEmpty()) {
+            citationRepository.insertAll(judgmentId, versionIds);
         }
     }
 

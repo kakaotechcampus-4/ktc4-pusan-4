@@ -939,6 +939,51 @@ class JudgmentEngineTest {
         assertThat(notGiven.attributes()).doesNotContainKey("matched");
     }
 
+    @Test
+    void home_office_answer_is_available_when_the_context_has_a_ratio() {
+        TransactionInput utility = subscription("수도광열", 80_000);
+
+        Judgment result = JudgmentEngine.judge(
+            utility, new UserContext("940909", false, 20), List.of(homeOfficeFact(utility)), new RuleSet(List.of(utilityCard()))
+        );
+
+        assertThat(result)
+            .extracting(Judgment::verdict, Judgment::account, Judgment::attributes)
+            .containsExactly(Verdict.AVAILABLE, "수도광열비", Map.of("안분", "작업공간비율"));
+    }
+
+    @Test
+    void home_office_answer_needs_review_without_a_ratio() {
+        TransactionInput utility = subscription("수도광열", 80_000);
+
+        // 금액을 나눌 비율이 없다. 문진에 비율을 넣고 다시 판정해야 한다
+        Judgment result = JudgmentEngine.judge(
+            utility, new UserContext("940909", false, null), List.of(homeOfficeFact(utility)),
+            new RuleSet(List.of(utilityCard()))
+        );
+
+        assertThat(result.verdict()).isEqualTo(Verdict.NEEDS_REVIEW);
+    }
+
+    private static RuleCard utilityCard() {
+        QuestionSpec dedication = new QuestionSpec(
+            "UTILITY_DEDICATION", "사업 전용 공간인가요?", "공간전용여부", "merchant_norm",
+            List.of("사업 전용", "자택 겸용"),
+            Map.of(
+                "사업 전용", new QuestionEffect(Verdict.AVAILABLE, "수도광열비", Map.of()),
+                "자택 겸용", new QuestionEffect(Verdict.AVAILABLE, "수도광열비", Map.of("안분", "작업공간비율"))
+            )
+        );
+        return new RuleCard(
+            "R-103", 1, Gate.G2, 500, RuleMatch.categories("수도광열"), Verdict.NEEDS_REVIEW, null,
+            List.of(new Citation("소득세법-33-1-5")), Map.of(), List.of(dedication)
+        );
+    }
+
+    private static UserFact homeOfficeFact(TransactionInput transaction) {
+        return new UserFact("merchant:" + transaction.merchantNorm(), "공간전용여부", Map.of("value", "자택 겸용"));
+    }
+
     private static TransactionInput onDate(LocalDate approvedAt) {
         return new TransactionInput(UUID.randomUUID(), approvedAt, "가맹점", "음식점", 20_000);
     }

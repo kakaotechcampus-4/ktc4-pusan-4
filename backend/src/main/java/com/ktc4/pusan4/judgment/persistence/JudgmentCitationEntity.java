@@ -25,9 +25,4 @@ class JudgmentCitationEntity {
 
     protected JudgmentCitationEntity() {
     }
-
-    JudgmentCitationEntity(UUID judgmentId, Long statuteVersionId) {
-        this.judgmentId = judgmentId;
-        this.statuteVersionId = statuteVersionId;
-    }
 }

@@ -105,7 +105,7 @@ export function ClassificationPreview() {
     <AppShell>
       <div className="mx-auto max-w-3xl">
         <header>
-          <p className="text-small font-semibold text-accent">2단계 · 분류 확인</p>
+          <p className="text-small font-bold text-accent">2단계 · 분류 확인</p>
           <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
             {loadError ?
             '분류 결과를 불러오지 못했습니다' :
@@ -174,7 +174,7 @@ export function ClassificationPreview() {
               <p className="text-small text-muted">분류를 마친 거래</p>
               <p className="mt-1 text-stat font-bold tabular-nums text-ink">
                 {formatNumber(classified)}
-                <span className="ml-1 text-h4 font-semibold text-muted">
+                <span className="ml-1 text-h4 font-bold text-muted">
                   / {formatNumber(total)}건
                 </span>
               </p>
@@ -251,7 +251,7 @@ export function ClassificationPreview() {
               }>
 
                   <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                    <p className="text-body-lg font-semibold text-ink">
+                    <p className="text-body-lg font-bold text-ink">
                       {title}
                     </p>
                     <p className="text-small tabular-nums text-muted">
@@ -280,7 +280,7 @@ export function ClassificationPreview() {
                           {row.installmentMonths > 0 &&
                     `${row.merchantRaw === title ? '' : ' · '}${row.installmentMonths}개월 할부`}
                         </span>
-                        <span className="shrink-0 text-small font-semibold tabular-nums text-ink">
+                        <span className="shrink-0 text-small font-bold tabular-nums text-ink">
                           {formatWon(row.amount)}
                         </span>
                       </li>
@@ -292,7 +292,7 @@ export function ClassificationPreview() {
                 }
                   </ul>
 
-                  <p className="mt-5 text-body font-semibold text-ink">
+                  <p className="mt-5 text-body font-bold text-ink">
                     이 {formatNumber(group.count)}건은 어떤 지출인가요?
                   </p>
                   <div className="mt-2.5 flex flex-wrap items-center gap-2">
@@ -351,7 +351,7 @@ export function ClassificationPreview() {
         <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-line pt-6">
             <p className="max-w-md text-small leading-6 text-muted">
               지금 넘어가면 확인하지 않은{' '}
-              <strong className="font-semibold text-ink">
+              <strong className="font-bold text-ink">
                 {formatNumber(pendingCount)}건
               </strong>
               은 판정에서 빠집니다. 나중에 이 화면에서 다시 확인할 수 있습니다.

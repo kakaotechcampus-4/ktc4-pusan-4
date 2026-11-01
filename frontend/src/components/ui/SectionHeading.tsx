@@ -38,8 +38,8 @@ export function SectionHeading({
       {eyebrow &&
       <p
         className={cn(
-          'text-body-lg font-semibold',
-          inverse ? 'text-white/60' : 'text-accent'
+          'text-body-lg font-bold',
+          inverse ? 'text-white/60' : 'text-ink2'
         )}>
         
           {eyebrow}
@@ -58,7 +58,7 @@ export function SectionHeading({
       {description &&
       <p
         className={cn(
-          'mt-3 max-w-2xl text-body-lg',
+          'mt-4 max-w-2xl text-body-lg',
           inverse ? 'text-white/60' : 'text-muted'
         )}>
         

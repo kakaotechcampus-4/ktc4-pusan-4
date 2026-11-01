@@ -3,10 +3,10 @@ package com.ktc4.pusan4.judgment.api;
 import com.ktc4.pusan4.judgment.api.JudgmentSummaryResponse.Scope;
 import com.ktc4.pusan4.judgment.domain.Verdict;
 import com.ktc4.pusan4.judgment.persistence.JudgmentListQuery;
+import com.ktc4.pusan4.judgment.persistence.JudgmentOverrideService;
 import com.ktc4.pusan4.judgment.persistence.JudgmentQueryService;
 import com.ktc4.pusan4.shared.api.ApiException;
 import com.ktc4.pusan4.shared.api.ErrorResponse;
-import com.ktc4.pusan4.shared.api.MockResponse;
 import com.ktc4.pusan4.shared.api.PageResponse;
 import com.ktc4.pusan4.shared.auth.CurrentUser;
 import io.swagger.v3.oas.annotations.Operation;
@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import org.springframework.http.HttpStatus;
@@ -35,12 +36,12 @@ import java.util.stream.Stream;
 @RequestMapping("/judgments")
 public class JudgmentController {
 
-    private final JudgmentMockData mockData;
     private final JudgmentQueryService queryService;
+    private final JudgmentOverrideService overrideService;
 
-    public JudgmentController(JudgmentMockData mockData, JudgmentQueryService queryService) {
-        this.mockData = mockData;
+    public JudgmentController(JudgmentQueryService queryService, JudgmentOverrideService overrideService) {
         this.queryService = queryService;
+        this.overrideService = overrideService;
     }
 
     @Operation(summary = "판정 목록 및 revision 조회",
@@ -101,15 +102,23 @@ public class JudgmentController {
         return JudgmentResponse.from(queryService.get(currentUser.id(), judgmentId));
     }
 
-    @MockResponse
     @Operation(summary = "사용자 판정 수정 (Override)",
-        description = "기존 Judgment 는 보존하고 새 revision 을 만든다. 같은 거래의 기존 활성 Override 는 비활성화된다. "
-            + "응답은 새 Judgment")
+        description = "기존 Judgment 는 보존하고 verdict 만 바꾼 새 revision 을 만든다. 같은 거래의 기존 활성 Override 는 "
+            + "비활성화된다. 응답은 새 Judgment")
+    @ApiResponse(responseCode = "404", description = "JUDGMENT_NOT_FOUND",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode = "409", description = "CONFLICT — 거래의 현재 판정이 아니거나 판정 대상이 아닌 거래",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode = "422", description = "UNPROCESSABLE_ENTITY — toVerdict 가 NEEDS_REVIEW",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @PostMapping("/{judgmentId}/override")
     public JudgmentResponse override(
+        CurrentUser currentUser,
         @PathVariable UUID judgmentId,
-        @RequestBody OverrideJudgmentRequest request
+        @Valid @RequestBody OverrideJudgmentRequest request
     ) {
-        return mockData.override();
+        UUID revisionId = overrideService.override(currentUser.id(), judgmentId, request.toVerdict(), request.reason());
+        // 저장 트랜잭션이 끝난 뒤 다시 읽어야 DB 가 정한 computedAt 이 실린다.
+        return JudgmentResponse.from(queryService.get(currentUser.id(), revisionId));
     }
 }

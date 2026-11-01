@@ -4,17 +4,18 @@ import { cn } from './cn';
 type CardTone = 'surface' | 'canvas' | 'ink';
 type CardPadding = 'sm' | 'md' | 'lg' | 'none';
 
+/** 회색 패널이 기본이다. 테두리도 그림자도 쓰지 않고 바탕색으로만 가른다 */
 const TONE: Record<CardTone, string> = {
-  surface: 'border border-line bg-surface',
-  canvas: 'border border-line bg-canvas',
+  surface: 'bg-surface',
+  canvas: 'border border-line bg-sheet',
   ink: 'bg-ink text-white'
 };
 
 const PADDING: Record<CardPadding, string> = {
   none: '',
-  sm: 'p-6',
-  md: 'p-7',
-  lg: 'p-8 lg:p-10'
+  sm: 'p-7',
+  md: 'p-8',
+  lg: 'p-10 lg:p-12'
 };
 
 interface CardProps extends React.HTMLAttributes<HTMLElement> {

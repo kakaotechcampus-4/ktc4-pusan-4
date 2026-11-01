@@ -119,6 +119,26 @@ def test_앞_번호_말고는_봐주지_않는다(quote):
     assert len(bad) == 1 and "본문에 없다" in bad[0]
 
 
+# 원문의 낫표를 모델이 빼고 옮긴다. 보험 카드는 이것만으로 재시도 3회를 다 썼다(#94)
+보험 = hit("영-55-1-11", "법령", "11. 「국민건강보험법」에 따라 사용자로서 부담하는 보험료")
+
+
+@pytest.mark.parametrize("quote", [
+    "국민건강보험법에 따라 사용자로서 부담하는 보험료",
+    "『국민건강보험법』에 따라 사용자로서 부담하는 보험료",
+    "\"국민건강보험법\"에 따라 사용자로서 부담하는 보험료",
+    "“국민건강보험법”에 따라 사용자로서 부담하는 보험료",
+])
+def test_낫표_따옴표만_달라도_통과(quote):
+    assert _check(ev([StatuteRef(statute_id="영-55-1-11", quote=quote)]), _pool({"법령": [보험]})) == []
+
+
+def test_낫표를_빼도_글자가_다르면_걸린다():
+    refs = [StatuteRef(statute_id="영-55-1-11", quote="국민건강보험법에 따라 사업자로서 부담하는 보험료")]
+    bad = _check(ev(refs), _pool({"법령": [보험]}))
+    assert len(bad) == 1 and "본문에 없다" in bad[0]
+
+
 def test_너무_짧은_인용은_거른다():
     bad = _check(ev([StatuteRef(statute_id="소득세법-33-1-5", quote="가사")]), FLAT)
     assert len(bad) == 1 and "너무 짧다" in bad[0]

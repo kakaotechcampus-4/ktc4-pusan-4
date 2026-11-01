@@ -1,6 +1,6 @@
 package com.ktc4.pusan4.integration;
 
-import com.ktc4.pusan4.shared.auth.TemporaryCurrentUserProvider;
+import com.ktc4.pusan4.shared.auth.FixedUser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,7 +32,7 @@ class JudgmentQueryIntegrationTest {
     @ServiceConnection
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17-alpine");
 
-    private static final UUID USER_ID = TemporaryCurrentUserProvider.TEMPORARY_USER_ID;
+    private static final UUID USER_ID = FixedUser.ID;
 
     @Autowired
     private MockMvc mockMvc;

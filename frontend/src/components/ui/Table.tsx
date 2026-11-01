@@ -55,15 +55,16 @@ export function Table<T>({
 
   const cellClass = (column: Column<T>) =>
   cn(
-    'px-4 py-3 text-body',
+    'px-4 py-4 text-body',
     column.align === 'right' ? 'text-right tabular-nums' : 'text-left',
     column.width,
     column.hideBelow && HIDE[column.hideBelow]
   );
 
   return (
-    <div className={cn('overflow-x-auto rounded-2xl border border-line bg-surface', className)}>
-      <table className="w-full border-collapse">
+    <div className={cn('overflow-x-auto', className)}>
+      {/* 표는 패널에 넣지 않는다. 머리 위 굵은 괘선 하나와 행 사이 얇은 괘선만 쓴다 */}
+      <table className="w-full border-collapse border-t-2 border-rule">
         <caption className="sr-only">{caption}</caption>
         <thead>
           <tr className="border-b border-line">
@@ -71,7 +72,7 @@ export function Table<T>({
             <th
               key={index}
               scope="col"
-              className={cn(cellClass(column), 'py-2.5 text-small font-medium text-muted')}>
+              className={cn(cellClass(column), 'py-3.5 text-small font-normal text-muted')}>
 
                 {column.header}
               </th>
@@ -112,8 +113,8 @@ export function Table<T>({
                 className={cn(
                   'transition-colors duration-150',
                   onRowClick &&
-                  'cursor-pointer hover:bg-canvas focus-visible:bg-canvas focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
-                  selected && 'bg-accent-soft/50'
+                  'cursor-pointer hover:bg-surface focus-visible:bg-surface focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
+                  selected && 'bg-surface'
                 )}>
 
                 {columns.map((column, index) =>
@@ -143,7 +144,7 @@ export function Pagination({ page, onChange, note }: PaginationProps) {
   const last = Math.min((page.number + 1) * 20, page.totalElements);
 
   return (
-    <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-small text-muted">
+    <div className="mt-5 flex flex-wrap items-center justify-between gap-3 text-small text-muted">
       <span className="tabular-nums">
         {note ?? `${first}–${last} / ${page.totalElements.toLocaleString('ko-KR')}건`}
       </span>
@@ -152,7 +153,7 @@ export function Pagination({ page, onChange, note }: PaginationProps) {
           type="button"
           disabled={page.number === 0}
           onClick={() => onChange(page.number - 1)}
-          className="rounded-lg border border-line px-3 py-1.5 font-medium text-ink transition-colors duration-150 hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-40">
+          className="rounded-lg border border-line px-3 py-1.5 font-normal text-ink transition-colors duration-150 hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-40">
 
           이전
         </button>
@@ -163,7 +164,7 @@ export function Pagination({ page, onChange, note }: PaginationProps) {
           type="button"
           disabled={!page.hasNext}
           onClick={() => onChange(page.number + 1)}
-          className="rounded-lg border border-line px-3 py-1.5 font-medium text-ink transition-colors duration-150 hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-40">
+          className="rounded-lg border border-line px-3 py-1.5 font-normal text-ink transition-colors duration-150 hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-40">
 
           다음
         </button>

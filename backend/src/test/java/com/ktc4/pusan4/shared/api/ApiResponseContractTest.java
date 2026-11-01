@@ -1,29 +1,53 @@
 package com.ktc4.pusan4.shared.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ktc4.pusan4.judgment.api.JudgmentMockData;
+import com.ktc4.pusan4.auth.AuthService;
+import com.ktc4.pusan4.auth.TestAuthentication;
 import com.ktc4.pusan4.judgment.domain.Gate;
 import com.ktc4.pusan4.judgment.domain.JudgmentOrigin;
 import com.ktc4.pusan4.judgment.domain.JudgmentOriginType;
 import com.ktc4.pusan4.judgment.domain.JudgmentRevision;
 import com.ktc4.pusan4.judgment.domain.JudgmentRun;
 import com.ktc4.pusan4.judgment.domain.JudgmentSummary;
+import com.ktc4.pusan4.judgment.domain.PendingTotal;
 import com.ktc4.pusan4.judgment.domain.Question;
 import com.ktc4.pusan4.judgment.domain.QuestionStatus;
 import com.ktc4.pusan4.judgment.domain.JudgmentRunFailure;
 import com.ktc4.pusan4.judgment.domain.JudgmentRunStatus;
 import com.ktc4.pusan4.judgment.domain.StatuteVersion;
 import com.ktc4.pusan4.judgment.domain.Verdict;
+import com.ktc4.pusan4.judgment.persistence.BulkAnswerResult;
+import com.ktc4.pusan4.judgment.persistence.JudgmentOverrideService;
 import com.ktc4.pusan4.judgment.persistence.JudgmentQueryService;
 import com.ktc4.pusan4.judgment.persistence.JudgmentRunService;
 import com.ktc4.pusan4.judgment.persistence.QuestionAnswerResult;
 import com.ktc4.pusan4.judgment.persistence.QuestionAnswerService;
 import com.ktc4.pusan4.judgment.persistence.QuestionQueryService;
+import com.ktc4.pusan4.judgment.persistence.QuestionSuggestionService;
+import com.ktc4.pusan4.assistant.AssistantRelayService;
+import com.ktc4.pusan4.assistant.api.ChatResponse;
+import com.ktc4.pusan4.progress.domain.NextStep;
+import com.ktc4.pusan4.progress.persistence.ProgressService;
 import com.ktc4.pusan4.judgment.persistence.StatuteService;
-import com.ktc4.pusan4.merchant.api.ClassificationMockData;
+import com.ktc4.pusan4.merchant.api.ClassificationReviewStatus;
 import com.ktc4.pusan4.shared.UuidV7Generator;
-import com.ktc4.pusan4.shared.auth.TemporaryCurrentUserProvider;
-import com.ktc4.pusan4.transaction.api.TransactionMockData;
+import com.ktc4.pusan4.shared.auth.FixedUser;
+import com.ktc4.pusan4.transaction.api.CardIssuer;
+import com.ktc4.pusan4.transaction.api.ClassificationStatus;
+import com.ktc4.pusan4.transaction.api.SourceStatus;
+import com.ktc4.pusan4.transaction.api.SourceType;
+import com.ktc4.pusan4.transaction.api.UserInclusion;
+import com.ktc4.pusan4.transaction.domain.ClassificationAnswer;
+import com.ktc4.pusan4.transaction.domain.ClassificationReviewGroup;
+import com.ktc4.pusan4.transaction.domain.ClassificationReviewItem;
+import com.ktc4.pusan4.transaction.domain.ClassificationReviewResult;
+import com.ktc4.pusan4.transaction.domain.TransactionDetail;
+import com.ktc4.pusan4.transaction.domain.UploadBatchSummary;
+import com.ktc4.pusan4.transaction.domain.UploadResult;
+import com.ktc4.pusan4.transaction.persistence.ClassificationReviewService;
+import com.ktc4.pusan4.transaction.persistence.TransactionService;
+import com.ktc4.pusan4.transaction.persistence.UploadBatchService;
+import com.ktc4.pusan4.transaction.persistence.UploadService;
 import com.ktc4.pusan4.user.domain.AppUser;
 import com.ktc4.pusan4.user.domain.BookkeepingDuty;
 import com.ktc4.pusan4.user.domain.BusinessContext;
@@ -34,10 +58,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.InOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -59,6 +85,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
@@ -70,8 +97,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 목 응답이 api.md 의 상태 코드를 지키는지 확인한다. 값은 보지 않는다 — 서비스로 바꿔도 깨지지 않아야 한다.
  */
 @WebMvcTest
-@Import({ApiExceptionHandler.class, UuidV7Generator.class, TemporaryCurrentUserProvider.class,
-    TransactionMockData.class, ClassificationMockData.class, JudgmentMockData.class})
+@Import({ApiExceptionHandler.class, UuidV7Generator.class, TestAuthentication.class})
 class ApiResponseContractTest {
 
     private static final String ID = "0199c8f2-0000-7000-8000-000000000001";
@@ -96,22 +122,60 @@ class ApiResponseContractTest {
     private JudgmentQueryService judgmentQueryService;
 
     @MockitoBean
+    private JudgmentOverrideService overrideService;
+
+    @MockitoBean
     private QuestionQueryService questionQueryService;
 
     @MockitoBean
     private QuestionAnswerService questionAnswerService;
 
     @MockitoBean
+    private QuestionSuggestionService questionSuggestionService;
+
+    @MockitoBean
+    private ProgressService progressService;
+
+    @MockitoBean
+    private AssistantRelayService assistantRelayService;
+
+    @MockitoBean
     private StatuteService statuteService;
+
+    @MockitoBean
+    private UploadService uploadService;
+
+    @MockitoBean
+    private UploadBatchService batchService;
+
+    @MockitoBean
+    private TransactionService transactionService;
+
+    @MockitoBean
+    private ClassificationReviewService reviewService;
+
+    /** 인증 API 의 동작은 AuthIntegrationTest 가 본다. 여기서는 컨텍스트에 컨트롤러가 뜨도록 자리만 채운다. */
+    @MockitoBean
+    private AuthService authService;
 
     @BeforeEach
     void stubServices() {
+        ClassificationReviewItem review = new ClassificationReviewItem(UUID.fromString(ID), UUID.fromString(ID),
+            UUID.fromString(ID), ClassificationReviewStatus.PENDING, OffsetDateTime.parse("2026-09-18T01:10:00+09:00"),
+            null, LocalDate.parse("2026-01-03"), "XYZ PAYMENTS", "XYZ PAYMENTS", "미분류", 47_000L, 0);
+        given(reviewService.list(any(), any(), any(), anyInt(), anyInt())).willReturn(new ClassificationReviewResult<>(
+            new PageImpl<>(List.of(review), PageRequest.of(0, 20), 1), 1, 47_000L));
+        given(reviewService.groups(any(), any(), any(), anyInt(), anyInt())).willReturn(new ClassificationReviewResult<>(
+            new PageImpl<>(List.of(new ClassificationReviewGroup("merchant:XYZ PAYMENTS", "XYZ PAYMENTS",
+                List.of(review))), PageRequest.of(0, 20), 1), 1, 47_000L));
+        given(reviewService.answer(any(), any(), any())).willReturn(new ClassificationAnswer(1, "해외SaaS", 1));
+
         given(userService.get(any())).willReturn(new AppUser(
-            TemporaryCurrentUserProvider.TEMPORARY_USER_ID, "demo@example.com",
+            FixedUser.ID, "demo@example.com",
             OffsetDateTime.parse("2026-09-01T10:00:00+09:00")));
 
         BusinessContext context = new BusinessContext(UUID.fromString(ID),
-            TemporaryCurrentUserProvider.TEMPORARY_USER_ID, 1, "62010", 82_000_000L, LocalDate.parse("2024-03-15"),
+            FixedUser.ID, 1, "62010", 82_000_000L, LocalDate.parse("2024-03-15"),
             BookkeepingDuty.간편장부, false, 20, OffsetDateTime.parse("2026-09-01T10:05:00+09:00"));
         given(contextService.create(any(), any())).willReturn(context);
         given(contextService.current(any())).willReturn(context);
@@ -134,6 +198,7 @@ class ApiResponseContractTest {
             OffsetDateTime.parse("2026-09-12T14:05:00+09:00"),
             List.of(new JudgmentRevision.CitedStatute(1418, "소득세법-27-1")));
         given(judgmentQueryService.get(any(), any())).willReturn(judgment);
+        given(overrideService.override(any(), any(), any(), any())).willReturn(UUID.fromString(ID));
         given(judgmentQueryService.list(any(), any(), anyInt(), anyInt())).willReturn(new PageImpl<>(List.of(judgment)));
         given(judgmentQueryService.summary(any(), any(), any(), any())).willReturn(JudgmentSummary.of(List.of(
             new JudgmentSummary.Row(Verdict.AVAILABLE, "소모품비", 12_800L))));
@@ -141,12 +206,43 @@ class ApiResponseContractTest {
         given(questionQueryService.find(any(), any(), any())).willReturn(List.of(new Question(UUID.fromString(ID),
             UUID.fromString(ID), UUID.fromString(ID), "merchant:스타벅스", "용도", "용도가 무엇인가요?",
             List.of("사업", "개인", "혼용"), QuestionStatus.PENDING, null, null,
-            OffsetDateTime.parse("2026-09-12T14:05:30+09:00"), null, judgment.transaction(), false, false)));
-        given(questionAnswerService.answer(any(), any(), any()))
+            OffsetDateTime.parse("2026-09-12T14:05:30+09:00"), null, judgment.transaction(), false, false,
+            "CAFE_PURPOSE")));
+        given(assistantRelayService.chat(any(), any(), any()))
+            .willReturn(new ChatResponse("판정 근거를 확인했습니다.", List.of(), "trace-1"));
+        given(progressService.progress(any(), any())).willReturn(new ProgressService.Progress(
+            new ProgressService.Batch(UUID.fromString(ID), "국민",
+                LocalDate.parse("2026-09-01"), LocalDate.parse("2026-09-30"), 18),
+            context, new PendingTotal(2, 97_000), null,
+            new PendingTotal(9, 1_038_100), 2, NextStep.QUESTIONS));
+        given(questionAnswerService.answer(any(), any(), any(), any()))
             .willReturn(new QuestionAnswerResult(1, UUID.fromString(ID), 1));
+        given(questionAnswerService.bulkAnswer(any(), any(), any(), any()))
+            .willReturn(new BulkAnswerResult(1, 0, 0, List.of(UUID.fromString(ID)), 1, new PendingTotal(0, 0L)));
 
         given(statuteService.get(anyLong())).willReturn(new StatuteVersion(1523, "소득세법시행령-67-4",
             "소득세법 시행령 제67조 제4항", "시행령", LocalDate.parse("2026-01-01"), null, "https://www.law.go.kr/", "..."));
+
+        given(uploadService.upload(any(), any(), any())).willReturn(new UploadResult(UUID.fromString(ID), 1, 0, 0,
+            OffsetDateTime.parse("2026-09-18T01:10:00+09:00")));
+
+        UploadBatchSummary batch = new UploadBatchSummary(UUID.fromString(ID), SourceType.승인내역, CardIssuer.국민,
+            LocalDate.parse("2026-01-01"), LocalDate.parse("2026-01-31"), 289, 3, 4,
+            OffsetDateTime.parse("2026-09-18T01:10:00+09:00"));
+        given(batchService.list(any(), anyInt(), anyInt()))
+            .willReturn(new PageImpl<>(List.of(batch), PageRequest.of(0, 20), 1));
+        given(batchService.get(any(), any())).willReturn(batch);
+
+        TransactionDetail transaction = new TransactionDetail(UUID.fromString(ID), UUID.fromString(ID),
+            LocalDate.parse("2026-01-03"), "AWS APN1", "Amazon Web Services", "해외SaaS",
+            ClassificationStatus.CLASSIFIED, 137_000L, 0, SourceStatus.JUDGEABLE, UserInclusion.AUTO);
+        given(transactionService.list(any(), any(), anyInt(), anyInt()))
+            .willReturn(new PageImpl<>(List.of(transaction), PageRequest.of(0, 20), 1));
+        given(transactionService.get(any(), any())).willReturn(transaction);
+        given(transactionService.include(any(), any())).willReturn(transaction);
+        given(transactionService.exclude(any(), any())).willReturn(new TransactionDetail(UUID.fromString(ID),
+            UUID.fromString(ID), LocalDate.parse("2026-01-03"), "AWS APN1", "Amazon Web Services", "해외SaaS",
+            ClassificationStatus.CLASSIFIED, 137_000L, 0, SourceStatus.JUDGEABLE, UserInclusion.EXCLUDED));
     }
 
     static Stream<Arguments> endpoints() {
@@ -191,6 +287,11 @@ class ApiResponseContractTest {
             Arguments.of("DELETE", "/api/v1/judgment-overrides/" + ID, null, 204),
             Arguments.of("GET", "/api/v1/questions?batchId=" + ID, null, 200),
             Arguments.of("GET", "/api/v1/questions?batchId=" + ID + "&grouped=true", null, 200),
+            Arguments.of("GET", "/api/v1/questions/suggestions?batchId=" + ID, null, 200),
+            Arguments.of("GET", "/api/v1/progress?batchId=" + ID, null, 200),
+            Arguments.of("POST", "/api/v1/assistant/chat", """
+                {"message": "이거 왜 불가야?"}
+                """, 200),
             Arguments.of("POST", "/api/v1/questions/bulk-answer", """
                 {"batchId": "%s", "factType": "용도", "answer": {"value": "사업"}}
                 """.formatted(ID), 200),
@@ -223,6 +324,9 @@ class ApiResponseContractTest {
         "prevYearRevenue", "businessOpenDate", "bookkeepingDuty", "hasEmployee", "homeOfficeRatio", "createdAt");
     private static final Set<String> UPLOAD_BATCH_KEYS = Set.of("id", "sourceType", "cardIssuer", "periodStart",
         "periodEnd", "transactionCount", "skippedDuplicateCount", "classificationPendingCount", "createdAt");
+    private static final Set<String> TRANSACTION_KEYS = Set.of("id", "batchId", "approvedAt", "merchantRaw",
+        "merchantNorm", "merchantCategory", "classificationStatus", "amount", "installmentMonths", "sourceStatus",
+        "userInclusion", "effectiveStatus");
     /** api.md 3.4 거래 요약. 거래를 함께 보여주는 응답은 이 필드를 모두 넣는다 */
     private static final Set<String> TRANSACTION_SUMMARY_KEYS = Set.of("approvedAt", "merchantRaw", "merchantNorm",
         "merchantCategory", "amount", "installmentMonths");
@@ -231,8 +335,8 @@ class ApiResponseContractTest {
         "ruleCardId", "ruleCardVersion", "appliedRuleIds", "rulesCommitSha", "userContextVersion", "explanation",
         "computedAt", "citations");
     private static final Set<String> QUESTION_KEYS = Set.of("id", "batchId", "transactionId", "groupKey", "factType",
-        "questionText", "options", "status", "answeredFactId", "answer", "createdAt", "answeredAt");
-    private static final Set<String> QUESTION_GROUP_KEYS = Set.of("groupKey", "factType", "status", "questionIds",
+        "code", "questionText", "options", "status", "answeredFactId", "answer", "createdAt", "answeredAt");
+    private static final Set<String> QUESTION_GROUP_KEYS = Set.of("groupKey", "factType", "code", "status", "questionIds",
         "count", "totalAmount", "questionText", "options", "answer", "bulkAnswerable", "transactions");
     private static final Set<String> QUESTION_GROUP_TRANSACTION_KEYS =
         withTransactionSummary("questionId", "transactionId", "overridden");
@@ -258,6 +362,8 @@ class ApiResponseContractTest {
             Arguments.of("/api/v1/users/me/contexts", "/0", CONTEXT_KEYS),
             Arguments.of("/api/v1/upload-batches", "/items/0", UPLOAD_BATCH_KEYS),
             Arguments.of("/api/v1/upload-batches/" + ID, "", UPLOAD_BATCH_KEYS),
+            Arguments.of("/api/v1/transactions", "/items/0", TRANSACTION_KEYS),
+            Arguments.of("/api/v1/transactions/" + ID, "", TRANSACTION_KEYS),
             Arguments.of("/api/v1/judgments?batchId=" + ID, "/items/0", JUDGMENT_KEYS),
             Arguments.of("/api/v1/judgments?batchId=" + ID, "/items/0/transaction", TRANSACTION_SUMMARY_KEYS),
             Arguments.of("/api/v1/judgments/" + ID, "", JUDGMENT_KEYS),
@@ -296,7 +402,18 @@ class ApiResponseContractTest {
         mockMvc.perform(get("/api/v1/users/me")).andExpect(status().isOk());
 
         // then: 요청 값이 아니라 CurrentUserProvider 가 정한 사용자로 조회한다
-        verify(userService).get(TemporaryCurrentUserProvider.TEMPORARY_USER_ID);
+        verify(userService).get(FixedUser.ID);
+    }
+
+    @Test
+    void deleting_me_logs_out_everywhere_before_deleting_user() throws Exception {
+        // when
+        mockMvc.perform(request(HttpMethod.DELETE, "/api/v1/users/me")).andExpect(status().isNoContent());
+
+        // then: 로그인을 먼저 끊어야 Redis 가 실패했을 때 지워진 사용자의 토큰이 남지 않는다
+        InOrder order = inOrder(authService, userService);
+        order.verify(authService).logoutEverywhere(FixedUser.ID);
+        order.verify(userService).delete(FixedUser.ID);
     }
 
     @Test

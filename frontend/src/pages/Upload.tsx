@@ -225,7 +225,7 @@ export function Upload() {
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0">
           <header>
-            <p className="text-small font-semibold text-accent">1단계 · 카드내역</p>
+            <p className="text-small font-bold text-accent">1단계 · 카드내역</p>
             <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
               카드내역 올리기
             </h1>
@@ -305,7 +305,7 @@ function DropZone({ onFiles }: {onFiles: (files: ArrayLike<File>) => void;}) {
       )}>
 
       <UploadCloudIcon className="mx-auto h-8 w-8 text-muted" aria-hidden="true" />
-      <p className="mt-3 text-body-lg font-semibold text-ink">
+      <p className="mt-3 text-body-lg font-bold text-ink">
         승인내역 파일을 여기에 끌어다 놓으세요
       </p>
       <p className="mt-1 text-small text-muted">KB국민 · IBK기업 승인내역 .xls · 최대 5MB</p>
@@ -353,7 +353,7 @@ function SampleList({ onPick }: {onPick: (file: File) => void;}) {
 
   return (
     <section className="mt-7">
-      <h2 className="text-body font-semibold text-ink">샘플 파일로 해 보기</h2>
+      <h2 className="text-body font-bold text-ink">샘플 파일로 해 보기</h2>
       <p className="mt-1 text-small text-muted">
         목업 모드에서만 보입니다. 가짜 거래로 만든 파일입니다.
       </p>
@@ -367,7 +367,7 @@ function SampleList({ onPick }: {onPick: (file: File) => void;}) {
 
               <FileSpreadsheetIcon className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-body font-medium text-ink">
+                <span className="block truncate text-body font-normal text-ink">
                   {sample.label}
                 </span>
                 <span className="block truncate text-caption text-muted">{sample.file.name}</span>
@@ -386,7 +386,7 @@ function ParsingCard({ file }: {file: File;}) {
     <section className="animate-rise rounded-2xl border border-line bg-surface p-6">
       <div className="flex items-center gap-2.5">
         <Loader2Icon className="h-4 w-4 animate-spin text-accent" aria-hidden="true" />
-        <h2 className="text-body-lg font-semibold text-ink">파일을 읽고 있습니다</h2>
+        <h2 className="text-body-lg font-bold text-ink">파일을 읽고 있습니다</h2>
       </div>
       <p className="mt-1.5 break-all text-small text-muted">
         {file.name} · 아직 서버로 보낸 것은 없습니다.
@@ -421,7 +421,7 @@ function BlockedCard({
           <p className="mt-2 text-small text-ink2">판별 근거: {BLOCKED_REASON[outcome.code]}</p>
           {billing &&
           <div className="mt-4 rounded-xl border border-warn-line bg-surface p-4">
-              <h3 className="text-small font-semibold text-ink">승인내역 받는 방법</h3>
+              <h3 className="text-small font-bold text-ink">승인내역 받는 방법</h3>
               <p className="mt-1 text-small text-ink2">{APPROVAL_EXPORT_STEPS}</p>
             </div>
           }
@@ -537,7 +537,7 @@ function PreviewCard({
 
       {unsendable.length > 0 &&
       <div className="mt-6">
-          <h3 className="text-body font-semibold text-ink">
+          <h3 className="text-body font-bold text-ink">
             보내지 않는 행 {formatNumber(unsendable.length)}건
           </h3>
           <p className="mt-1 text-small text-muted">
@@ -555,7 +555,7 @@ function PreviewCard({
 
       {head.length > 0 &&
       <div className="mt-6">
-          <h3 className="text-body font-semibold text-ink">
+          <h3 className="text-body font-bold text-ink">
             처음 {formatNumber(head.length)}행
           </h3>
           <Table
@@ -569,7 +569,7 @@ function PreviewCard({
       }
 
       {request === null &&
-      <p className="mt-6 rounded-xl border border-warn-line bg-warn-bg px-4 py-3 text-body font-semibold text-warn">
+      <p className="mt-6 rounded-xl border border-warn-line bg-warn-bg px-4 py-3 text-body font-bold text-warn">
           보낼 거래가 없습니다
         </p>
       }
@@ -669,10 +669,10 @@ function ReadyCard({
 function DataBoundary() {
   return (
     <aside className="h-fit rounded-2xl border border-line bg-surface p-5">
-      <h2 className="text-body font-semibold text-ink">데이터 경계</h2>
+      <h2 className="text-body font-bold text-ink">데이터 경계</h2>
       <div className="mt-4 space-y-4 text-small">
         <div>
-          <p className="font-semibold text-ink">서버로 보내는 것</p>
+          <p className="font-bold text-ink">서버로 보내는 것</p>
           <p className="mt-0.5 text-muted">
             승인일, 가맹점명(의료 업종은 가림), 금액, 할부 개월, 승인번호, 가맹점
             사업자번호(IBK기업), 메모(KB국민), 파일 해시
@@ -683,18 +683,18 @@ function DataBoundary() {
         </div>
         <div className="h-px bg-line2" />
         <div>
-          <p className="font-semibold text-ink">브라우저에 남는 것</p>
+          <p className="font-bold text-ink">브라우저에 남는 것</p>
           <p className="mt-0.5 text-muted">원본 파일, 카드번호, 이용고객명·이용카드명, 승인 시각</p>
         </div>
         <div className="h-px bg-line2" />
         <div>
-          <p className="font-semibold text-ink">로그에 남지 않는 것</p>
+          <p className="font-bold text-ink">로그에 남지 않는 것</p>
           <p className="mt-0.5 text-muted">소득 금액, 이름</p>
         </div>
         <div className="h-px bg-line2" />
         <div>
           {/* QR-7. 비서 도구가 모델에 넘기는 필드에서 뽑았다. 목록은 AI 쪽이 확정한다(agent-secretary.md 10장) */}
-          <p className="font-semibold text-ink">비서 Really 에게 물을 때 외부 모델로 보내는 것</p>
+          <p className="font-bold text-ink">비서 Really 에게 물을 때 외부 모델로 보내는 것</p>
           <p className="mt-0.5 text-muted">{ASSISTANT_SENDS}</p>
           <p className="mt-1.5 text-caption text-muted">{ASSISTANT_DOES_NOT_SEND} 묻지 않으면 보내지 않습니다.</p>
         </div>

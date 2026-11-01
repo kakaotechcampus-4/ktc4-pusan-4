@@ -45,7 +45,7 @@ export function FilterBar<V extends string>({
             aria-pressed={active}
             onClick={() => onChange(option.value)}
             className={cn(
-              'rounded-lg px-3 py-1.5 text-small font-semibold transition-colors duration-150 ease-snap',
+              'rounded-lg px-3 py-1.5 text-small font-bold transition-colors duration-150 ease-snap',
               active ? 'bg-ink text-white' : 'text-ink2 hover:bg-canvas'
             )}>
 

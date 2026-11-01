@@ -28,6 +28,18 @@ public class UserService {
             .orElseThrow(UserService::userNotFound);
     }
 
+    /**
+     * 회원 탈퇴 (api.md 3.1). 종속 데이터는 DB 가 함께 지운다(docs/architecture.md "삭제 정책").
+     * 업로드(B4)가 잡는 사용자 행 잠금과 같은 행을 지우므로, 진행 중인 업로드가 끝난 뒤에 지워진다.
+     * 이미 없는 사용자면 조회와 같이 401 이다.
+     */
+    @Transactional
+    public void delete(UUID userId) {
+        if (userRepository.deleteUser(userId) == 0) {
+            throw userNotFound();
+        }
+    }
+
     static ApiException userNotFound() {
         return new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "사용자를 찾을 수 없습니다.");
     }

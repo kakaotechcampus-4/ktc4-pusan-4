@@ -7,23 +7,24 @@ export type ButtonSize = 'sm' | 'md' | 'lg' | 'inline';
 
 const VARIANT: Record<ButtonVariant, string> = {
   primary: 'bg-accent text-white hover:bg-accent-hover',
-  secondary: 'border border-line bg-surface text-ink hover:bg-canvas',
-  soft: 'bg-accent-soft text-accent hover:bg-accent-line',
-  ghost: 'text-ink hover:text-accent',
+  secondary: 'border border-accent-line bg-sheet text-ink hover:border-ink',
+  soft: 'bg-surface text-ink hover:bg-accent-line',
+  /** 문장 속 링크. 밑줄로 알아보게 한다 */
+  ghost: 'text-ink underline underline-offset-4 decoration-accent-line hover:decoration-ink',
   /** 되돌릴 수 없는 동작에만. 한 화면에 하나 */
   danger: 'bg-deny text-white hover:brightness-95'
 };
 
 /** sm은 헤더·표 안, md는 폼, lg는 랜딩 CTA, inline은 문장 속 텍스트 링크(ghost 전용) */
 const SIZE: Record<ButtonSize, string> = {
-  sm: 'rounded-lg px-4 py-2 text-body',
-  md: 'rounded-xl px-5 py-3 text-body-lg',
-  lg: 'rounded-xl px-7 py-3.5 text-lead',
+  sm: 'rounded-full px-4 py-2 text-body',
+  md: 'rounded-full px-6 py-3 text-body-lg',
+  lg: 'rounded-full px-8 py-4 text-lead',
   inline: 'text-body-lg'
 };
 
 const BASE =
-'inline-flex items-center justify-center gap-1.5 font-semibold leading-normal transition-colors duration-150 ease-snap disabled:cursor-not-allowed disabled:opacity-50';
+'inline-flex items-center justify-center gap-2 font-bold leading-normal transition-colors duration-150 ease-snap disabled:cursor-not-allowed disabled:opacity-40';
 
 interface CommonProps {
   variant?: ButtonVariant;

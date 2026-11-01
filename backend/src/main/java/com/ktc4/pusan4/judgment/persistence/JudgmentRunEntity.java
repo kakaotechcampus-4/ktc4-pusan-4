@@ -44,6 +44,9 @@ class JudgmentRunEntity {
     @Column(name = "started_at")
     private OffsetDateTime startedAt;
 
+    @Column(name = "created_at", insertable = false, updatable = false)
+    private OffsetDateTime createdAt;
+
     @Column(name = "completed_at")
     private OffsetDateTime completedAt;
 
