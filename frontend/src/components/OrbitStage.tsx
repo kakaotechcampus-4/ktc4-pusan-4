@@ -17,12 +17,15 @@ const SWAP_MS = 3200;
 /** 궤도 위 자리. angle 은 12시부터 시계방향, radius 는 판 절반 대비 % */
 type Spot = {angle: number; radius: number; size: number; Icon: () => React.ReactElement;};
 
-/* 노란 판 위에서 읽히게 흰 바탕 + 검정 선으로 그리고, 주황·빨강만 점으로 쓴다 */
+/*
+ * 남색 판 위에 올라간다. 흰 바탕만으로 테두리가 서니 검정 외곽선은 두지 않고,
+ * 안쪽 획만 먹색으로 둔다. 점으로 쓰는 색은 노랑(강조)과 상태색 막대뿐이다
+ */
 const Card = () =>
 <svg viewBox="0 0 64 64" className="h-full w-full" aria-hidden="true">
-    <rect x="6" y="14" width="52" height="36" rx="7" fill="#FFFFFF" stroke="#0A0A0A" strokeWidth="2.5" />
-    <rect x="6" y="23" width="52" height="7" fill="#0A0A0A" />
-    <rect x="13" y="38" width="16" height="4" rx="2" fill="#FF6A00" />
+    <rect x="6" y="14" width="52" height="36" rx="7" fill="#FFFFFF" />
+    <rect x="6" y="23" width="52" height="7" fill="#16181D" />
+    <rect x="13" y="38" width="16" height="4" rx="2" fill="#FFE600" />
   </svg>;
 
 
@@ -31,21 +34,19 @@ const Receipt = () =>
     <path
     d="M13 8h38v44l-5.4-4-5.4 4-5.4-4-5.4 4-5.4-4-5.4 4-5.6-4z"
     fill="#FFFFFF"
-    stroke="#0A0A0A"
-    strokeWidth="2.5"
-    strokeLinejoin="round" />
+    />
 
-    <rect x="21" y="20" width="22" height="3.4" rx="1.7" fill="#0A0A0A" />
-    <rect x="21" y="29" width="22" height="3.4" rx="1.7" fill="#C9CDD2" />
-    <rect x="21" y="38" width="13" height="3.4" rx="1.7" fill="#C9CDD2" />
+    <rect x="21" y="20" width="22" height="3.4" rx="1.7" fill="#16181D" />
+    <rect x="21" y="29" width="22" height="3.4" rx="1.7" fill="#DCE1E8" />
+    <rect x="21" y="38" width="13" height="3.4" rx="1.7" fill="#DCE1E8" />
   </svg>;
 
 
 const Store = () =>
 <svg viewBox="0 0 64 64" className="h-full w-full" aria-hidden="true">
-    <rect x="12" y="27" width="40" height="26" rx="4" fill="#FFFFFF" stroke="#0A0A0A" strokeWidth="2.5" />
-    <path d="M10 14h44l-4 13H14z" fill="#FF4B4B" />
-    <rect x="28" y="37" width="8" height="16" rx="2" fill="#0A0A0A" />
+    <rect x="12" y="27" width="40" height="26" rx="4" fill="#FFFFFF" />
+    <path d="M10 14h44l-4 13H14z" fill="#FF5A5A" />
+    <rect x="28" y="37" width="8" height="16" rx="2" fill="#16181D" />
   </svg>;
 
 
@@ -53,21 +54,21 @@ const Bubble = () =>
 <svg viewBox="0 0 64 64" className="h-full w-full" aria-hidden="true">
     <path
     d="M32 13c12.7 0 23 7.6 23 17s-10.3 17-23 17a30 30 0 0 1-5.6-.5l-10.6 5.3 3-8.6C12.4 40 9 35 9 30c0-9.4 10.3-17 23-17z"
-    fill="#FF6A00" />
+    fill="#FFE600" />
 
-    <circle cx="23" cy="30" r="3" fill="#FFFFFF" />
-    <circle cx="32" cy="30" r="3" fill="#FFFFFF" />
-    <circle cx="41" cy="30" r="3" fill="#FFFFFF" />
+    <circle cx="23" cy="30" r="3" fill="#122E55" />
+    <circle cx="32" cy="30" r="3" fill="#122E55" />
+    <circle cx="41" cy="30" r="3" fill="#122E55" />
   </svg>;
 
 
 const Statute = () =>
 <svg viewBox="0 0 64 64" className="h-full w-full" aria-hidden="true">
-    <rect x="12" y="8" width="40" height="48" rx="5" fill="#FFFFFF" stroke="#0A0A0A" strokeWidth="2.5" />
-    <rect x="20" y="19" width="24" height="3.4" rx="1.7" fill="#0A0A0A" />
-    <rect x="20" y="28" width="24" height="3.4" rx="1.7" fill="#C9CDD2" />
-    <rect x="20" y="37" width="16" height="3.4" rx="1.7" fill="#C9CDD2" />
-    <circle cx="44" cy="46" r="6" fill="#FF4B4B" stroke="#0A0A0A" strokeWidth="2" />
+    <rect x="12" y="8" width="40" height="48" rx="5" fill="#FFFFFF" />
+    <rect x="20" y="19" width="24" height="3.4" rx="1.7" fill="#16181D" />
+    <rect x="20" y="28" width="24" height="3.4" rx="1.7" fill="#DCE1E8" />
+    <rect x="20" y="37" width="16" height="3.4" rx="1.7" fill="#DCE1E8" />
+    <circle cx="44" cy="46" r="6" fill="#FF5A5A" />
   </svg>;
 
 
@@ -140,16 +141,16 @@ export function OrbitStage() {
   return (
     <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
       {/* 좁은 화면에서는 테만 남긴다 */}
-      <span className="absolute left-[72%] top-[62%] aspect-square w-[90%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-ink/[0.07] lg:hidden" />
-      <span className="absolute left-[72%] top-[62%] aspect-square w-[58%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-ink/[0.07] lg:hidden" />
+      <span className="absolute left-[72%] top-[62%] aspect-square w-[90%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20 lg:hidden" />
+      <span className="absolute left-[72%] top-[62%] aspect-square w-[58%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20 lg:hidden" />
       {/*
         궤도는 정사각 판 안에서만 돈다. 가로·세로 %를 따로 쓰면 원이 아니라
         타원이 되어 그림이 좌우 끝으로 밀린다. 중심을 오른쪽으로 비켜 두어
         왼쪽 위 제목과 겹치지 않게 한다
       */}
       <div className="absolute left-[66%] top-1/2 hidden aspect-square h-[94%] -translate-x-1/2 -translate-y-1/2 lg:block">
-        <span className="absolute left-1/2 top-1/2 aspect-square w-[104%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-ink/[0.07]" />
-        <span className="absolute left-1/2 top-1/2 aspect-square w-[72%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-ink/[0.07]" />
+        <span className="absolute left-1/2 top-1/2 aspect-square w-[104%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20" />
+        <span className="absolute left-1/2 top-1/2 aspect-square w-[72%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20" />
 
         <Ring spots={OUTER} spin="animate-orbit" counter="animate-orbit-back" />
         <Ring
@@ -161,7 +162,7 @@ export function OrbitStage() {
 
       {/* 가운데 바뀌는 문구 — 궤도 중심에 맞춘다 */}
       <div className="absolute inset-y-0 left-[66%] hidden w-[70%] -translate-x-1/2 items-center justify-center px-8 lg:flex">
-        <p className="relative text-center text-h3 font-bold tracking-ir-sm text-ink lg:text-ir-panel">
+        <p className="relative text-center text-h3 font-bold tracking-ir-sm text-white lg:text-ir-panel">
           {CENTER_LINES.map((line, i) =>
           <span
             key={line}

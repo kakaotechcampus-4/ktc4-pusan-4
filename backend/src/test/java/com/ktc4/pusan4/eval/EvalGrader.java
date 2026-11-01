@@ -1,5 +1,6 @@
 package com.ktc4.pusan4.eval;
 
+import com.ktc4.pusan4.judgment.domain.AmountCalculator;
 import com.ktc4.pusan4.judgment.domain.Citation;
 import com.ktc4.pusan4.judgment.domain.Judgment;
 import com.ktc4.pusan4.judgment.domain.Verdict;
@@ -67,6 +68,12 @@ final class EvalGrader {
                 mismatch.add("속성 " + key + ": 기대 " + value + ", 실제 " + actual);
             }
         });
+        if (expected.amount() != null) {
+            long actual = AmountCalculator.finalAmount(judgment, evalCase.transaction(), evalCase.context());
+            if (actual != expected.amount()) {
+                mismatch.add("금액: 기대 " + expected.amount() + ", 실제 " + actual);
+            }
+        }
 
         if (evalCase.critical() && finalVerdict) {
             critical.addAll(mismatch);

@@ -3,6 +3,7 @@ package com.ktc4.pusan4.transaction.persistence;
 import com.ktc4.pusan4.judgment.domain.JudgmentOrigin;
 import com.ktc4.pusan4.judgment.domain.JudgmentOriginType;
 import com.ktc4.pusan4.judgment.persistence.JudgmentExecutor;
+import com.ktc4.pusan4.judgment.persistence.LimitSettlementService;
 import com.ktc4.pusan4.judgment.persistence.TransactionRecordEntity;
 import com.ktc4.pusan4.judgment.persistence.TransactionRecordRepository;
 import com.ktc4.pusan4.merchant.MerchantCategoryVocabulary;
@@ -62,6 +63,7 @@ public class ClassificationReviewService {
     private final MerchantCategoryVocabulary vocabulary;
     private final BusinessContextService contextService;
     private final JudgmentExecutor executor;
+    private final LimitSettlementService limitSettlement;
     private final Clock clock;
 
     public ClassificationReviewService(
@@ -71,6 +73,7 @@ public class ClassificationReviewService {
         MerchantCategoryVocabulary vocabulary,
         BusinessContextService contextService,
         JudgmentExecutor executor,
+        LimitSettlementService limitSettlement,
         Clock clock
     ) {
         this.reviewRepository = reviewRepository;
@@ -79,12 +82,14 @@ public class ClassificationReviewService {
         this.vocabulary = vocabulary;
         this.contextService = contextService;
         this.executor = executor;
+        this.limitSettlement = limitSettlement;
         this.clock = clock;
     }
 
     /**
      * 분류 확인 요청을 한 카테고리로 해결한다 (api.md 3.5). 거래 분류를 확정하고, 답을 개인 사전에 남긴다.
-     * batch 에 완료된 판정 실행이 있으면 그 run 의 문진 버전으로, 해결한 거래 중 판정 대상만 다시 판정한다.
+     * batch 에 완료된 판정 실행이 있으면 그 run 의 문진 버전으로, 해결한 거래 중 판정 대상만 다시 판정하고
+     * 접대비 한도를 다시 집계한다.
      * 남의 요청은 없는 요청과 똑같이 404 다. 한 건이라도 실패하면 아무것도 바꾸지 않는다.
      */
     @Transactional
@@ -98,6 +103,8 @@ public class ClassificationReviewService {
                 "허용하지 않는 가맹점 카테고리입니다.");
         }
 
+        // 재판정 뒤 한도 집계가 사용자 락을 잡는다. 거래 락보다 먼저 잡아 "사용자 → 거래" 순서를 지킨다.
+        limitSettlement.lockUser(userId);
         Set<UUID> ids = new LinkedHashSet<>(reviewIds);
         Map<UUID, ClassificationReviewEntity> reviews = new HashMap<>();
         reviewRepository.findAllForUpdate(ids).forEach(review -> reviews.put(review.id(), review));
@@ -124,6 +131,9 @@ public class ClassificationReviewService {
         merchantNorms.forEach(merchantNorm -> dictionaryRepository.savePersonal(userId, merchantNorm, category, now));
 
         int judged = rejudge(userId, batchIds.iterator().next(), transactions);
+        if (judged > 0) {
+            limitSettlement.settleProvisional(userId);
+        }
         return new ClassificationAnswer(ids.size(), category, judged);
     }
 
