@@ -1,7 +1,7 @@
 package com.ktc4.pusan4.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ktc4.pusan4.shared.auth.FixedUser;
+import com.ktc4.pusan4.auth.TestUser;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,10 +26,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * 로그인·재발급·로그아웃과 Bearer 확인 (api.md 1.1).
+ * 회원가입·로그인·재발급·로그아웃과 Bearer 확인 (api.md 1.1).
  * 다른 테스트처럼 기본 토큰이 실린 MockMvc 를 쓰면 인증 실패를 볼 수 없어서, 기본값 없는 MockMvc 를 직접 만든다.
  */
-@SpringBootTest(properties = "app.auth.demo-password=test-password")
+@SpringBootTest
 @Testcontainers
 @ImportTestcontainers(RedisTestContainer.class)
 class AuthIntegrationTest {
@@ -38,8 +38,9 @@ class AuthIntegrationTest {
     @ServiceConnection
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17-alpine");
 
+    private static final String MEMBER_EMAIL = "member@example.com";
     private static final String LOGIN_BODY = """
-        {"email": "demo@example.com", "password": "test-password"}
+        {"email": "member@example.com", "password": "test-password"}
         """;
 
     @Autowired
@@ -51,8 +52,62 @@ class AuthIntegrationTest {
     private MockMvc mockMvc;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         mockMvc = MockMvcBuilders.webAppContextSetup(context).build();
+        // 로그인 테스트가 쓸 계정. 컨텍스트를 같이 쓰는 다른 테스트가 먼저 만들었으면 409 다
+        int status = signup(LOGIN_BODY).getResponse().getStatus();
+        assertThat(status).isIn(201, 409);
+    }
+
+    @Test
+    void signup_creates_account_and_logs_in() throws Exception {
+        // when
+        MvcResult result = signup("""
+            {"email": "New@Example.com", "password": "new-password"}
+            """);
+
+        // then: 로그인과 같은 응답이고, 이메일은 소문자로 저장된다
+        assertThat(result.getResponse().getStatus()).isEqualTo(201);
+        assertThat(result.getResponse().getHeader(HttpHeaders.SET_COOKIE)).startsWith("refresh_token=");
+        mockMvc.perform(get("/api/v1/users/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken(result)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.email").value("new@example.com"));
+    }
+
+    @Test
+    void signup_with_existing_email_in_other_case_returns_conflict() throws Exception {
+        MvcResult result = signup("""
+            {"email": "MEMBER@example.com", "password": "other-password"}
+            """);
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(409);
+        assertThat(result.getResponse().getContentAsString()).contains("EMAIL_ALREADY_EXISTS");
+    }
+
+    @Test
+    void signup_rejects_short_or_too_long_password() throws Exception {
+        assertThat(signup("""
+            {"email": "short@example.com", "password": "1234567"}
+            """).getResponse().getStatus()).isEqualTo(400);
+        // 25자지만 UTF-8 75바이트라 BCrypt 한계(72바이트)를 넘는다
+        assertThat(signup("""
+            {"email": "long@example.com", "password": "가나다라마바사아자차카타파하가나다라마바사아자차카"}
+            """).getResponse().getStatus()).isEqualTo(400);
+    }
+
+    @Test
+    void login_finds_email_regardless_of_case() throws Exception {
+        assertThat(login("""
+            {"email": "MEMBER@EXAMPLE.COM", "password": "test-password"}
+            """).getResponse().getStatus()).isEqualTo(200);
+    }
+
+    @Test
+    void account_without_password_cannot_log_in() throws Exception {
+        // 테스트 기본 사용자처럼 비밀번호가 없는 행(예전 고정 사용자)은 어떤 비밀번호로도 들어올 수 없다
+        assertThat(login("""
+            {"email": "%s", "password": "any-password"}
+            """.formatted(TestUser.EMAIL)).getResponse().getStatus()).isEqualTo(401);
     }
 
     @Test
@@ -70,14 +125,14 @@ class AuthIntegrationTest {
         // 받은 액세스 토큰으로 API 를 부를 수 있다
         mockMvc.perform(get("/api/v1/users/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken(result)))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.id").value(FixedUser.ID.toString()));
+            .andExpect(jsonPath("$.email").value(MEMBER_EMAIL));
     }
 
     @Test
     void wrong_password_returns_invalid_credentials() throws Exception {
         mockMvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                    {"email": "demo@example.com", "password": "wrong"}
+                    {"email": "member@example.com", "password": "wrong-password"}
                     """))
             .andExpect(status().isUnauthorized())
             .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"));
@@ -182,6 +237,11 @@ class AuthIntegrationTest {
     @Test
     void health_stays_public() throws Exception {
         mockMvc.perform(get("/actuator/health")).andExpect(status().isOk());
+    }
+
+    private MvcResult signup(String body) throws Exception {
+        return mockMvc.perform(post("/api/v1/auth/signup").contentType(MediaType.APPLICATION_JSON).content(body))
+            .andReturn();
     }
 
     private MvcResult login(String body) throws Exception {

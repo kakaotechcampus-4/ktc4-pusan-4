@@ -2,14 +2,15 @@ package com.ktc4.pusan4.auth;
 
 import com.ktc4.pusan4.auth.RefreshTokenStore.RefreshToken;
 import com.ktc4.pusan4.shared.api.ApiException;
+import com.ktc4.pusan4.user.persistence.UserService;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
 
 /**
- * 로그인·재발급·로그아웃 (api.md 1.1). 자격 확인과 리프레시 토큰 보관은 인터페이스 뒤에 있어,
- * 실제 계정(B9b)을 붙여도 이 클래스는 바뀌지 않는다.
+ * 회원가입·로그인·재발급·로그아웃 (api.md 1.1). 자격 확인과 리프레시 토큰 보관은 인터페이스 뒤에 있다.
  */
 @Service
 public class AuthService {
@@ -17,16 +18,31 @@ public class AuthService {
     private final CredentialVerifier credentials;
     private final AccessTokens accessTokens;
     private final RefreshTokenStore refreshTokens;
+    private final UserService users;
+    private final PasswordEncoder passwordEncoder;
 
-    AuthService(CredentialVerifier credentials, AccessTokens accessTokens, RefreshTokenStore refreshTokens) {
+    AuthService(CredentialVerifier credentials, AccessTokens accessTokens, RefreshTokenStore refreshTokens,
+        UserService users, PasswordEncoder passwordEncoder) {
         this.credentials = credentials;
         this.accessTokens = accessTokens;
         this.refreshTokens = refreshTokens;
+        this.users = users;
+        this.passwordEncoder = passwordEncoder;
+    }
+
+    /** 이메일로 가입하고 바로 로그인한다. 메일 인증은 하지 않는다. */
+    public IssuedTokens signup(String email, String password) {
+        if (!Passwords.fitsBcrypt(password)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "비밀번호는 72바이트를 넘을 수 없습니다.");
+        }
+        UUID userId = users.registerEmailAccount(email, passwordEncoder.encode(password))
+            .orElseThrow(() -> new ApiException(HttpStatus.CONFLICT, "EMAIL_ALREADY_EXISTS", "이미 가입한 이메일입니다."));
+        return issue(userId);
     }
 
     public IssuedTokens login(String email, String password) {
         return credentials.verify(email, password)
-            .map(userId -> new IssuedTokens(accessTokens.issue(userId), refreshTokens.issue(userId)))
+            .map(this::issue)
             .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS",
                 "이메일 또는 비밀번호가 맞지 않습니다."));
     }
@@ -51,6 +67,10 @@ public class AuthService {
     /** 그 사용자의 모든 로그인을 끊는다. 탈퇴할 때 쓴다. 이미 발급된 액세스 토큰은 만료(15분)까지 남는다. */
     public void logoutEverywhere(UUID userId) {
         refreshTokens.revokeAll(userId);
+    }
+
+    private IssuedTokens issue(UUID userId) {
+        return new IssuedTokens(accessTokens.issue(userId), refreshTokens.issue(userId));
     }
 
     private static ApiException invalidRefreshToken() {

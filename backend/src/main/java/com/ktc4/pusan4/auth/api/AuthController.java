@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -36,12 +37,20 @@ public class AuthController {
         this.refreshCookie = new RefreshCookie(secureCookie);
     }
 
+    @Operation(summary = "이메일 회원가입", description = "가입하고 바로 로그인한다. 응답은 로그인과 같고 상태만 201 이다")
+    @ApiResponse(responseCode = "409", description = "EMAIL_ALREADY_EXISTS",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @PostMapping("/signup")
+    public ResponseEntity<AccessTokenResponse> signup(@Valid @RequestBody SignupRequest request) {
+        return issued(HttpStatus.CREATED, authService.signup(request.email(), request.password()));
+    }
+
     @Operation(summary = "로그인", description = "액세스 토큰을 본문으로, 리프레시 토큰을 Set-Cookie 로 준다")
     @ApiResponse(responseCode = "401", description = "INVALID_CREDENTIALS",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @PostMapping("/login")
     public ResponseEntity<AccessTokenResponse> login(@Valid @RequestBody LoginRequest request) {
-        return issued(authService.login(request.email(), request.password()));
+        return issued(HttpStatus.OK, authService.login(request.email(), request.password()));
     }
 
     @Operation(summary = "액세스 토큰 재발급", description = "리프레시 토큰 쿠키로 새 액세스 토큰과 새 리프레시 토큰을 준다")
@@ -51,7 +60,7 @@ public class AuthController {
     public ResponseEntity<AccessTokenResponse> refresh(
         @CookieValue(name = RefreshCookie.NAME, required = false) String refreshToken
     ) {
-        return issued(authService.refresh(refreshToken));
+        return issued(HttpStatus.OK, authService.refresh(refreshToken));
     }
 
     @Operation(summary = "로그아웃", description = "리프레시 토큰 쿠키를 지운다. 쿠키가 없어도 204")
@@ -66,8 +75,8 @@ public class AuthController {
             .build();
     }
 
-    private ResponseEntity<AccessTokenResponse> issued(IssuedTokens tokens) {
-        return ResponseEntity.ok()
+    private ResponseEntity<AccessTokenResponse> issued(HttpStatus status, IssuedTokens tokens) {
+        return ResponseEntity.status(status)
             .header(HttpHeaders.SET_COOKIE, refreshCookie.issue(tokens.refreshToken()))
             .body(new AccessTokenResponse(tokens.accessToken()));
     }

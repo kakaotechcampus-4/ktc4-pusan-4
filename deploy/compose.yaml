@@ -46,7 +46,6 @@ services:
       ASSISTANT_SERVER_URL: http://ai:8000
       HOLIDAY_API_KEY: ${HOLIDAY_API_KEY:-}
       APP_AUTH_JWT_SECRET: ${APP_AUTH_JWT_SECRET:-}
-      APP_AUTH_DEMO_PASSWORD: ${APP_AUTH_DEMO_PASSWORD:-}
       JAVA_TOOL_OPTIONS: -Xms128m -Xmx768m
     depends_on:
       postgres:
