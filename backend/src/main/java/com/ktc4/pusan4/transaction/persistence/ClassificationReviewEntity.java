@@ -51,11 +51,6 @@ class ClassificationReviewEntity extends AssignedIdEntity<UUID> {
         return id;
     }
 
-    @Override
-    public UUID getId() {
-        return id;
-    }
-
     UUID transactionId() {
         return transactionId;
     }
@@ -68,5 +63,10 @@ class ClassificationReviewEntity extends AssignedIdEntity<UUID> {
         this.status = "RESOLVED";
         this.selectedCategory = category;
         this.resolvedAt = resolvedAt;
+    }
+
+    @Override
+    public UUID getId() {
+        return id;
     }
 }

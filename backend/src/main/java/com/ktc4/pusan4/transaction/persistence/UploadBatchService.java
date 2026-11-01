@@ -1,5 +1,6 @@
 package com.ktc4.pusan4.transaction.persistence;
 
+import com.ktc4.pusan4.judgment.persistence.LimitSettlementService;
 import com.ktc4.pusan4.judgment.persistence.UploadBatchEntity;
 import com.ktc4.pusan4.judgment.persistence.UploadBatchRepository;
 import com.ktc4.pusan4.shared.api.ApiException;
@@ -26,15 +27,18 @@ public class UploadBatchService {
     private final UploadBatchRepository batchRepository;
     private final UploadBatchCountRepository countRepository;
     private final UserWriteLock userWriteLock;
+    private final LimitSettlementService limitSettlement;
 
     public UploadBatchService(
         UploadBatchRepository batchRepository,
         UploadBatchCountRepository countRepository,
-        UserWriteLock userWriteLock
+        UserWriteLock userWriteLock,
+        LimitSettlementService limitSettlement
     ) {
         this.batchRepository = batchRepository;
         this.countRepository = countRepository;
         this.userWriteLock = userWriteLock;
+        this.limitSettlement = limitSettlement;
     }
 
     @Transactional(readOnly = true)
@@ -61,6 +65,8 @@ public class UploadBatchService {
         if (batchRepository.deleteOwned(batchId, userId) == 0) {
             throw batchNotFound();
         }
+        // 지운 batch 의 한도 항목은 CASCADE 로 사라진다. 남은 batch 의 판정에 한도를 다시 배분한다.
+        limitSettlement.settleProvisional(userId);
     }
 
     private List<UploadBatchSummary> summarize(List<UploadBatchEntity> batches) {

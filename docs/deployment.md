@@ -162,12 +162,16 @@ docker compose --env-file /etc/ktc4/production.env -f "$repo/deploy/compose.yaml
 - Redis를 비우면(`FLUSHALL`, 볼륨 삭제) 모든 사용자가 로그아웃된다. 데이터 손실은 없다.
 - 비서 사용자별 한도(`assistant:*` 키, 10장)도 여기서 센다. 키마다 TTL이 있다. Redis가 내려가면 비서 대화만 503 `ASSISTANT_UNAVAILABLE`이다.
 
-## 9. 로그인 (고정 사용자)
+## 9. 로그인
 
-실제 계정이 생기기 전까지는 고정 사용자 `demo@example.com` 하나만 로그인한다(api.md 1.1). 새 값을 넣은 뒤 백엔드를 다시 배포해야 반영된다.
+이메일로 가입한 계정으로 로그인한다(api.md 1.1). 새 값을 넣은 뒤 백엔드를 다시 배포해야 반영된다.
 
 - `/etc/ktc4/production.env`의 `APP_AUTH_JWT_SECRET`에는 `openssl rand -hex 32`로 만든 값을 넣는다. 비우면 백엔드가 기동할 때마다 임시 키를 만들어, 재배포할 때마다 모든 로그인이 풀린다. 32바이트보다 짧으면 백엔드가 뜨지 않는다.
-- `APP_AUTH_DEMO_PASSWORD`에는 시연용 비밀번호를 넣는다. 비우면 아무도 로그인할 수 없다(로그인 API가 401 `INVALID_CREDENTIALS`).
+- 예전 고정 사용자 `demo@example.com` 행은 비밀번호가 없어 로그인할 수 없고, 같은 이메일로 다시 가입할 수도 없다(409). 시연 계정은 다른 이메일로 가입한다. `APP_AUTH_DEMO_PASSWORD`는 더 쓰지 않으니 `production.env`에서 지워도 된다.
+- 카카오 로그인은 `APP_AUTH_KAKAO_REST_API_KEY`(카카오 앱의 REST API 키), `APP_AUTH_KAKAO_CLIENT_SECRET`(보안 메뉴에서 켠 Client Secret, 안 쓰면 비움), `APP_AUTH_KAKAO_REDIRECT_URI`(`https://<DOMAIN>/auth/kakao/callback`, 카카오 앱에 등록한 값과 같게)를 넣는다. 키가 비면 카카오 로그인만 503으로 꺼지고 이메일 로그인은 그대로다. 동의항목은 닉네임만 쓰고 이메일은 켜지 않는다(비즈 앱 심사가 필요하다).
+- 이메일 가입은 메일 인증을 거친다. 인증 코드는 팀 Gmail 계정의 SMTP(`smtp.gmail.com:587`, STARTTLS)로 보낸다. `APP_MAIL_USERNAME`에 그 Gmail 주소, `APP_MAIL_PASSWORD`에 앱 비밀번호(Google 계정 > 보안 > 2단계 인증을 켠 뒤 "앱 비밀번호", 16자리)를 넣는다. 계정 비밀번호는 넣지 않는다. 비우면 인증 요청이 503 `EMAIL_VERIFICATION_UNAVAILABLE`이라 새 이메일 가입을 할 수 없다(이미 있는 계정의 로그인·카카오 로그인은 그대로다).
+- Gmail 한도는 하루 약 500통이다. 이메일 하나에 하루 5통까지만 보내지만 IP 단위 제한은 없다. 메일은 `/actuator/health`에서 뺐다(Gmail이 잠깐 안 돼도 배포가 멈추지 않는다).
+- 인증 상태는 Redis에 둔다(`email-verify:*`, 모두 TTL). Redis를 비우면 진행 중인 인증만 처음부터 다시 한다.
 - 리프레시 토큰 쿠키는 `Secure`라 HTTPS(Caddy)로만 저장된다. 로컬 프로필은 http라 `Secure`를 끈다.
 
 ## 10. 비서 중계
@@ -177,3 +181,56 @@ docker compose --env-file /etc/ktc4/production.env -f "$repo/deploy/compose.yaml
 - 주소는 `ASSISTANT_SERVER_URL`이다. `deploy/compose.yaml`이 `http://ai:8000`으로 넣고, 로컬 기본값은 `http://localhost:8000`이다.
 - 읽기 타임아웃은 40초로, AI 서버의 한 턴 상한(30초)보다 길다. AI 서버가 응답하지 않거나 오류를 내면 503 `ASSISTANT_UNAVAILABLE`, AI 서버 전체 한도(8턴)에 걸리면 429 `ASSISTANT_RATE_LIMITED`다.
 - 사용자별 한도(동시 1, 분당 10, 하루 100)는 Redis에 센다(8장).
+
+## 11. 규칙 후보 주간 배치와 카드 PR
+
+매주 일요일 05:00 KST(코퍼스 동기화 1시간 뒤)에 `deploy/rule-candidates.sh`가 `ai` 이미지로 세 단계를 차례로 돌린다. 배포·코퍼스 동기화와 같은 락을 잡으므로 앞 작업이 길어지면 끝날 때까지 기다린다. 한 단계가 실패해도 나머지는 돈다.
+
+1. `pipeline.promote`: 관리자가 승인한 후보(`rule_candidate.status='승인'`)를 모아 카드 PR 하나를 `develop`으로 연다.
+   - 초안에 `id: R-C<후보 id>`, 효력 시작일(승인일, 소급 없음), `review: { by: 관리자 }`를 채워 `rules/cards/R-C<id>_<카테고리>.yaml`로 올린다.
+   - 레포가 공개라 관리자 이메일은 카드와 PR에 넣지 않는다.
+   - 지난 PR도 정리한다. 닫힌 PR의 카드가 `develop`에 있으면 `promoted_rule_id`를 남긴다. 없으면 후보를 `대기`로 되돌려 다시 심사받게 한다.
+2. `pipeline.candidates --limit 10`: 새 후보를 적재한다(CONTEXT.md §9-5).
+3. `pipeline.notify`: 두 단계의 출력과 실패한 단계 이름을 코퍼스 알림과 같은 디스코드 스레드(`TEAM_DISCORD_WEBHOOK`)로 보낸다. 늘 보내므로, 일요일 아침에 알림이 없으면 타이머나 스크립트가 멈춘 것이다.
+
+후보 추출은 `docs/categories.md`와 `profiles/`를 읽는데 `ai` 이미지에는 둘 다 없다. 그래서 스크립트가 배포된 커밋의 두 경로를 컨테이너 `/docs`·`/profiles`에 읽기 전용으로 붙인다. 붙이지 않으면 `category_meta()`가 `/docs/categories.md`를 찾지 못해 실패한다.
+
+**PR 토큰.** `/etc/ktc4/production.env`의 `RULES_PR_TOKEN`에 fine-grained PAT를 넣는다.
+
+- GitHub → Settings → Developer settings → Fine-grained tokens에서 만든다.
+- Resource owner는 `kakaotechcampus-4`, Repository access는 이 레포 하나다. 권한은 Contents와 Pull requests를 Read and write로 준다.
+- 조직 설정에 따라 조직 관리자의 승인이 필요할 수 있다.
+- 만료일이 지나면 promote 단계가 실패로 알림에 뜬다. 새로 발급해 바꿔 넣는다. 비워 두어도 같은 실패로 뜬다.
+- 토큰은 스크립트가 promote 단계에만 넘기고, 상시 떠 있는 `ai` 서버 컨테이너에는 넣지 않는다.
+
+**카드 PR 처리.**
+
+- CI(`RuleCardLoader`·`EvalHarnessTest`)가 초록이면 머지한다. 머지된 카드는 다음 `develop → release` 배포부터 판정에 쓰인다. 이미 끝난 판정은 사용자가 다시 실행해야 바뀐다.
+- 카드 하나를 빼려면 PR에서 그 파일을 지우고 머지한다. 다음 실행 때 그 후보가 `대기`로 돌아간다. PR을 통째로 닫으면 들어 있던 후보가 모두 `대기`로 돌아간다.
+- 같은 날 promote를 두 번 돌리면 브랜치 이름(`feature/rule-candidates-<날짜>`)이 겹쳐 실패한다. 다음 날 다시 돌리면 된다.
+
+첫 배포에 성공한 뒤 타이머를 설치한다.
+
+```bash
+sudo cp /opt/ktc4/repo/deploy/ktc4-rule-candidates.* /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now ktc4-rule-candidates.timer
+sudo systemctl start ktc4-rule-candidates.service   # 첫 실행은 수동으로 확인
+journalctl -u ktc4-rule-candidates.service -n 50
+systemctl list-timers ktc4-rule-candidates.timer
+```
+
+실패하면 서비스가 failed로 남고 `journalctl`에 원인이 있다. 원인을 고친 뒤 `systemctl start ktc4-rule-candidates.service`로 다시 돌린다. 후보 추출은 이미 행이 있는 조합을 건너뛰고, promote는 PR에 올린 후보를 다시 올리지 않는다.
+
+## 12. 관리자 지정
+
+규칙 후보 관리자 API(api.md 3.15)는 `app_user.role`이 `ADMIN`인 사용자만 부른다. 가입하면 `USER`이고, 앱에는 role을 바꾸는 API가 없다. 관리자는 운영 서버에서 DB로 지정한다.
+
+```bash
+sudo docker compose --env-file /etc/ktc4/production.env -f /opt/ktc4/repo/deploy/compose.yaml exec postgres \
+  psql -U "$DB_USERNAME" -d "$DB_NAME" -c "update app_user set role = 'ADMIN' where email = 'admin@example.com'"
+```
+
+- `DB_USERNAME`·`DB_NAME`은 `production.env`의 값이다(`set -a; source /etc/ktc4/production.env; set +a`로 먼저 읽는다).
+- 이메일이 없는 카카오 계정은 `where id = '<사용자 id>'`로 지정한다. id 는 그 계정으로 `GET /api/v1/users/me`를 불러 확인한다.
+- 관리자를 해제할 때는 `role = 'USER'`로 되돌린다. 바뀐 role 은 다음 요청부터 바로 반영된다.
