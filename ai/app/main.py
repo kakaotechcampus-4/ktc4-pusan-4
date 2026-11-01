@@ -80,8 +80,10 @@ class ClassifyRequest(BaseModel):
 def classify_merchants(req: ClassifyRequest):
     """내부 전용. 백엔드가 업로드 트랜잭션 전에 규칙으로 못 정한 가맹점을 보낸다.
 
-    숫자만 돌려주고 확정은 백엔드가 임계값으로 정한다. results 는 요청 순서이고, 실패하거나 마감을 넘긴 항목은 null 이다.
+    숫자만 돌려주고 백엔드가 분류 확인의 추천 후보로 쓴다. results 는 요청 순서이고, 실패하거나 마감을 넘긴 항목은 null 이다.
+    마감을 넘긴 항목의 merchantNorm 은 timedOut 에도 담는다. 실패와 달리 나중에 다시 물을 수 있다.
     """
     if not settings.classify_api_key or not settings.classify_base_url:
         raise HTTPException(status_code=503, detail="CLASSIFY_UNAVAILABLE")
-    return {"model": settings.classify_model, "results": decisions.classify_all([i.model_dump() for i in req.items])}
+    results, timed_out = decisions.classify_all([i.model_dump() for i in req.items])
+    return {"model": settings.classify_model, "results": results, "timedOut": timed_out}

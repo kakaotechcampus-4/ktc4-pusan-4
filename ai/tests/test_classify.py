@@ -83,9 +83,9 @@ def test_게이트웨이에_가맹점마다_Bearer_로_한_번씩_보내고_HTTP
 
     monkeypatch.setattr(decisions, "http", httpx.Client(transport=httpx.MockTransport(handler)))
 
-    results = decisions.classify_all([ITEM, {"merchantNorm": "망가진곳", "merchantRaw": "망가진곳"}])
+    results, timed_out = decisions.classify_all([ITEM, {"merchantNorm": "망가진곳", "merchantRaw": "망가진곳"}])
 
-    assert results[0]["category"] == "카페" and results[1] is None
+    assert results[0]["category"] == "카페" and results[1] is None and timed_out == []
     assert sorted(seen) == [
         ("https://gw.example/abc/v1/decisions", "Bearer test-key", "가맹점 표기(원문): 망가진곳\n가맹점 표기(정규화): 망가진곳"),
         ("https://gw.example/abc/v1/decisions", "Bearer test-key", "가맹점 표기(원문): 스타벅스강남R점\n가맹점 표기(정규화): 스타벅스"),
@@ -107,20 +107,24 @@ def test_분류_응답은_요청_순서대로(configured, monkeypatch):
     assert [(r["merchantNorm"], r["category"]) for r in res.json()["results"]] == [(f"가게{i}", f"원문{i}") for i in range(20)]
     assert res.json()["results"][0] == {"merchantNorm": "가게0", "category": "원문0", "confidence": 0.93, "known": 0.99,
                                         "suggestions": ["카페", "음식점", "편의점"], "refused": False}
+    assert res.json()["timedOut"] == []
 
 
-def test_마감을_넘긴_가맹점만_null(configured, monkeypatch, caplog):
+def test_마감을_넘긴_가맹점과_실패한_가맹점은_null_이고_마감만_timedOut(configured, monkeypatch, caplog):
     release = threading.Event()
 
     def slow_send(item):
         if item["merchantNorm"] == "느린곳":
             release.wait(5)
+        if item["merchantNorm"] == "고장난곳":
+            raise httpx.ConnectError("boom")
         return fake_send(item)
 
     monkeypatch.setattr(decisions, "send", slow_send)
     monkeypatch.setattr(settings, "classify_deadline", 0.3)
     caplog.set_level(logging.INFO, logger="uvicorn.error")
-    items = [ITEM, {"merchantNorm": "느린곳", "merchantRaw": "느린곳"}, {"merchantNorm": "빠른곳", "merchantRaw": "빠른곳"}]
+    items = [ITEM, {"merchantNorm": "느린곳", "merchantRaw": "느린곳"}, {"merchantNorm": "빠른곳", "merchantRaw": "빠른곳"},
+             {"merchantNorm": "고장난곳", "merchantRaw": "고장난곳"}]
     try:
         res = client.post("/classify/merchants", json={"items": items})
     finally:
@@ -128,9 +132,11 @@ def test_마감을_넘긴_가맹점만_null(configured, monkeypatch, caplog):
 
     results = res.json()["results"]
     assert res.status_code == 200
-    assert results[1] is None and results[0]["merchantNorm"] == "스타벅스" and results[2]["merchantNorm"] == "빠른곳"
-    assert "items=3 ok=2 refused=0 failed=0 timed_out=1" in caplog.text
-    assert not any(name in caplog.text for name in ("스타벅스", "느린곳", "빠른곳"))   # 가맹점 이름은 로그에 남기지 않는다
+    assert results[1] is None and results[3] is None
+    assert results[0]["merchantNorm"] == "스타벅스" and results[2]["merchantNorm"] == "빠른곳"
+    assert res.json()["timedOut"] == ["느린곳"]
+    assert "items=4 ok=2 refused=0 failed=1 timed_out=1" in caplog.text
+    assert not any(name in caplog.text for name in ("스타벅스", "느린곳", "빠른곳", "고장난곳"))   # 가맹점 이름은 로그에 남기지 않는다
 
 
 @pytest.mark.parametrize("unset", ["classify_api_key", "classify_base_url"])
