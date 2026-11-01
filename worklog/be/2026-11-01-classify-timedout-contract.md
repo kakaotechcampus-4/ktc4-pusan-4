@@ -23,3 +23,14 @@
 ## 13:33 새 필드를 받아도 깨지지 않는지 확인
 
 - 가짜 AI 서버 응답에 `timedOut` 을 넣고 `MerchantModelClassifyIntegrationTest` 6건이 통과하는 것을 봤다 (76aa1a2)
+
+## 13:57 develop 머지 — 충돌 2곳 해결 (#209)
+
+- 커밋: e8335a4
+- `application.yml`: 우리 `app.classify` 블록은 두고, 인증 주석은 develop 문장("리프레시 토큰은 Redis 에 둔다")을 썼다
+- `docs/backend_api_plan.md` 10/16 결정 표
+  - 분류 행은 우리 것: 10/19 결정, 계약, 10/30 실험, 10/31 결정, `timedOut`
+  - 금액 행은 develop 것: 결정(10/28)
+- develop 이 `ClassificationReviewService.resolve()` 에 한도 재집계를 넣은 것은 자동 머지됐다. 후보 조회(`items()`)와 겹치지 않는다
+- 마이그레이션 번호는 겹치지 않는다(develop 은 V14 까지)
+- 머지 후 `gradlew check` 통과(unit 396, integration 235, PMD)
