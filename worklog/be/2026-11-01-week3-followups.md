@@ -44,3 +44,34 @@
 - 충돌은 `ApiResponseContractTest` 한 곳이었다. develop 쪽 `FixedUser.ID` 를 두고 업종만 940909 로 바꿨다.
 - 확인: FE `tsc` 오류 0, `vitest` 158 통과, `npm run build` 통과, lint 오류 0(경고 10건은 기존). 백엔드 `ApiResponseContractTest` 통과. 백엔드 변경은 스웨거 예시값과 계약 테스트 값뿐이라 전체 check 는 다시 돌리지 않았다.
 - 인증 스택이 나중에 develop 에 들어올 때 같은 변경이 겹친다. 같은 내용이라 충돌은 없을 것으로 보지만 확인하지 않았다.
+
+## 20:58 #214 리뷰 반영: 자택 비율 0, 판정에 쓴 답을 참조로, 세무대리인 질문 거래를 관계 테이블로
+
+- 커밋: 302ae35..243ddc0 (3개)
+- 문진 자택 비율 0 을 비율 없음으로 본다. 엔진과 금액 계산이 `UserContext.hasHomeOfficeRatio()` 하나로 판단한다. 0% + "작업 공간이 따로 나뉨" 은 확인필요, 0% 를 가능으로 수정하면 전액이다. api.md 3.8 에 "(미입력 또는 0)" 을 적었다.
+- `judgment.input_facts`(jsonb, batch 답 전부 복사)를 없애고 `judgment_input_fact`(judgment_id, user_fact_id) 로 바꿨다(V19). 엔진이 질문을 실제로 푼 답(`Judgment.usedFacts`)을 돌려주고 그 id 만 남긴다. override revision 은 연결을 이어받는다. 엔티티는 LAZY 라 목록·요약·내보내기는 읽지 않는다.
+- `handoff_note.transaction_ids`(jsonb)를 `handoff_note_transaction` 으로 바꿨다. 업로드를 지우면 질문은 남고 그 거래만 FK CASCADE 로 빠진다. V18 은 아직 develop 에 없어 새 번호 대신 V18 을 고쳤다.
+
+### 왜 이렇게 했나
+
+- 리뷰(IwanttobeaHokage): 0% 이면 `가능 · 0원` 이 나오니 머지 전에 고쳐 달라는 요청. 위 "남은 것" 에서 금액이 같아 두었던 것을 리뷰에 따라 바꿨다. 문진 화면은 "아니오" 를 0 으로 보내고 null 을 보내는 경로가 없어서, null 만 보던 "비율 없으면 확인필요" 가 화면 경로에서는 한 번도 걸리지 않았다.
+- 리뷰가 `export()` 의 메모리를 재 달라고 했다. 재 보니 export 만이 아니라 develop 의 요약도 같은 원인(판정 행마다 batch 답 전부)으로 OOM 이 났다. 읽는 쪽만 빼는 것은 증상만 막아서 저장 방식을 바꿨다. 복사본에는 답의 id·version·source 가 없어 근거 기록으로도 부족했고, `user_fact` 는 version 을 쌓고 고치지 않아 id 참조로 판정 당시 답이 남는다. `trigger_user_fact_id`·`answered_fact_id` 와 같은 참조 FK 규칙(DEFERRABLE)을 따랐다(사용자 결정: 쓴 답만 + 참조 둘 다).
+- jsonb·복사 칸을 같이 살폈다. 비즈니스 요구가 있는 스냅샷(`question_queue.options`, `unmatched_log` 의 카테고리·업종)이나 DB 밖 참조(`applied_rule_ids`)는 그대로 두고, 요구 없이 jsonb 로 둔 `handoff_note.transaction_ids` 만 바꿨다(사용자 결정: #214 에 포함).
+- `transactionIds` 순서는 거래 id 순이다. 순서 칸을 두면 거래가 CASCADE 로 빠질 때 빈 칸이 생겨 다루기 번거롭고, api.md 에 정한 순서가 없다.
+
+### 확인한 것
+
+- 새 테스트는 먼저 실패하는 것을 봤다. 비율 0 테스트 2건과 `handoff_note` 테스트는 고치기 전 코드에서, 판정 답 연결 테스트는 실행기가 batch 답 전부를 넘기게 일부러 바꿔서 실패를 봤다. override 가 연결을 이어받는 단언은 먼저 실패시켜 보지 않았다.
+- `gradlew -p backend check` 통과(unit 399, integration 240, 측정용 3건은 환경변수로 건너뜀).
+- 측정용 테스트(커밋 안 함, Testcontainers PG17, 테스트 JVM 힙 768MB = 운영 `JAVA_TOOL_OPTIONS`). 3,000건(가맹점 300곳 × 10건)을 run 한 뒤 실제 답변 API 로 질문에 다 답했다(답 2,685개).
+  - 바꾸기 전: 요약·내보내기 모두 OutOfMemoryError. `input_facts` 합계 136MB(압축 크기). 답 1건 62ms → 마지막 187ms.
+  - 바꾼 뒤: 요약 0.1~0.3초 +13~17MB, 내보내기 0.2~0.3초 +65~70MB. 답 1건 63ms → 121ms.
+  - 질문 전체 조회는 4,350행 +34~41MB 로 바꾸기 전후 모두 문제없었다.
+
+### 남은 것 · 아는 문제
+
+- 답 1건 시간은 여전히 늘어난다. 단계별로 재 보니 사용자 단위 접대비 한도 집계가 대부분이고 새 업로드에도 넘어간다(업로드 2 첫 답 198ms). #184 부터 있던 동작이라 이슈 #218 로 남겼다.
+- V18 을 고쳐서, 이 브랜치를 로컬 DB 에 띄운 적이 있으면 Flyway 체크섬이 맞지 않는다. DB 를 다시 만들거나 `flyway repair` 가 필요하다.
+- 세무대리인 질문 목록은 질문마다 거래 연결을 따로 읽는다(N+1). 사용자당 몇 개라 두었다.
+- 문진 기본값 20%(FE)는 여전히 남아 있다. 리뷰가 같은 배포에 넣자고 했다. FE 담당이 정해져야 한다.
+- 기존 개발 DB 의 62010 문진은 다시 제출하면 940909 로 바뀐다. 운영 데이터가 없어 마이그레이션은 하지 않았다(사용자 결정).
