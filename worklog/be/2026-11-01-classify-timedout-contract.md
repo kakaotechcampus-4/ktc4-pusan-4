@@ -34,3 +34,11 @@
 - develop 이 `ClassificationReviewService.resolve()` 에 한도 재집계를 넣은 것은 자동 머지됐다. 후보 조회(`items()`)와 겹치지 않는다
 - 마이그레이션 번호는 겹치지 않는다(develop 은 V14 까지)
 - 머지 후 `gradlew check` 통과(unit 396, integration 235, PMD)
+
+## 14:31 마이그레이션 V15 → V19 (#209 리뷰)
+
+- 커밋: 04b99c4
+- `V15__create_merchant_model_decision.sql` 을 `V19__` 로 옮기고, 엔티티 주석과 `backend_api_plan.md` B10 의 번호를 고쳤다. 내용은 그대로다
+- 리뷰(memoryhong · yuyeol3)는 V18 을 권했다. 열린 PR 이 V15(#177) · V16(#176) · V17(#174)을 쓰기 때문이다. 그런데 리뷰 뒤에 올라온 #214 가 V18 을 써서 V19 로 했다
+- 확인: `BackendApplicationIntegrationTest`(Flyway 초기화) 5건, `MerchantModelClassifyIntegrationTest` 6건 통과
+- 주의: Flyway 는 `out-of-order` 를 끈 기본값이다. 그래서 #209 를 V15~V18 PR 보다 먼저 배포하면, 뒤에 오는 마이그레이션이 기동 검증에서 막힌다. 머지는 리뷰어가 정한 순서대로 마지막에 한다
