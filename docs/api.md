@@ -219,8 +219,10 @@ refresh_token={token}; Path=/api/v1/auth; Max-Age=1209600; HttpOnly; Secure; Sam
 - 로컬 프로필(http)에서만 `Secure` 를 뺀다.
 
 > 지금은 실제 계정이 없어 고정 사용자 `demo@example.com` 하나만 로그인한다. 비밀번호는 서버 설정(`APP_AUTH_DEMO_PASSWORD`)이다.
-> 리프레시 토큰은 서버에 저장하지 않아(서명만 확인) 로그아웃해도 이미 복사된 토큰은 만료까지 유효하다.
-> 실제 계정은 B9b, 리프레시 토큰 저장·폐기(Redis)는 B9c 에서 붙이며 아래 계약은 바뀌지 않는다.
+> 실제 계정은 B9b 에서 붙이며 아래 계약은 바뀌지 않는다.
+
+리프레시 토큰은 서버(Redis)가 로그인 단위로 기억한다. 재발급하면 이전 토큰은 쓸 수 없고, 로그아웃하면 그 로그인만 끊긴다(다른 기기는 그대로).
+이미 쓴 리프레시 토큰을 다시 보내면 탈취로 보고 그 로그인을 끊는다. 그래서 프론트는 재발급 요청을 한 번에 하나만 보낸다.
 
 ### `POST /api/v1/auth/login`
 
@@ -248,7 +250,7 @@ refresh_token={token}; Path=/api/v1/auth; Max-Age=1209600; HttpOnly; Secure; Sam
 본문 없음. 쿠키의 리프레시 토큰으로 새 액세스 토큰과 새 리프레시 토큰(`Set-Cookie`)을 준다. 응답은 로그인과 같다.
 
 ```
-401 INVALID_REFRESH_TOKEN   쿠키가 없거나, 틀리거나, 만료됨 → 로그인 화면으로
+401 INVALID_REFRESH_TOKEN   쿠키가 없거나, 틀리거나, 만료됐거나, 로그아웃·재발급으로 폐기됨 → 로그인 화면으로
 ```
 
 ### `POST /api/v1/auth/logout`
@@ -428,7 +430,7 @@ verdict = AVAILABLE
 finalAmount < transaction.amount
 ```
 
-이면 안분, 상각, 한도 등이 적용된 것이다.
+이면 안분, 상각 등이 적용된 것이다. G6 한도(접대비 등)는 연간 집계라 `finalAmount`에 넣지 않고 한도 집계(`limit_bucket_entry`)에 따로 둔다.
 
 ---
 
@@ -641,6 +643,8 @@ G6
 `role` 은 `USER` 또는 `ADMIN` 이다. `ADMIN` 이면 관리자 API(3.15)를 쓸 수 있다.
 
 ### `DELETE /api/v1/users/me`
+
+그 사용자의 모든 로그인(리프레시 토큰)을 끊고 지운다. 이미 받은 액세스 토큰은 만료(15분)까지 남는다.
 
 응답:
 
@@ -1751,6 +1755,12 @@ GET /api/v1/judgments/summary?runId=R1
 
 `byVerdict`는 세 verdict를 늘 담는다. 판정이 없는 verdict는 `count`·`finalAmount`가 0이다. `finalAmount`가 아직 없는 Judgment(금액 계산 전)는 0으로 더한다.
 
+현재 결과인 `batchId`, `year` 집계는 한도 항목(`limit_bucket_entry`)이 있는 Judgment(접대비)를 `finalAmount` 대신 한도 인정액으로 더한다. 한도를 넘는 금액은 필요경비에 들어가지 않기 때문이다(소득세법 §35 3항). `byVerdict.AVAILABLE`과 `byAccount`에 같이 적용되어, 둘의 차이로 계산하는 값은 그대로 맞는다.
+
+- 한도는 사용자의 한 해 전체 기준이다. `year` 합계는 배분 순서와 관계없이 맞지만, `batchId` 하나에 돌아가는 몫은 배분 순서(승인일 오름차순, #15 확정 전 잠정)에 따라 달라진다.
+- 거래별 `finalAmount`는 그대로라, 판정 목록의 `finalAmount` 합과 요약이 접대비 한도 초과분만큼 다를 수 있다.
+- 과거 Run인 `runId` 집계는 `finalAmount` 합 그대로다. 한도 항목은 다시 집계할 때마다 지금 상태로 갈아 끼워져, 그 Run 시점의 인정액이 남아 있지 않다.
+
 `byAccount`는 `AVAILABLE`이면서 `account`가 있는 Judgment만 모은다. 정렬은 `finalAmount DESC`이고, 같으면 `account` 이름순이다.
 
 다른 사용자의 `batchId`·`runId`를 넘기면 404가 아니라 빈 집계(`totalCount` 0)다.
@@ -1828,7 +1838,7 @@ GET /api/v1/judgments/summary?runId=R1
 | origin | 이 revision이 생성된 직접 원인 |
 | outOfScope | 룰엔진 판정 범위 밖(핸드오프)인지. `verdict = NEEDS_REVIEW`일 때만 `true`일 수 있고 그 외 verdict에서는 항상 `false` |
 | account | 계정과목 |
-| finalAmount | 안분, 상각, 한도 적용 후 인정 금액 |
+| finalAmount | 안분, 상각 적용 후 인정 금액. `AVAILABLE`이 아니면 0. G6 한도는 연간 집계라 반영하지 않는다(요약은 반영한다, 3.7 summary) |
 | isInference | 룰로 확정하지 못해 fallback 결과인지 |
 | unmatchedReason | 매칭 실패 원인 |
 | attributes | 판정 과정에서 생성된 속성 |
@@ -1931,7 +1941,7 @@ JudgmentOverride 생성
 }
 ```
 
-새 revision은 수정한 판정에서 `verdict`만 바꾸고 나머지(계정과목, 룰카드, 속성, 인용)는 이어받는다. `outOfScope`는 확인 필요에만 붙으므로 `false`가 된다. 질문은 새로 만들지 않는다. 금액은 아직 계산하지 않아 `null`이다.
+새 revision은 수정한 판정에서 `verdict`만 바꾸고 나머지(계정과목, 룰카드, 속성, 인용)는 이어받는다. `outOfScope`는 확인 필요에만 붙으므로 `false`가 된다. 질문은 새로 만들지 않는다. `finalAmount`는 이어받은 속성과 판정 당시 문진 버전으로 바뀐 verdict에 맞춰 다시 계산한다. `UNAVAILABLE`이면 0이고, 자택 겸용 안분 속성이 있는데 문진에 비율이 없으면 결제금액 전액이다.
 
 에러:
 
@@ -2394,6 +2404,8 @@ factType 일치
 각 `(scopeKey, factType)`마다 UserFact를 하나 생성하고, 영향받는 Transaction만 재판정해 새 Judgment revision을 만든다. 동일 Transaction이 여러 Question에 걸려도 한 번만 재판정한다. 새 `JudgmentRun`은 생성하지 않는다.
 
 `factType`이 다른 Question은 변경하지 않는다.
+
+재판정 Context는 3.10과 같이 Question이 발생한 Judgment의 `userContextVersion`이다. 대상 Question끼리 버전이 다르면 그룹을 가리지 않고 가장 큰 버전 하나로 모든 대상 Transaction을 재판정한다.
 
 응답 `200`:
 

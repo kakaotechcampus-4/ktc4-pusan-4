@@ -5,7 +5,6 @@ import com.ktc4.pusan4.assistant.AssistantRelayService;
 import com.ktc4.pusan4.assistant.api.ChatResponse;
 import com.ktc4.pusan4.auth.AuthService;
 import com.ktc4.pusan4.auth.TestAuthentication;
-import com.ktc4.pusan4.judgment.api.JudgmentMockData;
 import com.ktc4.pusan4.judgment.domain.Gate;
 import com.ktc4.pusan4.judgment.domain.JudgmentOrigin;
 import com.ktc4.pusan4.judgment.domain.JudgmentOriginType;
@@ -21,6 +20,7 @@ import com.ktc4.pusan4.judgment.domain.RuleCandidate;
 import com.ktc4.pusan4.judgment.domain.RuleCandidateStatus;
 import com.ktc4.pusan4.judgment.domain.StatuteVersion;
 import com.ktc4.pusan4.judgment.domain.Verdict;
+import com.ktc4.pusan4.judgment.persistence.BulkAnswerResult;
 import com.ktc4.pusan4.judgment.persistence.JudgmentOverrideService;
 import com.ktc4.pusan4.judgment.persistence.JudgmentQueryService;
 import com.ktc4.pusan4.judgment.persistence.JudgmentRunService;
@@ -63,6 +63,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.InOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -89,6 +90,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
@@ -100,8 +102,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 목 응답이 api.md 의 상태 코드를 지키는지 확인한다. 값은 보지 않는다 — 서비스로 바꿔도 깨지지 않아야 한다.
  */
 @WebMvcTest
-@Import({ApiExceptionHandler.class, UuidV7Generator.class, TestAuthentication.class,
-    JudgmentMockData.class})
+@Import({ApiExceptionHandler.class, UuidV7Generator.class, TestAuthentication.class})
 class ApiResponseContractTest {
 
     private static final String ID = "0199c8f2-0000-7000-8000-000000000001";
@@ -227,6 +228,8 @@ class ApiResponseContractTest {
             new PendingTotal(9, 1_038_100), 2, NextStep.QUESTIONS));
         given(questionAnswerService.answer(any(), any(), any(), any()))
             .willReturn(new QuestionAnswerResult(1, UUID.fromString(ID), 1));
+        given(questionAnswerService.bulkAnswer(any(), any(), any(), any()))
+            .willReturn(new BulkAnswerResult(1, 0, 0, List.of(UUID.fromString(ID)), 1, new PendingTotal(0, 0L)));
 
         given(statuteService.get(anyLong())).willReturn(new StatuteVersion(1523, "소득세법시행령-67-4",
             "소득세법 시행령 제67조 제4항", "시행령", LocalDate.parse("2026-01-01"), null, "https://www.law.go.kr/", "..."));
@@ -431,6 +434,17 @@ class ApiResponseContractTest {
 
         // then: 요청 값이 아니라 CurrentUserProvider 가 정한 사용자로 조회한다
         verify(userService).get(FixedUser.ID);
+    }
+
+    @Test
+    void deleting_me_logs_out_everywhere_before_deleting_user() throws Exception {
+        // when
+        mockMvc.perform(request(HttpMethod.DELETE, "/api/v1/users/me")).andExpect(status().isNoContent());
+
+        // then: 로그인을 먼저 끊어야 Redis 가 실패했을 때 지워진 사용자의 토큰이 남지 않는다
+        InOrder order = inOrder(authService, userService);
+        order.verify(authService).logoutEverywhere(FixedUser.ID);
+        order.verify(userService).delete(FixedUser.ID);
     }
 
     @Test

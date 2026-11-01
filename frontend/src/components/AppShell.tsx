@@ -79,14 +79,14 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
           xl 미만 — 지금 단계가 아닌 단계 이름 · lg 미만 — 귀속 연도, 이메일(아이콘으로) · md 미만 — 단계 표시
         */}
         <div className="mx-auto flex h-[72px] max-w-page items-center justify-between gap-3 whitespace-nowrap px-6">
-          <Link to="/" className="flex shrink-0 items-center gap-2" aria-label="경비판정 홈">
+          <Link to="/" className="flex shrink-0 items-center gap-2" aria-label="PreeT 홈">
             <span aria-hidden="true" className="flex gap-[3px]">
               <span className="block h-[18px] w-[4px] rounded-sm bg-ink" />
               <span className="block h-[18px] w-[4px] rounded-sm bg-ink" />
               <span className="block h-[18px] w-[4px] rounded-sm bg-highlight" />
             </span>
             <span className="text-h4 font-bold tracking-tight text-ink">
-              경비판정
+              PreeT
             </span>
             <span aria-hidden="true" className="h-3.5 w-px bg-accent-line" />
             <span className="text-body text-ink2">판정</span>

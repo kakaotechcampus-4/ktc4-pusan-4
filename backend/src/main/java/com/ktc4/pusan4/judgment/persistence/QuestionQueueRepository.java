@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-interface QuestionQueueRepository extends Repository<QuestionQueueEntity, UUID> {
+interface QuestionQueueRepository extends Repository<QuestionQueueEntity, UUID>, PersistenceContextSync {
 
     QuestionQueueEntity save(QuestionQueueEntity question);
 

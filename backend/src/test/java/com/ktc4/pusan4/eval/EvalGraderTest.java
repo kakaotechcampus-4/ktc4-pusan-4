@@ -29,7 +29,7 @@ class EvalGraderTest {
             new EvalCase.Expectation(
                 Verdict.UNAVAILABLE, true, Gate.G1,
                 List.of("소득세법-33-1-2"), List.of("소득세법-33-1-12"),
-                false, Map.of()
+                false, Map.of(), null
             )
         );
     }
@@ -72,7 +72,7 @@ class EvalGraderTest {
         EvalCase base = parkingFine(false, false);
         EvalCase expectedAvailable = new EvalCase(base.id(), base.group(), base.critical(), base.onHold(),
             base.transaction(), base.context(), base.facts(),
-            new EvalCase.Expectation(Verdict.AVAILABLE, false, null, List.of(), List.of(), false, Map.of()));
+            new EvalCase.Expectation(Verdict.AVAILABLE, false, null, List.of(), List.of(), false, Map.of(), null));
 
         EvalGrader.Grade grade = EvalGrader.grade(expectedAvailable,
             judgment(Verdict.UNAVAILABLE, Gate.G1, false, "소득세법-33-1-2"));
@@ -112,6 +112,23 @@ class EvalGraderTest {
             judgment(Verdict.UNAVAILABLE, Gate.G1, false, "소득세법-33-1-4"));
 
         assertThat(grade.outcome()).isEqualTo(Outcome.SHORTFALL);
+    }
+
+    @Test
+    void amount_is_graded_only_when_expected() {
+        EvalCase base = parkingFine(false, false);
+        EvalCase withAmount = new EvalCase(base.id(), base.group(), base.critical(), base.onHold(),
+            base.transaction(), base.context(), base.facts(),
+            new EvalCase.Expectation(Verdict.AVAILABLE, false, null, List.of(), List.of(), false, Map.of(), 40_000L));
+
+        EvalGrader.Grade wrongAmount = EvalGrader.grade(withAmount,
+            judgment(Verdict.AVAILABLE, null, false, "소득세법-27-1"));
+        EvalGrader.Grade noExpectedAmount = EvalGrader.grade(base,
+            judgment(Verdict.UNAVAILABLE, Gate.G1, false, "소득세법-33-1-2"));
+
+        assertThat(wrongAmount.outcome()).isEqualTo(Outcome.SHORTFALL);
+        assertThat(wrongAmount.problems()).containsExactly("금액: 기대 40000, 실제 50000");
+        assertThat(noExpectedAmount.outcome()).isEqualTo(Outcome.MATCH);
     }
 
     @Test
