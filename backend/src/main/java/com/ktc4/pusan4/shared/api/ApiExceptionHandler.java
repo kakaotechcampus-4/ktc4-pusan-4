@@ -42,6 +42,7 @@ public class ApiExceptionHandler {
     @ExceptionHandler(ApiException.class)
     ResponseEntity<ErrorResponse> handleApiException(ApiException exception) {
         return ResponseEntity.status(exception.getStatus())
+            .headers(exception.getHeaders())
             .body(error(exception.getCode(), exception.getMessage()));
     }
 

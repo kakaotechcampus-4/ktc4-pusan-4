@@ -6,7 +6,7 @@ export function MarketingFooter() {
       <Container className="py-12">
         <div className="flex flex-wrap items-start justify-between gap-8">
           <div className="max-w-xl">
-            <p className="text-body-lg font-bold text-ink">경비판정</p>
+            <p className="text-body-lg font-bold text-ink">PreeT</p>
             <p className="mt-3 text-small leading-6 text-muted">
               이 서비스는 확인할 항목과 근거까지만 제시합니다. 세액을 확정하거나
               세무 신고를 대리하지 않으며, 최종 판단에는 세무대리인의 확인이
@@ -35,7 +35,7 @@ export function MarketingFooter() {
         </div>
 
         <div className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t border-line2 pt-6 text-caption text-muted">
-          <p>© 2026 경비판정. 무자격 세무대리를 하지 않습니다.</p>
+          <p>© 2026 PreeT. 무자격 세무대리를 하지 않습니다.</p>
           <ul className="flex gap-5">
             <li>이용약관</li>
             <li>개인정보처리방침</li>

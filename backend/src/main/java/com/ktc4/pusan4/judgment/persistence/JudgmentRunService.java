@@ -42,6 +42,7 @@ public class JudgmentRunService {
     private final TransactionRecordRepository transactionRepository;
     private final BusinessContextService contextService;
     private final JudgmentExecutor executor;
+    private final LimitSettlementService limitSettlement;
     private final ApplicationEventPublisher eventPublisher;
     private final UuidGenerator uuidGenerator;
     private final Clock clock;
@@ -53,6 +54,7 @@ public class JudgmentRunService {
         TransactionRecordRepository transactionRepository,
         BusinessContextService contextService,
         JudgmentExecutor executor,
+        LimitSettlementService limitSettlement,
         ApplicationEventPublisher eventPublisher,
         UuidGenerator uuidGenerator,
         Clock clock
@@ -63,6 +65,7 @@ public class JudgmentRunService {
         this.transactionRepository = transactionRepository;
         this.contextService = contextService;
         this.executor = executor;
+        this.limitSettlement = limitSettlement;
         this.eventPublisher = eventPublisher;
         this.uuidGenerator = uuidGenerator;
         this.clock = clock;
@@ -147,11 +150,13 @@ public class JudgmentRunService {
         run.recordFailure(now());
     }
 
+    /** 끝나면 한도를 다시 집계한다. 같은 트랜잭션이라 COMPLETED 로 보이는 run 은 한도도 반영돼 있다. */
     @Transactional
     void complete(UUID runId) {
         JudgmentRunEntity run = lock(runId);
         if (run.isRunning()) {
             run.complete(now());
+            limitSettlement.settleProvisional(batchRepository.findById(run.batchId()).orElseThrow().userId());
         }
     }
 

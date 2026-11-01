@@ -38,6 +38,8 @@ bash ./backend/gradlew -p backend bootRun --args='--spring.profiles.active=local
 
 로컬 프로필을 사용하지 않는 환경에서는 Spring 표준 환경 변수인 `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`를 주입합니다.
 
+`HOLIDAY_API_KEY` 없이 실행하면 공휴일 동기화를 건너뛰고 시드도 넣지 않아, 새 DB의 `public_holiday` 표가 비어 있습니다. 이때는 공휴일 거래가 평일로 판정됩니다. 공휴일 판정을 확인하거나 데모 데이터를 만들 때는 공공데이터포털 「한국천문연구원_특일 정보」의 Decoding 키를 `HOLIDAY_API_KEY` 환경 변수로 넣고 실행합니다(`docs/deployment.md` 7절).
+
 ## 테스트
 
 모든 테스트는 Gradle 표준 경로인 `src/test/java`에 둡니다. 실행 속도와 외부 인프라 의존성을 기준으로 실행 명령만 분리합니다.
@@ -68,7 +70,7 @@ bash ./backend/gradlew -p backend bootRun --args='--spring.profiles.active=local
 
 ## 목 응답
 
-서비스 레이어가 구현되기 전의 API는 기능별 `*MockData` Bean(`TransactionMockData`, `ClassificationMockData`, `JudgmentMockData`)이 만든 고정 응답을 반환합니다. 입력과 id에 상관없이 같은 값이고, 상태를 저장하지 않습니다. 이런 API에는 `@MockResponse`가 붙어 있고 스웨거 설명이 `[목 응답]`으로 시작합니다.
+서비스 레이어가 구현되기 전의 API는 기능별 `*MockData` Bean이 만든 고정 응답을 반환합니다. 입력과 id에 상관없이 같은 값이고, 상태를 저장하지 않습니다. 이런 API에는 `@MockResponse`가 붙어 있고 스웨거 설명이 `[목 응답]`으로 시작합니다. 지금은 남은 `*MockData` Bean이 없습니다.
 
 서비스를 구현하면 엔드포인트 단위로 다음을 바꿉니다.
 
@@ -89,7 +91,7 @@ bash ./backend/gradlew -p backend bootRun --args='--spring.profiles.active=local
 | 구성요소 | 지금 | 바꿀 때 |
 | --- | --- | --- |
 | `AccessTokens` | JWT 발급·검증(15분) | 그대로 |
-| `RefreshTokenStore` | `StatelessRefreshTokenStore` — 서명만 확인, 저장 없음. `revoke`·`revokeAll`은 아무것도 하지 않는다 | B9c: Redis 구현으로 빈만 교체(교체·폐기·탈퇴 시 전체 폐기) |
+| `RefreshTokenStore` | `RedisRefreshTokenStore` — 로그인 단위(family)로 토큰 해시를 Redis에 둔다. 재발급 때 교체, 이미 쓴 토큰이 오면 그 로그인 폐기, 로그아웃은 그 로그인만, 탈퇴는 전체 폐기 | 그대로 |
 | `CredentialVerifier` | `FixedUserCredentialVerifier` — `FixedUser` + `APP_AUTH_DEMO_PASSWORD` | B9b: 실제 계정·카카오 구현으로 교체, `FixedUser`·`TemporaryUserSeeder` 삭제 |
 
 `AuthService`와 `AuthController`는 위 인터페이스만 보므로 교체해도 바뀌지 않습니다.

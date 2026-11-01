@@ -120,6 +120,7 @@ class QuestionQueryIntegrationTest {
             .andExpect(jsonPath("$.items[0].count").value(2))
             .andExpect(jsonPath("$.items[0].totalAmount").value(13_000))
             .andExpect(jsonPath("$.items[0].bulkAnswerable").value(true))
+            .andExpect(jsonPath("$.items[0].code").value("Q-TEST"))
             .andExpect(jsonPath("$.items[0].transactions[0].transactionId").value(overridden.toString()))
             .andExpect(jsonPath("$.items[0].transactions[0].overridden").value(true))
             .andExpect(jsonPath("$.items[0].transactions[1].overridden").value(false))

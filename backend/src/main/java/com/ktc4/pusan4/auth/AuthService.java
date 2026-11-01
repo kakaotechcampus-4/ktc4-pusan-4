@@ -5,9 +5,11 @@ import com.ktc4.pusan4.shared.api.ApiException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
+import java.util.UUID;
+
 /**
  * 로그인·재발급·로그아웃 (api.md 1.1). 자격 확인과 리프레시 토큰 보관은 인터페이스 뒤에 있어,
- * 실제 계정(B9b)·Redis(B9c)를 붙여도 이 클래스는 바뀌지 않는다.
+ * 실제 계정(B9b)을 붙여도 이 클래스는 바뀌지 않는다.
  */
 @Service
 public class AuthService {
@@ -44,6 +46,11 @@ public class AuthService {
         if (refreshToken != null && !refreshToken.isBlank()) {
             refreshTokens.revoke(refreshToken);
         }
+    }
+
+    /** 그 사용자의 모든 로그인을 끊는다. 탈퇴할 때 쓴다. 이미 발급된 액세스 토큰은 만료(15분)까지 남는다. */
+    public void logoutEverywhere(UUID userId) {
+        refreshTokens.revokeAll(userId);
     }
 
     private static ApiException invalidRefreshToken() {

@@ -1,5 +1,6 @@
 package com.ktc4.pusan4.merchant.api;
 
+import com.ktc4.pusan4.transaction.domain.ClassificationAnswer;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 public record ClassificationAnswerResponse(
@@ -7,4 +8,8 @@ public record ClassificationAnswerResponse(
     String merchantCategory,
     @Schema(description = "Batch 에 완료된 JudgmentRun 이 없으면 0") int judgedCount
 ) {
+
+    static ClassificationAnswerResponse from(ClassificationAnswer answer) {
+        return new ClassificationAnswerResponse(answer.resolvedCount(), answer.merchantCategory(), answer.judgedCount());
+    }
 }

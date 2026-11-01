@@ -352,8 +352,9 @@ export function Results() {
         </section>
 
         {selectedId && !failed && !nothingJudged &&
-        // 패널이 화면보다 길면 수정 버튼·이력이 접힌 아래로 밀린다. 화면 높이 안에서 따로 스크롤한다
-        <aside className="lg:sticky lg:top-32 lg:max-h-[calc(100vh-9rem)] lg:self-start lg:overflow-y-auto">
+        // 패널이 화면보다 길면 수정 버튼·이력이 접힌 아래로 밀린다. 화면 높이 안에서 따로 스크롤한다.
+        // 아래 여백은 오른쪽 아래 비서 버튼이 패널 끝을 가리지 않게 둔 것이다
+        <aside className="lg:sticky lg:top-32 lg:max-h-[calc(100vh-9rem)] lg:self-start lg:overflow-y-auto lg:pb-20">
             {panelData && !panelData.failed && panelData.judgment ?
           <JudgmentDetailPanel
             key={selectedId}

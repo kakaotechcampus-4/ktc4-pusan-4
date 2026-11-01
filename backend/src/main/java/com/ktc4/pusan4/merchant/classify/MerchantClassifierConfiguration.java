@@ -1,5 +1,6 @@
 package com.ktc4.pusan4.merchant.classify;
 
+import com.ktc4.pusan4.merchant.MerchantCategoryVocabulary;
 import com.ktc4.pusan4.merchant.MerchantDictionaryRepository;
 import com.ktc4.pusan4.merchant.normalize.NormalizeSpecLoader;
 import com.ktc4.pusan4.merchant.normalize.T1Normalizer;
@@ -41,6 +42,11 @@ class MerchantClassifierConfiguration {
     @Bean
     KeywordRules keywordRules() throws IOException {
         return KeywordRules.load(rulesDirectory);
+    }
+
+    @Bean
+    MerchantCategoryVocabulary merchantCategoryVocabulary() throws IOException {
+        return MerchantCategoryVocabulary.load(rulesDirectory);
     }
 
     @Bean

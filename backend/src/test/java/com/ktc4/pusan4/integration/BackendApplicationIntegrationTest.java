@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -41,6 +42,9 @@ class BackendApplicationIntegrationTest {
     @Autowired
     private MerchantClassifier merchantClassifier;
 
+    @Autowired
+    private ConfigurableApplicationContext context;
+
     @Test
     void health_endpoint_reports_application_up() throws Exception {
         // Redis 컨테이너 없이 UP 이어야 한다. Redis 는 health 에서 뺐다(application.yml management.health.redis)
@@ -56,6 +60,12 @@ class BackendApplicationIntegrationTest {
             .andExpect(jsonPath("$.id").value(FixedUser.ID.toString()))
             .andExpect(jsonPath("$.email").value(FixedUser.EMAIL))
             .andExpect(jsonPath("$.createdAt").exists());
+    }
+
+    @Test
+    void judgment_run_executor_closes_before_entity_manager_factory() {
+        // 빈은 만든 역순으로 닫힌다. 실행기가 먼저 닫혀야 종료 때 run 을 기다리는 동안 DB 커넥션 풀이 열려 있다.
+        assertThat(context.getBeanFactory().getDependentBeans("entityManagerFactory")).contains("judgmentRunExecutor");
     }
 
     @Test

@@ -49,45 +49,45 @@ export default {content: [
       colors: {
         /** 바탕은 흰색이고 패널이 아주 옅은 회색이다 */
         canvas: '#FFFFFF',
-        surface: '#F5F6F8',
+        surface: '#F3F5F7',
         /** 표처럼 패널 위에서 흰 바탕이 필요할 때 */
         sheet: '#FFFFFF',
-        /** 첫 화면 큰 판 */
-        surface2: '#FFE600',
-        line: '#ECEEF1',
-        line2: '#F5F6F8',
+        /** 첫 화면 큰 판. 어두운 남색이라 글자·그림은 흰색으로 올린다 */
+        surface2: '#122E55',
+        line: '#E8ECF0',
+        line2: '#F3F5F7',
         /** 괘선 중 굵은 것 — 표 머리 위에 긋는다 */
-        rule: '#1A1A1A',
-        ink: '#0A0A0A',
-        ink2: '#2B2B2B',
-        muted: '#5D6670',
+        rule: '#16181D',
+        ink: '#16181D',
+        ink2: '#30363F',
+        muted: '#67707E',
         /** 주된 동작은 검정이다. 파랑은 문장 속 링크에만 쓴다 */
         accent: {
-          DEFAULT: '#0A0A0A',
-          hover: '#2B2B2B',
-          soft: '#F5F6F8',
-          line: '#DDE1E6',
+          DEFAULT: '#16181D',
+          hover: '#30363F',
+          soft: '#F3F5F7',
+          line: '#DCE1E8',
         },
-        link: '#1A6DFF',
+        link: '#1B64DA',
         /** 한 화면에 한 번만 쓰는 강조 블록 */
         highlight: '#FFE600',
         ok: {
           DEFAULT: '#00703D',
-          bg: '#E6F8F0',
-          line: '#A8E6C9',
+          bg: '#E8F6F0',
+          line: '#B2E3CE',
           /** 막대·점처럼 글자가 안 올라가는 채움. 밝게 쓴다 */
           bar: '#12B76A',
         },
         warn: {
-          DEFAULT: '#955A00',
-          bg: '#FFF6E0',
-          line: '#FFD98A',
+          DEFAULT: '#8A5A10',
+          bg: '#FDF3E3',
+          line: '#EFD7A4',
           bar: '#F7A51B',
         },
         deny: {
-          DEFAULT: '#C92A2A',
-          bg: '#FFEDED',
-          line: '#FFC4C4',
+          DEFAULT: '#C5283D',
+          bg: '#FDEDEF',
+          line: '#F7CDD4',
           bar: '#FF5A5A',
         },
       },
