@@ -15,12 +15,12 @@ body,
 }
 body {
   background-color: #ffffff;
-  color: #2B2B2B;
+  color: #30363F;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 :focus-visible {
-  outline: 2px solid #0A0A0A;
+  outline: 2px solid #16181D;
   outline-offset: 2px;
   border-radius: 4px;
 }
