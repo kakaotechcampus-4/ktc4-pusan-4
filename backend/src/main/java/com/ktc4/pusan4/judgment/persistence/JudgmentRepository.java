@@ -114,6 +114,52 @@ interface JudgmentRepository extends Repository<JudgmentEntity, UUID> {
         Pageable pageable
     );
 
+    // 한도 집계(LimitSettlementService) 대상: 사용자의 현재 판정(§5) 중 가능이면서 limit_bucket 이 :bucket 인 것.
+    // 현재 판정·판정 대상 조건은 findPage 와 같다. 판정 행은 batch 의 UserFact 전부(input_facts)를 싣고 있어,
+    // 엔티티로 읽으면 거래 수의 제곱만큼 메모리를 쓴다. 집계에 필요한 값만 꺼낸다.
+    @Query("""
+        select new com.ktc4.pusan4.judgment.persistence.JudgmentRepository$LimitTagged(
+            judgment.id, transaction.approvedAt, judgment.finalAmount, transaction.amount)
+        from JudgmentEntity judgment, TransactionRecordEntity transaction
+        where transaction.id = judgment.transactionId
+          and transaction.userId = :userId
+          and judgment.verdict = 'AVAILABLE'
+          and function('jsonb_extract_path_text', judgment.attributes, 'limit_bucket') = :bucket
+          and (
+            judgment.judgmentOverrideId = (
+              select override.id
+              from JudgmentOverrideEntity override
+              where override.transactionId = judgment.transactionId
+                and override.active = true
+            )
+            or (
+              not exists (
+                select override
+                from JudgmentOverrideEntity override
+                where override.transactionId = judgment.transactionId
+                  and override.active = true
+              )
+              and judgment.judgmentOverrideId is null
+              and judgment.revision = (
+                select max(latest.revision)
+                from JudgmentEntity latest
+                where latest.transactionId = judgment.transactionId
+                  and latest.judgmentOverrideId is null
+              )
+            )
+          )
+          and transaction.classificationStatus = 'CLASSIFIED'
+          and (
+            (transaction.sourceStatus = 'JUDGEABLE' and transaction.userInclusion <> 'EXCLUDED')
+            or (transaction.sourceStatus = 'EXCLUDED' and transaction.userInclusion = 'INCLUDED')
+          )
+        """)
+    List<LimitTagged> findCurrentLimitTagged(@Param("userId") UUID userId, @Param("bucket") String bucket);
+
+    /** finalAmount 는 금액 계산 전에 저장된 판정이면 비어 있다. */
+    record LimitTagged(UUID judgmentId, LocalDate approvedAt, Long finalAmount, long amount) {
+    }
+
     @Query("""
         select coalesce(max(judgment.revision), 0) + 1
         from JudgmentEntity judgment

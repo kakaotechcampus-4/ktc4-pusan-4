@@ -1,9 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRightIcon } from 'lucide-react';
+import { useSession } from '../contexts/SessionContext';
 import { MarketingHeader } from '../components/MarketingHeader';
 import { MarketingFooter } from '../components/MarketingFooter';
 import { OrbitStage } from '../components/OrbitStage';
+import { ExampleCarousel } from '../components/ExampleCarousel';
 import {
   FLOW_STEPS,
   HERO_SUMMARY,
@@ -37,7 +39,7 @@ function ArrowDot({ size = 'md' }: {size?: 'sm' | 'md';}) {
  */
 function IrHeading({ children }: {children: React.ReactNode;}) {
   return (
-    <h2 className="flex items-center gap-4 text-h2 font-normal tracking-ir text-ink lg:text-ir-section">
+    <h2 className="flex items-center gap-4 text-h2 font-normal tracking-ir text-ink [word-break:keep-all] lg:text-ir-section">
       <span
         aria-hidden="true"
         className="flex h-12 w-12 shrink-0 items-center justify-center gap-[3px] rounded-xl bg-surface">
@@ -94,7 +96,12 @@ const BOARDS = [
 
 
 export function Landing() {
+  const { status } = useSession();
   const [ok, ask] = HERO_SUMMARY.distribution;
+
+  /* 로그인 뒤에는 메인으로 오므로, CTA 가 로그인 폼으로 되돌아가면 막힌다 */
+  const signedIn = status === 'signedIn';
+  const startTo = signedIn ? '/upload' : '/login';
 
   return (
     <div className="min-h-full bg-canvas">
@@ -110,10 +117,10 @@ export function Landing() {
 
                 {/* 글은 궤도 위에 올린다 */}
                 <div className="relative z-10 px-8 pt-12 sm:px-16 sm:pt-16">
-                  <p className="text-body text-ink2">
+                  <p className="text-body text-highlight">
                     1인 IT 개발 사업자를 위한 경비 판정
                   </p>
-                  <strong className="mt-5 block text-h2 font-normal leading-tight tracking-ir text-ink [word-break:keep-all] lg:text-ir-display">
+                  <strong className="mt-5 block text-h2 font-normal leading-tight tracking-ir text-white [word-break:keep-all] lg:text-ir-display">
                     이 카드값이 경비인지,
                     <br />
                     조문까지 붙여 답합니다
@@ -124,10 +131,10 @@ export function Landing() {
               {/* 왼쪽 아래 모서리를 바탕색으로 베어 내고 그 자리에 링크를 둔다 */}
               <div className="absolute bottom-0 left-0 flex h-[72px] items-center rounded-tr-[20px] bg-canvas pr-7 pt-2">
                 <Link
-                  to="/login"
+                  to={startTo}
                   className="flex items-center gap-3 text-ir-lead font-normal tracking-ir-xs text-ink">
 
-                  무료로 판정해보기
+                  {signedIn ? '카드내역 올리기' : '무료로 판정해보기'}
                   <ArrowDot />
                 </Link>
               </div>
@@ -135,7 +142,7 @@ export function Landing() {
 
             {/* 첫 장은 검정에 큰 숫자, 아래로 회색 (레퍼런스 wrap_banner) */}
             <div className="flex flex-col gap-2">
-              <div className="rounded-2xl bg-ink2 p-5 text-white">
+              <div className="rounded-2xl bg-surface2 p-5 text-white">
                 <p className="text-caption text-white/60">이번 달 인정 경비</p>
                 <p className="mt-2 whitespace-nowrap text-ir-num font-bold tracking-ir-sm tabular-nums">
                   {won(HERO_SUMMARY.availableAmount)}
@@ -186,7 +193,7 @@ export function Landing() {
 
         {/* 주요현황 — 회색 패널(428×241) 3장 + 카드(428×360) 3장 + 알약 */}
         <section id="flow" className={`${SHELL} pt-28`}>
-          <IrHeading>경비판정 주요현황</IrHeading>
+          <IrHeading>PreeT 주요현황</IrHeading>
 
           <div className="mt-10 grid gap-4 md:grid-cols-3">
             {BOARDS.map((board) =>
@@ -226,12 +233,24 @@ export function Landing() {
 
           <div className="mt-10 flex justify-center">
             <Link
-              to="/login"
+              to={startTo}
               className="inline-flex h-[79px] items-center gap-4 rounded-full bg-surface px-10 text-ir-lead font-normal tracking-ir-xs text-ink transition-colors hover:bg-accent-line">
 
               판정 흐름 전체보기
               <ArrowDot />
             </Link>
+          </div>
+        </section>
+
+        {/* 지출 예시 — 가로로 넘겨 본다 */}
+        <section className={`${SHELL} pt-28`}>
+          <IrHeading>이런 지출을 이렇게 봅니다</IrHeading>
+          <p className="mt-5 max-w-xl text-body-lg text-ink2 [word-break:keep-all]">
+            1인 개발 사업자가 자주 쓰는 항목입니다. 같은 지출도 상황에 따라
+            결과가 달라집니다.
+          </p>
+          <div className="mt-10">
+            <ExampleCarousel />
           </div>
         </section>
 
@@ -254,7 +273,7 @@ export function Landing() {
 
         {/* 지키는 것 — 회색 패널 3장 */}
         <section id="system" className={`${SHELL} pt-28`}>
-          <IrHeading>경비판정이 지키는 것</IrHeading>
+          <IrHeading>PreeT가 지키는 것</IrHeading>
 
           <ul className="mt-10 grid gap-4 md:grid-cols-3">
             {SYSTEM_FEATURES.map((feature) =>
