@@ -151,7 +151,7 @@ public final class JudgmentEngine {
         // 자택 겸용 안분(#65)은 문진의 작업공간 비율로 금액을 나눈다. 비율이 없으면 금액을 정할 수 없다.
         boolean review = questions.stream().anyMatch(JudgmentEngine::changesOutcome)
             || answeredAccountConflict
-            || HOME_OFFICE_RATIO.equals(attributes.get(APPORTIONMENT)) && context.homeOfficeRatio() == null;
+            || HOME_OFFICE_RATIO.equals(attributes.get(APPORTIONMENT)) && !context.hasHomeOfficeRatio();
         Verdict verdict = review
             ? moreRestrictive(resolvedVerdict, Verdict.NEEDS_REVIEW)
             : resolvedVerdict;
