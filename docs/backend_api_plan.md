@@ -280,7 +280,7 @@ flowchart LR
 
 | PR | 트랙 | 날짜 | 내용 |
 | --- | --- | --- | --- |
-| B10 | B | 11/2 | 분류 AI를 연동한다. B3b 분류기에서 사전과 키워드로 분류하지 못한 가맹점(`UNCLASSIFIED`, 취소상계만 있는 가맹점 제외, 요청당 200개까지)만 모아 AI 서버 `POST /classify/merchants`를 한 번 호출한다(계약은 아래 10/16 결정). 호출은 DB 트랜잭션 밖(`UploadFacade`)에서 한다. 재전송·중복 파일이면 부르지 않는다. 시간 초과(read 10초 = AI 마감 8초 + 여유)나 실패, 기능 꺼짐(`CLASSIFY_ENABLED`, 기본 false)이면 모델 없이 지금처럼 `미분류` + 분류 확인이다. 모델 답으로 확정하지 않는다. 모델이 답한 가맹점도 `미분류` + 분류 확인이고, 후보 최대 3개(`suggestedCategories`)를 붙인다. 모델 결과는 `merchant_dict`(개인·전역)에 저장하지 않고(`CONTEXT.md` 흔한 실수 #18) `merchant_model_decision`(V15)에 남긴다. |
+| B10 | B | 11/2 | 분류 AI를 연동한다. B3b 분류기에서 사전과 키워드로 분류하지 못한 가맹점(`UNCLASSIFIED`, 취소상계만 있는 가맹점 제외, 요청당 200개까지)만 모아 AI 서버 `POST /classify/merchants`를 한 번 호출한다(계약은 아래 10/16 결정). 호출은 DB 트랜잭션 밖(`UploadFacade`)에서 한다. 재전송·중복 파일이면 부르지 않는다. 시간 초과(read 10초 = AI 마감 8초 + 여유)나 실패, 기능 꺼짐(`CLASSIFY_ENABLED`, 기본 false)이면 모델 없이 지금처럼 `미분류` + 분류 확인이다. 모델 답으로 확정하지 않는다. 모델이 답한 가맹점도 `미분류` + 분류 확인이고, 후보 최대 3개(`suggestedCategories`)를 붙인다. 모델 결과는 `merchant_dict`(개인·전역)에 저장하지 않고(`CONTEXT.md` 흔한 실수 #18) `merchant_model_decision`(V19)에 남긴다. |
 | 버퍼 | A·B | 11/3~11/5 | 밀린 PR, 회귀 수정, 누적 시나리오 테스트 보강, 데모 데이터(`CONTEXT.md` §15 히어로 시나리오) 준비 |
 
 ## 미리 정해야 할 것

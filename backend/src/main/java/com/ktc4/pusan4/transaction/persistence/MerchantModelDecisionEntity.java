@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * 분류 모델이 미분류 거래에 낸 답 (V15). 업로드가 남기고, 분류 확인 목록이 후보를 읽는다. 사전에는 쓰지 않는다.
+ * 분류 모델이 미분류 거래에 낸 답 (V19). 업로드가 남기고, 분류 확인 목록이 후보를 읽는다. 사전에는 쓰지 않는다.
  */
 @Entity
 @Table(name = "merchant_model_decision")
