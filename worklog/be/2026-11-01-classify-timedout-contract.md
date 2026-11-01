@@ -19,3 +19,7 @@
 ## 남은 것 · 아는 문제
 
 - 시간 초과 가맹점을 다시 묻는 정책은 아직 없다
+
+## 13:33 새 필드를 받아도 깨지지 않는지 확인
+
+- 가짜 AI 서버 응답에 `timedOut` 을 넣고 `MerchantModelClassifyIntegrationTest` 6건이 통과하는 것을 봤다 (76aa1a2)
