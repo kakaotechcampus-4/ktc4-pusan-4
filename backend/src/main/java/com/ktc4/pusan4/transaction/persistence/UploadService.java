@@ -152,7 +152,7 @@ public class UploadService {
                 reviews.add(ClassificationReviewEntity.pending(uuidGenerator.generate(), transaction.id(), now));
             }
         }
-        reviews.forEach(reviewRepository::save);
+        reviewRepository.saveAll(reviews);
 
         return new UploadResult(batch.id(), fresh.size(), skipped, reviews.size(), now);
     }
