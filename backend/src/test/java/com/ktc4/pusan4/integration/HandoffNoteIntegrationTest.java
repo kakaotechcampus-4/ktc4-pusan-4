@@ -98,6 +98,21 @@ class HandoffNoteIntegrationTest {
             "select count(*) from handoff_note where user_id = ?", Integer.class, user)).isZero();
     }
 
+    @Test
+    void deleting_the_upload_keeps_the_note_and_drops_the_transaction() throws Exception {
+        // given
+        UUID transactionId = insertTransaction(FixedUser.ID);
+        create("업로드를 지울 질문", "[\"%s\"]".formatted(transactionId)).andExpect(status().isCreated());
+
+        // when
+        jdbcTemplate.update(
+            "delete from upload_batch where id = (select batch_id from transaction where id = ?)", transactionId);
+
+        // then
+        mockMvc.perform(get("/api/v1/handoff-notes"))
+            .andExpect(jsonPath("$[?(@.text == '업로드를 지울 질문')].transactionIds[*]").isEmpty());
+    }
+
     private ResultActions create(String text, String transactionIdsJson) throws Exception {
         return mockMvc.perform(post("/api/v1/handoff-notes")
             .contentType(MediaType.APPLICATION_JSON)
