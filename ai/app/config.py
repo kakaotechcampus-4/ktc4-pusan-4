@@ -29,7 +29,8 @@ class Settings(BaseSettings):
     classify_base_url: str | None = None
     classify_model: str = "openai/gpt-6-luna"
     # 동시 호출 수, 호출 하나의 타임아웃(초), 요청 전체 마감(초). 마감까지 못 받은 가맹점은 null 로 준다.
-    classify_concurrency: int = 8
+    # 실측(11/1, 200건): 동시 8 은 8초에 139건, 16 은 4.8초에 200건을 받았다(오류 0).
+    classify_concurrency: int = 16
     classify_call_timeout: float = 4.0
     classify_deadline: float = 8.0
     # 비서 도구가 사용자 토큰으로 부르는 백엔드 공개 API.
