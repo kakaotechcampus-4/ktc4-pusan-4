@@ -1,0 +1,8 @@
+[Unit]
+Description=Promote approved ktc4 rule candidates and extract new ones
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash /opt/ktc4/repo/deploy/rule-candidates.sh
