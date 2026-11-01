@@ -22,6 +22,7 @@ import java.util.Objects;
  * </ul>
  * 코드는 6자리라 해시해도 금방 풀려서 원문으로 둔다. 대신 틀린 횟수와 하루 발송 횟수로 맞혀 보기를 막는다
  * (코드 하나에 {@link #MAX_ATTEMPTS}번, 하루 {@link #DAILY_LIMIT}개).
+ * 메일 발송에 실패한 요청은 하루 횟수에 세지 않는다({@link #refund}).
  */
 @Component
 class EmailVerificationStore {
@@ -69,6 +70,14 @@ class EmailVerificationStore {
         return 1
         """, Long.class);
 
+    /** KEYS: daily. 횟수가 남아 있을 때만 하나 내린다. 그사이 TTL 이 끝나 키가 없으면 DECR 이 TTL 없는 -1 을 만들어서다. */
+    private static final RedisScript<Long> REFUND = RedisScript.of("""
+        if tonumber(redis.call('GET', KEYS[1]) or '0') > 0 then
+          redis.call('DECR', KEYS[1])
+        end
+        return 0
+        """, Long.class);
+
     private final StringRedisTemplate redis;
 
     EmailVerificationStore(StringRedisTemplate redis) {
@@ -86,9 +95,13 @@ class EmailVerificationStore {
         return value < 0 ? IssueResult.dailyLimit() : IssueResult.cooldown(Duration.ofMillis(value));
     }
 
-    /** 메일을 못 보냈을 때. 코드와 재발송 대기를 지워 바로 다시 요청할 수 있게 한다. 하루 횟수는 그대로 센다. */
-    void cancel(String email) {
-        redis.delete(List.of(codeKey(email), cooldownKey(email)));
+    /**
+     * 메일을 못 보냈을 때. 서버 쪽 실패라 하루 횟수를 하나 돌려준다.
+     * 재발송 대기는 그대로 둔다. Gmail 이 장애여도 이메일 하나에 SMTP 호출이 대기 한 번에 한 번으로 묶인다.
+     * 코드도 지우지 않는다. 타임아웃처럼 실패로 보였지만 메일은 나간 경우 사용자가 받은 코드를 그대로 쓸 수 있다.
+     */
+    void refund(String email) {
+        redis.execute(REFUND, List.of(dailyKey(email)));
     }
 
     ConfirmResult confirm(String email, String code, String verificationToken) {

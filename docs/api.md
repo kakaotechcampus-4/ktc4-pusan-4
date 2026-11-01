@@ -239,7 +239,7 @@ refresh_token={token}; Path=/api/v1/auth; Max-Age=1209600; HttpOnly; Secure; Sam
 409 EMAIL_ALREADY_EXISTS             이미 가입한 이메일
 429 VERIFICATION_RESEND_TOO_SOON     60초 안에 다시 요청함 (message 에 남은 초)
 429 VERIFICATION_DAILY_LIMIT         오늘 이 이메일로 5번 보냄
-502 EMAIL_SEND_FAILED                메일을 보내지 못함 → 바로 다시 요청해도 된다
+502 EMAIL_SEND_FAILED                메일을 보내지 못함 → 60초 뒤 다시 요청. 하루 횟수에는 세지 않는다
 503 EMAIL_VERIFICATION_UNAVAILABLE   서버에 메일 계정이 설정되지 않음
 ```
 

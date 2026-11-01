@@ -103,15 +103,17 @@ class AuthIntegrationTest {
     }
 
     @Test
-    void failed_mail_lets_user_request_again_right_away() throws Exception {
+    void failed_mail_keeps_cooldown() throws Exception {
         // given
         mailbox.failNext();
         sendCode("mailfail@example.com")
             .andExpect(status().isBadGateway())
             .andExpect(jsonPath("$.code").value("EMAIL_SEND_FAILED"));
 
-        // then: 재발송 대기가 풀려 있다
-        sendCode("mailfail@example.com").andExpect(status().isNoContent());
+        // then: 재발송 대기는 남는다. 하루 횟수를 돌려주는 것은 EmailVerificationStoreIntegrationTest 에서 본다
+        sendCode("mailfail@example.com")
+            .andExpect(status().isTooManyRequests())
+            .andExpect(jsonPath("$.code").value("VERIFICATION_RESEND_TOO_SOON"));
     }
 
     @Test

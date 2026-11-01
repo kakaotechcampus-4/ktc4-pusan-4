@@ -55,3 +55,16 @@
 ## 10-30 VERIFICATION_CODE_EXPIRED 메시지
 
 - 이미 쓴 코드를 다시 보내도 "만료됐습니다" 로만 나와 헷갈려서, 메시지를 "인증 코드가 만료됐거나 이미 사용됐습니다. 코드를 다시 받아 주세요." 로 바꿨다(성진 결정). 에러 코드는 그대로라 프론트 처리는 바뀌지 않는다. 스웨거 설명·api.md 도 맞췄다.
+
+## 11-01 메일 발송 실패 시 하루 횟수를 돌려준다 (#193 리뷰)
+
+- yuyeol3 리뷰: 서버 쪽 장애로 실패한 발송까지 하루 5회에 세면 사용자가 손해를 본다. 트랜잭션처럼 되돌리자.
+- 실패하면 재발송 대기를 지우고 횟수는 남기던 것을 거꾸로 바꿨다. 대기(60초)는 남기고 하루 횟수를 하나 돌려준다(`EmailVerificationStore.refund`, 성진 결정). 대기가 남아 있어 Gmail 장애 중에도 이메일 하나에 SMTP 호출은 분당 1회로 묶인다.
+- 코드는 지우지 않는다. 타임아웃처럼 실패로 보였지만 메일은 나간 경우 받은 코드를 그대로 쓸 수 있다. 다음 발급이 덮어쓴다.
+- 돌려주기는 Lua 로 `GET` 이 0보다 클 때만 `DECR` 한다. 그사이 daily 키 TTL 이 끝나면 `DECR` 이 TTL 없는 -1 을 만들어 다음 날 한도가 6이 되기 때문이다.
+- 502 메시지를 "1분 뒤 다시 시도해 주세요" 로 바꾸고 api.md 1.1·스웨거 설명을 맞췄다.
+
+### 확인한 것
+
+- 이 환경은 Gradle 배포판 다운로드가 막혀 테스트를 돌리지 못했다. 돌려주기 Lua 는 redis-server 에 직접 EVAL 해 3→2(TTL 유지), 0→0, 키 없음→생성 안 함을 확인했다.
+- 테스트: `refund_keeps_cooldown_and_code`, `refunded_sends_do_not_count_toward_daily_limit`, `refund_after_daily_key_expired_does_not_go_negative` 추가, `failed_mail_keeps_cooldown`(429) 로 바꿈. 로컬 `gradlew -p backend check` 로 확인해야 한다.

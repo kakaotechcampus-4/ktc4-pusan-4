@@ -111,12 +111,35 @@ class EmailVerificationStoreIntegrationTest {
     }
 
     @Test
-    void cancel_allows_immediate_retry() {
+    void refund_keeps_cooldown_and_code() {
         store.issue(EMAIL, "123456");
 
-        store.cancel(EMAIL);
+        store.refund(EMAIL);
 
-        assertThat(store.issue(EMAIL, "654321").status()).isEqualTo(Status.ISSUED);
+        assertThat(store.issue(EMAIL, "654321").status()).isEqualTo(Status.COOLDOWN);
+        assertThat(store.confirm(EMAIL, "123456", "token")).isEqualTo(ConfirmResult.VERIFIED);
+    }
+
+    @Test
+    void refunded_sends_do_not_count_toward_daily_limit() {
+        for (int i = 0; i < EmailVerificationStore.DAILY_LIMIT; i++) {
+            assertThat(store.issue(EMAIL, "123456").status()).isEqualTo(Status.ISSUED);
+            store.refund(EMAIL);
+            redis.delete("email-verify:cooldown:" + EMAIL);
+        }
+
+        assertThat(store.issue(EMAIL, "123456").status()).isEqualTo(Status.ISSUED);
+        assertThat(redis.opsForValue().get("email-verify:daily:" + EMAIL)).isEqualTo("1");
+    }
+
+    @Test
+    void refund_after_daily_key_expired_does_not_go_negative() {
+        store.issue(EMAIL, "123456");
+        redis.delete("email-verify:daily:" + EMAIL);
+
+        store.refund(EMAIL);
+
+        assertThat(redis.hasKey("email-verify:daily:" + EMAIL)).isFalse();
     }
 
     @Test

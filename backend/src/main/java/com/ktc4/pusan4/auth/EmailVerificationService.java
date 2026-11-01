@@ -83,10 +83,10 @@ public class EmailVerificationService {
         try {
             mailSender.send(email, code);
         } catch (MailException e) {
-            store.cancel(email);
+            store.refund(email);
             log.warn("인증 메일을 보내지 못했다: {}", e.getMessage());
             throw new ApiException(HttpStatus.BAD_GATEWAY, "EMAIL_SEND_FAILED",
-                "인증 메일을 보내지 못했습니다. 잠시 뒤 다시 시도해 주세요.");
+                "인증 메일을 보내지 못했습니다. 1분 뒤 다시 시도해 주세요.");
         }
     }
 

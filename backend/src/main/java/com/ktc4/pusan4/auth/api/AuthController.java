@@ -48,7 +48,7 @@ public class AuthController {
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @ApiResponse(responseCode = "429", description = "VERIFICATION_RESEND_TOO_SOON — 60초 안에 다시 요청 / VERIFICATION_DAILY_LIMIT",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
-    @ApiResponse(responseCode = "502", description = "EMAIL_SEND_FAILED",
+    @ApiResponse(responseCode = "502", description = "EMAIL_SEND_FAILED — 60초 뒤 다시 요청. 하루 횟수에는 세지 않음",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @ApiResponse(responseCode = "503", description = "EMAIL_VERIFICATION_UNAVAILABLE — 서버에 메일 계정이 없음",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
