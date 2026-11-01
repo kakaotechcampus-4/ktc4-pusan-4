@@ -60,11 +60,20 @@ def test_식별_질문_답이_없으면_known_은_null():
     assert decisions.parse({"answers": ANSWER["answers"][:1]})["known"] is None
 
 
-def test_보기에_없는_업종이면_실패로_본다():
+def test_1등이_보기에_없으면_실패로_본다():
     bad = {"answers": [{**ANSWER["answers"][0], "choice": "기타"}]}
 
     with pytest.raises(ValueError):
         decisions.parse(bad)
+
+
+def test_추천에_보기_밖_값이_섞이면_그것만_빼고_1등은_살린다():
+    choice = ANSWER["answers"][0]
+    mixed = {"answers": [{**choice, "probabilities": [*choice["probabilities"], {"value": "기타", "probability": 0.03}]}]}
+
+    parsed = decisions.parse(mixed)
+
+    assert parsed["category"] == "카페" and parsed["suggestions"] == ["카페", "음식점", "편의점"]
 
 
 @pytest.mark.parametrize("base", ["https://gw.example/abc/v1", "https://gw.example/abc/v1/", "https://gw.example/abc",

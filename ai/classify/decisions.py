@@ -44,10 +44,11 @@ def parse(payload: dict) -> dict:
     known = answers.get(SPEC["known_name"], {}).get("probability")
     if choice["type"] == "refusal":
         return {"category": None, "confidence": 0.0, "known": known, "suggestions": [], "refused": True}
-    top = sorted(choice["probabilities"], key=lambda p: p["probability"], reverse=True)[:3]
-    suggestions = [p["value"] for p in top]
-    if not {choice["choice"], *suggestions} <= VALUES:
+    if choice["choice"] not in VALUES:
         raise ValueError("보기에 없는 업종")
+    # 추천에 보기 밖 값이 섞이면 그 값만 뺀다. 1등이 정상이면 답 전체를 버리지 않는다.
+    ranked = sorted(choice["probabilities"], key=lambda p: p["probability"], reverse=True)
+    suggestions = [p["value"] for p in ranked if p["value"] in VALUES][:3]
     return {"category": choice["choice"], "confidence": choice["confidence"], "known": known,
             "suggestions": suggestions, "refused": False}
 
