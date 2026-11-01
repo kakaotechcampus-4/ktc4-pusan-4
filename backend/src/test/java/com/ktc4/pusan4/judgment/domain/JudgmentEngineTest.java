@@ -748,6 +748,34 @@ class JudgmentEngineTest {
             .containsExactly(Verdict.UNAVAILABLE, null, List.of("R-311", "R-060"));
     }
 
+    // 가산세 플래그만 세우는 질문(증빙수취·가산세)은 답이 없어도 앞 관문의 확정을 끌어내리지 않는다.
+    // 실물 R-060 은 카드매출전표 자동 인정(v2)으로 묻지 않게 되어, 이 경로는 합성 카드로 지킨다.
+    // 현금·계좌이체 입력이 생겨 증빙 질문이 돌아오면 이 동작에 기댄다.
+    @Test
+    void unanswered_penalty_only_question_does_not_downgrade() {
+        QuestionSpec receipt = new QuestionSpec(
+            "QUALIFIED_RECEIPT", "적격증빙을 받아두셨나요?", "증빙유무", "transaction",
+            List.of("받아둠", "없음"),
+            Map.of(
+                "받아둠", new QuestionEffect(null, null, Map.of("증빙수취", true, "가산세_대상", false)),
+                "없음", new QuestionEffect(null, null, Map.of("증빙수취", false, "가산세_대상", true, "가산세율", 0.02))
+            )
+        );
+        RuleCard g5 = new RuleCard(
+            "R-060", 1, Gate.G5, 500,
+            new RuleMatch(List.of(), List.of(), List.of(), 30_001L, null, List.of(), false),
+            null, null, List.of(new Citation("소득세법-160의2-2")), Map.of(), List.of(receipt)
+        );
+
+        Judgment result = JudgmentEngine.judge(
+            subscription("사무용품", 50_000), new UserContext("940909", false, null), List.of(),
+            new RuleSet(List.of(g2Available(), g5))
+        );
+
+        assertThat(result.verdict()).isEqualTo(Verdict.AVAILABLE);
+        assertThat(result.questions()).extracting(QuestionSpec::code).containsExactly("QUALIFIED_RECEIPT");
+    }
+
     private static RuleCard g5Receipt() {
         return new RuleCard(
             "R-060", 1, Gate.G5, 500, RuleMatch.categories("음식점"),

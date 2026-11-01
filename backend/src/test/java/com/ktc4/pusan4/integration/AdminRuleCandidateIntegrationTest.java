@@ -1,6 +1,6 @@
 package com.ktc4.pusan4.integration;
 
-import com.ktc4.pusan4.shared.auth.FixedUser;
+import com.ktc4.pusan4.auth.TestUser;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -139,7 +139,7 @@ class AdminRuleCandidateIntegrationTest {
     }
 
     private void setRole(String role) {
-        jdbcTemplate.update("update app_user set role = ? where id = ?", role, FixedUser.ID);
+        jdbcTemplate.update("update app_user set role = ? where id = ?", role, TestUser.ID);
     }
 
     private long insert(String category, String status, String createdAt) {

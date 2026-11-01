@@ -21,3 +21,7 @@
 ## 남은 것 · 아는 문제
 
 - 로컬 DB 에 예전 V14(password_hash)·V15(kakao_id)가 이미 적용돼 있으면 Flyway 검증이 실패한다. 로컬 DB 볼륨을 지우거나 `flyway_schema_history` 의 두 행을 지우고 다시 띄운다.
+
+## 14:42 로컬 check 결과
+
+- `gradlew -p backend check` 통과(로컬, feature/email-verification — 아래 세 브랜치 포함). 네 브랜치 모두 push 했다.

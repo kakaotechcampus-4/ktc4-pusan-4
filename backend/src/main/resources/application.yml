@@ -5,6 +5,20 @@ spring:
     hibernate:
       ddl-auto: validate
     open-in-view: false
+  # 가입 인증 메일 (app.auth.email-verification). 팀 Gmail 계정과 그 계정의 앱 비밀번호다.
+  # 계정이 비면 인증 요청이 503 EMAIL_VERIFICATION_UNAVAILABLE 이라 이메일 가입을 할 수 없다.
+  mail:
+    host: ${APP_MAIL_HOST:smtp.gmail.com}
+    port: ${APP_MAIL_PORT:587}
+    username: ${APP_MAIL_USERNAME:}
+    password: ${APP_MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+      # 가입 요청이 메일 발송을 기다리므로 짧게 끊는다(ms)
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 5000
+      mail.smtp.writetimeout: 5000
 
 app:
   # 공휴일 동기화 (공공데이터포털 「한국천문연구원_특일 정보」). 키가 비면 동기화를 건너뛰고 표에 있는 값만 쓴다.
@@ -40,15 +54,22 @@ app:
     base-url: ${ASSISTANT_SERVER_URL:http://localhost:8000}
     connect-timeout: 3s
     read-timeout: 40s
-  # 인증 (api.md 1.1). 고정 사용자 하나만 로그인한다 — 실제 계정은 B9b. 리프레시 토큰은 Redis 에 둔다.
+  # 인증 (api.md 1.1). 이메일 계정(비밀번호 BCrypt)으로 로그인한다. 리프레시 토큰은 Redis 에 둔다.
   # jwt-secret 이 비면 기동할 때마다 임시 키를 만든다(재기동하면 로그인이 풀린다). 넣는다면 32바이트 이상.
-  # demo-password 가 비면 아무도 로그인할 수 없다.
   auth:
     jwt-secret: ${APP_AUTH_JWT_SECRET:}
-    demo-password: ${APP_AUTH_DEMO_PASSWORD:}
     access-token-ttl: 15m
     refresh-token-ttl: 14d
     cookie-secure: ${APP_AUTH_COOKIE_SECURE:true}
+    # 카카오 로그인 (developers.kakao.com 앱). 키나 redirect-uri 가 비면 카카오 로그인은 503 KAKAO_LOGIN_UNAVAILABLE 이다.
+    # redirect-uri 는 프론트 콜백 페이지 주소로, 카카오 앱에 등록한 값과 같아야 한다.
+    kakao:
+      rest-api-key: ${APP_AUTH_KAKAO_REST_API_KEY:}
+      client-secret: ${APP_AUTH_KAKAO_CLIENT_SECRET:}
+      redirect-uri: ${APP_AUTH_KAKAO_REDIRECT_URI:}
+    # 가입 인증 코드를 보내는 방법. smtp(spring.mail) 또는 log(로컬 전용, 백엔드 로그에 코드를 찍는다)
+    email-verification:
+      delivery: ${APP_AUTH_EMAIL_DELIVERY:smtp}
 
 management:
   endpoints:
@@ -58,6 +79,9 @@ management:
   # Redis 는 리프레시 토큰만 맡는다. Redis 가 내려가도 백엔드 전체를 unhealthy 로 만들어 배포를 멈추지 않게 health 에서 뺀다.
   health:
     redis:
+      enabled: false
+    # 메일도 같은 이유로 뺀다. Gmail 이 잠깐 안 돼도 이메일 가입만 502 가 될 뿐이다.
+    mail:
       enabled: false
 
 # 스웨거는 기본으로 닫는다. 로컬(application-local.yml)에서만 연다.
