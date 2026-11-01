@@ -59,6 +59,16 @@ public class UserService {
         return inserted == 1 ? Optional.of(id) : Optional.empty();
     }
 
+    /**
+     * 카카오 회원번호의 사용자 id. 처음 온 회원번호면 계정을 만든다. 동시에 처음 로그인해도 UNIQUE(kakao_id)가 하나만 남긴다.
+     */
+    @Transactional
+    public UUID findOrCreateKakaoAccount(long kakaoId) {
+        userRepository.insertKakaoAccount(uuidGenerator.generate(), kakaoId);
+        return userRepository.findIdByKakaoId(kakaoId)
+            .orElseThrow(() -> new IllegalStateException("카카오 계정을 만들지 못했다: " + kakaoId));
+    }
+
     /** 이메일 로그인용. 없는 이메일이거나 비밀번호가 없는 계정이면 empty 다. */
     @Transactional(readOnly = true)
     public Optional<EmailCredential> findEmailCredential(String email) {

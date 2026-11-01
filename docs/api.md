@@ -101,6 +101,8 @@ Question
 │   │   └── POST                        이메일 회원가입
 │   ├── login/
 │   │   └── POST                        로그인
+│   ├── kakao/
+│   │   └── POST                        카카오 로그인
 │   ├── refresh/
 │   │   └── POST                        액세스 토큰 재발급
 │   └── logout/
@@ -210,7 +212,8 @@ refresh_token={token}; Path=/api/v1/auth; Max-Age=1209600; HttpOnly; Secure; Sam
 - `Domain` 은 붙이지 않는다. 배포는 Caddy 뒤 같은 오리진이다.
 - 로컬 프로필(http)에서만 `Secure` 를 뺀다.
 
-계정은 이메일 가입으로 만든다. 이메일은 앞뒤 공백을 빼고 소문자로 저장하고, 로그인할 때도 같은 규칙으로 찾는다. 메일 인증은 아직 없다.
+계정은 이메일 가입이나 카카오 로그인으로 만든다. 이메일은 앞뒤 공백을 빼고 소문자로 저장하고, 로그인할 때도 같은 규칙으로 찾는다. 메일 인증은 아직 없다.
+카카오 계정은 카카오 회원번호로만 식별하고 이메일을 받지 않는다(`GET /users/me` 의 `email` 이 `null`). 같은 이메일이어도 이메일 계정과 카카오 계정은 따로다.
 
 리프레시 토큰은 서버(Redis)가 로그인 단위로 기억한다. 재발급하면 이전 토큰은 쓸 수 없고, 로그아웃하면 그 로그인만 끊긴다(다른 기기는 그대로).
 이미 쓴 리프레시 토큰을 다시 보내면 탈취로 보고 그 로그인을 끊는다. 그래서 프론트는 재발급 요청을 한 번에 하나만 보낸다.
@@ -255,6 +258,24 @@ refresh_token={token}; Path=/api/v1/auth; Max-Age=1209600; HttpOnly; Secure; Sam
 
 ```
 401 INVALID_CREDENTIALS   이메일 또는 비밀번호가 틀림 (어느 쪽인지 구분하지 않는다)
+```
+
+### `POST /api/v1/auth/kakao`
+
+```
+{
+  "code": "카카오 인가 코드"
+}
+```
+
+프론트가 카카오 인가 페이지(`https://kauth.kakao.com/oauth/authorize?client_id={REST API 키}&redirect_uri={콜백}&response_type=code`)로 보내고,
+카카오가 콜백 페이지로 넘긴 `code` 를 그대로 보낸다. 콜백 주소는 서버 설정(`APP_AUTH_KAKAO_REDIRECT_URI`)과 같아야 한다.
+처음 온 카카오 회원이면 계정을 만든다. 응답은 로그인과 같다(`200` + 리프레시 토큰 `Set-Cookie`).
+
+```
+401 INVALID_KAKAO_CODE        코드가 틀렸거나 만료됐거나 이미 씀 → 카카오 로그인을 처음부터 다시
+502 KAKAO_UNAVAILABLE         카카오와 통신하지 못함
+503 KAKAO_LOGIN_UNAVAILABLE   서버에 카카오 키가 설정되지 않음
 ```
 
 ### `POST /api/v1/auth/refresh`
@@ -649,6 +670,8 @@ G6
   "createdAt": "2026-09-01T10:00:00+09:00"
 }
 ```
+
+`email` 은 카카오 계정이면 `null` 이다.
 
 ### `DELETE /api/v1/users/me`
 

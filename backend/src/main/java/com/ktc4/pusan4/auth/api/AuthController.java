@@ -53,6 +53,19 @@ public class AuthController {
         return issued(HttpStatus.OK, authService.login(request.email(), request.password()));
     }
 
+    @Operation(summary = "카카오 로그인",
+        description = "프론트 콜백 페이지가 받은 인가 코드를 넘긴다. 처음 온 카카오 회원이면 계정을 만든다. 응답은 로그인과 같다")
+    @ApiResponse(responseCode = "401", description = "INVALID_KAKAO_CODE — 코드가 틀렸거나 만료됐거나 이미 씀",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode = "502", description = "KAKAO_UNAVAILABLE",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode = "503", description = "KAKAO_LOGIN_UNAVAILABLE — 서버에 카카오 키가 없음",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @PostMapping("/kakao")
+    public ResponseEntity<AccessTokenResponse> kakao(@Valid @RequestBody KakaoLoginRequest request) {
+        return issued(HttpStatus.OK, authService.kakaoLogin(request.code()));
+    }
+
     @Operation(summary = "액세스 토큰 재발급", description = "리프레시 토큰 쿠키로 새 액세스 토큰과 새 리프레시 토큰을 준다")
     @ApiResponse(responseCode = "401", description = "INVALID_REFRESH_TOKEN — 쿠키가 없거나 만료",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))

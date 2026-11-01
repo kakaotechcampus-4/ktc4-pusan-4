@@ -21,6 +21,18 @@ interface AppUserRepository extends Repository<AppUserEntity, UUID> {
      *
      * @return 만든 행 수. 이미 있으면 0
      */
+    /** 카카오 계정을 만든다. 같은 카카오 회원번호가 있으면 아무것도 하지 않는다. */
+    @Modifying
+    @Query(value = """
+        insert into app_user(id, kakao_id)
+        values (:id, :kakaoId)
+        on conflict (kakao_id) do nothing
+        """, nativeQuery = true)
+    int insertKakaoAccount(@Param("id") UUID id, @Param("kakaoId") long kakaoId);
+
+    @Query(value = "select id from app_user where kakao_id = :kakaoId", nativeQuery = true)
+    Optional<UUID> findIdByKakaoId(@Param("kakaoId") long kakaoId);
+
     @Modifying
     @Query(value = """
         insert into app_user(id, email, password_hash)
