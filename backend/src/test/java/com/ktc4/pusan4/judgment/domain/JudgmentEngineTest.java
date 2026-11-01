@@ -978,6 +978,21 @@ class JudgmentEngineTest {
         assertThat(result.verdict()).isEqualTo(Verdict.NEEDS_REVIEW);
     }
 
+    @Test
+    void used_facts_are_only_the_answers_that_resolved_a_question() {
+        TransactionInput utility = subscription("수도광열", 80_000);
+        UserFact used = homeOfficeFact(utility);
+        UserFact otherMerchant = new UserFact("merchant:다른가맹점", "공간전용여부", Map.of("value", "자택 겸용"));
+        UserFact otherFactType = new UserFact("merchant:" + utility.merchantNorm(), "용도", Map.of("value", "업무"));
+
+        Judgment result = JudgmentEngine.judge(
+            utility, new UserContext("940909", false, 20), List.of(otherMerchant, used, otherFactType),
+            new RuleSet(List.of(utilityCard()))
+        );
+
+        assertThat(result.usedFacts()).containsExactly(used);
+    }
+
     private static RuleCard utilityCard() {
         QuestionSpec dedication = new QuestionSpec(
             "UTILITY_DEDICATION", "사업 전용 공간인가요?", "공간전용여부", "merchant_norm",
