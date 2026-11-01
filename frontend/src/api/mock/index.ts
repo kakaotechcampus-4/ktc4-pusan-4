@@ -323,13 +323,16 @@ const rejudge = (transactionId: string, groupKey: string, answer: string) => {
   // 엔진은 사용자 수정이 아니라 자기 판정 위에서 다시 판정한다
   const prev = automaticOf(transactionId);
   if (!prev) return;
-  const verdict = QUESTION_ANSWER_VERDICT[groupKey]?.[answer] ?? 'NEEDS_REVIEW';
   // 질문을 낸 카드의 선택지대로 규칙 카드·계정과목·근거를 붙인다
   const card = QUESTION_CARDS[groupKey];
   const option = card?.options[answer];
-  // 작업 공간 면적으로 안분하는 선택지(R-103·R-210 v3+)는 최신 문진의 비율을 쓴다.
-  // 서버처럼 문진에 비율이 없으면 안분하지 않는다(api.md 3.8)
-  const areaRatio = option?.attributes?.['안분'] === '작업공간비율' ? store.contexts.at(-1)?.homeOfficeRatio ?? null : null;
+  // 작업 공간 면적으로 안분하는 선택지(R-103·R-210 v3+)는 그 판정이 쓴 문진 버전의 비율을 쓴다(서버도 같다).
+  // 서버처럼 문진에 비율이 없으면 금액을 정할 수 없어 확인 필요로 둔다
+  const apportioned = option?.attributes?.['안분'] === '작업공간비율';
+  const context = store.contexts.find((item) => item.version === prev.userContextVersion) ?? store.contexts.at(-1);
+  const areaRatio = apportioned ? context?.homeOfficeRatio ?? null : null;
+  const answered = QUESTION_ANSWER_VERDICT[groupKey]?.[answer] ?? 'NEEDS_REVIEW';
+  const verdict = apportioned && areaRatio === null && answered === 'AVAILABLE' ? 'NEEDS_REVIEW' : answered;
   const ratio = ratioOf(answer) ?? areaRatio;
   const amount = transactionOf(transactionId)?.amount ?? 0;
   const next: JudgmentSeed = {

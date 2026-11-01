@@ -25,7 +25,10 @@ const HEADER = [
 '사용 목적 등 답한 내용'];
 
 
-/** 내보내기 API 가 없는 서버에서 판정 목록으로 같은 모양을 만든다. 한도 반영 금액과 답은 비어 있다 */
+/**
+ * 내보내기 API 가 없는 서버에서 판정 목록으로 같은 모양을 만든다. 인정 금액은 한도(접대비)를 반영하지 않은
+ * finalAmount 이고, 답한 내용은 비어 있다
+ */
 export const exportRowOf = (judgment: Judgment): JudgmentExportRow => ({
   judgment,
   allowedAmount: judgment.verdict.code === 'AVAILABLE' ? judgment.finalAmount ?? 0 : 0,
@@ -37,7 +40,9 @@ export const exportRowOf = (judgment: Judgment): JudgmentExportRow => ({
  * 데이터는 GET /judgments/export 가 주고 파일 변환은 FE 가 한다(#214). 엑셀이 한글을 깨뜨리지 않게 BOM 을 붙인다
  */
 export function judgmentsCsv(rows: JudgmentExportRow[]): string {
-  const body = rows.map(({ judgment, allowedAmount, answers }) => [
+  // 서버(computedAt DESC)·목업·판정 목록 대체 경로가 순서를 다르게 준다. 파일은 늘 승인일 순이다
+  const ordered = [...rows].sort((a, b) => a.judgment.transaction.approvedAt.localeCompare(b.judgment.transaction.approvedAt));
+  const body = ordered.map(({ judgment, allowedAmount, answers }) => [
   // 스프레드시트가 날짜로 읽도록 ISO 날짜로 쓴다
   judgment.transaction.approvedAt.slice(0, 10),
   judgment.transaction.merchantNorm,

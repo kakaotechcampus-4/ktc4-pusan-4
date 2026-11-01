@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { CheckIcon } from 'lucide-react';
-import { useSession } from '../contexts/SessionContext';
+import { SignedUpError, useSession } from '../contexts/SessionContext';
 import { api, ApiRequestError, mockVerificationCode } from '../api';
 import { AUTH_INPUT, AUTH_LABEL, AUTH_PRIMARY, AUTH_SECONDARY, AuthLayout } from '../components/AuthLayout';
 
@@ -70,6 +70,8 @@ export function Signup() {
   const [cooldown, setCooldown] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** 지금 오류가 비밀번호 칸 때문인지. 약관·서버 오류에 비밀번호 칸을 빨갛게 칠하지 않는다 */
+  const [passwordError, setPasswordError] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   /** 연타로 두 번 보내지 않게 막는다. busy 는 다음 렌더에야 반영된다 */
   const sending = useRef(false);
@@ -150,21 +152,27 @@ export function Signup() {
     setCooldown(0);
     setNotice(null);
     setError(null);
+    setPasswordError(false);
   };
 
   const submitSignup = (event: React.FormEvent) => {
     event.preventDefault();
     if (!sentTo || !verificationToken) return;
+    const invalidPassword = (message: string) => {
+      setError(message);
+      setPasswordError(true);
+    };
+    setPasswordError(false);
     if (password.length < 8) {
-      setError('비밀번호는 8자 이상으로 입력해 주세요.');
+      invalidPassword('비밀번호는 8자 이상으로 입력해 주세요.');
       return;
     }
     if (byteLength(password) > 72) {
-      setError('비밀번호가 너무 깁니다. 한글은 24자, 영문은 72자까지 쓸 수 있습니다.');
+      invalidPassword('비밀번호가 너무 깁니다. 한글은 24자, 영문은 72자까지 쓸 수 있습니다.');
       return;
     }
     if (password !== passwordAgain) {
-      setError('비밀번호가 서로 다릅니다.');
+      invalidPassword('비밀번호가 서로 다릅니다.');
       return;
     }
     if (!agreeTerms || !agreePrivacy) {
@@ -176,12 +184,17 @@ export function Signup() {
         await signUp({ email: sentTo, password, verificationToken });
         navigate('/interview', { replace: true, state: { welcome: true, from } });
       } catch (caught) {
+        if (caught instanceof SignedUpError) {
+          setError('가입은 마쳤지만 로그인하지 못했습니다. 아래 「로그인」에서 가입한 이메일로 로그인해 주세요.');
+          return;
+        }
         if (caught instanceof ApiRequestError && caught.code === 'EMAIL_NOT_VERIFIED') {
           // 토큰이 30분을 넘겼거나 다른 이메일 것이다. 인증부터 다시 한다
           changeEmail();
           setError('이메일 인증이 만료됐습니다. 인증 코드를 다시 받아 주세요.');
           return;
         }
+        setPasswordError(caught instanceof ApiRequestError && caught.code === 'VALIDATION_ERROR');
         setError(describe(caught, SIGNUP_ERRORS, '가입하지 못했습니다. 잠시 후 다시 시도해 주세요.'));
       }
     });
@@ -322,7 +335,7 @@ export function Signup() {
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               placeholder="8자 이상"
-              aria-invalid={Boolean(error)}
+              aria-invalid={passwordError}
               className={AUTH_INPUT} />
 
             </div>
@@ -336,7 +349,7 @@ export function Signup() {
               autoComplete="new-password"
               value={passwordAgain}
               onChange={(event) => setPasswordAgain(event.target.value)}
-              aria-invalid={Boolean(error)}
+              aria-invalid={passwordError}
               className={AUTH_INPUT} />
 
             </div>

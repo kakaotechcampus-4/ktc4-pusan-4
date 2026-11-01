@@ -9,7 +9,8 @@ import {
 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { useAssistant } from '../components/assistant/context';
-import { api, ApiRequestError } from '../api';
+import { api, ApiRequestError, isMock } from '../api';
+import { useSession } from '../contexts/SessionContext';
 import type { JudgmentRun, JudgmentRunFailure, Transaction } from '../types/domain';
 import { Badge, Button, Card } from '../components/ui';
 import { formatWon } from '../utils/format';
@@ -53,12 +54,18 @@ export function RunEntry() {
 
 /**
  * 판정 진행. runId 는 주소(`/run/:runId`)에서 읽는다 — 새로고침해도 같은 실행을 이어서 보고,
- * 새 실행을 만들지 않는다 (#187)
+ * 새 실행을 만들지 않는다 (#187). 뒤로·앞으로 가기로 다른 실행에 오면 앞 실행의 상태가 남지 않게 새로 그린다
  */
 export function Run() {
+  const { runId } = useParams<{ runId: string }>();
+  return <RunProgress key={runId} />;
+}
+
+function RunProgress() {
   const navigate = useNavigate();
   const { runId = null } = useParams<{ runId: string }>();
   const { showNudge } = useAssistant();
+  const { setBatchId } = useSession();
   const [run, setRun] = useState<JudgmentRun | null>(null);
   const [counts, setCounts] = useState({ available: 0, needsReview: 0, unavailable: 0 });
   /** null 은 아직 받지 않음. 빈 배열은 받았는데 비어 있음(run 시작 실패 등, #127) */
@@ -87,11 +94,13 @@ export function Run() {
       void api.runs.
       get(id).
       catch((caught: Error) => {
-        // 404 는 돌아올 리 없으니 멈춘다. 그 밖의 오류는 다음 주기에 다시 해본다
-        const gone = caught instanceof ApiRequestError && caught.status === 404;
+        // 404(없는 실행)·400(실행 id 모양이 아님)은 다시 물어도 같으니 멈춘다. 그 밖의 오류는 다음 주기에 다시 해본다
+        const gone = caught instanceof ApiRequestError && (caught.status === 404 || caught.status === 400);
         if (gone) stop();
         setLoadError(
           gone ?
+          isMock ?
+          '이 판정 실행을 찾을 수 없습니다. 체험 화면은 새로고침하면 처음 상태로 돌아갑니다.' :
           '이 판정 실행을 찾을 수 없습니다. 업로드가 지워졌을 수 있습니다.' :
           '판정 상태를 읽지 못했습니다. 다시 확인하고 있습니다.'
         );
@@ -102,6 +111,8 @@ export function Run() {
         if (stopped || !next) return;
         setLoadError(null);
         setRun(next);
+        // 새로고침하면 세션의 배치는 가장 최근 업로드로 시작한다. 「결과 보기」·질문 안내가 이 실행의 배치를 열게 맞춘다
+        setBatchId(next.batchId);
         const finished =
         next.status.code === 'COMPLETED' ||
         next.status.code === 'PARTIAL_FAILED' ||
@@ -156,7 +167,7 @@ export function Run() {
     poll();
     timer.current = window.setInterval(poll, 1000);
     return stop;
-  }, [runId, showNudge]);
+  }, [runId, showNudge, setBatchId]);
 
   const total = run?.totalCount ?? 0;
   const processed = run?.processedCount ?? 0;
@@ -208,7 +219,7 @@ export function Run() {
           <p className="flex items-center gap-1.5 text-caption tabular-nums text-muted">
             <RadioIcon className="h-3.5 w-3.5" aria-hidden="true" />
             {runId ? `실행 ${runId.slice(0, 8)}` : '실행 없음'}
-            {runId && !loadError && ' · 새로고침해도 이어집니다'}
+            {runId && !loadError && !isMock && ' · 새로고침해도 이어집니다'}
           </p>
         </header>
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRightIcon, CircleHelpIcon, DownloadIcon, SearchXIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
@@ -33,13 +33,21 @@ const readAllJudgments = async (batchId: string) => {
   }
 };
 
-/** 세무사에게 넘길 내보내기. 한도 반영 인정 금액과 답한 내용이 함께 온다 */
+/**
+ * 세무사에게 넘길 내보내기. 한도 반영 인정 금액과 답한 내용이 함께 온다.
+ * 내보내기가 없는 서버는 `/judgments/export` 를 `/judgments/{judgmentId}` 로 읽어 400 VALIDATION_ERROR(id 가 UUID 가 아님)를,
+ * 그 경로도 없으면 404 를 준다. 이때만 판정 목록으로 만든다. 내보내기의 400 INVALID_EXPORT_SCOPE 는 그대로 실패다
+ */
+const noExportApi = (caught: unknown) =>
+caught instanceof ApiRequestError && (
+caught.status === 404 || caught.status === 400 && caught.code === 'VALIDATION_ERROR');
+
 const readExport = (batchId: string) =>
 api.judgments.
 export({ batchId }).
 then((result) => result.items).
 catch(async (caught: unknown) => {
-  if (!(caught instanceof ApiRequestError && caught.status === 404)) throw caught;
+  if (!noExportApi(caught)) throw caught;
   return (await readAllJudgments(batchId)).map(exportRowOf);
 });
 
@@ -118,8 +126,14 @@ export function Results() {
   );
   const panelData = panelQ.data?.id === selectedId ? panelQ.data : null;
 
+  /**
+   * 방금 판정 대상에서 뺀 거래. 목록을 다시 읽는 동안에는 옛 목록이 남아 있어서,
+   * 첫 행 자동 선택이 뺀 거래를 다시 고르지 않게 건너뛴다
+   */
+  const excludedId = useRef<string | null>(null);
+
   // 넓은 화면은 처음에 첫 행을 보여 준다. 좁은 화면에서 그러면 들어오자마자 창이 덮는다
-  const firstId = judgments[0]?.transactionId;
+  const firstId = judgments.find((judgment) => judgment.transactionId !== excludedId.current)?.transactionId;
   useEffect(() => {
     if (wide && !selectedId && firstId) setSelectedId(firstId);
   }, [wide, selectedId, firstId]);
@@ -148,6 +162,7 @@ export function Results() {
 
   /** 판정 대상에서 뺀 거래는 목록에서 사라진다. 다시 넣는 곳을 알려 준다 */
   const excluded = (merchant: string) => {
+    excludedId.current = selectedId;
     setSelectedId(null);
     setNotice(`${merchant} 거래를 판정 대상에서 뺐습니다. 거래 화면의 「대상제외」에서 다시 넣을 수 있습니다.`);
     changed();

@@ -40,4 +40,25 @@ describe('judgmentsCsv', () => {
     // 인정 금액은 finalAmount 가 아니라 한도까지 반영한 allowedAmount 다
     expect(text.split('\r\n')[1]).toBe('2026-01-31,가게,가게 본점,식비,1000,0,가능,800,,,소득세법-27-1,용도는? → 업무미팅');
   });
+
+  it('서버가 어떤 순서로 주든 승인일 순으로 쓴다', async () => {
+    const { judgmentsCsv } = await import('./csv');
+    const row = (approvedAt: string) => ({
+      judgment: {
+        transaction: { approvedAt, merchantNorm: approvedAt.slice(0, 10), merchantRaw: '', merchantCategory: '', amount: 1, installmentMonths: 0 },
+        verdict: { code: 'AVAILABLE', label: '가능' },
+        finalAmount: 1,
+        origin: { type: 'RUN', id: 'r' },
+        outOfScope: false,
+        citations: []
+      } as unknown as import('../types/domain').Judgment,
+      allowedAmount: 1,
+      answers: []
+    });
+    // 실서버 내보내기는 computedAt DESC 로 온다
+    const lines = judgmentsCsv([row('2026-01-20T09:00:00+09:00'), row('2026-01-03T09:00:00+09:00'), row('2026-01-11T09:00:00+09:00')]).
+    split('\r\n').
+    slice(1);
+    expect(lines.map((line) => line.slice(0, 10))).toEqual(['2026-01-03', '2026-01-11', '2026-01-20']);
+  });
 });

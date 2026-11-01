@@ -23,7 +23,32 @@ export function BottomSheet({ open, onClose, label, children }: BottomSheetProps
     if (!open) return;
     const opener = document.activeElement as HTMLElement | null;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onCloseRef.current();
+      if (event.key === 'Escape') {
+        onCloseRef.current();
+        return;
+      }
+      // aria-modal 이라고 적었으니 Tab 이 뒤 화면으로 빠져나가지 않게 한다 (Modal 과 같다)
+      if (event.key !== 'Tab' || !panel.current) return;
+      const items = Array.from(
+        panel.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+      );
+      const active = document.activeElement;
+      if (items.length === 0) {
+        event.preventDefault();
+        panel.current.focus();
+        return;
+      }
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (!event.shiftKey && (active === last || !panel.current.contains(active))) {
+        event.preventDefault();
+        first.focus();
+      } else if (event.shiftKey && (active === first || active === panel.current)) {
+        event.preventDefault();
+        last.focus();
+      }
     };
     const overflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';

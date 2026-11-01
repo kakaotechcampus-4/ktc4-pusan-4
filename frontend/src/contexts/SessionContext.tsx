@@ -30,6 +30,13 @@ export const DEFAULT_CONTEXT: BusinessContext = {
 /** restoring: 새로고침 뒤 리프레시 쿠키로 로그인을 이어 가는 중. 이때는 로그인 화면으로 보내지 않는다 */
 export type AuthStatus = 'restoring' | 'anonymous' | 'signedIn';
 
+/** 가입은 됐지만 그 뒤 내 정보를 읽지 못해 로그인하지 못했다. reason 은 실제 실패다 */
+export class SignedUpError extends Error {
+  constructor(readonly reason: unknown) {
+    super('가입은 마쳤지만 로그인하지 못했습니다.');
+  }
+}
+
 /**
  * 클라이언트 세션. 로그인 상태와 "지금 어느 배치·문진을 보고 있는지"만 든다. 판정 실행은 주소에 싣는다(`/run/:runId`).
  * 판정·질문 같은 서버 상태는 여기 두지 않고 api.* 로 읽는다. 토큰은 api 층 안에만 있다.
@@ -45,7 +52,7 @@ interface SessionValue {
   isAdmin: boolean;
   /** 로그인하고 내 정보를 읽는다. 실패하면 ApiRequestError 를 던진다 */
   signIn: (email: string, password: string) => Promise<void>;
-  /** 가입하고 바로 로그인한다. 실패하면 ApiRequestError 를 던진다 */
+  /** 가입하고 바로 로그인한다. 가입이 실패하면 ApiRequestError, 가입은 됐는데 로그인을 못 하면 SignedUpError 를 던진다 */
   signUp: (body: SignupRequest) => Promise<void>;
   /** 카카오 인가 코드로 로그인한다. 실패하면 ApiRequestError 를 던진다 */
   signInWithKakao: (code: string) => Promise<void>;
@@ -153,7 +160,18 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
     (nextEmail: string, password: string) => enter(() => api.auth.login({ email: nextEmail, password })),
     [enter]
   );
-  const signUp = useCallback((body: SignupRequest) => enter(() => api.auth.signup(body)), [enter]);
+  const signUp = useCallback(async (body: SignupRequest) => {
+    let created = false;
+    try {
+      await enter(async () => {
+        await api.auth.signup(body);
+        created = true;
+      });
+    } catch (caught) {
+      // 계정은 만들어졌고 인증 토큰도 썼다. 같은 가입을 다시 보내면 실패하니 로그인으로 보내야 한다
+      throw created ? new SignedUpError(caught) : caught;
+    }
+  }, [enter]);
   const signInWithKakao = useCallback((code: string) => enter(() => api.auth.kakao({ code })), [enter]);
 
   /**

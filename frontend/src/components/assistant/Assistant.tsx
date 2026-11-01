@@ -28,11 +28,15 @@ export function Assistant() {
   return (
     <>
       {open && <Panel onClose={() => setOpen(false)} />}
-      {/* 적용 결과는 왼쪽 아래에 띄운다. 오른쪽은 패널과 버튼이 차지한다 */}
+      {/* 적용 결과는 왼쪽 아래에 띄운다. 오른쪽은 패널과 버튼이 차지한다.
+          좁은 화면에서 패널이 열려 있으면 아래는 입력칸이라 위로 올리고, 눌러도 뒤로 지나가게 한다 */}
       {toast &&
       <p
         role="status"
-        className="fixed bottom-5 left-5 z-50 max-w-[calc(100vw-2.5rem)] rounded-2xl bg-ink px-4 py-3 text-small leading-6 text-white shadow-panel motion-safe:animate-rise sm:max-w-sm">
+        className={cn(
+          'pointer-events-none fixed bottom-5 left-5 z-50 max-w-[calc(100vw-2.5rem)] rounded-2xl bg-ink px-4 py-3 text-small leading-6 text-white shadow-panel motion-safe:animate-rise sm:max-w-sm',
+          open && 'max-sm:bottom-auto max-sm:top-20'
+        )}>
 
           {toast}
         </p>

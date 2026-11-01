@@ -42,16 +42,19 @@ const CRUMB: Record<string, [string, string]> = {
 };
 
 /** 흐름의 단계가 아니라 언제든 들러보는 자료 화면 */
-const REFS = [
+/** short 는 640px 보다 좁을 때 보이는 이름이다 */
+interface NavRef {path: string;label: string;short?: string;}
+
+const REFS: NavRef[] = [
 { path: '/transactions', label: '거래' },
-{ path: '/uploads', label: '업로드 이력' }];
+{ path: '/uploads', label: '업로드 이력', short: '이력' }];
 
 /** 관리자에게만 보인다 (M1) */
-const ADMIN_REF = { path: '/admin', label: '관리자' };
+const ADMIN_REF: NavRef = { path: '/admin', label: '관리자' };
 
 /** 단계 표시에 포함되지 않지만 특정 단계에 속하는 화면 */
 const STEP_ALIAS: Record<string, number> = {
-  '/confirm': 2,
+  '/confirm': 3,
   '/questions': 4,
   '/summary': 4,
   '/judgments': 4
@@ -136,8 +139,12 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
             </nav>
           }
 
-          <div className="flex min-w-0 items-center gap-3 text-small text-muted">
-            <nav aria-label="자료" className="flex shrink-0 items-center gap-1.5">
+          {/* 360px 에서도 로고·자료·내 정보·로그아웃이 한 줄에 들어가도록 좁은 폭에서는 간격과 이름을 줄인다.
+              그래도 넘치면(관리자 메뉴까지 있을 때) 자료 메뉴만 옆으로 밀리고 화면은 가로로 늘지 않는다 */}
+          <div className="flex min-w-0 items-center gap-2 text-small text-muted sm:gap-3">
+            <nav
+              aria-label="자료"
+              className="flex min-w-0 items-center gap-1 overflow-x-auto [scrollbar-width:none] sm:shrink-0 sm:gap-1.5 sm:overflow-visible">
               {refs.map((ref) => {
                 const active = under(pathname, ref.path);
                 return (
@@ -145,11 +152,17 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
                     key={ref.path}
                     to={ref.path}
                     aria-current={active ? 'page' : undefined}
-                    className={`rounded-full px-3 py-1.5 font-bold transition-colors duration-150 ease-snap ${
+                    aria-label={ref.short ? ref.label : undefined}
+                    className={`shrink-0 whitespace-nowrap rounded-full px-2.5 py-1.5 font-bold transition-colors duration-150 ease-snap sm:px-3 ${
                     active ? 'bg-accent text-white' : 'text-ink2 hover:bg-surface'}`
                     }>
 
-                    {ref.label}
+                    {ref.short ?
+                    <>
+                        <span className="sm:hidden">{ref.short}</span>
+                        <span className="hidden sm:inline">{ref.label}</span>
+                      </> :
+                    ref.label}
                   </Link>);
 
               })}
@@ -188,7 +201,7 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
             <Button
               variant="secondary"
               size="sm"
-              className="shrink-0"
+              className="shrink-0 max-sm:px-3"
               onClick={() => {
                 signOut();
                 navigate('/');

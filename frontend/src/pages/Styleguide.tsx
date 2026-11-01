@@ -33,7 +33,7 @@ const COLORS: { name: string; cls: string; hex: string; use: string }[] = [
 { name: 'rule', cls: 'bg-rule', hex: '#16181D', use: '표 머리 위 굵은 괘선' },
 { name: 'ink', cls: 'bg-ink', hex: '#16181D', use: '제목, 주된 동작, 어두운 판' },
 { name: 'ink2', cls: 'bg-ink2', hex: '#30363F', use: '본문' },
-{ name: 'muted', cls: 'bg-muted', hex: '#67707E', use: '보조 설명, 캡션' },
+{ name: 'muted', cls: 'bg-muted', hex: '#626B79', use: '보조 설명, 캡션' },
 { name: 'accent', cls: 'bg-accent', hex: '#16181D', use: 'CTA, 지금 자리 알약' },
 { name: 'accent-soft', cls: 'bg-accent-soft', hex: '#E6ECF4', use: '연한 채움 — 고른 선택지, 진행 중 단계' },
 { name: 'accent-line', cls: 'bg-accent-line', hex: '#DCE1E8', use: '테두리 버튼, 패널 안 구분선' },

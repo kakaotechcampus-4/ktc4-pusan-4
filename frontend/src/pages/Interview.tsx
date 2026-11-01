@@ -72,8 +72,12 @@ export function Interview() {
   const navigate = useNavigate();
   const location = useLocation();
   const welcome = (location.state as LocationState | null)?.welcome === true;
-  /** 가입 직후에는 올린 카드내역이 없어 판정 확인으로 가도 막힌다. 카드내역부터 올리게 한다 */
-  const afterWelcome = (location.state as LocationState | null)?.from ?? '/upload';
+  /**
+   * 가입 직후에는 올린 카드내역이 없어 판정 확인으로 가도 막힌다. 카드내역부터 올리게 한다.
+   * 로그인 화면이 넘긴 기본값('/')이나 이 화면 자체로는 보내지 않는다 — '/' 는 랜딩이고, 같은 주소로 가면 저장 중에 멈춘다
+   */
+  const requested = (location.state as LocationState | null)?.from;
+  const afterWelcome = requested && requested !== '/' && requested !== '/interview' ? requested : '/upload';
   const { context, setContext, setContextRef } = useSession();
   const [form, setForm] = useState<BusinessContext>(() => formFrom(context));
   /**
@@ -86,14 +90,18 @@ export function Interview() {
   const [error, setError] = useState<string | null>(null);
   /** 한 번이라도 고쳤으면 늦게 온 저장 문진으로 덮지 않는다 */
   const edited = useRef(false);
-  /** 기장의무를 직접 골랐으면 수입금액이 바뀌어도 바꾸지 않는다. 고르기 전에는 수입금액을 따라간다 */
-  const dutyChosen = useRef(false);
+  /**
+   * 기장의무를 직접 골랐으면 수입금액이 바뀌어도 바꾸지 않는다. 고르기 전에는 수입금액을 따라간다.
+   * 저장된 문진의 기장의무가 수입금액 기준과 다르면 예전에 직접 고른 것이다
+   */
+  const dutyChosen = useRef(context !== null && context.bookkeepingDuty !== dutyFor(context.prevYearRevenue));
   const today = todayKst();
 
   // 새로고침 직후에는 저장된 문진(3.2)이 화면보다 늦게 온다
   useEffect(() => {
     if (edited.current) return;
     const next = formFrom(context);
+    dutyChosen.current = context !== null && context.bookkeepingDuty !== dutyFor(context.prevYearRevenue);
     setForm(next);
     setHome(homeAnswerOf(next.homeOfficeRatio));
     setRatioText(ratioTextOf(next.homeOfficeRatio));

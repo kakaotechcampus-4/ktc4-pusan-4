@@ -18,12 +18,14 @@ const ERRORS: Record<string, string> = {
  */
 export function KakaoCallback() {
   const navigate = useNavigate();
-  const { signInWithKakao } = useSession();
+  const { status, signInWithKakao } = useSession();
   const [error, setError] = useState<string | null>(null);
   const started = useRef(false);
 
   useEffect(() => {
-    if (started.current) return;
+    // 앱이 뜨면서 시작한 이어 가기(리프레시 쿠키)가 끝난 뒤에 보낸다. 같이 보내면 앞 계정의 재발급이
+    // 카카오 로그인과 엇갈려, 카카오 계정에 앞 계정의 배치·문진이 남거나 앞 계정으로 바뀐다
+    if (status === 'restoring' || started.current) return;
     started.current = true;
 
     const params = new URLSearchParams(window.location.search);
@@ -59,7 +61,7 @@ export function KakaoCallback() {
         '로그인하지 못했습니다. 잠시 후 다시 시도해 주세요.')
       );
     });
-  }, [navigate, signInWithKakao]);
+  }, [status, navigate, signInWithKakao]);
 
   return (
     <AuthLayout title="카카오 로그인">

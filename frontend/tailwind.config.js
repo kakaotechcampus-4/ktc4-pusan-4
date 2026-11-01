@@ -61,7 +61,7 @@ export default {content: [
         rule: '#16181D',
         ink: '#16181D',
         ink2: '#30363F',
-        muted: '#67707E',
+        muted: '#626B79',
         /** 주된 동작은 검정이다. 파랑은 문장 속 링크에만 쓴다 */
         accent: {
           DEFAULT: '#16181D',

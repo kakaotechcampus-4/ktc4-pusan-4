@@ -11,7 +11,7 @@ export const APPROVAL_EXPORT_STEPS = '카드사 홈페이지·앱 → 이용(승
  * 업로드 화면의 데이터 경계 안내와 도움말이 같은 문장을 쓴다
  */
 export const ASSISTANT_SENDS =
-'묻는 말과 최근 대화, 지금 화면, 답에 필요한 거래(승인일·가맹점명·카테고리·금액)·판정·질문·근거 조문';
+'묻는 말과 최근 대화, 지금 화면, 사업자 문진 중 기장의무·직원 유무, 진행 상황(건수·금액 합계), 답에 필요한 거래(승인일·가맹점명·카테고리·금액)·판정·질문·근거 조문';
 export const ASSISTANT_DOES_NOT_SEND = '소득 금액·이름·이메일은 보내지 않습니다.';
 /**
  * 받는 곳. 모델은 ai/app/config.py, 품질 점검 기록은 ai/pipeline/llm.py 의 mask() 를 거친다.
