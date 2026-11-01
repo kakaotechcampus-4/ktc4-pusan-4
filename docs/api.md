@@ -97,8 +97,16 @@ Question
 /api/v1
 │
 ├── auth/                               (Authorization 없이 부른다)
+│   ├── email-verification/
+│   │   ├── POST                        가입 인증 코드 메일 보내기
+│   │   └── confirm/
+│   │       └── POST                    가입 인증 코드 확인
+│   ├── signup/
+│   │   └── POST                        이메일 회원가입
 │   ├── login/
 │   │   └── POST                        로그인
+│   ├── kakao/
+│   │   └── POST                        카카오 로그인
 │   ├── refresh/
 │   │   └── POST                        액세스 토큰 재발급
 │   └── logout/
@@ -179,9 +187,19 @@ Question
 │   ├── GET                             세무대리인 질문 목록
 │   └── POST                            세무대리인 질문 저장
 │
-└── statutes/
-    └── {statuteVersionId}/
-        └── GET                         법령 원문 조회
+├── statutes/
+│   └── {statuteVersionId}/
+│       └── GET                         법령 원문 조회
+│
+└── admin/
+    └── rule-candidates/
+        ├── GET                         규칙 후보 목록 (관리자)
+        │
+        └── {candidateId}/
+            ├── approve/
+            │   └── POST                규칙 후보 승인 (관리자)
+            └── reject/
+                └── POST                규칙 후보 기각 (관리자)
 ```
 
 > v2에서는 JudgmentRun SSE API를 사용하지 않는다. Rule Engine은 LLM, 외부 API, 현재 시각, 난수에 의존하지 않는 로컬 결정론적 연산이므로 우선 `GET /judgment-runs/{runId}` polling으로 충분하다고 본다. 실제 성능 측정 후 장시간 실행이 확인되면 SSE를 다시 검토한다.
@@ -215,17 +233,87 @@ refresh_token={token}; Path=/api/v1/auth; Max-Age=1209600; HttpOnly; Secure; Sam
 - `Domain` 은 붙이지 않는다. 배포는 Caddy 뒤 같은 오리진이다.
 - 로컬 프로필(http)에서만 `Secure` 를 뺀다.
 
-> 지금은 실제 계정이 없어 고정 사용자 `demo@example.com` 하나만 로그인한다. 비밀번호는 서버 설정(`APP_AUTH_DEMO_PASSWORD`)이다.
-> 실제 계정은 B9b 에서 붙이며 아래 계약은 바뀌지 않는다.
+계정은 이메일 가입이나 카카오 로그인으로 만든다. 이메일은 앞뒤 공백을 빼고 소문자로 저장하고, 로그인할 때도 같은 규칙으로 찾는다.
+이메일 가입은 메일 인증을 먼저 한다: 코드 요청 → 메일로 받은 6자리 코드 확인 → 받은 `verificationToken` 으로 가입. 인증하지 않은 계정은 만들어지지 않는다.
+카카오 계정은 카카오 회원번호로만 식별하고 이메일을 받지 않는다(`GET /users/me` 의 `email` 이 `null`). 같은 이메일이어도 이메일 계정과 카카오 계정은 따로다.
 
 리프레시 토큰은 서버(Redis)가 로그인 단위로 기억한다. 재발급하면 이전 토큰은 쓸 수 없고, 로그아웃하면 그 로그인만 끊긴다(다른 기기는 그대로).
 이미 쓴 리프레시 토큰을 다시 보내면 탈취로 보고 그 로그인을 끊는다. 그래서 프론트는 재발급 요청을 한 번에 하나만 보낸다.
+
+### `POST /api/v1/auth/email-verification`
+
+```
+{
+  "email": "user@example.com"
+}
+```
+
+6자리 인증 코드를 메일로 보낸다. 응답 `204`. 코드는 5분 동안 쓸 수 있고, 다시 받으면 이전 코드는 쓸 수 없다.
+다시 받기는 60초에 한 번, 이메일 하나에 하루 5번까지다.
+
+```
+400 VALIDATION_ERROR                 이메일 형식이 아님
+409 EMAIL_ALREADY_EXISTS             이미 가입한 이메일
+429 VERIFICATION_RESEND_TOO_SOON     60초 안에 다시 요청함 (message 에 남은 초)
+429 VERIFICATION_DAILY_LIMIT         오늘 이 이메일로 5번 보냄
+502 EMAIL_SEND_FAILED                메일을 보내지 못함 → 60초 뒤 다시 요청. 하루 횟수에는 세지 않는다
+503 EMAIL_VERIFICATION_UNAVAILABLE   서버에 메일 계정이 설정되지 않음
+```
+
+### `POST /api/v1/auth/email-verification/confirm`
+
+```
+{
+  "email": "user@example.com",
+  "code": "123456"
+}
+```
+
+응답 `200`:
+
+```
+{
+  "verificationToken": "..."
+}
+```
+
+토큰은 30분 동안 그 이메일의 가입에만 쓸 수 있다.
+
+```
+400 VALIDATION_ERROR            코드가 숫자 6자리가 아님
+400 INVALID_VERIFICATION_CODE   코드가 틀림 → 다시 입력
+400 VERIFICATION_CODE_EXPIRED   만료됐거나, 이미 썼거나, 5번 틀려 폐기됨 → 코드를 다시 받는다
+```
+
+### `POST /api/v1/auth/signup`
+
+```
+{
+  "email": "user@example.com",
+  "password": "...",
+  "verificationToken": "..."
+}
+```
+
+| 필드 | 제약 |
+| --- | --- |
+| email | 이메일 형식, 최대 320자. 인증한 이메일과 같아야 한다(대소문자·앞뒤 공백 무시) |
+| password | 8자 이상, UTF-8 72바이트 이하 |
+| verificationToken | `email-verification/confirm` 응답의 값 |
+
+가입하고 바로 로그인한다. 응답은 로그인과 같고 상태만 `201` 이다. 가입하면 인증 토큰은 더 쓸 수 없다.
+
+```
+400 VALIDATION_ERROR       형식·길이가 맞지 않음
+400 EMAIL_NOT_VERIFIED     인증 토큰이 없거나, 다른 이메일 것이거나, 만료됨 → 인증부터 다시
+409 EMAIL_ALREADY_EXISTS   이미 가입한 이메일
+```
 
 ### `POST /api/v1/auth/login`
 
 ```
 {
-  "email": "demo@example.com",
+  "email": "user@example.com",
   "password": "..."
 }
 ```
@@ -240,6 +328,24 @@ refresh_token={token}; Path=/api/v1/auth; Max-Age=1209600; HttpOnly; Secure; Sam
 
 ```
 401 INVALID_CREDENTIALS   이메일 또는 비밀번호가 틀림 (어느 쪽인지 구분하지 않는다)
+```
+
+### `POST /api/v1/auth/kakao`
+
+```
+{
+  "code": "카카오 인가 코드"
+}
+```
+
+프론트가 카카오 인가 페이지(`https://kauth.kakao.com/oauth/authorize?client_id={REST API 키}&redirect_uri={콜백}&response_type=code`)로 보내고,
+카카오가 콜백 페이지로 넘긴 `code` 를 그대로 보낸다. 콜백 주소는 서버 설정(`APP_AUTH_KAKAO_REDIRECT_URI`)과 같아야 한다.
+처음 온 카카오 회원이면 계정을 만든다. 응답은 로그인과 같다(`200` + 리프레시 토큰 `Set-Cookie`).
+
+```
+401 INVALID_KAKAO_CODE        코드가 틀렸거나 만료됐거나 이미 씀 → 카카오 로그인을 처음부터 다시
+502 KAKAO_UNAVAILABLE         카카오와 통신하지 못함
+503 KAKAO_LOGIN_UNAVAILABLE   서버에 카카오 키가 설정되지 않음
 ```
 
 ### `POST /api/v1/auth/refresh`
@@ -294,6 +400,7 @@ ID      "0199c8f2-1a2b-7c3d-8e4f-5a6b7c8d9e0f"
 | --- | --- | --- |
 | 400 | VALIDATION_ERROR | 필수 필드 누락·타입 불일치 등 문서화되지 않은 요청 검증 실패 |
 | 401 | UNAUTHORIZED | `Authorization` 헤더 누락, 토큰이 틀리거나 만료됨 |
+| 403 | FORBIDDEN | 관리자 API 를 관리자가 아닌 사용자가 부름 |
 | 404 | NOT_FOUND | 전용 `*_NOT_FOUND`가 없는 경로의 리소스 없음 |
 | 405 | METHOD_NOT_ALLOWED | 경로는 있으나 지원하지 않는 HTTP 메서드 |
 | 409 | CONFLICT | 전용 코드가 없는 상태 충돌 |
@@ -301,7 +408,7 @@ ID      "0199c8f2-1a2b-7c3d-8e4f-5a6b7c8d9e0f"
 | 422 | UNPROCESSABLE_ENTITY | 전용 코드가 없는 처리 불가 |
 | 500 | INTERNAL_ERROR | 그 외 서버 오류 |
 
-단건 리소스 조회의 404는 리소스별 전용 코드를 쓴다: `BATCH_NOT_FOUND`, `TRANSACTION_NOT_FOUND`, `CONTEXT_NOT_FOUND`, `JUDGMENT_NOT_FOUND`, `JUDGMENT_RUN_NOT_FOUND`, `JUDGMENT_OVERRIDE_NOT_FOUND`, `CLASSIFICATION_REVIEW_NOT_FOUND`, `QUESTION_NOT_FOUND`, `STATUTE_NOT_FOUND`.
+단건 리소스 조회의 404는 리소스별 전용 코드를 쓴다: `BATCH_NOT_FOUND`, `TRANSACTION_NOT_FOUND`, `CONTEXT_NOT_FOUND`, `JUDGMENT_NOT_FOUND`, `JUDGMENT_RUN_NOT_FOUND`, `JUDGMENT_OVERRIDE_NOT_FOUND`, `CLASSIFICATION_REVIEW_NOT_FOUND`, `QUESTION_NOT_FOUND`, `STATUTE_NOT_FOUND`, `RULE_CANDIDATE_NOT_FOUND`.
 
 ---
 
@@ -631,9 +738,13 @@ G6
 {
   "id": "0199c8f2-...",
   "email": "user@example.com",
+  "role": "USER",
   "createdAt": "2026-09-01T10:00:00+09:00"
 }
 ```
+
+`email` 은 카카오 계정이면 `null` 이다.
+`role` 은 `USER` 또는 `ADMIN` 이다. `ADMIN` 이면 관리자 API(3.15)를 쓸 수 있다.
 
 ### `DELETE /api/v1/users/me`
 
@@ -2672,6 +2783,56 @@ Question을 삭제하지 않고 상태를 남겨 판정 이력을 보존한다.
 - 붙인 거래가 없거나 다른 사용자의 것이면 `404 TRANSACTION_NOT_FOUND`.
 - 사용자 소유라 탈퇴하면 함께 지운다. 업로드를 지워도 질문은 남고, 지운 거래는 `transactionIds` 에서 빠진다.
 - `transactionIds` 는 거래 id 순이다(넣은 순서를 저장하지 않는다).
+
+---
+
+# 3.15 관리자 — 규칙 후보
+
+규칙 후보는 여러 사용자에게서 판정할 규칙이 없던 업종·카테고리 조합과 그 규칙 카드 초안이다. AI 규칙 후보 파이프라인이 만든다.
+관리자만 부를 수 있고, 아니면 `403 FORBIDDEN` 이다. 관리자는 `app_user.role` 이 `ADMIN` 인 사용자다(`GET /users/me` 의 `role`). 가입하면 `USER` 이고, 관리자는 운영에서 DB 로 지정한다(docs/deployment.md "관리자 지정").
+
+`status` 는 `PENDING`(대기) · `IN_REVIEW`(검토중) · `APPROVED`(승인) · `REJECTED`(기각) · `ON_HOLD`(보류) 이다.
+
+### `GET /api/v1/admin/rule-candidates`
+
+Query: `status`(없으면 전체), `page`, `size`(1.4). 정렬은 `createdAt` DESC, `id` DESC.
+
+```
+{
+  "items": [
+    {
+      "id": 12,
+      "merchantCategory": "사무용품",
+      "industryCode": "940909",
+      "distinctUsers": 3,
+      "occurrenceCount": 7,
+      "suggestedDocs": [
+        { "statuteId": "소득세법시행령-55-1", "quote": "업무와 관련된 비용", "tier": "법령" }
+      ],
+      "searchedTier": "법령",
+      "draftYaml": "id: R-900 ...",
+      "status": { "code": "PENDING", "label": "대기" },
+      "reviewedBy": null,
+      "reviewedAt": null,
+      "createdAt": "2026-10-20T10:00:00+09:00"
+    }
+  ],
+  "page": { ... }
+}
+```
+
+`draftYaml` 은 초안을 만들지 못했으면 `null` 이다(이때 보통 `ON_HOLD`). `tier` 는 인용이 나온 위계이고 못 찾았으면 `null` 이다.
+
+### `POST /api/v1/admin/rule-candidates/{candidateId}/approve`
+### `POST /api/v1/admin/rule-candidates/{candidateId}/reject`
+
+본문 없음. `PENDING`·`IN_REVIEW`·`ON_HOLD` 후보를 `APPROVED`·`REJECTED` 로 바꾸고, `reviewedBy`(관리자 이메일. 이메일이 없는 계정이면 사용자 id)와 `reviewedAt` 을 남긴다.
+응답 `200` 은 바뀐 후보 하나(목록의 항목과 같은 모양)다. 승인해도 규칙 카드를 만들지는 않는다 — 카드 PR 은 사람이 올린다.
+
+```
+404 RULE_CANDIDATE_NOT_FOUND
+409 CONFLICT                   이미 승인·기각한 후보
+```
 
 ---
 

@@ -1,6 +1,6 @@
 package com.ktc4.pusan4.integration;
 
-import com.ktc4.pusan4.shared.auth.FixedUser;
+import com.ktc4.pusan4.auth.TestUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -43,7 +43,7 @@ class HandoffNoteIntegrationTest {
     @Test
     void saved_notes_are_listed_in_the_order_they_were_added_with_duplicate_transactions_removed() throws Exception {
         // given
-        UUID transactionId = insertTransaction(FixedUser.ID);
+        UUID transactionId = insertTransaction(TestUser.ID);
 
         // when
         create("휴대폰 요금의 업무 비중은?", "[\"%s\", \"%s\"]".formatted(transactionId, transactionId))
@@ -101,7 +101,7 @@ class HandoffNoteIntegrationTest {
     @Test
     void deleting_the_upload_keeps_the_note_and_drops_the_transaction() throws Exception {
         // given
-        UUID transactionId = insertTransaction(FixedUser.ID);
+        UUID transactionId = insertTransaction(TestUser.ID);
         create("업로드를 지울 질문", "[\"%s\"]".formatted(transactionId)).andExpect(status().isCreated());
 
         // when

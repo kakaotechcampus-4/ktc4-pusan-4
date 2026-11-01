@@ -1,11 +1,10 @@
 package com.ktc4.pusan4.transaction.persistence;
 
 import com.ktc4.pusan4.shared.api.ApiException;
-import jakarta.persistence.EntityManager;
+import com.ktc4.pusan4.judgment.persistence.UploadBatchRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
 import java.util.UUID;
 
 /**
@@ -19,17 +18,14 @@ import java.util.UUID;
 @Component
 class UserWriteLock {
 
-    private final EntityManager entityManager;
+    private final UploadBatchRepository batchRepository;
 
-    UserWriteLock(EntityManager entityManager) {
-        this.entityManager = entityManager;
+    UserWriteLock(UploadBatchRepository batchRepository) {
+        this.batchRepository = batchRepository;
     }
 
     void lock(UUID userId) {
-        List<?> rows = entityManager.createNativeQuery("select id from app_user where id = :userId for update")
-            .setParameter("userId", userId)
-            .getResultList();
-        if (rows.isEmpty()) {
+        if (batchRepository.lockUserForWrite(userId).isEmpty()) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "사용자를 찾을 수 없습니다.");
         }
     }

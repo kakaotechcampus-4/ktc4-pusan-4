@@ -7,7 +7,7 @@ public record SaveRuleCandidateCommand(
     String industryCode,
     int distinctUsers,
     int occurrenceCount,
-    List<String> suggestedDocs,
+    List<SuggestedDocJson> suggestedDocs,
     String searchedTier,
     String draftYaml
 ) {
