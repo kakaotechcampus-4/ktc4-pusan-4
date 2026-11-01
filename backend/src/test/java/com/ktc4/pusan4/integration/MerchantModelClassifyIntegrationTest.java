@@ -228,8 +228,10 @@ class MerchantModelClassifyIntegrationTest {
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
-                byte[] body = JSON.writeValueAsBytes(
-                    JSON.createObjectNode().put("model", "gpt-6-luna").set("results", results));
+                ObjectNode response = JSON.createObjectNode().put("model", "gpt-6-luna");
+                response.set("results", results);
+                response.putArray("timedOut");   // 백엔드는 아직 안 읽는다. 모르는 필드여도 깨지지 않아야 한다
+                byte[] body = JSON.writeValueAsBytes(response);
                 exchange.getResponseHeaders().add("Content-Type", "application/json");
                 exchange.sendResponseHeaders(200, body.length);
                 exchange.getResponseBody().write(body);
