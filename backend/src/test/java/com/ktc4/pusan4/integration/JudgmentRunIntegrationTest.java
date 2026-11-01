@@ -3,7 +3,9 @@ package com.ktc4.pusan4.integration;
 import com.ktc4.pusan4.judgment.domain.JudgmentRun;
 import com.ktc4.pusan4.judgment.domain.JudgmentRunFailure;
 import com.ktc4.pusan4.judgment.domain.JudgmentRunStatus;
+import com.ktc4.pusan4.judgment.domain.UserFact;
 import com.ktc4.pusan4.judgment.persistence.JudgmentRunService;
+import com.ktc4.pusan4.judgment.persistence.UserFactPersistenceService;
 import com.ktc4.pusan4.shared.api.ApiException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,6 +20,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -45,6 +48,9 @@ class JudgmentRunIntegrationTest {
 
     @Autowired
     private JudgmentRunService runService;
+
+    @Autowired
+    private UserFactPersistenceService userFactService;
 
     private UUID userId;
     private UUID batchId;
@@ -109,6 +115,28 @@ class JudgmentRunIntegrationTest {
         assertThat(finished.status()).isEqualTo(JudgmentRunStatus.COMPLETED);
         assertThat(finished.processedCount()).isEqualTo(1);
         assertThat(finished.failedCount()).isZero();
+    }
+
+    @Test
+    void completed_run_settles_the_entertainment_limit() {
+        // given: 업무미팅이라고 미리 답한 카페 결제 → 가능(접대비)
+        UUID cafe = insertTransaction("카페", "JUDGEABLE", "AUTO", "CLASSIFIED");
+        userFactService.save(userId, batchId, new UserFact("transaction:" + cafe, "용도", Map.of("value", "업무미팅")));
+
+        // when
+        awaitFinished(runService.create(userId, batchId, contextId).id());
+
+        // then
+        assertThat(jdbcTemplate.queryForMap("""
+            select entry.tax_year, entry.tagged_amount, entry.allowed_amount, entry.state
+            from limit_bucket_entry entry
+            join judgment on judgment.id = entry.judgment_id
+            where judgment.transaction_id = ? and entry.bucket_code = '접대비'
+            """, cafe))
+            .containsEntry("tax_year", 2025)
+            .containsEntry("tagged_amount", 6_500L)
+            .containsEntry("allowed_amount", 6_500L)
+            .containsEntry("state", "잠정");
     }
 
     @Test

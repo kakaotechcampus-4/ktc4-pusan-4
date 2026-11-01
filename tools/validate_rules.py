@@ -441,6 +441,11 @@ def check_rulecards(rep: Report):
             if verified is True and str(cid) == "TODO":
                 rep.error("%s: citation verified=true 인데 id 가 TODO" % rid)
 
+        # 지난번 답 등급(docs/rule-card-fields.md). 적지 않으면 보여주지 않는다.
+        previous = (card.get("question") or {}).get("previous_answer")
+        if previous is not None and previous not in ("carry", "history"):
+            rep.error("%s: question.previous_answer 는 carry 또는 history: %r" % (rid, previous))
+
         # 카드는 question 키를 쓴다. 예전엔 ask 를 읽어 이 검사가 한 번도 돌지 않았다.
         for opt in ((card.get("question") or {}).get("options") or []):
             v = opt.get("verdict")

@@ -25,7 +25,8 @@ class HolidaySyncTest {
 
     private final HolidayApiClient client = mock(HolidayApiClient.class);
     private final HolidayCalendar calendar = mock(HolidayCalendar.class);
-    private final HolidaySync sync = new HolidaySync(client, calendar, NEW_YEAR_KST);
+    private final HolidaySeed seed = mock(HolidaySeed.class);
+    private final HolidaySync sync = new HolidaySync(client, calendar, seed, NEW_YEAR_KST);
 
     @Test
     void save_failure_does_not_propagate_and_the_other_years_still_sync() {
@@ -39,5 +40,13 @@ class HolidaySyncTest {
         verify(calendar).replaceYear(2025, holidays);
         verify(calendar).replaceYear(2026, holidays);
         verify(calendar).replaceYear(2027, holidays);
+    }
+
+    @Test
+    void broken_seed_does_not_propagate() {
+        when(client.fetch(2026)).thenThrow(new IllegalStateException("Holiday API error"));
+        when(seed.holidays(2026)).thenThrow(new IllegalStateException("Holiday API returned 1 of 20 items for 2026"));
+
+        assertThatCode(() -> sync.syncYear(2026)).doesNotThrowAnyException();
     }
 }

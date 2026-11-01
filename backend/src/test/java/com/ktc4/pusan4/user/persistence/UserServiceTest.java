@@ -1,5 +1,6 @@
 package com.ktc4.pusan4.user.persistence;
 
+import com.ktc4.pusan4.shared.UuidGenerator;
 import com.ktc4.pusan4.shared.api.ApiException;
 import com.ktc4.pusan4.user.domain.AppUser;
 import org.junit.jupiter.api.Test;
@@ -16,7 +17,7 @@ import static org.mockito.Mockito.mock;
 class UserServiceTest {
 
     private final AppUserRepository repository = mock(AppUserRepository.class);
-    private final UserService userService = new UserService(repository);
+    private final UserService userService = new UserService(repository, mock(UuidGenerator.class));
 
     @Test
     void returns_user_when_present() {

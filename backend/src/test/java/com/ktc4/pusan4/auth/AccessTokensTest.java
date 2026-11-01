@@ -56,6 +56,13 @@ class AccessTokensTest {
     }
 
     @Test
+    void refresh_token_is_not_an_access_token() {
+        String refresh = tokens.issue(USER_ID, RedisRefreshTokenStore.TYPE, NOW, NOW.plus(Duration.ofDays(14)));
+
+        assertThat(accessTokensAt(NOW).verify(refresh)).isEmpty();
+    }
+
+    @Test
     void garbage_is_rejected() {
         assertThat(accessTokensAt(NOW).verify("not-a-jwt")).isEmpty();
     }

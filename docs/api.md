@@ -96,6 +96,22 @@ Question
 ```
 /api/v1
 │
+├── auth/                               (Authorization 없이 부른다)
+│   ├── email-verification/
+│   │   ├── POST                        가입 인증 코드 메일 보내기
+│   │   └── confirm/
+│   │       └── POST                    가입 인증 코드 확인
+│   ├── signup/
+│   │   └── POST                        이메일 회원가입
+│   ├── login/
+│   │   └── POST                        로그인
+│   ├── kakao/
+│   │   └── POST                        카카오 로그인
+│   ├── refresh/
+│   │   └── POST                        액세스 토큰 재발급
+│   └── logout/
+│       └── POST                        로그아웃
+│
 ├── users/
 │   └── me/
 │       ├── GET                         내 정보 조회
@@ -181,6 +197,151 @@ Question
 ```
 Authorization: Bearer {accessToken}
 ```
+
+`/auth/*` 를 뺀 모든 API 는 위 헤더가 있어야 한다. 없거나 토큰이 틀리거나 만료됐으면 `401 UNAUTHORIZED` 다.
+프론트는 이 401 을 받으면 `POST /auth/refresh` 로 한 번 재발급해 보고 같은 요청을 다시 보낸다.
+
+| 토큰 | 어디에 | 수명 | 모양 |
+| --- | --- | --- | --- |
+| 액세스 토큰 | 응답 본문 → 요청의 `Authorization` 헤더. 프론트는 메모리에만 둔다 | 15분 | JWT(HS256) |
+| 리프레시 토큰 | `Set-Cookie` → 브라우저가 `/auth/*` 요청에 실어 보낸다 | 14일 | 프론트는 값을 모른다 |
+
+리프레시 토큰 쿠키:
+
+```
+refresh_token={token}; Path=/api/v1/auth; Max-Age=1209600; HttpOnly; Secure; SameSite=Strict
+```
+
+- `Path=/api/v1/auth` 라 인증 API 에만 실린다.
+- `Domain` 은 붙이지 않는다. 배포는 Caddy 뒤 같은 오리진이다.
+- 로컬 프로필(http)에서만 `Secure` 를 뺀다.
+
+계정은 이메일 가입이나 카카오 로그인으로 만든다. 이메일은 앞뒤 공백을 빼고 소문자로 저장하고, 로그인할 때도 같은 규칙으로 찾는다.
+이메일 가입은 메일 인증을 먼저 한다: 코드 요청 → 메일로 받은 6자리 코드 확인 → 받은 `verificationToken` 으로 가입. 인증하지 않은 계정은 만들어지지 않는다.
+카카오 계정은 카카오 회원번호로만 식별하고 이메일을 받지 않는다(`GET /users/me` 의 `email` 이 `null`). 같은 이메일이어도 이메일 계정과 카카오 계정은 따로다.
+
+리프레시 토큰은 서버(Redis)가 로그인 단위로 기억한다. 재발급하면 이전 토큰은 쓸 수 없고, 로그아웃하면 그 로그인만 끊긴다(다른 기기는 그대로).
+이미 쓴 리프레시 토큰을 다시 보내면 탈취로 보고 그 로그인을 끊는다. 그래서 프론트는 재발급 요청을 한 번에 하나만 보낸다.
+
+### `POST /api/v1/auth/email-verification`
+
+```
+{
+  "email": "user@example.com"
+}
+```
+
+6자리 인증 코드를 메일로 보낸다. 응답 `204`. 코드는 5분 동안 쓸 수 있고, 다시 받으면 이전 코드는 쓸 수 없다.
+다시 받기는 60초에 한 번, 이메일 하나에 하루 5번까지다.
+
+```
+400 VALIDATION_ERROR                 이메일 형식이 아님
+409 EMAIL_ALREADY_EXISTS             이미 가입한 이메일
+429 VERIFICATION_RESEND_TOO_SOON     60초 안에 다시 요청함 (message 에 남은 초)
+429 VERIFICATION_DAILY_LIMIT         오늘 이 이메일로 5번 보냄
+502 EMAIL_SEND_FAILED                메일을 보내지 못함 → 60초 뒤 다시 요청. 하루 횟수에는 세지 않는다
+503 EMAIL_VERIFICATION_UNAVAILABLE   서버에 메일 계정이 설정되지 않음
+```
+
+### `POST /api/v1/auth/email-verification/confirm`
+
+```
+{
+  "email": "user@example.com",
+  "code": "123456"
+}
+```
+
+응답 `200`:
+
+```
+{
+  "verificationToken": "..."
+}
+```
+
+토큰은 30분 동안 그 이메일의 가입에만 쓸 수 있다.
+
+```
+400 VALIDATION_ERROR            코드가 숫자 6자리가 아님
+400 INVALID_VERIFICATION_CODE   코드가 틀림 → 다시 입력
+400 VERIFICATION_CODE_EXPIRED   만료됐거나, 이미 썼거나, 5번 틀려 폐기됨 → 코드를 다시 받는다
+```
+
+### `POST /api/v1/auth/signup`
+
+```
+{
+  "email": "user@example.com",
+  "password": "...",
+  "verificationToken": "..."
+}
+```
+
+| 필드 | 제약 |
+| --- | --- |
+| email | 이메일 형식, 최대 320자. 인증한 이메일과 같아야 한다(대소문자·앞뒤 공백 무시) |
+| password | 8자 이상, UTF-8 72바이트 이하 |
+| verificationToken | `email-verification/confirm` 응답의 값 |
+
+가입하고 바로 로그인한다. 응답은 로그인과 같고 상태만 `201` 이다. 가입하면 인증 토큰은 더 쓸 수 없다.
+
+```
+400 VALIDATION_ERROR       형식·길이가 맞지 않음
+400 EMAIL_NOT_VERIFIED     인증 토큰이 없거나, 다른 이메일 것이거나, 만료됨 → 인증부터 다시
+409 EMAIL_ALREADY_EXISTS   이미 가입한 이메일
+```
+
+### `POST /api/v1/auth/login`
+
+```
+{
+  "email": "user@example.com",
+  "password": "..."
+}
+```
+
+응답 `200` + 리프레시 토큰 `Set-Cookie`:
+
+```
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiJ9..."
+}
+```
+
+```
+401 INVALID_CREDENTIALS   이메일 또는 비밀번호가 틀림 (어느 쪽인지 구분하지 않는다)
+```
+
+### `POST /api/v1/auth/kakao`
+
+```
+{
+  "code": "카카오 인가 코드"
+}
+```
+
+프론트가 카카오 인가 페이지(`https://kauth.kakao.com/oauth/authorize?client_id={REST API 키}&redirect_uri={콜백}&response_type=code`)로 보내고,
+카카오가 콜백 페이지로 넘긴 `code` 를 그대로 보낸다. 콜백 주소는 서버 설정(`APP_AUTH_KAKAO_REDIRECT_URI`)과 같아야 한다.
+처음 온 카카오 회원이면 계정을 만든다. 응답은 로그인과 같다(`200` + 리프레시 토큰 `Set-Cookie`).
+
+```
+401 INVALID_KAKAO_CODE        코드가 틀렸거나 만료됐거나 이미 씀 → 카카오 로그인을 처음부터 다시
+502 KAKAO_UNAVAILABLE         카카오와 통신하지 못함
+503 KAKAO_LOGIN_UNAVAILABLE   서버에 카카오 키가 설정되지 않음
+```
+
+### `POST /api/v1/auth/refresh`
+
+본문 없음. 쿠키의 리프레시 토큰으로 새 액세스 토큰과 새 리프레시 토큰(`Set-Cookie`)을 준다. 응답은 로그인과 같다.
+
+```
+401 INVALID_REFRESH_TOKEN   쿠키가 없거나, 틀리거나, 만료됐거나, 로그아웃·재발급으로 폐기됨 → 로그인 화면으로
+```
+
+### `POST /api/v1/auth/logout`
+
+본문 없음. 응답 `204` + 리프레시 토큰 쿠키를 지우는 `Set-Cookie`(`Max-Age=0`). 쿠키가 없어도 `204` 다.
 
 ---
 
@@ -354,7 +515,7 @@ verdict = AVAILABLE
 finalAmount < transaction.amount
 ```
 
-이면 안분, 상각, 한도 등이 적용된 것이다.
+이면 안분, 상각 등이 적용된 것이다. G6 한도(접대비 등)는 연간 집계라 `finalAmount`에 넣지 않고 한도 집계(`limit_bucket_entry`)에 따로 둔다.
 
 ---
 
@@ -563,7 +724,11 @@ G6
 }
 ```
 
+`email` 은 카카오 계정이면 `null` 이다.
+
 ### `DELETE /api/v1/users/me`
+
+그 사용자의 모든 로그인(리프레시 토큰)을 끊고 지운다. 이미 받은 액세스 토큰은 만료(15분)까지 남는다.
 
 응답:
 
@@ -1141,6 +1306,8 @@ size
 createdAt ASC, id ASC
 ```
 
+지금 판정 대상(effectiveStatus = JUDGEABLE)인 거래의 Review만 반환하고 집계한다. 사용자가 거래를 제외하면 그 Review는 목록과 미해소 집계에서 빠지고, 다시 포함하면 돌아온다. Review 자체는 지우지 않는다. 업로드 배치의 `classificationPendingCount`와 같은 기준이다.
+
 ### grouped=false (기본)
 
 Review 개별 항목을 반환한다. `unresolved` 집계는 grouped 여부와 무관하게 항상 최상위에 포함한다(아래 "미해소 집계" 참고).
@@ -1672,6 +1839,12 @@ GET /api/v1/judgments/summary?runId=R1
 
 `byVerdict`는 세 verdict를 늘 담는다. 판정이 없는 verdict는 `count`·`finalAmount`가 0이다. `finalAmount`가 아직 없는 Judgment(금액 계산 전)는 0으로 더한다.
 
+현재 결과인 `batchId`, `year` 집계는 한도 항목(`limit_bucket_entry`)이 있는 Judgment(접대비)를 `finalAmount` 대신 한도 인정액으로 더한다. 한도를 넘는 금액은 필요경비에 들어가지 않기 때문이다(소득세법 §35 3항). `byVerdict.AVAILABLE`과 `byAccount`에 같이 적용되어, 둘의 차이로 계산하는 값은 그대로 맞는다.
+
+- 한도는 사용자의 한 해 전체 기준이다. `year` 합계는 배분 순서와 관계없이 맞지만, `batchId` 하나에 돌아가는 몫은 배분 순서(승인일 오름차순, #15 확정 전 잠정)에 따라 달라진다.
+- 거래별 `finalAmount`는 그대로라, 판정 목록의 `finalAmount` 합과 요약이 접대비 한도 초과분만큼 다를 수 있다.
+- 과거 Run인 `runId` 집계는 `finalAmount` 합 그대로다. 한도 항목은 다시 집계할 때마다 지금 상태로 갈아 끼워져, 그 Run 시점의 인정액이 남아 있지 않다.
+
 `byAccount`는 `AVAILABLE`이면서 `account`가 있는 Judgment만 모은다. 정렬은 `finalAmount DESC`이고, 같으면 `account` 이름순이다.
 
 다른 사용자의 `batchId`·`runId`를 넘기면 404가 아니라 빈 집계(`totalCount` 0)다.
@@ -1749,7 +1922,7 @@ GET /api/v1/judgments/summary?runId=R1
 | origin | 이 revision이 생성된 직접 원인 |
 | outOfScope | 룰엔진 판정 범위 밖(핸드오프)인지. `verdict = NEEDS_REVIEW`일 때만 `true`일 수 있고 그 외 verdict에서는 항상 `false` |
 | account | 계정과목 |
-| finalAmount | 안분, 상각, 한도 적용 후 인정 금액 |
+| finalAmount | 안분, 상각 적용 후 인정 금액. `AVAILABLE`이 아니면 0. G6 한도는 연간 집계라 반영하지 않는다(요약은 반영한다, 3.7 summary) |
 | isInference | 룰로 확정하지 못해 fallback 결과인지 |
 | unmatchedReason | 매칭 실패 원인 |
 | attributes | 판정 과정에서 생성된 속성 |
@@ -1852,7 +2025,7 @@ JudgmentOverride 생성
 }
 ```
 
-새 revision은 수정한 판정에서 `verdict`만 바꾸고 나머지(계정과목, 룰카드, 속성, 인용)는 이어받는다. `outOfScope`는 확인 필요에만 붙으므로 `false`가 된다. 질문은 새로 만들지 않는다. 금액은 아직 계산하지 않아 `null`이다.
+새 revision은 수정한 판정에서 `verdict`만 바꾸고 나머지(계정과목, 룰카드, 속성, 인용)는 이어받는다. `outOfScope`는 확인 필요에만 붙으므로 `false`가 된다. 질문은 새로 만들지 않는다. `finalAmount`는 이어받은 속성과 판정 당시 문진 버전으로 바뀐 verdict에 맞춰 다시 계산한다. `UNAVAILABLE`이면 0이고, 자택 겸용 안분 속성이 있는데 문진에 비율이 없으면 결제금액 전액이다.
 
 에러:
 
@@ -1952,6 +2125,7 @@ Question 개별 항목을 반환한다. `unresolved` 집계는 grouped 여부와
       "transactionId": "0199f1...",
       "groupKey": "merchant:스타벅스",
       "factType": "용도",
+      "code": "CAFE_PURPOSE",
       "questionText": "이 가맹점에서 사용한 비용은 주로 어떤 목적으로 지출하셨나요?",
       "options": [
         "사업",
@@ -1977,6 +2151,8 @@ Question 개별 항목을 반환한다. `unresolved` 집계는 grouped 여부와
 ```
 
 `answer`는 답한 값이다. 3.10 요청의 `answer`와 같은 모양(`{ "value": "개인" }`)이고, `ANSWERED`가 아니면 `null`이다. 정정했으면 마지막 답이다.
+
+`code`는 질문을 만든 규칙 카드의 질문 코드(`question.code`)다. 다른 업로드의 같은 질문을 찾는 데 쓴다(3.14 지난번 답). 같은 `factType`이라도 카드마다 선택지가 달라서 `factType`이 아니라 `code`로 맞춘다. 저장 값은 `question_queue.reason_code`다. `grouped=true` 그룹에도 같은 값이 붙는다.
 
 ### grouped=true
 
@@ -2135,9 +2311,14 @@ merchant_norm
 
   "answer": {
     "value": "사업"
-  }
+  },
+  "source": "PREVIOUS_ANSWER"
 }
 ```
+
+| 필드 | 필수 | 비고 |
+| --- | --- | --- |
+| source | N | 답의 출처. `USER`(기본), `ASSISTANT`(비서 제안 카드), `PREVIOUS_ANSWER`(지난번 답 불러오기). 일괄 응답(3.11)으로 만든 답은 `BULK`로 남는다. 판정에는 쓰지 않고, 지난번 답(3.14)이 일괄 응답을 약한 근거로 다룰 때 쓴다 |
 
 같은 요청의 Question은 동일 Batch, `groupKey`, `factType`에 속해야 한다.
 
@@ -2308,6 +2489,8 @@ factType 일치
 
 `factType`이 다른 Question은 변경하지 않는다.
 
+재판정 Context는 3.10과 같이 Question이 발생한 Judgment의 `userContextVersion`이다. 대상 Question끼리 버전이 다르면 그룹을 가리지 않고 가장 큰 버전 하나로 모든 대상 Transaction을 재판정한다.
+
 응답 `200`:
 
 ```json
@@ -2397,6 +2580,118 @@ Question을 삭제하지 않고 상태를 남겨 판정 이력을 보존한다.
 법률, 시행령, 기본통칙, 판례 등의 표시를 구분할 수 있도록 `hierarchy`를 반환한다.
 
 없는 법령이면 `404 STATUTE_NOT_FOUND`.
+
+---
+
+# 3.14 비서 (docs/agent-secretary.md)
+
+## `GET /api/v1/progress?batchId={batchId}`
+
+업로드 하나의 진행 상황과 다음 할 일이다. 비서와 화면 속 도움이 쓴다. 수입금액·이름·이메일은 담지 않는다(agent-secretary.md QR-7).
+
+```json
+{
+  "batch": { "id": "0199aa11-...", "label": "국민 · 2026-09", "transactionCount": 18 },
+  "context": { "version": 4, "bookkeeping": "복식부기", "hasEmployee": false },
+  "classification": { "pendingCount": 2, "pendingAmount": 97000 },
+  "run": { "id": "0199b2...", "status": { "code": "COMPLETED", "label": "완료" } },
+  "questions": { "pendingCount": 9, "pendingAmount": 1038100, "fillableFromPrevious": 2 },
+  "next": { "step": "QUESTIONS", "route": "/questions", "label": "질문에 답하기" }
+}
+```
+
+| 필드 | 뜻 |
+| --- | --- |
+| batch.label | `카드사 · 시작월`. 기간이 여러 달이면 `카드사 · 시작월~끝월` |
+| context | 최신 문진의 버전·기장의무·직원 유무. 문진 전이면 `null` |
+| classification | 이 Batch 에서 분류를 기다리는 거래 수와 금액 |
+| run | 이 Batch 의 최근 판정 실행. 실행한 적 없으면 `null` |
+| questions | 3.9 미해소 집계와 같다. `fillableFromPrevious`는 지난번 답(아래)이 A등급이고 값이 있는 그룹의 질문 수다 |
+| next | 아래 순서로 처음 맞는 것 하나 |
+
+| step | route | 조건 |
+| --- | --- | --- |
+| `CLASSIFY` | `/preview` | 분류 대기 거래가 있다 |
+| `INTERVIEW` | `/interview` | 문진 전이다 |
+| `CONFIRM` | `/confirm` | 판정 실행이 없거나 마지막 실행이 `FAILED`다 |
+| `QUESTIONS` | `/questions` | 미해소 질문이 있다 |
+| `RESULTS` | `/results` | 그 밖 |
+
+실행 중(`QUEUED`·`RUNNING`)이어도 판정된 거래의 질문과 결과는 볼 수 있어 `QUESTIONS`·`RESULTS`로 간다. 실행 중인지는 `run.status`로 안다.
+판정 실행 화면(`/run`)은 실행 id 없이 들어오면 판정을 새로 시작하므로 `route`로 주지 않는다. 비서의 이동 카드와 화면의 이동 버튼이 이 값을 그대로 쓴다.
+
+없거나 다른 사용자의 Batch 면 `404 BATCH_NOT_FOUND`.
+
+## `GET /api/v1/questions/suggestions?batchId={batchId}`
+
+지난번 답 불러오기(agent-secretary.md 3.1, FR-5). 이 Batch 의 `PENDING` 질문 그룹(3.9 `grouped=true` 와 같은 묶음)마다 한 항목을 준다.
+다른 업로드의 답은 읽기만 한다. 적용은 3.10 으로 하고, 그때 이 Batch 에 새 UserFact 가 생긴다(C-6).
+
+```json
+{
+  "items": [
+    { "groupKey": "merchant:SK텔레콤", "factType": "전용여부", "code": "TELECOM_DEDICATION",
+      "tier": "A", "value": "전용", "sourceLabel": "8월 업로드(국민)" },
+    { "groupKey": "merchant:한국전력", "factType": "공간전용여부", "code": "UTILITY_DEDICATION",
+      "tier": "A", "conflict": true,
+      "history": [
+        { "value": "자택 겸용", "sourceLabel": "8월 업로드(국민)", "bulk": false },
+        { "value": "사업 전용", "sourceLabel": "7월 업로드(국민)", "bulk": false }
+      ] },
+    { "groupKey": "transaction:0199f1...", "factType": "용도", "code": "CAFE_PURPOSE",
+      "tier": "B", "historyCounts": { "업무미팅": 6, "개인": 1 } },
+    { "groupKey": "transaction:0199f2...", "factType": "용도", "code": "WEEKEND_CAFE_PURPOSE",
+      "tier": "C", "reason": "소명 대기 질문은 건마다 답해야 합니다" }
+  ]
+}
+```
+
+등급은 규칙 카드 질문의 `previous_answer`로 정한다(rule-card-fields.md). 소명 대기 거래의 질문이 섞인 그룹(3.9 `bulkAnswerable=false`)은 카드와 상관없이 C다.
+
+| tier | 카드 | 내용 |
+| --- | --- | --- |
+| `A` | `carry` | 같은 `groupKey`·`code` 로 다른 Batch 에서 답한 값. Batch 마다 그 Batch 의 마지막 답 하나를 보고, 기간이 늦은 Batch 부터 본다 |
+| `B` | `history` | 같은 `code`, 같은 가맹점(`merchantNorm`)으로 다른 Batch 에서 답한 값별 질문 수(`historyCounts`). 미리 고르지 않는다 |
+| `C` | 없음 | `reason`만 준다 |
+
+등급에 해당하지 않는 필드는 싣지 않는다. A 의 `value`는 아래면 싣지 않고 `history`로 사정을 보여 준다.
+
+- 최근 두 Batch 의 답이 다르다: `conflict: true`, `history`에 두 답
+- 가장 최근 답이 일괄 응답(3.11, `source=BULK`)이다: `history`에 그 답(`bulk: true`)
+- 지난 답이 없다
+
+지금 질문의 `options`에 없는 지난 답은 없는 것으로 본다. `sourceLabel`은 `시작월~끝월 업로드(카드사)`이고 한 달이면 `9월 업로드(국민)`이다.
+
+없거나 다른 사용자의 Batch 면 `404 BATCH_NOT_FOUND`.
+
+## `POST /api/v1/assistant/chat`
+
+비서 대화 한 턴을 AI 서버(`POST /assistant/chat`, agent-secretary.md 9장)로 중계한다. 요청·응답 본문은 AI 서버와 같다.
+대화 기록은 저장하지 않는다(C-12).
+
+```json
+{
+  "message": "토요일 스타벅스는 클라이언트 미팅이었어",
+  "history": [{ "role": "user", "content": "..." }, { "role": "assistant", "content": "..." }],
+  "context": { "screen": "/questions", "batchId": "0199aa11-...", "transactionId": null, "year": 2026 },
+  "sessionId": "browser-conv-1"
+}
+```
+
+| 필드 | 규칙 |
+| --- | --- |
+| message | 1~1,000자 |
+| history | 20개 이하. `role`은 `user`·`assistant`, `content`는 2,000자 이하 |
+| context.screen | 200자 이하 |
+| context.batchId · transactionId | 있으면 요청한 사용자의 것이어야 한다. 아니면 `404 BATCH_NOT_FOUND` · `404 TRANSACTION_NOT_FOUND` |
+| context.year | 2000~2100 |
+| sessionId | 영문·숫자·`-`·`_`, 64자 이하 |
+
+응답 `200`은 AI 서버 응답 그대로다(`answer`, `proposals`, `traceId`).
+
+- AI 서버에는 요청의 `Authorization` 헤더만 함께 넘긴다. AI 서버의 조회 도구는 이 토큰으로 공개 API 를 불러, 사용자 본인 권한 밖을 읽지 못한다.
+- 사용자마다 동시 1턴, 분당 10턴, 하루(한국 시각) 100턴이다. 넘으면 `429 ASSISTANT_RATE_LIMITED`와 `Retry-After`(초)를 준다. AI 서버 전체 한도(8턴)에 걸려도 같다.
+- AI 서버에 닿지 못하거나 응답이 40초를 넘으면 `503 ASSISTANT_UNAVAILABLE`.
 
 ---
 
@@ -2705,6 +3000,12 @@ batch_id
 (user_id, batch_id, scope_key, fact_type, version)
 ```
 
+답의 출처(3.10 `source`):
+
+```
+source  USER | ASSISTANT | PREVIOUS_ANSWER | BULK
+```
+
 ---
 
 ## classification_review
@@ -2759,6 +3060,8 @@ answered_at
 ```
 
 `status=CANCELED`는 시스템만 설정한다.
+
+`reason_code`는 규칙 카드의 질문 코드(`question.code`)이고, 3.9 응답의 `code`로 나간다.
 
 ---
 

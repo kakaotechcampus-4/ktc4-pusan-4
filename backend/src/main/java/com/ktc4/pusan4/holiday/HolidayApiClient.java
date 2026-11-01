@@ -48,7 +48,11 @@ class HolidayApiClient {
                 .build(apiKey))
             .retrieve()
             .body(JsonNode.class);
+        return parse(root, year);
+    }
 
+    /** 특일정보 응답 본문을 공휴일 목록으로 바꾼다. 시드(HolidaySeed)도 같은 형식이라 이걸 쓴다. */
+    static List<PublicHoliday> parse(JsonNode root, int year) {
         JsonNode header = root.path("response").path("header");
         if (!"00".equals(header.path("resultCode").asText())) {
             // 키 오류는 403 이라 retrieve() 가 본문을 담은 예외를 먼저 던진다(2026-10 실제 응답으로 확인).

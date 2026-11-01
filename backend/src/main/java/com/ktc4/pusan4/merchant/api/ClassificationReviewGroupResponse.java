@@ -1,6 +1,8 @@
 package com.ktc4.pusan4.merchant.api;
 
 import com.ktc4.pusan4.transaction.api.MerchantCategories;
+import com.ktc4.pusan4.transaction.domain.ClassificationReviewGroup;
+import com.ktc4.pusan4.transaction.domain.ClassificationReviewItem;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDate;
@@ -17,10 +19,18 @@ public record ClassificationReviewGroupResponse(
     @Schema(description = "항상 reviewIds.length, transactions.length 와 같다") int count,
     @Schema(description = "transactions[].amount 의 합") long totalAmount,
     @Schema(description = "그룹 대표 표기. transactions 의 첫 거래 표기다") String merchantRaw,
-    List<String> suggestedCategories,
+    @Schema(description = "제안할 카테고리. 제안 근거가 아직 없어 빈 배열이다") List<String> suggestedCategories,
     @Schema(description = "Review 마다 거래 요약 하나. 잘라내지 않는다. 정렬: approvedAt ASC, transactionId ASC")
     List<ReviewTransaction> transactions
 ) {
+
+    static ClassificationReviewGroupResponse from(ClassificationReviewGroup group) {
+        List<ReviewTransaction> transactions = group.reviews().stream().map(ReviewTransaction::from).toList();
+        return new ClassificationReviewGroupResponse(group.groupKey(), group.merchantNorm(),
+            group.reviews().stream().map(ClassificationReviewItem::id).toList(), transactions.size(),
+            group.totalAmount(), transactions.getFirst().merchantRaw(), ClassificationReviewResponse.NO_SUGGESTIONS,
+            transactions);
+    }
 
     @Schema(description = "Review 와 그 거래 요약. 거래 요약 필드는 api.md 3.4 와 같다")
     public record ReviewTransaction(
@@ -33,5 +43,11 @@ public record ClassificationReviewGroupResponse(
         long amount,
         int installmentMonths
     ) {
+
+        static ReviewTransaction from(ClassificationReviewItem review) {
+            return new ReviewTransaction(review.id(), review.transactionId(), review.approvedAt(),
+                review.merchantRaw(), review.merchantNorm(), review.merchantCategory(), review.amount(),
+                review.installmentMonths());
+        }
     }
 }
