@@ -16,6 +16,8 @@ interface AppUserRepository extends Repository<AppUserEntity, UUID> {
 
     Optional<AppUserEntity> findByEmail(String email);
 
+    boolean existsByEmail(String email);
+
     /**
      * 이메일 계정을 만든다. 같은 이메일이 있으면 아무것도 하지 않는다 — 동시 가입도 UNIQUE(email)가 하나만 남긴다.
      *

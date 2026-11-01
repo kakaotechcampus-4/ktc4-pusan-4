@@ -169,6 +169,9 @@ docker compose --env-file /etc/ktc4/production.env -f "$repo/deploy/compose.yaml
 - `/etc/ktc4/production.env`의 `APP_AUTH_JWT_SECRET`에는 `openssl rand -hex 32`로 만든 값을 넣는다. 비우면 백엔드가 기동할 때마다 임시 키를 만들어, 재배포할 때마다 모든 로그인이 풀린다. 32바이트보다 짧으면 백엔드가 뜨지 않는다.
 - 예전 고정 사용자 `demo@example.com` 행은 비밀번호가 없어 로그인할 수 없고, 같은 이메일로 다시 가입할 수도 없다(409). 시연 계정은 다른 이메일로 가입한다. `APP_AUTH_DEMO_PASSWORD`는 더 쓰지 않으니 `production.env`에서 지워도 된다.
 - 카카오 로그인은 `APP_AUTH_KAKAO_REST_API_KEY`(카카오 앱의 REST API 키), `APP_AUTH_KAKAO_CLIENT_SECRET`(보안 메뉴에서 켠 Client Secret, 안 쓰면 비움), `APP_AUTH_KAKAO_REDIRECT_URI`(`https://<DOMAIN>/auth/kakao/callback`, 카카오 앱에 등록한 값과 같게)를 넣는다. 키가 비면 카카오 로그인만 503으로 꺼지고 이메일 로그인은 그대로다. 동의항목은 닉네임만 쓰고 이메일은 켜지 않는다(비즈 앱 심사가 필요하다).
+- 이메일 가입은 메일 인증을 거친다. 인증 코드는 팀 Gmail 계정의 SMTP(`smtp.gmail.com:587`, STARTTLS)로 보낸다. `APP_MAIL_USERNAME`에 그 Gmail 주소, `APP_MAIL_PASSWORD`에 앱 비밀번호(Google 계정 > 보안 > 2단계 인증을 켠 뒤 "앱 비밀번호", 16자리)를 넣는다. 계정 비밀번호는 넣지 않는다. 비우면 인증 요청이 503 `EMAIL_VERIFICATION_UNAVAILABLE`이라 새 이메일 가입을 할 수 없다(이미 있는 계정의 로그인·카카오 로그인은 그대로다).
+- Gmail 한도는 하루 약 500통이다. 이메일 하나에 하루 5통까지만 보내지만 IP 단위 제한은 없다. 메일은 `/actuator/health`에서 뺐다(Gmail이 잠깐 안 돼도 배포가 멈추지 않는다).
+- 인증 상태는 Redis에 둔다(`email-verify:*`, 모두 TTL). Redis를 비우면 진행 중인 인증만 처음부터 다시 한다.
 - 리프레시 토큰 쿠키는 `Secure`라 HTTPS(Caddy)로만 저장된다. 로컬 프로필은 http라 `Secure`를 끈다.
 
 ## 10. 비서 중계

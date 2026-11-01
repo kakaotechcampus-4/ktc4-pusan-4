@@ -86,7 +86,7 @@ bash ./backend/gradlew -p backend bootRun --args='--spring.profiles.active=local
 
 ### 인증 (`auth`)
 
-이메일 가입(`POST /api/v1/auth/signup`)으로 만든 계정으로 로그인합니다. 비밀번호는 BCrypt 해시(`app_user.password_hash`)로 저장합니다. 로컬에서는 스웨거에서 가입한 뒤 로그인하면 됩니다.
+이메일 가입(`POST /api/v1/auth/signup`)으로 만든 계정으로 로그인합니다. 비밀번호는 BCrypt 해시(`app_user.password_hash`)로 저장합니다. 가입 전에 메일 인증(`POST /api/v1/auth/email-verification` → `.../confirm`)을 합니다. 로컬 프로필은 메일을 보내지 않고 백엔드 로그에 `[메일 인증] ... 인증 코드: 123456` 으로 찍으니(`APP_AUTH_EMAIL_DELIVERY=log`), 스웨거에서 코드 요청 → 로그의 코드로 확인 → 받은 토큰으로 가입하면 됩니다.
 
 | 구성요소 | 지금 | 바꿀 때 |
 | --- | --- | --- |
