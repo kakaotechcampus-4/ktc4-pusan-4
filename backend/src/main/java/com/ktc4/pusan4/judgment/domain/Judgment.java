@@ -14,14 +14,37 @@ public record Judgment(
     List<Integer> appliedRuleVersions,
     List<Citation> citations,
     Map<String, Object> attributes,
-    List<QuestionSpec> questions
+    List<QuestionSpec> questions,
+    List<UserFact> usedFacts
 ) {
+    /** usedFacts: 질문을 실제로 푼 답. 판정 기록에 이 답들만 남긴다(judgment_input_fact). */
     public Judgment {
         appliedRuleIds = List.copyOf(appliedRuleIds);
         appliedRuleVersions = List.copyOf(appliedRuleVersions);
         citations = List.copyOf(citations);
         attributes = Map.copyOf(attributes);
         questions = List.copyOf(questions);
+        usedFacts = List.copyOf(usedFacts);
+    }
+
+    /** 답을 쓰지 않은 판정. */
+    public Judgment(
+        Verdict verdict,
+        Gate blockedAtGate,
+        boolean inference,
+        UnmatchedReason unmatchedReason,
+        boolean outOfScope,
+        String account,
+        List<String> appliedRuleIds,
+        List<Integer> appliedRuleVersions,
+        List<Citation> citations,
+        Map<String, Object> attributes,
+        List<QuestionSpec> questions
+    ) {
+        this(
+            verdict, blockedAtGate, inference, unmatchedReason, outOfScope, account,
+            appliedRuleIds, appliedRuleVersions, citations, attributes, questions, List.of()
+        );
     }
 
     public Judgment(

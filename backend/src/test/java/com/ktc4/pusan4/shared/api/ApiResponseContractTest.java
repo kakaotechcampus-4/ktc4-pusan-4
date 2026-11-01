@@ -10,6 +10,7 @@ import com.ktc4.pusan4.auth.TestUser;
 import com.ktc4.pusan4.judgment.domain.Gate;
 import com.ktc4.pusan4.judgment.domain.JudgmentOrigin;
 import com.ktc4.pusan4.judgment.domain.JudgmentOriginType;
+import com.ktc4.pusan4.judgment.domain.JudgmentExportRow;
 import com.ktc4.pusan4.judgment.domain.JudgmentRevision;
 import com.ktc4.pusan4.judgment.domain.JudgmentRun;
 import com.ktc4.pusan4.judgment.domain.JudgmentRunFailure;
@@ -31,6 +32,8 @@ import com.ktc4.pusan4.judgment.persistence.QuestionAnswerService;
 import com.ktc4.pusan4.judgment.persistence.QuestionQueryService;
 import com.ktc4.pusan4.judgment.persistence.QuestionSuggestionService;
 import com.ktc4.pusan4.judgment.persistence.RuleCandidateReviewService;
+import com.ktc4.pusan4.handoff.domain.HandoffNote;
+import com.ktc4.pusan4.handoff.persistence.HandoffNoteService;
 import com.ktc4.pusan4.judgment.persistence.StatuteService;
 import com.ktc4.pusan4.merchant.api.ClassificationReviewStatus;
 import com.ktc4.pusan4.progress.domain.NextStep;
@@ -146,6 +149,9 @@ class ApiResponseContractTest {
     private AssistantRelayService assistantRelayService;
 
     @MockitoBean
+    private HandoffNoteService handoffNoteService;
+
+    @MockitoBean
     private StatuteService statuteService;
 
     @MockitoBean
@@ -190,7 +196,7 @@ class ApiResponseContractTest {
             OffsetDateTime.parse("2026-09-01T10:00:00+09:00")));
 
         BusinessContext context = new BusinessContext(UUID.fromString(ID),
-            TestUser.ID, 1, "62010", 82_000_000L, LocalDate.parse("2024-03-15"),
+            TestUser.ID, 1, "940909", 82_000_000L, LocalDate.parse("2024-03-15"),
             BookkeepingDuty.간편장부, false, 20, OffsetDateTime.parse("2026-09-01T10:05:00+09:00"));
         given(contextService.create(any(), any())).willReturn(context);
         given(contextService.current(any())).willReturn(context);
@@ -217,6 +223,12 @@ class ApiResponseContractTest {
         given(judgmentQueryService.list(any(), any(), anyInt(), anyInt())).willReturn(new PageImpl<>(List.of(judgment)));
         given(judgmentQueryService.summary(any(), any(), any(), any())).willReturn(JudgmentSummary.of(List.of(
             new JudgmentSummary.Row(Verdict.AVAILABLE, "소모품비", 12_800L))));
+        given(judgmentQueryService.export(any(), any(), any())).willReturn(List.of(new JudgmentExportRow(judgment,
+            0L, List.of(new JudgmentExportRow.Answer("용도가 무엇인가요?", "혼용")))));
+        HandoffNote note = new HandoffNote(UUID.fromString(ID), "휴대폰 요금의 업무 비중은?", List.of(UUID.fromString(ID)),
+            OffsetDateTime.parse("2026-11-01T14:05:00+09:00"));
+        given(handoffNoteService.list(any())).willReturn(List.of(note));
+        given(handoffNoteService.create(any(), any(), any())).willReturn(note);
 
         given(questionQueryService.find(any(), any(), any())).willReturn(List.of(new Question(UUID.fromString(ID),
             UUID.fromString(ID), UUID.fromString(ID), "merchant:스타벅스", "용도", "용도가 무엇인가요?",
@@ -276,7 +288,7 @@ class ApiResponseContractTest {
             Arguments.of("GET", "/api/v1/users/me", null, 200),
             Arguments.of("DELETE", "/api/v1/users/me", null, 204),
             Arguments.of("POST", "/api/v1/users/me/contexts", """
-                {"industryCode": "62010", "prevYearRevenue": 82000000, "businessOpenDate": "2024-03-15",
+                {"industryCode": "940909", "prevYearRevenue": 82000000, "businessOpenDate": "2024-03-15",
                  "bookkeepingDuty": "간편장부", "hasEmployee": false, "homeOfficeRatio": 20}
                 """, 201),
             Arguments.of("GET", "/api/v1/users/me/contexts", null, 200),
@@ -306,6 +318,11 @@ class ApiResponseContractTest {
             Arguments.of("GET", "/api/v1/judgment-runs/" + ID + "/failures", null, 200),
             Arguments.of("GET", "/api/v1/judgments?batchId=" + ID, null, 200),
             Arguments.of("GET", "/api/v1/judgments/summary?batchId=" + ID, null, 200),
+            Arguments.of("GET", "/api/v1/judgments/export?batchId=" + ID, null, 200),
+            Arguments.of("GET", "/api/v1/handoff-notes", null, 200),
+            Arguments.of("POST", "/api/v1/handoff-notes", """
+                {"text": "휴대폰 요금의 업무 비중은?", "transactionIds": ["%s"]}
+                """.formatted(ID), 201),
             Arguments.of("GET", "/api/v1/judgments/" + ID, null, 200),
             Arguments.of("POST", "/api/v1/judgments/" + ID + "/override", """
                 {"toVerdict": "UNAVAILABLE", "reason": "개인적으로 사용한 비용입니다."}

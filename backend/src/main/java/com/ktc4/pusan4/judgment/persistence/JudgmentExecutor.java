@@ -78,7 +78,8 @@ public class JudgmentExecutor {
         if (!transaction.userId().equals(context.userId())) {
             throw new IllegalArgumentException("Context belongs to another user: " + context.id());
         }
-        List<UserFact> facts = references.userFacts().latest(transaction.userId(), transaction.batchId());
+        BatchUserFacts batchFacts = references.userFacts();
+        List<UserFact> facts = batchFacts.latest(transaction.userId(), transaction.batchId());
         TransactionInput input = transaction.toInput();
         UserContext userContext = new UserContext(context.industryCode(), context.hasEmployee(), context.homeOfficeRatio());
         Judgment judgment = JudgmentEngine.judge(input, userContext, facts, ruleSet, references.publicHolidays());
@@ -88,7 +89,8 @@ public class JudgmentExecutor {
             transactionId, origin, rulesCommitSha, context.version(),
             approvedAt.getYear(), approvedAt,
             transaction.merchantCategory(), transaction.merchantRaw(), context.industryCode(),
-            facts, judgment, AmountCalculator.finalAmount(judgment, input, userContext)
+            batchFacts.idsOf(transaction.userId(), transaction.batchId(), judgment.usedFacts()),
+            judgment, AmountCalculator.finalAmount(judgment, input, userContext)
         ), references.statuteVersions());
         questionRepository.cancelPendingOfOtherRevisions(transactionId, judgmentId);
         return judgmentId;
