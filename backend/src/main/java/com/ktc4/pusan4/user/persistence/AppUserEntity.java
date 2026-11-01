@@ -2,8 +2,11 @@ package com.ktc4.pusan4.user.persistence;
 
 import com.ktc4.pusan4.user.domain.AppUser;
 import com.ktc4.pusan4.user.domain.EmailCredential;
+import com.ktc4.pusan4.user.domain.UserRole;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
@@ -22,6 +25,11 @@ class AppUserEntity {
     @Column
     private String email;
 
+    /** 기본 USER(DB default). 관리자는 운영 절차로 바꾼다 — 앱에는 바꾸는 API 가 없다. */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, insertable = false, updatable = false)
+    private UserRole role;
+
     /** 이메일 계정의 BCrypt 해시. 이메일 가입 전에 있던 행은 비어 있다. */
     @Column(name = "password_hash")
     private String passwordHash;
@@ -37,6 +45,6 @@ class AppUserEntity {
     }
 
     AppUser toDomain() {
-        return new AppUser(id, email, createdAt);
+        return new AppUser(id, email, role, createdAt);
     }
 }

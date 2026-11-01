@@ -88,6 +88,12 @@ bash ./backend/gradlew -p backend bootRun --args='--spring.profiles.active=local
 
 이메일 가입(`POST /api/v1/auth/signup`)으로 만든 계정으로 로그인합니다. 비밀번호는 BCrypt 해시(`app_user.password_hash`)로 저장합니다. 가입 전에 메일 인증(`POST /api/v1/auth/email-verification` → `.../confirm`)을 합니다. 로컬 프로필은 메일을 보내지 않고 백엔드 로그에 `[메일 인증] ... 인증 코드: 123456` 으로 찍으니(`APP_AUTH_EMAIL_DELIVERY=log`), 스웨거에서 코드 요청 → 로그의 코드로 확인 → 받은 토큰으로 가입하면 됩니다.
 
+관리자 API(규칙 후보, `api.md` 3.15)는 `app_user.role`이 `ADMIN`인 사용자만 씁니다. 로컬에서 관리자 화면을 보려면 DB에서 직접 바꿉니다.
+
+```bash
+docker compose exec postgres psql -U ktc4 -d ktc4 -c "update app_user set role = 'ADMIN' where email = 'demo@example.com'"
+```
+
 | 구성요소 | 지금 | 바꿀 때 |
 | --- | --- | --- |
 | `AccessTokens` | JWT 발급·검증(15분) | 그대로 |

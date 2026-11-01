@@ -18,6 +18,7 @@ import com.ktc4.pusan4.judgment.persistence.LimitBucketPersistenceService;
 import com.ktc4.pusan4.judgment.persistence.RuleCandidatePersistenceService;
 import com.ktc4.pusan4.judgment.persistence.SaveJudgmentCommand;
 import com.ktc4.pusan4.judgment.persistence.SaveRuleCandidateCommand;
+import com.ktc4.pusan4.judgment.persistence.SuggestedDocJson;
 import com.ktc4.pusan4.judgment.persistence.UserFactPersistenceService;
 import jakarta.persistence.NoResultException;
 import org.junit.jupiter.api.Test;
@@ -264,13 +265,14 @@ class JudgmentSchemaIntegrationTest {
     void rule_candidate_is_stored_as_pending_with_suggested_docs() {
         long candidateId = ruleCandidatePersistenceService.save(new SaveRuleCandidateCommand(
             "구독", "620100", 3, 12,
-            List.of("소득세법-33-1-6", "소득세법시행령-67-4"),
+            List.of(new SuggestedDocJson("소득세법-33-1-6", "업무와 관련된 비용", "법령"),
+                new SuggestedDocJson("소득세법시행령-67-4", "감가상각", null)),
             "시행령", "draft"
         ));
 
         Map<String, Object> stored = jdbcTemplate.queryForMap("""
             select status, merchant_category, distinct_users,
-                   suggested_docs ->> 0 as first_doc
+                   suggested_docs -> 0 ->> 'statute_id' as first_doc
             from rule_candidate
             where id = ?
             """, candidateId);

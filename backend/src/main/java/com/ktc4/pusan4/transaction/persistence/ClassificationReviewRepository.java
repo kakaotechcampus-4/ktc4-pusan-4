@@ -15,6 +15,8 @@ import java.util.UUID;
 
 interface ClassificationReviewRepository extends Repository<ClassificationReviewEntity, UUID> {
 
+    ClassificationReviewEntity save(ClassificationReviewEntity review);
+
     boolean existsByTransactionIdAndStatus(UUID transactionId, String status);
 
     /** 같은 요청에 응답이 동시에 와도 한 번만 해결되도록 행을 잠근다. */
