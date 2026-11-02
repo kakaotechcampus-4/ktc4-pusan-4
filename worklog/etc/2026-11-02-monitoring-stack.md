@@ -28,3 +28,10 @@
 
 - 첫 배포에서 `AlarmToDiscordFunction` 이 "Could not unzip uploaded file" 로 실패했다. 템플릿 `Code` 에 `.py` 를 두면 AWS CLI v2(2.39.3)의 `cloudformation package` 가 zip 으로 묶지 않고 올린다.
 - `deploy.sh` 가 작업 폴더에 템플릿과 `alarm_to_discord.zip` 을 같이 만들고, 템플릿은 `Code: alarm_to_discord.zip` 을 가리키게 바꿨다.
+
+---
+
+# 첫 정상 판정 알림 끄기
+
+- 배포 직후 `ktc4-ec2-status-check-failed` 가 장애 없이 "✅ 복구" 를 보냈다. 알람이 INSUFFICIENT_DATA 로 시작해 첫 판정에서 OK 가 되기 때문이다. Agent 를 설치하면 메모리·디스크 알람도 같은 메시지를 보낸다.
+- Lambda 가 INSUFFICIENT_DATA → OK 만 보내지 않는다. INSUFFICIENT_DATA → ALARM 은 처음부터 문제라는 뜻이라 보낸다.
