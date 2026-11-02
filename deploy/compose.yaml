@@ -1,5 +1,12 @@
 name: ktc4
 
+# 백엔드 말고는 서버 디스크에 남기되 크기를 묶는다. Docker 기본 json-file 은 상한이 없어 디스크가 찬다.
+x-logging: &rotated-logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "5"
+
 services:
   postgres:
     image: ${ECR_REPOSITORY}:postgres-${POSTGRES_TAG}
@@ -17,6 +24,7 @@ services:
       timeout: 5s
       retries: 12
     mem_limit: 1g
+    logging: *rotated-logging
 
   # 리프레시 토큰 저장소(B9c). 포트는 열지 않고 compose 내부망으로만 쓴다.
   # 토큰은 모두 TTL 이 있어 메모리가 차면 오래 안 쓴 토큰부터 지운다(volatile-lru). 지워진 사용자는 다시 로그인한다.
@@ -33,6 +41,7 @@ services:
       timeout: 3s
       retries: 12
     mem_limit: 192m
+    logging: *rotated-logging
 
   backend:
     image: ${ECR_REPOSITORY}:backend-${IMAGE_TAG}
@@ -69,6 +78,16 @@ services:
     # 호스트의 CloudWatch Agent 가 /actuator/prometheus 를 긁는다. 127.0.0.1 에만 열어 밖에서는 닿지 않는다.
     ports:
       - "127.0.0.1:8080:8080"
+    # 로그는 CloudWatch Logs /ktc4/backend 로 간다(docs/deployment.md 13절). Docker 데몬이 호스트에서 인스턴스 역할로 보내므로
+    # 컨테이너에 자격 증명이 없어도 된다. 그룹은 모니터링 스택이 보존 기간과 함께 만든다. 자동으로 만들면 보존이 무기한이라 끈다.
+    # 그래서 그룹이 없으면 컨테이너가 뜨지 않는다. non-blocking 은 CloudWatch 가 느려도 앱 로그 쓰기가 멈추지 않게 한다.
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ap-northeast-2
+        awslogs-group: /ktc4/backend
+        awslogs-create-group: "false"
+        mode: non-blocking
     # 종료할 때 판정 run 을 app.judgment-run.await-termination(60s)까지 기다린다(application.yml).
     # Docker 기본값(10s)이면 그 전에 SIGKILL 로 꺼진다. 웹 요청 종료 대기(최대 30s) 뒤에 이어지므로 합 90s 에 10s 를 더 둔다.
     stop_grace_period: 100s
@@ -106,6 +125,7 @@ services:
       retries: 8
       start_period: 10s
     mem_limit: 512m
+    logging: *rotated-logging
 
   web:
     image: ${ECR_REPOSITORY}:web-${IMAGE_TAG}
@@ -122,6 +142,7 @@ services:
       backend:
         condition: service_healthy
     mem_limit: 256m
+    logging: *rotated-logging
 
 volumes:
   postgres-data:

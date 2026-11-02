@@ -234,3 +234,67 @@ sudo docker compose --env-file /etc/ktc4/production.env -f /opt/ktc4/repo/deploy
 - `DB_USERNAME`·`DB_NAME`은 `production.env`의 값이다(`set -a; source /etc/ktc4/production.env; set +a`로 먼저 읽는다).
 - 이메일이 없는 카카오 계정은 `where id = '<사용자 id>'`로 지정한다. id 는 그 계정으로 `GET /api/v1/users/me`를 불러 확인한다.
 - 관리자를 해제할 때는 `role = 'USER'`로 되돌린다. 바뀐 role 은 다음 요청부터 바로 반영된다.
+
+## 13. 로그
+
+백엔드 로그는 Docker `awslogs` 드라이버로 CloudWatch Logs `/ktc4/backend`(서울 리전)에 간다. 로그 스트림은 컨테이너마다 하나라 배포하면 새 스트림이 생긴다. 나머지 컨테이너(PostgreSQL·Redis·AI·웹)는 서버 디스크의 `json-file`에 컨테이너마다 10MB × 5개까지만 남긴다.
+
+- **로그 그룹이 먼저 있어야 한다.** 그룹은 14절의 모니터링 스택이 보존 기간 14일로 만든다. 보존 기간이 무기한인 그룹이 생기지 않게 compose 는 그룹을 만들지 않으므로(`awslogs-create-group: "false"`), 그룹이 없으면 백엔드 컨테이너가 뜨지 않고 배포가 실패한다. 이 설정이 든 커밋을 처음 `release`에 올리기 전에 확인한다.
+
+  ```bash
+  aws logs describe-log-groups --region ap-northeast-2 --log-group-name-prefix /ktc4/backend \
+    --query 'logGroups[].[logGroupName,retentionInDays]'
+  ```
+
+- 자격 증명은 Docker 데몬이 호스트에서 EC2 인스턴스 역할(`ktc-ec2-ssm-role`의 `CloudWatchAgentServerPolicy`)로 얻는다. 컨테이너에는 넣지 않는다.
+- `mode: non-blocking`이라 CloudWatch 가 느려도 앱은 멈추지 않는다. 대신 드라이버 버퍼(기본 1MB)가 차면 그 사이 로그는 버린다.
+- 서버에서 `docker logs`는 그대로 된다(Docker 의 dual logging). 서버에 남는 것은 최근 일부뿐이고 전체는 CloudWatch 에서 본다.
+
+  ```bash
+  sudo docker logs --tail 100 ktc4-backend-1
+  ```
+
+### 형식
+
+운영 로그는 한 줄에 JSON 하나다(Spring Boot 내장 `logstash` 형식, `application.yml`의 `logging.structured`). 로컬 프로필(`application-local.yml`)은 텍스트다.
+
+| 필드 | 내용 |
+| --- | --- |
+| `message`, `level`, `logger_name`, `thread_name`, `@timestamp` | 기본 필드 |
+| `stack_trace` | 예외. 한 이벤트 안에 들어간다. |
+| `traceId` | 요청마다 하나. 응답 헤더 `X-Trace-Id`와 에러 본문 `traceId`도 같은 값이다. |
+| `userId` | 인증을 거친 요청이면 그 사용자 id |
+| `runId` | 판정 run 워커가 낸 로그 |
+
+요청마다 `RequestTraceFilter`가 한 줄을 남긴다. 필드는 `method`, `path`(쿼리스트링 제외), `status`(숫자), `durationMs`(숫자)이고 본문은 남기지 않는다. `/actuator`는 healthcheck·지표 수집이 주기적으로 불러 남기지 않는다. 14절의 5xx 알람이 이 줄의 `status`로 센다.
+
+```json
+{"@timestamp":"...","message":"GET /api/v1/users/me 200 12ms","logger_name":"com.ktc4.pusan4.shared.api.RequestTraceFilter","level":"INFO","traceId":"01a19c9e-...","userId":"0199c8f2-...","method":"GET","path":"/api/v1/users/me","status":200,"durationMs":12}
+```
+
+### 찾기
+
+CloudWatch 콘솔 → Logs Insights 에서 로그 그룹 `/ktc4/backend`를 고르고 기간을 정해 실행한다. 사용자가 에러 화면의 `traceId`를 알려 주면 그 요청의 로그를 모두 볼 수 있다.
+
+```text
+fields @timestamp, level, message, status, path, stack_trace
+| filter traceId = '<traceId>'
+| sort @timestamp asc
+```
+
+```text
+# 최근 5xx 와 느린 요청
+fields @timestamp, method, path, status, durationMs, traceId
+| filter status >= 500 or durationMs > 3000
+| sort @timestamp desc
+| limit 50
+```
+
+```text
+# 판정 run 하나의 로그
+fields @timestamp, level, message, stack_trace
+| filter runId = '<runId>'
+| sort @timestamp asc
+```
+
+CLI 로 최근 로그를 따라 볼 때는 `aws logs tail /ktc4/backend --region ap-northeast-2 --follow --since 10m`을 쓴다.
