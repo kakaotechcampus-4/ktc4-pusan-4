@@ -475,4 +475,22 @@ describe('내보내기 (#214)', () => {
     // 시드 문진의 면적 비율은 20% 다
     expect(judgment.finalAmount).toBe(Math.floor(amount * 20 / 100));
   });
+
+  it('문진의 면적 비율이 0(해당 없음)이면 엔진처럼 비율이 없는 것으로 보고 확인 필요로 둔다', async () => {
+    const context = await api.contexts.create({
+      industryCode: '940909',
+      prevYearRevenue: 1,
+      businessOpenDate: '2024-01-01',
+      bookkeepingDuty: '간편장부',
+      hasEmployee: false,
+      homeOfficeRatio: 0
+    });
+    let run = await api.runs.create({ batchId, contextId: context.id });
+    while (run.status.code !== 'COMPLETED') run = await api.runs.get(run.id);
+    const group = await groupOf(tx('1008'));
+    await api.questions.respond({ questionIds: group.questionIds, answer: { value: '자택 겸용(작업 공간이 따로 나뉨)' } });
+    const judgment = await currentOf(tx('1008'));
+    expect(judgment.verdict.code).toBe('NEEDS_REVIEW');
+    expect(judgment.finalAmount).toBeNull();
+  });
 });
