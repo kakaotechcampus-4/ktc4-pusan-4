@@ -249,7 +249,7 @@ export function Upload() {
                     {phase.error}
                   </p>
               }
-                {isMock && <SampleList onPick={(file) => pick([file])} />}
+                <SampleList onPick={(file) => pick([file])} />
               </div>
             }
 
@@ -333,7 +333,10 @@ function DropZone({ onFiles }: {onFiles: (files: ArrayLike<File>) => void;}) {
 
 }
 
-/** 목업 모드 전용. 실제 서버에 가짜 거래가 들어가지 않도록 http 모드에서는 그리지 않는다 */
+/**
+ * 가짜 거래로 만든 샘플. 시연할 때 올릴 파일이 있어야 해서 실서버에서도 보인다(#215).
+ * 실서버에서는 올린 샘플이 그 계정의 업로드로 남는다
+ */
 function SampleList({ onPick }: {onPick: (file: File) => void;}) {
   const [samples, setSamples] = useState<SampleFile[]>([]);
 
@@ -357,7 +360,7 @@ function SampleList({ onPick }: {onPick: (file: File) => void;}) {
     <section className="mt-7">
       <h2 className="text-body font-bold text-ink">샘플 파일로 해 보기</h2>
       <p className="mt-1 text-small text-muted">
-        목업 모드에서만 보입니다. 가짜 거래로 만든 파일입니다.
+        가짜 거래로 만든 파일입니다.{!isMock && ' 올리면 내 업로드 이력에 남습니다.'}
       </p>
       <ul className="mt-3 space-y-2">
         {samples.map((sample) =>
