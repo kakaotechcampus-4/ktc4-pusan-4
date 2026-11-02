@@ -1,25 +1,17 @@
 import { MarketingHeader } from '../components/MarketingHeader';
 import { MarketingFooter } from '../components/MarketingFooter';
 import { SectionHeading } from '../components/ui';
+import { BugReportAddress, BugReportMailButton } from '../components/BugReport';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { WHAT_TO_WRITE } from '../utils/bugReport';
 
 /**
- * 버그 신고. 보내는 양식은 아직 없다 — 치오님이 여기에 붙인다.
- *
- * 메뉴에 자리를 먼저 잡아 두는 쪽을 택했다. 메뉴만 넣고 라우트가 없으면
- * `*` 가 랜딩으로 되돌려서, 눌러도 아무 일이 없는 것처럼 보인다.
- *
- * 보낼 곳을 아직 지어내지 않는다. 계약(`docs/api.md`)에 신고 엔드포인트가
- * 없고, 푸터의 help@expense-verdict.kr 은 코드 어디에도 쓰이지 않는 문구다.
- * 닿지 않는 곳으로 보내는 양식은 없는 것만 못하다.
+ * 버그 신고. 레포가 공개라 GitHub 이슈 대신 메일로 받는다(받는 주소는 utils/contact.ts).
+ * 머리말의 「버그 신고」는 같은 내용을 창으로 띄우고, 이 화면은 꼬리말 링크와 주소로 바로 들어올 때 쓴다.
+ * 메뉴만 넣고 라우트가 없으면 `*` 가 없는 주소 화면으로 보내서 눌러도 아무 일이 없는 것처럼 보인다(#211)
  */
-const WHAT_TO_WRITE = [
-{ term: '무엇을 하려다', detail: '어느 화면에서 어떤 버튼을 눌렀는지' },
-{ term: '무엇을 봤는지', detail: '화면에 뜬 문구 그대로. 숫자가 안 맞으면 양쪽 숫자를 함께' },
-{ term: '무엇을 기대했는지', detail: '대신 어떻게 나왔어야 하는지' },
-{ term: '언제', detail: '날짜와 대략의 시각' }];
-
-
 export function BugReport() {
+  useDocumentTitle('버그 신고');
   return (
     <div className="min-h-full bg-canvas">
       <MarketingHeader />
@@ -31,13 +23,16 @@ export function BugReport() {
           description="판정이 이상하거나 화면이 깨졌다면 알려주시면 고칩니다." />
 
         <div className="mt-12 max-w-2xl rounded-2xl border border-line bg-surface px-8 py-10">
-          <p className="text-h4 font-bold text-ink">
-            접수 창구를 준비하고 있습니다
-          </p>
+          <p className="text-h4 font-bold text-ink">메일로 받습니다</p>
           <p className="mt-4 text-body leading-6 text-ink2 [word-break:keep-all]">
-            곧 이 자리에서 바로 보낼 수 있게 됩니다. 그때까지는 아래 내용을
-            적어 두셨다가 한 번에 보내주시면 고치는 데 걸리는 시간이 줄어듭니다.
+            「메일 쓰기」를 누르면 아래 적을 것과 지금 시각·브라우저를 채운 메일이 열립니다.
           </p>
+          <div className="mt-6">
+            <BugReportMailButton />
+          </div>
+          <div className="mt-6">
+            <BugReportAddress />
+          </div>
         </div>
 
         <section className="mt-16 max-w-2xl">

@@ -89,6 +89,8 @@ export function Transactions() {
   {
     header: '승인일',
     width: 'w-[7.5rem]',
+    // 좁은 화면에서는 표가 옆으로 밀려 「제외하기」가 화면 밖으로 나간다. 날짜는 가맹점 칸으로 옮긴다
+    hideBelow: 'sm',
     cell: (row) =>
     <span className="whitespace-nowrap tabular-nums text-ink2">
           {formatFullDate(row.approvedAt)}
@@ -97,9 +99,13 @@ export function Transactions() {
   },
   {
     header: '가맹점',
+    width: 'w-full max-w-0',
     cell: (row) =>
     <span className="block min-w-0">
           <span className="block truncate font-normal text-ink">{row.merchantNorm}</span>
+          <span className="block whitespace-nowrap text-small tabular-nums text-muted sm:hidden">
+            {formatFullDate(row.approvedAt)}
+          </span>
           <span className="block truncate text-small text-muted">{row.merchantRaw}</span>
           {/* 분류 열은 좁은 화면에서 숨기므로, 그 정보를 여기로 옮긴다 */}
           <span className="mt-1 block md:hidden">
@@ -207,10 +213,11 @@ export function Transactions() {
         </div>
       </div>
 
-      {/* 비어 있어도 DOM 에 남아 있어야 바뀐 내용을 읽는다 */}
-      <div role="status">
+      {/* 비어 있어도 DOM 에 남아 있어야 바뀐 내용을 읽는다.
+          아래쪽 행에서 다시 넣으면 안내가 화면 밖에 생겨 보이지 않으므로 머리말 아래에 붙여 둔다 */}
+      <div role="status" className="sticky top-[76px] z-20">
         {rerunNeeded &&
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn-line bg-warn-bg px-4 py-3">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn-line bg-warn-bg px-4 py-3 shadow-panel">
             <p className="text-small leading-6 text-ink2">
               {rerunNeeded === 'classify' ?
             '분류가 안 된 거래가 있습니다. 분류 확인을 마친 뒤 판정을 새로 실행해야 결과에 반영됩니다.' :

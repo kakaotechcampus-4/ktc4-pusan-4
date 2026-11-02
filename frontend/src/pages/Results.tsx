@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRightIcon, CircleHelpIcon, SearchXIcon } from 'lucide-react';
+import { ArrowRightIcon, CircleHelpIcon, DownloadIcon, SearchXIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { JudgmentDetailPanel } from '../components/results/JudgmentDetailPanel';
 import { VerdictBadge } from '../components/VerdictBadge';
 import {
+  BottomSheet,
   Button,
   Empty,
   FilterBar,
@@ -14,11 +15,41 @@ import {
 '../components/ui';
 import { useSession } from '../contexts/SessionContext';
 import { useAssistantSubject } from '../components/assistant/context';
-import { api, useApi } from '../api';
+import { api, ApiRequestError, useApi } from '../api';
 import type { Judgment, Verdict } from '../types/domain';
 import { formatFullDate, formatNumber, formatPeriod, formatWon } from '../utils/format';
+import { download, exportRowOf, judgmentsCsv } from '../utils/csv';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 
 type Filter = 'ALL' | Verdict;
+
+/** 내보내기 API(#214)가 아직 없는 서버는 판정 목록을 끝까지 읽어 같은 모양을 만든다 */
+const readAllJudgments = async (batchId: string) => {
+  const all: Judgment[] = [];
+  for (let page = 0;; page += 1) {
+    const result = await api.judgments.list({ batchId, page, size: 100 });
+    all.push(...result.items);
+    if (!result.page.hasNext || page + 1 >= result.page.totalPages) return all;
+  }
+};
+
+/**
+ * 세무사에게 넘길 내보내기. 한도 반영 인정 금액과 답한 내용이 함께 온다.
+ * 내보내기가 없는 서버는 `/judgments/export` 를 `/judgments/{judgmentId}` 로 읽어 400 VALIDATION_ERROR(id 가 UUID 가 아님)를,
+ * 그 경로도 없으면 404 를 준다. 이때만 판정 목록으로 만든다. 내보내기의 400 INVALID_EXPORT_SCOPE 는 그대로 실패다
+ */
+const noExportApi = (caught: unknown) =>
+caught instanceof ApiRequestError && (
+caught.status === 404 || caught.status === 400 && caught.code === 'VALIDATION_ERROR');
+
+const readExport = (batchId: string) =>
+api.judgments.
+export({ batchId }).
+then((result) => result.items).
+catch(async (caught: unknown) => {
+  if (!noExportApi(caught)) throw caught;
+  return (await readAllJudgments(batchId)).map(exportRowOf);
+});
 
 /**
  * 3.7 판정 결과.
@@ -35,6 +66,10 @@ export function Results() {
   const [focusKey, setFocusKey] = useState(0);
   // 「이거 왜 불가야?」의 「이거」 (FR-2)
   useAssistantSubject(selectedId);
+  /** 넓은 화면은 표 옆에 상세를 늘 띄우고, 좁은 화면은 행을 누를 때만 아래에서 올린다 */
+  const wide = useMediaQuery('(min-width: 1024px)');
+  const [exporting, setExporting] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const batchQ = useApi(
     () => batchId ? api.uploads.get(batchId) : Promise.resolve(null),
@@ -91,18 +126,29 @@ export function Results() {
   );
   const panelData = panelQ.data?.id === selectedId ? panelQ.data : null;
 
-  // 처음에는 첫 행을 보여준다
-  const firstId = judgments[0]?.transactionId;
+  /**
+   * 방금 판정 대상에서 뺀 거래. 목록을 다시 읽는 동안에는 옛 목록이 남아 있어서,
+   * 첫 행 자동 선택이 뺀 거래를 다시 고르지 않게 건너뛴다
+   */
+  const excludedId = useRef<string | null>(null);
+
+  // 넓은 화면은 처음에 첫 행을 보여 준다. 좁은 화면에서 그러면 들어오자마자 창이 덮는다
+  const firstId = judgments.find((judgment) => judgment.transactionId !== excludedId.current)?.transactionId;
   useEffect(() => {
-    if (!selectedId && firstId) setSelectedId(firstId);
-  }, [selectedId, firstId]);
+    if (wide && !selectedId && firstId) setSelectedId(firstId);
+  }, [wide, selectedId, firstId]);
+
+  // 넓은 화면에서 고른 채로 창을 줄이면 아래 창이 저절로 뜬다. 줄일 때 고른 것을 푼다
+  useEffect(() => {
+    if (!wide) setSelectedId(null);
+  }, [wide]);
 
   // 마지막 행이 다른 분류로 빠지면 그 페이지가 빈다. Pagination 이 사라지므로 첫 페이지로
   useEffect(() => {
     if (page > 0 && judgmentsQ.data && judgmentsQ.data.items.length === 0) setPage(0);
   }, [page, judgmentsQ.data]);
 
-  // 패널은 열릴 때 제목으로 초점을 옮긴다. 좁은 화면에서는 표 아래에 있으므로 그때 함께 스크롤된다
+  // 패널은 열릴 때 제목으로 초점을 옮긴다. 좁은 화면에서는 아래에서 올라오는 창으로 연다
   const select = (transactionId: string) => {
     setSelectedId(transactionId);
     setFocusKey((key) => key + 1);
@@ -112,6 +158,30 @@ export function Results() {
     judgmentsQ.reload();
     summaryQ.reload();
     panelQ.reload();
+  };
+
+  /** 판정 대상에서 뺀 거래는 목록에서 사라진다. 다시 넣는 곳을 알려 준다 */
+  const excluded = (merchant: string) => {
+    excludedId.current = selectedId;
+    setSelectedId(null);
+    setNotice(`${merchant} 거래를 판정 대상에서 뺐습니다. 거래 화면의 「대상제외」에서 다시 넣을 수 있습니다.`);
+    changed();
+  };
+
+  const exportCsv = async () => {
+    if (!batchId || exporting) return;
+    setExporting(true);
+    setNotice(null);
+    try {
+      const all = await readExport(batchId);
+      const batch = batchQ.data;
+      const period = batch ? `${batch.periodStart}_${batch.periodEnd}` : batchId.slice(0, 8);
+      download(`PreeT-판정결과-${period}.csv`, judgmentsCsv(all));
+    } catch {
+      setNotice('CSV 를 만들지 못했습니다. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setExporting(false);
+    }
   };
 
   const summary = summaryQ.data;
@@ -151,9 +221,11 @@ export function Results() {
           }
               <span className="truncate">{transaction.merchantNorm}</span>
             </span>
+            {/* 승인일 열은 좁은 화면에서 숨기므로 여기로 옮긴다. 가맹점명 줄에 붙이면 말줄임에 같이 잘린다 */}
+            <span className="block whitespace-nowrap text-small tabular-nums text-muted sm:hidden">
+              {formatFullDate(transaction.approvedAt)}
+            </span>
             <span className="block truncate text-small text-muted">
-              {/* 승인일 열은 좁은 화면에서 숨기므로, 그 정보를 여기로 옮긴다 */}
-              <span className="sm:hidden">{formatFullDate(transaction.approvedAt)} · </span>
               {transaction.merchantRaw} · {transaction.merchantCategory}
               {transaction.installmentMonths > 0 &&
             ` · ${transaction.installmentMonths}개월 할부`}
@@ -207,7 +279,7 @@ export function Results() {
   const header =
   <header className="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <p className="text-small font-bold text-accent">4단계 · 반영</p>
+        <p className="text-small font-bold text-accent">5단계 · 결과</p>
         <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">판정 결과</h1>
         {summary &&
       <p className="mt-2 text-body tabular-nums text-muted">
@@ -225,6 +297,12 @@ export function Results() {
         {!(unresolved && unresolved.count > 0) && answeredGroups > 0 &&
       <Button to="/questions" variant="ghost" size="sm">
             답한 질문 보기
+          </Button>
+      }
+        {batchId && summary && summary.totalCount > 0 &&
+      <Button variant="ghost" size="sm" disabled={exporting} onClick={() => void exportCsv()}>
+            <DownloadIcon className="h-4 w-4" aria-hidden="true" />
+            {exporting ? 'CSV 만드는 중…' : 'CSV 내려받기'}
           </Button>
       }
         <Button to="/summary" variant="secondary" size="sm">
@@ -299,9 +377,49 @@ export function Results() {
     description="다른 판정을 골라 보세요." />;
 
 
+  const panel =
+  panelData && !panelData.failed && panelData.judgment ?
+  <JudgmentDetailPanel
+    key={selectedId}
+    judgment={panelData.judgment}
+    focusKey={focusKey}
+    onChanged={changed}
+    onExcluded={excluded} /> :
+
+  // 수정 뒤 다시 읽기가 실패해도 이전 판정을 그리지 않고 실패를 알린다
+  panelData?.failed ?
+  <div role="alert" className="rounded-2xl border border-deny-line bg-deny-bg p-5 text-body text-deny">
+        이 거래의 판정을 불러오지 못했습니다.{' '}
+        <button type="button" onClick={panelQ.reload} className="font-bold underline">
+          다시 시도
+        </button>
+      </div> :
+
+  panelData ?
+  <p className="rounded-2xl border border-line bg-surface p-5 text-body text-muted">
+        이 거래에는 현재 판정이 없습니다. 판정 대상에서 빠졌거나 아직 판정하지 않은 거래입니다.
+      </p> :
+
+  <span className="block h-96 animate-pulse rounded-2xl bg-line2" />;
+
+
   return (
     <AppShell>
       {header}
+
+      {notice &&
+      <p role="status" className="mt-4 flex items-start justify-between gap-3 rounded-xl border border-line bg-surface px-4 py-3 text-small text-ink2">
+          <span>
+            {notice}{' '}
+            {notice.includes('대상제외') &&
+          <Link to="/transactions" className="font-bold underline underline-offset-4">거래 화면으로</Link>
+          }
+          </span>
+          <button type="button" onClick={() => setNotice(null)} className="shrink-0 text-muted hover:text-ink">
+            닫기
+          </button>
+        </p>
+      }
 
       {unresolved && unresolved.count > 0 &&
       <Link
@@ -332,6 +450,8 @@ export function Results() {
             onChange={(next) => {
               setFilter(next);
               setPage(0);
+              // 다른 판정을 고르면 보던 거래가 목록에 없을 수 있다. 새 목록의 첫 행으로 다시 고른다
+              setSelectedId(null);
             }}
             options={filters} />
 
@@ -351,36 +471,22 @@ export function Results() {
           }
         </section>
 
-        {selectedId && !failed && !nothingJudged &&
+        {wide && selectedId && !failed && !nothingJudged &&
         // 패널이 화면보다 길면 수정 버튼·이력이 접힌 아래로 밀린다. 화면 높이 안에서 따로 스크롤한다.
         // 아래 여백은 오른쪽 아래 비서 버튼이 패널 끝을 가리지 않게 둔 것이다
-        <aside className="lg:sticky lg:top-32 lg:max-h-[calc(100vh-9rem)] lg:self-start lg:overflow-y-auto lg:pb-20">
-            {panelData && !panelData.failed && panelData.judgment ?
-          <JudgmentDetailPanel
-            key={selectedId}
-            judgment={panelData.judgment}
-            focusKey={focusKey}
-            onChanged={changed} /> :
-
-          // 수정 뒤 다시 읽기가 실패해도 이전 판정을 그리지 않고 실패를 알린다
-          panelData?.failed ?
-          <div role="alert" className="rounded-2xl border border-deny-line bg-deny-bg p-5 text-body text-deny">
-                이 거래의 판정을 불러오지 못했습니다.{' '}
-                <button type="button" onClick={panelQ.reload} className="font-bold underline">
-                  다시 시도
-                </button>
-              </div> :
-
-          panelData ?
-          <p className="rounded-2xl border border-line bg-surface p-5 text-body text-muted">
-                이 거래에는 현재 판정이 없습니다. 판정 대상에서 빠졌거나 아직 판정하지 않은 거래입니다.
-              </p> :
-
-          <span className="block h-96 animate-pulse rounded-2xl bg-line2" />
-          }
+        <aside className="sticky top-32 max-h-[calc(100vh-9rem)] self-start overflow-y-auto pb-20">
+            {panel}
           </aside>
         }
       </div>
+
+      <BottomSheet
+        open={!wide && selectedId !== null && !failed && !nothingJudged}
+        onClose={() => setSelectedId(null)}
+        label="거래 판정 상세">
+        
+        {panel}
+      </BottomSheet>
     </AppShell>);
 
 }

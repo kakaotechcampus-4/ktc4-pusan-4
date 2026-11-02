@@ -12,6 +12,7 @@ import type {
   JudgmentRun,
   JudgmentRunFailure,
   Page,
+  Progress,
   Question,
   QuestionGroup,
   QuestionPage,
@@ -91,8 +92,11 @@ const MERCHANT_KEYWORDS: [RegExp, string, string][] = [
 /** 시드 판정이 쓴 규칙 커밋. 새로 만드는 판정도 같은 값을 쓴다 */
 const RULES_SHA = JUDGMENTS[0]?.rulesCommitSha ?? '';
 
-/** 분류 확인 화면이 먼저 보여줄 선택지. 서버는 후보를 계산하지만 목업은 고정이다 */
-const SUGGESTED_CATEGORIES = ['해외SaaS', '사무용품', '기타'] as const;
+/**
+ * 분류 확인 화면이 먼저 보여줄 선택지. 서버는 분류 모델이 고르지만 목업은 고정이다.
+ * 서버처럼 최대 3개, 가맹점 카테고리 안의 값만 두고 `기타`·`PG_미상`은 넣지 않는다(#209)
+ */
+const SUGGESTED_CATEGORIES = ['해외SaaS', '사무용품', '구독서비스'] as const;
 
 /** 못 맞히면 category 가 null 이다 */
 const guessMerchant = (raw: string) => {
@@ -203,8 +207,16 @@ const store = {
   failures: new Map<string, JudgmentRunFailure[]>(),
   /** 다음 업로드를 이 오류로 실패시킨다 (개발용) */
   failUpload: null as ApiRequestError | null,
-  /** 로그인한 이메일. 로그아웃하면 null 이고, 그때 users.me 는 401 이다 */
+  /** 로그인했는가. 로그아웃하면 false 이고, 그때 users.me 는 401 이다 */
+  signedIn: false,
+  /** 로그인한 이메일. 카카오 계정이면 null 이다 */
   email: null as string | null,
+  /** 목업에서 가입한 계정. 이메일 → 비밀번호 */
+  accounts: new Map<string, string>(),
+  /** 이메일 → 보낸 인증 코드의 상태 (#193) */
+  verifications: new Map<string, { sentAt: number; sentToday: number; attempts: number; used: boolean }>(),
+  /** 가입 토큰 → 인증한 이메일 */
+  verificationTokens: new Map<string, string>(),
   ruleCandidates: RULE_CANDIDATES.map((c) => ({ ...c })) as RuleCandidate[],
   /** 다음 비서 요청을 이 오류로 실패시킨다 (개발용) */
   failAssistant: null as ApiRequestError | null,
@@ -212,10 +224,27 @@ const store = {
 };
 
 /**
- * 목업 비밀번호. 이메일은 무엇이든 받고 비밀번호만 본다. 실서버 로컬 프로필의 고정 사용자 비밀번호와 같다(#155).
+ * 목업 비밀번호. 이메일은 무엇이든 받고 비밀번호만 본다. 실서버에는 고정 사용자가 없으니 가입해서 계정을 만든다(#177).
  * 로그인 화면의 목업 전용 버튼과 안내도 이 값을 쓴다(Login.tsx)
  */
 export const MOCK_PASSWORD = 'demo1234';
+
+/** 목업 인증 코드. 메일을 보내지 않으므로 늘 이 값이다. 가입 화면의 목업 안내가 쓴다 */
+export const MOCK_VERIFICATION_CODE = '123456';
+
+/** 서버와 같은 규칙으로 이메일을 맞춘다 — 앞뒤 공백을 빼고 소문자 (api.md 1.1) */
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const CODE_TTL_MS = 5 * 60_000;
+const RESEND_MS = 60_000;
+
+const reject = (status: number, code: string, message: string) =>
+Promise.reject(new ApiRequestError(status, code, message));
+
+const signInAs = (email: string | null) => {
+  store.signedIn = true;
+  store.email = email;
+};
 
 /** 목업에서 관리자 화면을 보려면 admin@… 으로 로그인한다 */
 const isAdminEmail = (email: string | null) => email?.split('@')[0] === 'admin';
@@ -297,11 +326,17 @@ const rejudge = (transactionId: string, groupKey: string, answer: string) => {
   // 엔진은 사용자 수정이 아니라 자기 판정 위에서 다시 판정한다
   const prev = automaticOf(transactionId);
   if (!prev) return;
-  const verdict = QUESTION_ANSWER_VERDICT[groupKey]?.[answer] ?? 'NEEDS_REVIEW';
   // 질문을 낸 카드의 선택지대로 규칙 카드·계정과목·근거를 붙인다
   const card = QUESTION_CARDS[groupKey];
   const option = card?.options[answer];
-  const ratio = ratioOf(answer);
+  // 작업 공간 면적으로 안분하는 선택지(R-103·R-210 v3+)는 그 판정이 쓴 문진 버전의 비율을 쓴다(서버도 같다).
+  // 서버처럼 문진에 비율이 없으면 금액을 정할 수 없어 확인 필요로 둔다. 0(「해당 없음」)도 비율이 없는 것으로 본다(#214 UserContext)
+  const apportioned = option?.attributes?.['안분'] === '작업공간비율';
+  const context = store.contexts.find((item) => item.version === prev.userContextVersion) ?? store.contexts.at(-1);
+  const areaRatio = apportioned && (context?.homeOfficeRatio ?? 0) > 0 ? context?.homeOfficeRatio ?? null : null;
+  const answered = QUESTION_ANSWER_VERDICT[groupKey]?.[answer] ?? 'NEEDS_REVIEW';
+  const verdict = apportioned && areaRatio === null && answered === 'AVAILABLE' ? 'NEEDS_REVIEW' : answered;
+  const ratio = ratioOf(answer) ?? areaRatio;
   const amount = transactionOf(transactionId)?.amount ?? 0;
   const next: JudgmentSeed = {
     ...prev,
@@ -326,7 +361,9 @@ const rejudge = (transactionId: string, groupKey: string, answer: string) => {
     explanation:
     verdict === 'AVAILABLE' ?
     ratio !== null ?
-    `사용자 응답으로 업무 사용 비율 ${ratio}%를 적용해 구분되는 금액만 산입합니다.` :
+    areaRatio !== null ?
+    `작업 공간이 따로 나뉜다는 응답과 문진의 작업 공간 면적 비율 ${ratio}%로 그만큼만 산입합니다.` :
+    `사용자 응답으로 비율 ${ratio}%를 적용해 구분되는 금액만 산입합니다.` :
     '사용자 응답을 반영해 카드의 선택지대로 필요경비로 판정했습니다.' :
     verdict === 'UNAVAILABLE' ?
     '사용자 응답에 따라 개인 목적 지출로 확정되어 필요경비에 산입하지 않습니다.' :
@@ -452,8 +489,17 @@ const pendingGroups = (status?: string, batchId?: string) => {
 const byImpact = (a: QuestionGroup, b: QuestionGroup) =>
 b.count - a.count || b.totalAmount - a.totalAmount || a.questionIds[0].localeCompare(b.questionIds[0]);
 
+/**
+ * 지금 판정 대상(JUDGEABLE)인 거래의 Review 만 센다(api.md 3.5). 거래를 제외하면 목록과 미해소 집계에서
+ * 빠지고, 다시 넣으면 돌아온다. 업로드 배치의 classificationPendingCount 도 같은 기준이다
+ */
 const filterReviews = (status?: string, batchId?: string) =>
-store.reviews.filter((r) => (!status || r.status.code === status) && (!batchId || r.batchId === batchId));
+store.reviews.filter(
+  (r) =>
+  (!status || r.status.code === status) &&
+  (!batchId || r.batchId === batchId) &&
+  transactionOf(r.transactionId)?.effectiveStatus.code === 'JUDGEABLE'
+);
 
 const pendingReviewCount = (batchId: string) => filterReviews('PENDING', batchId).length;
 
@@ -558,6 +604,13 @@ const mockChat = async ({ message, context }: AssistantChatRequest): Promise<Ass
     proposals,
     traceId: nextId('mock-trace')
   });
+  // 중계가 먼저 보는 것 (api.md POST /assistant/chat)
+  if (message.length < 1 || message.length > 1000)
+  return Promise.reject(new ApiRequestError(400, 'VALIDATION_ERROR', '요청을 확인해 주세요.'));
+  if (context.batchId && !store.batches.some((b) => b.id === context.batchId))
+  return Promise.reject(new ApiRequestError(404, 'BATCH_NOT_FOUND', '업로드를 찾을 수 없습니다.'));
+  if (context.transactionId && !transactionOf(context.transactionId))
+  return Promise.reject(new ApiRequestError(404, 'TRANSACTION_NOT_FOUND', '거래를 찾을 수 없습니다.'));
   const batchId = context.batchId ?? undefined;
 
   if (/세무사|세무대리인|비율|세액/.test(message)) {
@@ -659,17 +712,66 @@ const mockChat = async ({ message, context }: AssistantChatRequest): Promise<Ass
 
 export const mockApi: Api = {
   auth: {
+    // 목업 비밀번호면 어떤 이메일이든 들어간다. 목업에서 가입한 계정은 그 비밀번호로도 들어간다
     login: ({ email, password }) => {
-      if (password !== MOCK_PASSWORD)
-      return Promise.reject(
-        new ApiRequestError(401, 'INVALID_CREDENTIALS', '이메일 또는 비밀번호가 올바르지 않습니다.')
-      );
-      store.email = email;
+      const key = normalizeEmail(email);
+      if (password !== MOCK_PASSWORD && store.accounts.get(key) !== password)
+      return reject(401, 'INVALID_CREDENTIALS', '이메일 또는 비밀번호가 올바르지 않습니다.');
+      signInAs(key);
+      return delay(undefined);
+    },
+    requestEmailVerification: ({ email }) => {
+      const key = normalizeEmail(email);
+      if (!EMAIL_PATTERN.test(key)) return reject(400, 'VALIDATION_ERROR', '이메일 형식이 아닙니다.');
+      if (store.accounts.has(key)) return reject(409, 'EMAIL_ALREADY_EXISTS', '이미 가입한 이메일입니다.');
+      const previous = store.verifications.get(key);
+      const at = Date.now();
+      if (previous && at - previous.sentAt < RESEND_MS) {
+        const left = Math.ceil((RESEND_MS - (at - previous.sentAt)) / 1000);
+        return reject(429, 'VERIFICATION_RESEND_TOO_SOON', `${left}초 뒤에 다시 요청할 수 있습니다.`);
+      }
+      if (previous && previous.sentToday >= 5)
+      return reject(429, 'VERIFICATION_DAILY_LIMIT', '오늘은 더 보낼 수 없습니다.');
+      store.verifications.set(key, { sentAt: at, sentToday: (previous?.sentToday ?? 0) + 1, attempts: 0, used: false });
+      return delay(undefined);
+    },
+    confirmEmailVerification: ({ email, code }) => {
+      const key = normalizeEmail(email);
+      if (!/^\d{6}$/.test(code)) return reject(400, 'VALIDATION_ERROR', '코드는 숫자 6자리입니다.');
+      const sent = store.verifications.get(key);
+      if (!sent || sent.used || sent.attempts >= 5 || Date.now() - sent.sentAt > CODE_TTL_MS)
+      return reject(400, 'VERIFICATION_CODE_EXPIRED', '코드를 다시 받아 주세요.');
+      if (code !== MOCK_VERIFICATION_CODE) {
+        sent.attempts += 1;
+        return reject(400, 'INVALID_VERIFICATION_CODE', '코드가 맞지 않습니다.');
+      }
+      sent.used = true;
+      const verificationToken = `mock-verification-${++seq}`;
+      store.verificationTokens.set(verificationToken, key);
+      return delay({ verificationToken });
+    },
+    signup: ({ email, password, verificationToken }) => {
+      const key = normalizeEmail(email);
+      if (password.length < 8 || new TextEncoder().encode(password).length > 72)
+      return reject(400, 'VALIDATION_ERROR', '비밀번호는 8자 이상, 72바이트 이하입니다.');
+      if (store.verificationTokens.get(verificationToken) !== key)
+      return reject(400, 'EMAIL_NOT_VERIFIED', '이메일 인증을 다시 해 주세요.');
+      if (store.accounts.has(key)) return reject(409, 'EMAIL_ALREADY_EXISTS', '이미 가입한 이메일입니다.');
+      store.verificationTokens.delete(verificationToken);
+      store.accounts.set(key, password);
+      signInAs(key);
+      return delay(undefined);
+    },
+    // 목업은 카카오에 다녀오지 않는다. 코드가 비어 있지 않으면 카카오 계정(이메일 없음)으로 들어간다
+    kakao: ({ code }) => {
+      if (!code) return reject(401, 'INVALID_KAKAO_CODE', '카카오 로그인을 다시 해 주세요.');
+      signInAs(null);
       return delay(undefined);
     },
     // 목업은 새로고침하면 상태가 사라지므로 이어 갈 로그인이 없다
     restore: () => delay(false),
     logout: () => {
+      store.signedIn = false;
       store.email = null;
       return delay(undefined);
     },
@@ -679,7 +781,7 @@ export const mockApi: Api = {
 
   users: {
     me: () =>
-    store.email === null ?
+    !store.signedIn ?
     Promise.reject(new ApiRequestError(401, 'UNAUTHORIZED', '로그인이 필요합니다.')) :
     delay({
       id: USER_ID,
@@ -1030,6 +1132,30 @@ export const mockApi: Api = {
       const out = j && withTransaction(j);
       return out ? delay(out) : notFound('JUDGMENT_NOT_FOUND', '판정을 찾을 수 없습니다.');
     },
+    // 대상은 같은 조건의 현재 판정이고 페이지가 없다(#214). 목업은 한도를 두지 않아 인정 금액이 finalAmount 다
+    export: (scope) => {
+      if ((scope.batchId === undefined) === (scope.year === undefined))
+      return Promise.reject(new ApiRequestError(400, 'INVALID_EXPORT_SCOPE', 'batchId·year 중 하나만 지정해야 합니다.'));
+      const answersOf = (transactionId: string) =>
+      liveGroups().
+      filter((g) => g.pairs.some((p) => p.transaction.id === transactionId) && store.answers.has(g.seed.groupKey)).
+      map((g) => ({ question: g.seed.questionText, answer: store.answers.get(g.seed.groupKey)?.value ?? '' }));
+      const items = currentAll().
+      filter((j) => {
+        const t = transactionOf(j.transactionId);
+        if (!t || !isJudgeable(t)) return false;
+        return scope.batchId ? t.batchId === scope.batchId : t.approvedAt.startsWith(String(scope.year));
+      }).
+      map(withTransaction).
+      filter((j): j is Judgment => j !== null).
+      sort((a, b) => a.transaction.approvedAt.localeCompare(b.transaction.approvedAt)).
+      map((judgment) => ({
+        judgment,
+        allowedAmount: judgment.verdict.code === 'AVAILABLE' ? judgment.finalAmount ?? 0 : 0,
+        answers: answersOf(judgment.transactionId)
+      }));
+      return delay({ items });
+    },
     // 목업은 Idempotency-Key 재사용을 흉내 내지 않는다 (업로드와 같다)
     override: (id, body) => {
       const prev = store.judgments.find((x) => x.id === id);
@@ -1341,19 +1467,23 @@ export const mockApi: Api = {
       const reviews = filterReviews('PENDING', batchId);
       const run = [...store.runs.values()].filter((r) => r.batchId === batchId).at(-1);
       const questions = unresolvedIn(batchId);
-      const next =
+      // 순서·경로·문구는 서버(NextStep.java)와 같다. 마지막 실행이 실패했으면 다시 판정 확인으로 보낸다
+      const next: Progress['next'] =
       reviews.length > 0 ?
-      { step: 'CLASSIFICATION', route: '/preview', label: '분류 확인하기' } :
+      { step: 'CLASSIFY', route: '/preview', label: '분류 확인하기' } :
       !context ?
-      { step: 'INTERVIEW', route: '/interview', label: '사업자 문진 하기' } :
-      !run ?
-      { step: 'RUN', route: '/confirm', label: '판정 전 확인하기' } :
+      { step: 'INTERVIEW', route: '/interview', label: '사업자 문진 작성하기' } :
+      !run || run.status.code === 'FAILED' ?
+      { step: 'CONFIRM', route: '/confirm', label: '판정 시작하기' } :
       questions.count > 0 ?
       { step: 'QUESTIONS', route: '/questions', label: '질문에 답하기' } :
-      { step: 'SUMMARY', route: '/summary', label: '요약 보기' };
+      { step: 'RESULTS', route: '/results', label: '결과 보기' };
+      const start = batch.periodStart.slice(0, 7);
+      const end = batch.periodEnd.slice(0, 7);
       return delay({
         batch: {
-          label: `${batch.cardIssuer} · ${batch.periodStart.slice(0, 7)}`,
+          id: batch.id,
+          label: `${batch.cardIssuer} · ${start === end ? start : `${start}~${end}`}`,
           transactionCount: store.transactions.filter((t) => t.batchId === batchId).length
         },
         context: context ?
@@ -1363,7 +1493,7 @@ export const mockApi: Api = {
           pendingCount: reviews.length,
           pendingAmount: reviews.reduce((sum, r) => sum + (transactionOf(r.transactionId)?.amount ?? 0), 0)
         },
-        run: run ? { status: run.status.code } : null,
+        run: run ? { id: run.id, status: { ...run.status } } : null,
         questions: { pendingCount: questions.count, pendingAmount: questions.amount, fillableFromPrevious: fillableIn(batchId) },
         next
       });
@@ -1410,17 +1540,23 @@ export const mockControls = {
       error.traceId
     );
   },
-  /** 다음 비서 요청 한 번을 실패시킨다. 429 는 Retry-After 5초 (AI 서버의 ASSISTANT_BUSY) */
-  failNextAssistant(status: 422 | 429) {
+  /**
+   * 다음 비서 요청 한 번을 실패시킨다. 서버(AssistantRateLimiter)처럼 429 는 ASSISTANT_RATE_LIMITED 다.
+   * 'daily' 는 하루 한도라 Retry-After 가 자정까지다
+   */
+  failNextAssistant(kind: 400 | 429 | 'daily' | 503) {
     store.failAssistant =
-    status === 429 ?
-    new ApiRequestError(429, 'ASSISTANT_BUSY', '이전 질문에 답하는 중입니다.', '', 5) :
-    new ApiRequestError(422, 'VALIDATION_ERROR', '요청을 확인해 주세요.');
+    kind === 429 ?
+    new ApiRequestError(429, 'ASSISTANT_RATE_LIMITED', '잠시 뒤 다시 물어봐 주세요.', '', 5) :
+    kind === 'daily' ?
+    new ApiRequestError(429, 'ASSISTANT_RATE_LIMITED', '오늘은 더 물어볼 수 없습니다.', '', 6 * 3600) :
+    kind === 503 ?
+    new ApiRequestError(503, 'ASSISTANT_UNAVAILABLE', '비서가 답하지 못했습니다.') :
+    new ApiRequestError(400, 'VALIDATION_ERROR', '요청을 확인해 주세요.');
   }
 };
 
 export const mockSeedSession = {
   batchId: UPLOAD_BATCH.id,
-  contextRef: { id: '0199d3a1-0000-7000-8000-000000000001', version: 4 },
-  runId: JUDGMENT_RUN.id
+  contextRef: { id: '0199d3a1-0000-7000-8000-000000000001', version: 4 }
 };

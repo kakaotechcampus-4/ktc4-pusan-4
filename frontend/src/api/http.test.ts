@@ -70,6 +70,43 @@ describe('인증 (#139 가정)', () => {
     expect(bearer(callsTo('/users/me')[0][1])).toBe('Bearer a1');
   });
 
+  it('가입·카카오 로그인도 받은 토큰을 싣는다. 요청에는 지난 토큰을 싣지 않는다', async () => {
+    const api = await fresh();
+    route({
+      '/auth/login': () => [200, { accessToken: 'a1' }],
+      '/auth/signup': () => [201, { accessToken: 's1' }],
+      '/auth/kakao': () => [200, { accessToken: 'k1' }],
+      '/users/me': () => [200, { id: 'u' }]
+    });
+    await api.auth.login({ email: 'a@b.c', password: 'secret1' });
+    await api.auth.signup({ email: 'n@b.c', password: 'longenough', verificationToken: 't' });
+    expect(bearer(callsTo('/auth/signup')[0][1])).toBeUndefined();
+    await api.users.me();
+    expect(bearer(callsTo('/users/me')[0][1])).toBe('Bearer s1');
+    await api.auth.kakao({ code: 'c' });
+    expect(bearer(callsTo('/auth/kakao')[0][1])).toBeUndefined();
+    await api.users.me();
+    expect(bearer(callsTo('/users/me')[1][1])).toBe('Bearer k1');
+  });
+
+  it('재발급을 Web Locks 로 다른 탭과 줄 세운다 (#195)', async () => {
+    const names: string[] = [];
+    vi.stubGlobal('navigator', {
+      locks: {
+        request: (name: string, callback: () => Promise<unknown>) => {
+          names.push(name);
+          return callback();
+        }
+      }
+    });
+    const api = await fresh();
+    route({ '/auth/refresh': () => [200, { accessToken: 'r1' }], '/users/me': () => [200, { id: 'u' }] });
+    expect(await api.auth.restore()).toBe(true);
+    expect(names).toEqual(['auth-refresh']);
+    await api.users.me();
+    expect(bearer(callsTo('/users/me')[0][1])).toBe('Bearer r1');
+  });
+
   it('401 이면 한 번 재발급하고 같은 요청을 다시 보낸다. 동시에 받은 401 도 재발급은 한 번이다', async () => {
     const api = await fresh();
     let refreshed = false;

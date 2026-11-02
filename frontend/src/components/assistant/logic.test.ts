@@ -77,13 +77,18 @@ describe('historyOf', () => {
 });
 
 describe('chatErrorText', () => {
-  it('429 는 Retry-After 초를 알려 준다', () => {
-    expect(chatErrorText(new ApiRequestError(429, 'ASSISTANT_BUSY', 'x', '', 5))).toBe('5초 뒤에 다시 물어봐 주세요.');
-    expect(chatErrorText(new ApiRequestError(429, 'LIMIT', 'x', '', 3600))).toContain('잠시 뒤');
+  it('429 는 Retry-After 초를 알려 주고, 1분을 넘으면 하루 한도라 내일로 안내한다', () => {
+    expect(chatErrorText(new ApiRequestError(429, 'ASSISTANT_RATE_LIMITED', 'x', '', 5))).toBe('5초 뒤에 다시 물어봐 주세요.');
+    expect(chatErrorText(new ApiRequestError(429, 'ASSISTANT_RATE_LIMITED', 'x', '', 3600))).toContain('내일');
+  });
+
+  it('보던 업로드·거래가 없으면(404) 그 사정을 알린다', () => {
+    expect(chatErrorText(new ApiRequestError(404, 'BATCH_NOT_FOUND', 'x'))).toContain('업로드를 찾을 수 없습니다');
+    expect(chatErrorText(new ApiRequestError(404, 'TRANSACTION_NOT_FOUND', 'x'))).toContain('거래를 찾을 수 없습니다');
   });
 
   it('Retry-After 가 0 이면 「0초 뒤」로 적지 않는다', () => {
-    expect(chatErrorText(new ApiRequestError(429, 'ASSISTANT_BUSY', 'x', '', 0))).toBe(
+    expect(chatErrorText(new ApiRequestError(429, 'ASSISTANT_RATE_LIMITED', 'x', '', 0))).toBe(
       '지금은 더 받을 수 없습니다. 잠시 뒤 다시 물어봐 주세요.'
     );
   });
@@ -131,6 +136,15 @@ describe('previousAnswer (명세 3.1)', () => {
         suggestion({ value: null, conflict: true, history: [{ value: '전용', sourceLabel: '9월' }, { value: '없는 값', sourceLabel: '8월' }] })
       )
     ).toEqual({ kind: 'history', text: "지난 답이 서로 다릅니다: 9월 '전용'" });
+  });
+
+  it('가장 최근 답이 일괄 응답이면 「서로 다르다」고 하지 않고 그 사정을 적는다', () => {
+    expect(
+      previousAnswer(group(), suggestion({ value: null, history: [{ value: '전용', sourceLabel: '9월 업로드(국민)', bulk: true }] }))
+    ).toEqual({
+      kind: 'history',
+      text: "9월 업로드(국민)에서는 한 번에 답하기로 '전용'으로 답했습니다. 이번에는 직접 골라 주세요."
+    });
   });
 
   it('소명 대기가 섞인 그룹은 A 라도 지난 답으로 채우지 않는다', () => {

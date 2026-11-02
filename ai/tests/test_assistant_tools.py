@@ -247,6 +247,8 @@ def test_판정_수정_카드는_현재_판정_id_와_사용자_문장을_사유
     ref = t.find_transactions(None, None, "넷플릭스", None, None)["items"][0]["ref"]
 
     assert t.run("propose_override", {"transaction": ref, "to_verdict": "불가", "quote": "넷플릭스는"})["error"] == "SAME_VERDICT"
+    # BE 는 확인 필요로 바꾸는 수정을 422 로 거절한다(api.md 3.8). 카드를 만들지 않는다
+    assert t.run("propose_override", {"transaction": ref, "to_verdict": "확인 필요", "quote": "넷플릭스는"})["error"] == "INVALID_VERDICT"
     assert t.run("propose_override", {"transaction": ref, "to_verdict": "가능", "quote": "판정 바꿔 줘"})["error"] == "AMBIGUOUS_TARGET"
     out = t.propose_override(ref, "가능", "넷플릭스는 강의 자료 조사용이라 업무용이야")
 

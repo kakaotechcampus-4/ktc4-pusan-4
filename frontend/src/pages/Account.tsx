@@ -1,21 +1,33 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowRightIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
+import { BugReportButton } from '../components/BugReport';
 import { api, ApiRequestError, useApi } from '../api';
 import { useSession } from '../contexts/SessionContext';
 import { Button, Card, Modal, SectionHeading } from '../components/ui';
-import { formatFullDate, toKst } from '../utils/format';
+import { formatFullDate, formatNumber, toKst } from '../utils/format';
+import { accountLabel } from '../utils/account';
+import { contextRows } from '../utils/context';
 
-/** 가입 이메일과 가입일을 보고, 탈퇴합니다 (FR-02·03). 3.1 */
+const SECTION = 'overflow-hidden rounded-2xl border border-line bg-surface';
+const SECTION_TITLE = 'flex items-center justify-between gap-3 border-b border-line2 px-5 py-3';
+
+/**
+ * 내 정보 (마이페이지, FR-02·03). 계정과 사업자 문진, 내 자료로 가는 길, 도움말, 탈퇴.
+ * 비밀번호 바꾸기와 계정 연결은 BE API 가 생기면 붙인다
+ */
 export function Account() {
   const navigate = useNavigate();
-  const { signOut } = useSession();
+  const { signOut, context } = useSession();
   const [confirming, setConfirming] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const meQ = useApi(() => api.users.me(), []);
   const me = meQ.data;
+  // 몇 건 올렸는지만 본다
+  const uploadsQ = useApi(() => api.uploads.list({ size: 1 }), []);
 
   const remove = async () => {
     setRemoving(true);
@@ -36,11 +48,15 @@ export function Account() {
     }
   };
 
-  const rows = me ?
+  const kakao = me !== null && me !== undefined && me.email === null;
+  const accountRows = me ?
   [
-  { term: '가입 이메일', value: me.email },
+  { term: '로그인 방식', value: kakao ? '카카오' : '이메일' },
+  ...(me.email ? [{ term: '가입 이메일', value: me.email }] : []),
   { term: '가입일', value: formatFullDate(toKst(me.createdAt).date) }] :
   [];
+
+  const uploadCount = uploadsQ.data?.page.totalElements;
 
   return (
     <AppShell>
@@ -48,11 +64,14 @@ export function Account() {
         <SectionHeading
           eyebrow="설정"
           title="내 정보"
-          description="가입 정보를 확인하고 탈퇴할 수 있습니다." />
+          description="계정과 사업자 문진을 확인하고, 탈퇴할 수 있습니다." />
 
-        <section className="mt-6 overflow-hidden rounded-2xl border border-line bg-surface">
+        <section className={`mt-6 ${SECTION}`}>
+          <div className={SECTION_TITLE}>
+            <h2 className="text-body font-bold text-ink">계정</h2>
+          </div>
           <dl className="divide-y divide-line2">
-            {rows.length === 0 &&
+            {accountRows.length === 0 &&
             <div className="px-5 py-3">
                 <p className="text-small text-muted">
                   {meQ.loading ?
@@ -71,13 +90,81 @@ export function Account() {
                 }
               </div>
             }
-            {rows.map((row) =>
+            {accountRows.map((row) =>
             <div key={row.term} className="flex gap-4 px-5 py-3">
                 <dt className="w-32 shrink-0 text-small text-muted">{row.term}</dt>
                 <dd className="text-small font-normal text-ink">{row.value}</dd>
               </div>
             )}
           </dl>
+          {kakao &&
+          <p className="border-t border-line2 px-5 py-3 text-caption leading-5 text-muted">
+              카카오 계정은 이메일 계정과 따로입니다. 같은 이메일로 가입한 계정이 있어도 판정 이력은 합쳐지지 않습니다.
+            </p>
+          }
+        </section>
+
+        <section className={`mt-4 ${SECTION}`}>
+          <div className={SECTION_TITLE}>
+            <h2 className="text-body font-bold text-ink">사업자 문진</h2>
+            <Button to="/interview" variant="ghost" size="sm">
+              {context ? '문진 고치기' : '문진 하기'}
+            </Button>
+          </div>
+          {context ?
+          <dl className="divide-y divide-line2">
+              {contextRows(context).map((row) =>
+            <div key={row.term} className="flex gap-4 px-5 py-3">
+                  <dt className="w-32 shrink-0 text-small text-muted">{row.term}</dt>
+                  <dd className="text-small font-normal text-ink">{row.value}</dd>
+                </div>
+            )}
+            </dl> :
+
+          <p className="px-5 py-4 text-small text-muted">
+              아직 문진을 하지 않았습니다. 판정을 시작하기 전에 마치면 됩니다.
+            </p>
+          }
+          {context &&
+          <p className="border-t border-line2 px-5 py-3 text-caption leading-5 text-muted">
+              고치면 새 버전으로 저장됩니다. 이미 낸 판정은 그때 문진 버전을 그대로 기록해 둡니다.
+            </p>
+          }
+        </section>
+
+        <section className={`mt-4 ${SECTION}`}>
+          <div className={SECTION_TITLE}>
+            <h2 className="text-body font-bold text-ink">내 자료</h2>
+          </div>
+          <ul className="divide-y divide-line2 text-small">
+            <li>
+              <Link to="/uploads" className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-canvas">
+                <span className="text-ink">업로드 이력</span>
+                <span className="flex items-center gap-2 tabular-nums text-muted">
+                  {uploadCount !== undefined && `${formatNumber(uploadCount)}건`}
+                  <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
+                </span>
+              </Link>
+            </li>
+            <li>
+              <Link to="/transactions" className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-canvas">
+                <span className="text-ink">거래 목록</span>
+                <ArrowRightIcon className="h-4 w-4 text-muted" aria-hidden="true" />
+              </Link>
+            </li>
+          </ul>
+        </section>
+
+        <section className={`mt-4 ${SECTION}`}>
+          <div className={SECTION_TITLE}>
+            <h2 className="text-body font-bold text-ink">도움말</h2>
+          </div>
+          <ul className="flex flex-wrap gap-x-5 gap-y-2 px-5 py-4 text-small text-ink2">
+            <li><Link to="/faq" className="underline-offset-4 hover:text-ink hover:underline">자주 묻는 질문</Link></li>
+            <li><Link to="/terms" className="underline-offset-4 hover:text-ink hover:underline">이용약관</Link></li>
+            <li><Link to="/privacy" className="font-bold underline-offset-4 hover:text-ink hover:underline">개인정보처리방침</Link></li>
+            <li><BugReportButton /></li>
+          </ul>
         </section>
 
         <Card as="section" padding="md" className="mt-4">
@@ -98,9 +185,6 @@ export function Account() {
 
               탈퇴하기
             </Button>
-            <Button to="/uploads" variant="secondary" size="md">
-              업로드 이력
-            </Button>
           </div>
         </Card>
 
@@ -109,7 +193,12 @@ export function Account() {
           onClose={() => setConfirming(false)}
           tone="danger"
           title="정말 탈퇴할까요?"
-          description="되돌릴 수 없습니다. 이 이메일로 다시 로그인할 수 없고, 아래 데이터가 함께 사라집니다."
+          description={
+          kakao ?
+          // 카카오 로그인은 처음 보는 회원번호면 계정을 새로 만든다(#176). 막히는 것이 아니라 빈 계정으로 다시 시작한다
+          '되돌릴 수 없습니다. 아래 데이터가 함께 사라지고, 같은 카카오 계정으로 다시 로그인하면 빈 새 계정으로 시작합니다.' :
+          '되돌릴 수 없습니다. 이 이메일로 다시 로그인할 수 없고, 아래 데이터가 함께 사라집니다.'
+          }
           footer={
           <>
               <Button
@@ -156,8 +245,8 @@ export function Account() {
           {me &&
           <dl className="space-y-1.5 rounded-xl bg-canvas p-4 text-small">
               <div className="flex justify-between gap-3">
-                <dt className="text-muted">가입 이메일</dt>
-                <dd className="text-ink">{me.email}</dd>
+                <dt className="text-muted">계정</dt>
+                <dd className="text-ink">{accountLabel(me.email)}</dd>
               </div>
               <div className="flex justify-between gap-3">
                 <dt className="text-muted">가입일</dt>
