@@ -359,7 +359,7 @@ AI 서버    에이전트 루프 ── 도구 (백엔드 조회 API를 사용�
 |---|---|
 | `message` | 1~1,000자 |
 | `history` | 최근 메시지 20개 이하. 각 `user` 또는 `assistant`, 2,000자 이하. 서버는 저장하지 않는다(C-12) |
-| `context.screen` | 지금 화면 경로. 화면별 도구 묶음을 고르는 데 쓴다 |
+| `context.screen` | 지금 화면 경로. 화면별 도구 묶음을 고르는 데 쓴다. 모델에는 아는 화면 경로만 넘기고, 그 밖의 값은 "기타"로 바꾼다 |
 | `context.batchId` · `transactionId` · `year` | 지금 보고 있는 업로드·거래와 귀속연도. 없으면 null |
 | `sessionId` | Langfuse 세션 묶음용. 영문·숫자·`-`·`_`, 64자 이하 |
 

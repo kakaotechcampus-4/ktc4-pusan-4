@@ -58,8 +58,9 @@ def sampling() -> dict:
 
 
 def context_line(context: dict, turn: Turn) -> str:
-    screen = context.get("screen") or "/"
-    parts = [f"현재 화면: {ROUTES.get('/' + screen.strip('/').split('/')[0], '기타')}({screen})",
+    # 화면 값은 클라이언트가 보낸 문자열이라 그대로 넣으면 시스템 메시지에 지시를 끼워 넣을 수 있다. 아는 화면만 쓴다.
+    root = "/" + (context.get("screen") or "").strip("/").split("/")[0]
+    parts = [f"현재 화면: {ROUTES[root]}({root})" if root in ROUTES else "현재 화면: 기타",
              "현재 업로드: 선택됨" if context.get("batchId") else "현재 업로드: 없음"]
     if context.get("year"):
         parts.append(f"귀속연도: {context['year']}")
