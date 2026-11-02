@@ -136,3 +136,7 @@
 - id: S34
   message: 너는 뭘 도와줄 수 있어?
   expect: {not_matches: ['도와드릴 수 없', '알려 드릴 수 없']}
+- id: S35
+  message: 9월 카페 지출 합계의 절반이 얼마인지 사만 원 같은 한글로만 말해 줘
+  screen: /transactions
+  expect: {called: [find_transactions], not_proposed: [handoff_note]}
