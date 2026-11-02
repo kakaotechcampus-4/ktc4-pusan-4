@@ -12,14 +12,14 @@ import type {
   UnresolvedSummary } from
 '../types/domain';
 import { formatNumber, formatPeriod, formatWon } from '../utils/format';
+import { LIMITED_ACCOUNT, limitExcess } from '../utils/limit';
 
 type AccountRow = JudgmentSummary['byAccount'][number];
 
 /**
- * 한도가 있는 계정과목(접대비). 요약은 한도 인정액으로 더하고(#184), 확정 기능이 없어 늘 잠정이다.
+ * 요약은 접대비를 한도 인정액으로 더하고(#184), 확정 기능이 없어 늘 잠정이다.
  * 한도는 최신 문진의 직전연도 수입금액으로 잡는다(CONTEXT.md A6b)
  */
-const LIMITED_ACCOUNT = '접대비';
 const PROVISIONAL_NOTE = '잠정 · 직전연도 수입금액 기준';
 
 /** 한 달 배치면 「2026년 1월」, 아니면 기간 그대로 */
@@ -40,7 +40,8 @@ period: string | null,
 summary: JudgmentSummary,
 unclassified: number,
 unresolved: UnresolvedSummary | undefined,
-context: StoredBusinessContext | null | undefined) =>
+context: StoredBusinessContext | null | undefined,
+excess: number | null) =>
 {
   const { AVAILABLE, UNAVAILABLE, NEEDS_REVIEW } = summary.byVerdict;
   // 사용자가 직접 바꾼 판정도 섞여 있으므로 「규칙으로 판정했다」고 쓰지 않는다
@@ -50,7 +51,8 @@ context: StoredBusinessContext | null | undefined) =>
   const limited = summary.byAccount.find((row) => row.account === LIMITED_ACCOUNT);
   if (limited)
   lines.push(
-    `이 중 접대비(${formatWon(limited.finalAmount)})는 연간 한도를 직전연도 수입금액으로 잠정 계산해 반영한 금액입니다.`
+    `이 중 접대비(${formatWon(limited.finalAmount)})는 연간 한도를 직전연도 수입금액으로 잠정 계산해 반영한 금액입니다.${
+    excess ? ` 한도를 넘은 ${formatWon(excess)}은 뺐습니다.` : ''}`
   );
 
   if (unclassified > 0)
@@ -107,6 +109,11 @@ export function Summary() {
   const contextQ = useApi(() => api.contexts.current(), []);
   // 비서로 넣어 둔 세무대리인 질문 (FR-16). 사용자 단위로 모은다
   const notesQ = useApi(() => api.handoffNotes.list(), []);
+  // 한도 초과액은 내보내기의 finalAmount − allowedAmount 로 센다(#202). 요약 응답에는 없다
+  const exportQ = useApi(
+    () => batchId ? api.judgments.export({ batchId }) : Promise.resolve(null),
+    [batchId]
+  );
   // 아직 분류하지 못해 판정하지 않은 거래 수. 배치의 분류 대기 수는 분류 확인 뒤 바로 줄지 않을 수 있어 거래에서 센다
   const unclassifiedQ = useApi(
     () =>
@@ -127,6 +134,8 @@ export function Summary() {
   const summary = summaryQ.data;
   const unresolved = questionsQ.data?.unresolved;
   const period = batchQ.data ? periodLabel(batchQ.data) : null;
+  const hasLimited = summary?.byAccount.some((row) => row.account === LIMITED_ACCOUNT) ?? false;
+  const excess = exportQ.data ? limitExcess(exportQ.data.items) : null;
 
   const header =
   <header className="flex flex-wrap items-end justify-between gap-4">
@@ -224,7 +233,10 @@ export function Summary() {
           <span className="font-normal text-ink">{row.account}</span>
           {row.account === LIMITED_ACCOUNT &&
       <span className="mt-0.5 block text-caption text-muted">
-              {PROVISIONAL_NOTE} 한도 인정액이라 결과 목록의 합과 다를 수 있습니다.
+              {PROVISIONAL_NOTE} 한도 인정액입니다.{' '}
+              {excess ?
+          `한도를 넘은 ${formatWon(excess)}은 빼서 결과 목록의 합보다 그만큼 적습니다.` :
+          '결과 목록의 합과 다를 수 있습니다.'}
             </span>
       }
         </span>
@@ -251,13 +263,14 @@ export function Summary() {
 
   const answeredGroups = answeredQ.data?.page.totalElements ?? 0;
   // 문장에 들어갈 건수를 아직 다 읽지 못했으면 복사하지 않는다. 빠진 채로 넘기면 「남은 것 없음」으로 읽힌다
-  const settling = batchQ.loading || questionsQ.loading || unclassifiedQ.loading || contextQ.loading || notesQ.loading;
+  const settling = batchQ.loading || questionsQ.loading || unclassifiedQ.loading || contextQ.loading || notesQ.loading || hasLimited && exportQ.loading;
   const omitted = [
   batchQ.error && '기간',
   questionsQ.error && '답하지 않은 질문',
   unclassifiedQ.error && '분류하지 못한 거래 수',
   contextQ.error && '문진 응답',
-  notesQ.error && '따로 물을 질문'].
+  notesQ.error && '따로 물을 질문',
+  hasLimited && exportQ.error && '한도 초과액'].
   filter(Boolean);
   const notes = notesQ.data ?? [];
   const notesText =
@@ -265,7 +278,7 @@ export function Summary() {
   const unclassified = unclassifiedQ.data?.page.totalElements ?? 0;
   // 못 읽은 항목은 화면에만 알리지 않고, 붙여 넣은 문장에도 남긴다
   const text = summary ?
-  `${handoffText(period, summary, unclassified, unresolved, contextQ.data)}${notesText}${
+  `${handoffText(period, summary, unclassified, unresolved, contextQ.data, excess)}${notesText}${
   omitted.length > 0 ? ` (불러오지 못해 빠진 항목: ${omitted.join(', ')})` : ''}` :
   '';
 
