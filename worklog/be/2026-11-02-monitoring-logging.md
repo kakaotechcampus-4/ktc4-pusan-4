@@ -33,3 +33,20 @@
 - 운영 확인은 release 뒤에 한다: CloudWatch 에 로그가 오는지, Logs Insights 에서 traceId 로 요청을 찾는지, `docker logs` 가 되는지.
 - `docs/deployment.md` 13절은 B1(#222)도 자리만 만들어 둬서, 뒤에 merge 하는 쪽이 충돌을 풀어야 한다. 이 PR 의 내용을 남기면 된다.
 - 판정 run 워커 로그에는 traceId 가 없다(run 을 만든 요청과는 runId 로 잇는다).
+
+## 23:50 실패한 actuator 요청은 요청 로그에 남긴다
+
+- 커밋: f8dcfdb (1개)
+- `/actuator` 를 요청 로그에서 통째로 빼던 것을, 2xx 만 빼고 나머지는 남기도록 바꿨다(사용자 결정).
+
+### 왜 이렇게 했나
+
+- actuator 가 5xx 를 내는 경우는 사실상 DB 연결 불가(health 503) 하나이고, 이건 거의 모든 API 가 죽은 상태다.
+- 사용자 요청이 있으면 그 요청의 500 으로 5xx 알람이 울린다. 요청이 없는 시간에는 프로세스가 살아 있어 재시작 알람도 없고, Docker 는 unhealthy 컨테이너를 재시작하지 않는다. 그래서 health 503 이 5xx 알람을 울리는 유일한 신호다.
+- 다른 안으로 B3 에 ERROR 레벨 메트릭 필터를 더하는 것이 있다. HTTP 밖의 오류까지 잡지만 B 트랙 몫이라 B3 리뷰에서 제안하기로 했다.
+
+### 확인한 것
+
+- 새 테스트를 먼저 돌려 실패를 본 뒤 고쳤다. unit 414 통과.
+- 기본 프로필로 띄우고 postgres 를 멈춰 health 를 불렀다. 30초 뒤 503 이고 `GET /actuator/health 503 30029ms` 가 `status:503` 으로 남았다. 성공한 200 은 남지 않았다.
+- DB 가 약 80초 끊겨 있는 동안 스케줄러(`interruptStale`)의 ERROR 로그는 나오지 않았다(Hikari WARN 만). 앞서 스케줄러가 ERROR 를 남길 것으로 본 추론은 이 시간 안에서는 맞지 않았다.
