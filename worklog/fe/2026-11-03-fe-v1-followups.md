@@ -39,3 +39,16 @@
 - 후보가 빈 배열인 화면, 62010 문진의 판정 시작 막기, 한도 초과액 문구는 브라우저에서 보지 못했다. mock 시드 세션에 그 경우가 나오지 않는다(한도 초과는 mock이 한도를 두지 않아 늘 0이다).
 - 실백엔드 통합 확인, `VITE_API=http` 전환, 운영 env 확인, GitHub variable `KAKAO_REST_API_KEY` 값 넣기(memoryhong에게 받는다)가 남았다.
 - #225가 develop에 들어가면 #222 스택(`/ktc4/backend` 로그 그룹)을 먼저 배포해야 release가 뜬다.
+
+## 02:00 브랜치를 다시 검토하고, 틀린 주석·문서를 고쳤다
+
+- 커밋: 1da4be7
+- 724e68f..df974db를 다시 검토했다. 동작 버그는 없었고, 이 커밋들 때문에 틀려진 설명만 고쳤다.
+  - 샘플 파일: `api/index.ts`의 `isMock` 주석, `parser/samples.ts` 두 곳, `frontend/README.md`가 아직 「목업 모드에서만」이라고 적고 있었다. 169c868부터 실서버에서도 보인다.
+  - 카카오 키: `web.Dockerfile` 주석과 `deployment.md` 2절이 「비우면 카카오 버튼을 숨긴다」고 적었다. 키는 `VITE_API=http` 빌드에서만 쓰인다. 지금 web 이미지는 목업 빌드라 키와 상관없이 버튼이 보인다.
+- 위 「남은 것」의 「mock 시드 세션에 그 경우가 나오지 않는다」는 후보 없는 화면에는 틀렸다. 시드 세션의 KG이니시스 묶음이 후보 없이 나온다. 브라우저로 보지 않았을 뿐이다. 시드에 없는 것은 62010 문진과 한도 초과액뿐이다.
+
+### 확인
+
+- FE `typecheck`, 고친 파일 eslint 통과. 주석과 문서만 바꿨다.
+- 다시 돌린 검사: FE 테스트 181개, lint 오류 0, `check:tokens` 일치, mock·`VITE_API=http` 빌드, AI pytest 238개·ruff 통과. PR CI(backend·web·ai·test)도 통과했다.
