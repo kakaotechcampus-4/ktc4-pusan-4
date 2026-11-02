@@ -41,6 +41,25 @@ describe('judgmentsCsv', () => {
     expect(text.split('\r\n')[1]).toBe('2026-01-31,가게,가게 본점,식비,1000,0,가능,800,,,소득세법-27-1,용도는? → 업무미팅');
   });
 
+  it('「확인 필요」 행은 인정 금액을 비우고, 「불가」 행은 0 으로 쓴다', async () => {
+    const { judgmentsCsv } = await import('./csv');
+    const row = (code: string, label: string) => ({
+      judgment: {
+        transaction: { approvedAt: '2026-01-31T09:00:00+09:00', merchantNorm: '가게', merchantRaw: '', merchantCategory: '', amount: 1000, installmentMonths: 0 },
+        verdict: { code, label },
+        finalAmount: 0,
+        origin: { type: 'RUN', id: 'r' },
+        outOfScope: false,
+        citations: []
+      } as unknown as import('../types/domain').Judgment,
+      allowedAmount: 0,
+      answers: []
+    });
+    const [, review, unavailable] = judgmentsCsv([row('NEEDS_REVIEW', '확인 필요'), row('UNAVAILABLE', '불가')]).split('\r\n');
+    expect(review).toBe('2026-01-31,가게,,,1000,0,확인 필요,,,,,');
+    expect(unavailable).toBe('2026-01-31,가게,,,1000,0,불가,0,,,,');
+  });
+
   it('서버가 어떤 순서로 주든 승인일 순으로 쓴다', async () => {
     const { judgmentsCsv } = await import('./csv');
     const row = (approvedAt: string) => ({

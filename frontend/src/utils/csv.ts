@@ -51,7 +51,8 @@ export function judgmentsCsv(rows: JudgmentExportRow[]): string {
   judgment.transaction.amount,
   judgment.transaction.installmentMonths,
   judgment.verdict.label,
-  allowedAmount,
+  // 「확인 필요」는 아직 금액을 정하지 않았다. 0 이면 세무사가 「인정 안 됨」으로 읽으니 비워 둔다(#214 리뷰)
+  judgment.verdict.code === 'NEEDS_REVIEW' ? null : allowedAmount,
   judgment.origin.type === 'OVERRIDE' ? '예' : '',
   judgment.outOfScope ? '예' : '',
   judgment.citations.map((citation) => citation.statuteId).join(' '),
