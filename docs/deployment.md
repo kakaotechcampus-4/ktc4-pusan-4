@@ -266,7 +266,7 @@ sudo docker compose --env-file /etc/ktc4/production.env -f /opt/ktc4/repo/deploy
 | `userId` | 인증을 거친 요청이면 그 사용자 id |
 | `runId` | 판정 run 워커가 낸 로그 |
 
-요청마다 `RequestTraceFilter`가 한 줄을 남긴다. 필드는 `method`, `path`(쿼리스트링 제외), `status`(숫자), `durationMs`(숫자)이고 본문은 남기지 않는다. `/actuator`는 healthcheck·지표 수집이 주기적으로 불러 남기지 않는다. 14절의 5xx 알람이 이 줄의 `status`로 센다.
+요청마다 `RequestTraceFilter`가 한 줄을 남긴다. 필드는 `method`, `path`(쿼리스트링 제외), `status`(숫자), `durationMs`(숫자)이고 본문은 남기지 않는다. `/actuator`는 healthcheck·지표 수집이 주기적으로 불러 성공한 요청은 남기지 않고 실패만 남긴다. 14절의 5xx 알람이 이 줄의 `status`로 센다. DB 가 끊기면 healthcheck 가 30초(Hikari 연결 대기) 뒤 503 을 받아 `GET /actuator/health 503` 이 15초마다 남는다. 사용자 요청이 없는 시간에는 이 줄이 5xx 알람을 울리는 유일한 신호다.
 
 ```json
 {"@timestamp":"...","message":"GET /api/v1/users/me 200 12ms","logger_name":"com.ktc4.pusan4.shared.api.RequestTraceFilter","level":"INFO","traceId":"01a19c9e-...","userId":"0199c8f2-...","method":"GET","path":"/api/v1/users/me","status":200,"durationMs":12}

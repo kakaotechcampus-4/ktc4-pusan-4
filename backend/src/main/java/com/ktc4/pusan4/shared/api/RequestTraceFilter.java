@@ -21,7 +21,8 @@ import java.io.IOException;
  *
  * <p>요청 로그 필드(method, path, status, durationMs)는 CloudWatch 메트릭 필터가 읽는 계약이다(docs/monitoring_plan.md).
  * path 에 쿼리스트링은 넣지 않고, 본문은 남기지 않는다. userId 는 인증을 거친 요청이면 MDC 로 붙는다(CurrentUserWebConfig).
- * actuator 는 healthcheck·지표 수집이 주기적으로 불러 요청 로그를 남기지 않는다.
+ * actuator 는 healthcheck·지표 수집이 주기적으로 불러, 성공한 요청은 남기지 않는다. 실패는 남긴다.
+ * DB 가 끊기면 health 가 503 이고, 사용자 요청이 없는 시간에는 이 줄이 5xx 알람을 울리는 유일한 신호다.
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -52,12 +53,16 @@ public class RequestTraceFilter extends OncePerRequestFilter {
             status = response.getStatus();
         } finally {
             // 예외가 여기까지 올라오면 컨테이너가 500 으로 응답한다
-            if (!request.getRequestURI().startsWith("/actuator")) {
+            if (!isSuccessfulActuator(request, status)) {
                 logRequest(request.getMethod(), request.getRequestURI(), status, (System.nanoTime() - started) / 1_000_000);
             }
             MDC.remove(TRACE_ID);
             MDC.remove(USER_ID);
         }
+    }
+
+    private static boolean isSuccessfulActuator(HttpServletRequest request, int status) {
+        return request.getRequestURI().startsWith("/actuator") && status < 300;
     }
 
     private static void logRequest(String method, String path, int status, long durationMs) {

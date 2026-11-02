@@ -17,6 +17,8 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.annotation.Import;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.MockMvc;
@@ -109,6 +111,27 @@ class RequestTraceFilterTest {
         JsonNode requestLog = requestLog(logLines(output, result.getResponse().getHeader("X-Trace-Id")));
         assertThat(requestLog.path("status").asInt()).isEqualTo(401);
         assertThat(requestLog.has("userId")).isFalse();
+    }
+
+    @Test
+    void actuator_request_is_logged_only_when_not_successful(CapturedOutput output) throws Exception {
+        // given: DB 가 끊기면 health 가 503 이다. 요청이 없는 시간에는 이 줄이 5xx 알람의 유일한 신호다
+        RequestTraceFilter filter = new RequestTraceFilter(new UuidV7Generator());
+        MockHttpServletResponse healthy = actuatorHealth(filter, 200);
+        MockHttpServletResponse down = actuatorHealth(filter, 503);
+
+        // then: 성공한 healthcheck 는 남기지 않는다
+        assertThat(output.getOut()).doesNotContain(healthy.getHeader("X-Trace-Id"));
+        JsonNode requestLog = requestLog(logLines(output, down.getHeader("X-Trace-Id")));
+        assertThat(requestLog.path("path").asText()).isEqualTo("/actuator/health");
+        assertThat(requestLog.path("status").asInt()).isEqualTo(503);
+    }
+
+    private static MockHttpServletResponse actuatorHealth(RequestTraceFilter filter, int status) throws Exception {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        filter.doFilter(new MockHttpServletRequest("GET", "/actuator/health"), response,
+            (request, chainResponse) -> ((MockHttpServletResponse) chainResponse).setStatus(status));
+        return response;
     }
 
     private List<JsonNode> logLines(CapturedOutput output, String traceId) {
