@@ -22,7 +22,7 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "upload_batch")
-public class UploadBatchEntity {
+public class UploadBatchEntity extends AssignedIdEntity<UUID> {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
@@ -72,6 +72,11 @@ public class UploadBatchEntity {
     }
 
     public UUID id() {
+        return id;
+    }
+
+    @Override
+    public UUID getId() {
         return id;
     }
 

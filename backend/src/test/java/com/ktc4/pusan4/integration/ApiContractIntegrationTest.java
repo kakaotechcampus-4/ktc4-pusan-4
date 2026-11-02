@@ -35,7 +35,11 @@ class ApiContractIntegrationTest {
     private static final Set<String> HTTP_METHODS = Set.of("get", "post", "put", "patch", "delete");
 
     private static final Set<String> CONTRACT = Set.of(
+        "POST /api/v1/auth/email-verification",
+        "POST /api/v1/auth/email-verification/confirm",
+        "POST /api/v1/auth/signup",
         "POST /api/v1/auth/login",
+        "POST /api/v1/auth/kakao",
         "POST /api/v1/auth/refresh",
         "POST /api/v1/auth/logout",
         "GET /api/v1/users/me",
@@ -58,6 +62,7 @@ class ApiContractIntegrationTest {
         "GET /api/v1/judgment-runs/{runId}/failures",
         "GET /api/v1/judgments",
         "GET /api/v1/judgments/summary",
+        "GET /api/v1/judgments/export",
         "GET /api/v1/judgments/{judgmentId}",
         "POST /api/v1/judgments/{judgmentId}/override",
         "DELETE /api/v1/judgment-overrides/{overrideId}",
@@ -67,7 +72,12 @@ class ApiContractIntegrationTest {
         "POST /api/v1/assistant/chat",
         "POST /api/v1/questions/bulk-answer",
         "POST /api/v1/question-responses",
-        "GET /api/v1/statutes/{statuteVersionId}"
+        "GET /api/v1/handoff-notes",
+        "POST /api/v1/handoff-notes",
+        "GET /api/v1/statutes/{statuteVersionId}",
+        "GET /api/v1/admin/rule-candidates",
+        "POST /api/v1/admin/rule-candidates/{candidateId}/approve",
+        "POST /api/v1/admin/rule-candidates/{candidateId}/reject"
     );
 
     @Autowired

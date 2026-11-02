@@ -9,7 +9,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.OffsetDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -67,6 +69,14 @@ public class UserFactPersistenceService {
         return userFactRepository.findAllLatest(userId, batchId).stream()
             .map(UserFactEntity::toDomain)
             .toList();
+    }
+
+    /** findAllLatest 와 같은 답을 같은 순서로, 행 id 와 함께 준다. 판정에 쓴 답을 id 로 남길 때 쓴다. */
+    @Transactional(readOnly = true)
+    public Map<UserFact, UUID> findAllLatestIds(UUID userId, UUID batchId) {
+        Map<UserFact, UUID> ids = new LinkedHashMap<>();
+        userFactRepository.findAllLatest(userId, batchId).forEach(fact -> ids.put(fact.toDomain(), fact.id()));
+        return ids;
     }
 
     @Transactional

@@ -7,5 +7,7 @@ import java.util.UUID;
 
 interface IdempotencyKeyRepository extends Repository<IdempotencyKeyEntity, UUID> {
 
+    IdempotencyKeyEntity save(IdempotencyKeyEntity key);
+
     Optional<IdempotencyKeyEntity> findByUserIdAndKey(UUID userId, String key);
 }

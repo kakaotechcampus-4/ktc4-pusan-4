@@ -36,6 +36,9 @@ class AmountCalculatorTest {
         // 엔진은 비율이 없으면 확인필요로 둔다. 사용자가 가능으로 수정했으면 전액이다
         assertThat(AmountCalculator.finalAmount(homeOffice, transaction(LocalDate.of(2025, 2, 25), 80_000), NO_RATIO))
             .isEqualTo(80_000);
+        // 문진 "아니오" 의 0 도 비율이 없는 것과 같다
+        assertThat(AmountCalculator.finalAmount(homeOffice, transaction(LocalDate.of(2025, 2, 25), 80_000),
+            new UserContext("940909", false, 0))).isEqualTo(80_000);
     }
 
     @Test

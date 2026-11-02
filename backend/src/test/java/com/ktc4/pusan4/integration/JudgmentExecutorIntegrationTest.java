@@ -155,6 +155,25 @@ class JudgmentExecutorIntegrationTest {
     }
 
     @Test
+    void records_only_the_facts_the_judgment_used() {
+        UUID transactionId = insertCafeTransaction("2025-10-08");
+        UUID usedId = userFactService.save(userId, batchId, new UserFact(
+            "transaction:" + transactionId, "용도", Map.of("value", "업무미팅")
+        ));
+        userFactService.save(userId, batchId, new UserFact(
+            "transaction:" + UUID.randomUUID(), "용도", Map.of("value", "개인")
+        ));
+
+        UUID judgmentId = executor.judge(
+            transactionId, contextService.version(userId, 1), new JudgmentOrigin(JudgmentOriginType.USER_FACT, usedId)
+        );
+
+        assertThat(jdbcTemplate.queryForList(
+            "select user_fact_id from judgment_input_fact where judgment_id = ?", UUID.class, judgmentId
+        )).containsExactly(usedId);
+    }
+
+    @Test
     void rejudge_uses_the_requested_context_version() {
         UUID transactionId = insertCafeTransaction("2025-10-08");
         insertContext(2);

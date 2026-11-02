@@ -354,6 +354,13 @@ export function Summary() {
         </dl>
       </section>
 
+      {/* 소득세법 §160의2①, 시행령 §208의2④⑤. 승인내역으로는 보관 여부를 알 수 없어 거래마다 묻지 않고 안내한다 */}
+      <p className="mt-4 rounded-xl border border-line bg-surface px-4 py-3 text-small text-ink2">
+        <strong className="font-bold text-ink">증빙 보관 안내</strong> — 카드 결제 증빙은 카드사에서 받은
+        월별이용대금명세서를 확정신고기간 종료일부터 5년간 보관해 주세요. 올린 이용내역 파일은 명세서로 인정되지 않을 수
+        있습니다. 국세청 현금영수증 홈페이지에 사업용 신용카드로 등록한 카드의 매출전표는 보관하지 않아도 됩니다.
+      </p>
+
       <section className="mt-4">
         <h2 className="text-body font-bold text-ink">계정과목별 인정 경비</h2>
         <Table

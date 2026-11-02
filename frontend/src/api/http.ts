@@ -339,7 +339,7 @@ export const httpApi: Api = {
     suggestions: (batchId) => get('/questions/suggestions', { batchId })
   },
 
-  // 경로는 api.md 와 같다. 세무대리인 질문(/handoff-notes)만 아직 서버에 없다
+  // 경로는 api.md 와 같다
   assistant: {
     chat: (body) => post('/assistant/chat', body)
   },
@@ -349,7 +349,7 @@ export const httpApi: Api = {
   },
 
   handoffNotes: {
-    // 저장 API 가 아직 없는 서버(404)는 저장한 질문이 없는 것과 같다. 다른 실패는 요약이 「빠진 항목」으로 알린다
+    // #214 전 서버에는 저장 API 가 없었다(404). 그때는 저장한 질문이 없는 것과 같다. 다른 실패는 요약이 「빠진 항목」으로 알린다
     list: () =>
     get<Awaited<ReturnType<Api['handoffNotes']['list']>>>('/handoff-notes').catch((caught: unknown) => {
       if (caught instanceof ApiRequestError && caught.status === 404) return [];

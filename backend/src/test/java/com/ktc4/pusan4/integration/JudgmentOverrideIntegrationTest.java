@@ -69,6 +69,12 @@ class JudgmentOverrideIntegrationTest {
         long statuteVersionId = insertStatute("소득세법-27-1");
         jdbcTemplate.update("insert into judgment_citation(judgment_id, statute_version_id) values (?, ?)",
             source, statuteVersionId);
+        UUID factId = UUID.randomUUID();
+        jdbcTemplate.update("""
+            insert into user_fact(id, user_id, batch_id, scope_key, fact_type, value, version)
+            values (?, ?, ?, ?, '용도', '{"value": "업무"}', 1)
+            """, factId, USER_ID, batchId, "transaction:" + transactionId);
+        jdbcTemplate.update("insert into judgment_input_fact(judgment_id, user_fact_id) values (?, ?)", source, factId);
 
         // when
         String body = override(source, "UNAVAILABLE", "개인적으로 사용한 비용입니다.")
@@ -95,6 +101,9 @@ class JudgmentOverrideIntegrationTest {
             .containsEntry("active", true);
         assertThat(jdbcTemplate.queryForObject("select verdict from judgment where id = ?", String.class, source))
             .isEqualTo("AVAILABLE");
+        assertThat(jdbcTemplate.queryForList(
+            "select user_fact_id from judgment_input_fact where judgment_id = ?", UUID.class, revision))
+            .containsExactly(factId);
         assertCurrent(revision);
     }
 
