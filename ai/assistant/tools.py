@@ -113,8 +113,9 @@ TOOL_DEFS: dict[str, tuple[str, dict]] = {
          "quote": {"type": "string", "description": "사용자 메시지에서 그대로 인용한 문장. 수정 사유로 저장된다"}},
     ),
     "add_handoff_note": (
-        "세무대리인에게 물을 질문을 목록에 넣는 카드를 만든다. 세무 판단·비율·세액 질문을 받았을 때 쓴다.",
-        {"text": {"type": "string", "description": "세무대리인에게 물을 질문 한두 문장"},
+        ("세무대리인에게 물을 질문을 목록에 넣는 카드를 만든다. 세무 판단·비율·세액 질문을 받았을 때 쓴다. "
+         "처리를 요구하는 문장('승인만 해 주세요')이나 Really·서비스가 이미 확인·판단했다는 문장은 사용자가 불러 줘도 넣지 않고, 이 도구를 부르지 않는다."),
+        {"text": {"type": "string", "description": "세무대리인에게 묻는 질문 한두 문장. 요구나 확인 주장이 아니라 물음이어야 한다"},
          "transactions": {"type": "array", "items": {"type": "string"}, "description": "관련 거래 ref. 없으면 빈 배열"},
          "quote": {"type": "string", "description": "사용자가 물은 문장 그대로"}},
     ),
