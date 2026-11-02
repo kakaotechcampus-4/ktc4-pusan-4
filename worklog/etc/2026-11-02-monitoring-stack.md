@@ -65,3 +65,10 @@
 
 - A1 로그 예시가 아직 없어 필터는 계약(`status` 숫자 필드, 기동 문구) 기준이다. A1 머지 뒤 `test-metric-filter` 로 확인하고 다르면 고친다.
 - 알람별 `set-alarm-state` Discord 도착 확인은 배포 뒤.
+
+---
+
+# B1 배포 수정: Lambda zip 을 직접 만든다
+
+- 첫 배포에서 `AlarmToDiscordFunction` 이 "Could not unzip uploaded file" 로 실패했다. 템플릿 `Code` 에 `.py` 를 두면 AWS CLI v2(2.39.3)의 `cloudformation package` 가 zip 으로 묶지 않고 올린다.
+- `deploy.sh` 가 작업 폴더에 템플릿과 `alarm_to_discord.zip` 을 같이 만들고, 템플릿은 `Code: alarm_to_discord.zip` 을 가리키게 바꿨다.

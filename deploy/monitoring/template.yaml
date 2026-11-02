@@ -77,8 +77,9 @@ Resources:
       FunctionName: ktc4-alarm-to-discord
       Runtime: python3.12
       Handler: alarm_to_discord.handler
-      # deploy.sh 의 cloudformation package 가 이 파일을 zip 으로 묶어 S3 에 올리고 S3 위치로 바꾼다.
-      Code: alarm_to_discord.py
+      # deploy.sh 가 alarm_to_discord.py 를 zip 으로 묶어 템플릿 옆에 두고, cloudformation package 가 S3 에 올린다.
+      # .py 를 그대로 두면 CLI v2 가 zip 으로 묶지 않고 올려 Lambda 가 "Could not unzip" 으로 실패한다.
+      Code: alarm_to_discord.zip
       Role: !GetAtt AlarmToDiscordRole.Arn
       Timeout: 10
       MemorySize: 128
