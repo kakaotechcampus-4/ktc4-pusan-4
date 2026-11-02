@@ -44,3 +44,10 @@
 - 지표 이름은 계획 문서의 예상값이다. A2 PR 본문의 실제 출력과 다르면 relabel 규칙과 `metric_selectors` 를 고친다.
 - 디스크 지표에서 `fstype` 차원은 Agent 설정으로 뺄 수 없다. 시계열은 하나라 비용은 같다. B3 알람은 설치 뒤 `list-metrics` 로 본 실제 값을 쓴다.
 - 운영 EC2 설치와 Agent 메모리 측정은 아직.
+
+---
+
+# B1 배포 수정: Lambda zip 을 직접 만든다
+
+- 첫 배포에서 `AlarmToDiscordFunction` 이 "Could not unzip uploaded file" 로 실패했다. 템플릿 `Code` 에 `.py` 를 두면 AWS CLI v2(2.39.3)의 `cloudformation package` 가 zip 으로 묶지 않고 올린다.
+- `deploy.sh` 가 작업 폴더에 템플릿과 `alarm_to_discord.zip` 을 같이 만들고, 템플릿은 `Code: alarm_to_discord.zip` 을 가리키게 바꿨다.

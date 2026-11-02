@@ -17,12 +17,17 @@ set -euo pipefail
 REGION=ap-northeast-2   # 조직 SCP 가 서울 밖을 막는다
 STACK=ktc4-monitoring
 HERE="$(cd "$(dirname "$0")" && pwd)"
-PACKAGED="$(mktemp "${TMPDIR:-/tmp}/ktc4-monitoring.XXXXXX")"
-trap 'rm -f "$PACKAGED"' EXIT
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/ktc4-monitoring.XXXXXX")"
+trap 'rm -rf "$WORK"' EXIT
+PACKAGED="$WORK/packaged.yaml"
+
+# 템플릿의 Code: alarm_to_discord.zip 은 템플릿 옆 파일을 가리킨다. 작업 폴더에 둘을 같이 둔다.
+cp "$HERE/template.yaml" "$WORK/template.yaml"
+(cd "$HERE" && zip -q -X "$WORK/alarm_to_discord.zip" alarm_to_discord.py)
 
 aws cloudformation package \
   --region "$REGION" \
-  --template-file "$HERE/template.yaml" \
+  --template-file "$WORK/template.yaml" \
   --s3-bucket "$ARTIFACT_BUCKET" \
   --s3-prefix monitoring \
   --output-template-file "$PACKAGED"
