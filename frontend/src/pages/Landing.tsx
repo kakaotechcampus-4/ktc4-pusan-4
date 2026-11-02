@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRightIcon } from 'lucide-react';
 import { useSession } from '../contexts/SessionContext';
 import { MarketingHeader } from '../components/MarketingHeader';
 import { MarketingFooter } from '../components/MarketingFooter';
-import { OrbitStage } from '../components/OrbitStage';
+import { HeroBanner } from '../components/HeroBanner';
+import { IntroOverlay } from '../components/IntroOverlay';
 import { ExampleCarousel } from '../components/ExampleCarousel';
 import {
   FLOW_STEPS,
@@ -15,6 +16,20 @@ import {
 '../mock/marketing';
 
 const won = (value: number) => value.toLocaleString('ko-KR');
+
+/** 인트로를 봤다는 표시. 처음 한 번만 띄운다 — 로고로 다녀와도 다시 뜨지 않는다 */
+const INTRO_SEEN = 'preet.intro.seen';
+
+/** 움직임을 줄이라는 설정이면 아예 띄우지 않는다 */
+function wantsIntro() {
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return false;
+  try {
+    return window.localStorage.getItem(INTRO_SEEN) === null;
+  } catch {
+    // 저장소를 막아 둔 브라우저. 띄우기는 하되 표시를 못 남겨 올 때마다 뜬다
+    return true;
+  }
+}
 
 /** 본문 폭과 좌우 여백. 레퍼런스는 1440 폭에서 좌우 62px 를 띄운다 */
 const SHELL = 'mx-auto w-full max-w-page px-6 lg:px-gutter';
@@ -99,12 +114,25 @@ export function Landing() {
   const { status } = useSession();
   const [ok, ask] = HERO_SUMMARY.distribution;
 
+  const [intro, setIntro] = useState(wantsIntro);
+
+  const closeIntro = useCallback(() => {
+    setIntro(false);
+    try {
+      window.localStorage.setItem(INTRO_SEEN, '1');
+    } catch {
+      // 못 남기면 다음에 또 뜬다. 막을 방법이 없고 막을 일도 아니다
+    }
+  }, []);
+
   /* 로그인 뒤에는 메인으로 오므로, CTA 가 로그인 폼으로 되돌아가면 막힌다 */
   const signedIn = status === 'signedIn';
   const startTo = signedIn ? '/upload' : '/login';
 
   return (
     <div className="min-h-full bg-canvas">
+      {intro && <IntroOverlay onDone={closeIntro} />}
+
       <MarketingHeader />
 
       <main>
@@ -112,21 +140,7 @@ export function Landing() {
         <section className={`${SHELL} pt-10`}>
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_206px]">
             <div className="relative">
-              <div className="relative min-h-[440px] overflow-hidden rounded-[20px] bg-surface2 lg:min-h-[621px]">
-                <OrbitStage />
-
-                {/* 글은 궤도 위에 올린다 */}
-                <div className="relative z-10 px-8 pt-12 sm:px-16 sm:pt-16">
-                  <p className="text-body text-highlight">
-                    1인 IT 개발 사업자를 위한 경비 판정
-                  </p>
-                  <strong className="mt-5 block text-h2 font-normal leading-tight tracking-ir text-white [word-break:keep-all] lg:text-ir-display">
-                    이 카드값이 경비인지,
-                    <br />
-                    조문까지 붙여 답합니다
-                  </strong>
-                </div>
-              </div>
+              <HeroBanner />
 
               {/* 왼쪽 아래 모서리를 바탕색으로 베어 내고 그 자리에 링크를 둔다 */}
               <div className="absolute bottom-0 left-0 flex h-[72px] items-center rounded-tr-[20px] bg-canvas pr-7 pt-2">

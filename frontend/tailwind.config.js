@@ -125,6 +125,19 @@ export default {content: [
           from: { transform: 'rotate(0deg)' },
           to: { transform: 'rotate(-360deg)' },
         },
+        /*
+         * 첫 모션 (Landing·OrbitStage) — 테가 그려지고 그림이 중심에서 제자리로 퍼진다.
+         * 끝이 기본 모습(scale 1 · opacity 1)이라 모션이 끝나도 화면이 움직이지 않는다.
+         * transform 을 통째로 쓰므로 -translate-x-1/2 같은 유틸리티와 같은 요소에 두면 안 된다
+         */
+        draw: {
+          from: { opacity: '0', transform: 'scale(0.88)' },
+          to: { opacity: '1', transform: 'scale(1)' },
+        },
+        spread: {
+          from: { opacity: '0', transform: 'scale(0.42)' },
+          to: { opacity: '1', transform: 'scale(1)' },
+        },
       },
       animation: {
         rise: 'rise 0.32s cubic-bezier(0.23, 1, 0.32, 1) both',
@@ -132,6 +145,8 @@ export default {content: [
         'orbit-back': 'orbit-back 52s linear infinite',
         'orbit-slow': 'orbit-back 78s linear infinite',
         'orbit-slow-back': 'orbit 78s linear infinite',
+        draw: 'draw 0.6s cubic-bezier(0.23, 1, 0.32, 1) both',
+        spread: 'spread 0.7s cubic-bezier(0.23, 1, 0.32, 1) both',
       },
     },
   },
