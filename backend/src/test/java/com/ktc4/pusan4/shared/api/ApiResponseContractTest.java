@@ -102,8 +102,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * 서비스 레이어가 붙기 전까지 컨트롤러는 고정된 목 응답을 반환한다.
- * 목 응답이 api.md 의 상태 코드를 지키는지 확인한다. 값은 보지 않는다 — 서비스로 바꿔도 깨지지 않아야 한다.
+ * 컨트롤러가 api.md 의 상태 코드를 지키는지 DB 없이 확인한다. 서비스는 대역으로 바꾸고 값은 보지 않는다.
  */
 @WebMvcTest
 @Import({ApiExceptionHandler.class, UuidV7Generator.class, TestAuthentication.class})

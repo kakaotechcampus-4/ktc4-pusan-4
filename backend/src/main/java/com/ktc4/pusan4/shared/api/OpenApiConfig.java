@@ -20,7 +20,6 @@ import java.util.Map;
 public class OpenApiConfig {
 
     private static final String BEARER = "bearer";
-    private static final String MOCK_RESPONSE_NOTE = "[목 응답] 입력과 상관없이 고정된 값을 반환한다.";
 
     /**
      * 모든 API 가 낼 수 있는 공통 에러 (api.md 1.3). 400 은 API 전용 코드가 있으면 그 설명 뒤에 덧붙인다.
@@ -42,8 +41,6 @@ public class OpenApiConfig {
                     이 문서는 요청·응답 형태와 에러 코드를 보여 주고, 동작 규칙과 흐름
                     (재판정, 상태 전이, 사용자 흐름)은 api.md 를 따른다.
 
-                    설명이 `[목 응답]` 으로 시작하는 API 는 서비스가 구현되기 전이라 고정된 값을 반환한다.
-
                     **공통 에러 코드 (api.md 1.3)** — API 마다 적힌 전용 `code` 외의 실패는 상태 코드별로 아래 코드를 쓴다.
 
                     | 상태 | code | 쓰임 |
@@ -62,21 +59,6 @@ public class OpenApiConfig {
                 .addSecuritySchemes(BEARER, new SecurityScheme()
                     .type(SecurityScheme.Type.HTTP)
                     .scheme("bearer")));
-    }
-
-    /**
-     * {@link MockResponse} 가 붙은 API 의 설명 앞에 목 응답 표시를 붙인다.
-     */
-    @Bean
-    OperationCustomizer mockResponseNote() {
-        return (operation, handlerMethod) -> {
-            if (handlerMethod.hasMethodAnnotation(MockResponse.class)) {
-                String description = operation.getDescription();
-                operation.setDescription(
-                    description == null ? MOCK_RESPONSE_NOTE : MOCK_RESPONSE_NOTE + " " + description);
-            }
-            return operation;
-        };
     }
 
     /**

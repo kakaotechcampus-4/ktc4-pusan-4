@@ -32,7 +32,7 @@ public class CurrentUserWebConfig implements WebMvcConfigurer {
     }
 
     /**
-     * 인증 API 를 뺀 모든 API 는 사용자를 알아야 한다(api.md 1.1). {@link CurrentUser} 인자가 없는 API(목 응답 등)도
+     * 인증 API 를 뺀 모든 API 는 사용자를 알아야 한다(api.md 1.1). {@link CurrentUser} 인자가 없는 API(법령 조회 등)도
      * 막도록 인자 리졸버가 아니라 인터셉터에서 확인한다. actuator·스웨거는 /api/v1 밖이라 걸리지 않는다.
      */
     @Override

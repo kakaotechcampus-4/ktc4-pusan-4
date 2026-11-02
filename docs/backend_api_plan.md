@@ -193,7 +193,7 @@ flowchart LR
   - 에이전트가 코드를 작성하고, 사람은 리뷰와 merge를 담당한다.
   - PR을 올리기 전에 에이전트 리뷰를 먼저 실행한다. 사람 리뷰는 에이전트의 지적사항과 스키마, 도메인 규칙(세법, api.md 계약)에 집중한다.
   - 직렬 사슬(A1a → A1b → A2a → A2b, B3a → B3b → B4 → B5 → B6)은 하루가 밀리면 뒤 작업도 모두 밀린다. 지연은 4주차 버퍼로 흡수한다.
-- 목 교체 절차: `backend/README.md`의 "목 응답" 절차를 따른다.
+- 목 교체 절차(11/2 모든 목 교체를 마쳤다):
   1. 컨트롤러에 주입된 `*MockData`를 서비스 코드로 교체한다.
   2. 해당 메서드의 `@MockResponse`를 삭제한다.
   3. 사용하지 않는 mock 메서드를 삭제한다.
@@ -272,8 +272,8 @@ flowchart LR
 | A7 | A | 10/29 | `POST /questions/bulk-answer`를 구현한다. 단건 답변 로직을 반복해서 호출하되, 같은 거래는 한 번만 재판정한다. 소명 대기 거래(Override를 뺀 최신 자동 판정이 불가인데 대기 질문이 남은 거래)의 질문은 대상과 `answer.value` 허용 검사에서 빼고 `excludedCount`로 센다(api.md 3.11, #103). |
 | B8 | B | 10/26 → 10/18 (#156, #158) | `GET /classification-reviews`와 `POST /classification-responses`를 구현한다. 사용자 응답은 개인 scope의 `merchant_dict`에 저장한다. 해당 batch에 완료된 run이 없으면 분류만 확정하고 `judgedCount=0`으로 응답한다. 완료된 run이 있으면 최근 run의 Context로 `rejudge`한다(api.md "판정 처리" 절). |
 | B9a | B | 10/27 | Redis 인프라를 추가한다. 로컬 `compose.yaml`, `deploy/compose.yaml`(`maxmemory` 128MB, AOF 켜기), `deploy/deploy.sh` 헬스체크, `spring-boot-starter-data-redis`, Testcontainers Redis 설정을 포함한다. |
-| B9b | B | 10/28, 일부 10/18 (#154, #155) | 인증을 도입한다. 확정한 인증 API 계약에 따라 로그인과 액세스 토큰(JWT) 발급을 구현한다. `CurrentUser` 리졸버 구현체는 Bearer 토큰 검증 방식으로 교체한다. **중간 발표(10/22) 때문에 일부를 먼저 올렸다(#154, #155, 머지 대기)**: 계약(api.md 1.1), 액세스 토큰, Bearer 검증, 로그인·재발급·로그아웃 API 를 구현했고, 고정 사용자 하나만 로그인한다. 남은 일은 `CredentialVerifier` 를 실제 계정·카카오 구현으로 바꾸고 `FixedUser`·`TemporaryUserSeeder` 를 지우는 것이다. |
-| B9c | B | 10/29, 일부 10/18 (#155) | 리프레시 토큰 재발급과 로그아웃을 구현한다. 저장 규칙은 `docs/architecture.md` "저장소 결정"을 따른다. 탈퇴하면 해당 사용자의 토큰을 모두 삭제한다. 재발급·로그아웃 API 는 B9b 와 함께 먼저 올렸다(#155, 머지 대기). 지금 `StatelessRefreshTokenStore` 는 서명만 확인해 `revoke`·`revokeAll` 이 아무것도 하지 않는다. 남은 일은 `RefreshTokenStore` 의 Redis 구현(교체 시 이전 토큰 폐기, 로그아웃 폐기, 탈퇴 시 `revokeAll`)을 빈으로 바꿔 끼우는 것이다. |
+| B9b | B | 10/28 → 11/1 (#154, #155, #176, #177, #193) | 인증을 도입한다. 확정한 인증 API 계약(api.md 1.1)에 따라 로그인과 액세스 토큰(JWT) 발급을 구현한다. `CurrentUser` 리졸버 구현체는 Bearer 토큰 검증 방식으로 교체한다. 중간 발표(10/22) 때문에 액세스 토큰·Bearer 검증·로그인·재발급·로그아웃 API 를 고정 사용자로 먼저 올렸고(#154, #155), 이메일 가입·로그인(#177), 카카오 로그인(#176), 메일 인증(#193)으로 실제 계정을 붙였다. `FixedUser`·`TemporaryUserSeeder` 는 지웠다. |
+| B9c | B | 10/29 → 11/1 (#155, #178) | 리프레시 토큰 재발급과 로그아웃을 구현한다. 저장 규칙은 `docs/architecture.md` "저장소 결정"을 따른다. 재발급·로그아웃 API 는 B9b 와 함께 먼저 올렸고(#155), `RefreshTokenStore` 의 Redis 구현(교체 시 이전 토큰 폐기, 로그아웃 폐기, 탈퇴 시 `revokeAll`)으로 바꿔 끼웠다(#178). |
 | M1 | B | 10/30 | 규칙 후보 관리자 API. [발표 준비](#발표-준비)를 참고한다. B10보다 먼저 진행한다. 버퍼가 줄어서 발표에 필요한 M1을 먼저 확보한다. |
 
 ### 4주차 (11/2~11/5): 발표 기능과 버퍼
