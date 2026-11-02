@@ -1,0 +1,21 @@
+# CloudWatch Agent 가 백엔드의 Prometheus 엔드포인트를 긁는 설정.
+# install.sh 가 /opt/aws/amazon-cloudwatch-agent/etc/prometheus.yaml 로 복사한다.
+global:
+  scrape_interval: 60s
+  scrape_timeout: 10s
+
+scrape_configs:
+  - job_name: ktc4-backend
+    metrics_path: /actuator/prometheus
+    static_configs:
+      # A2 가 compose 에서 127.0.0.1:8080 으로만 연다. A2 release 전에는 연결 실패가 Agent 로그에 찍힌다.
+      - targets: ["127.0.0.1:8080"]
+    metric_relabel_configs:
+      # 긁은 시계열은 전부 EMF 로그로 나가 로그 요금이 붙는다. 대시보드에 쓰는 3개만 남긴다.
+      # 값은 "__name__;area;name" 으로 이어 붙여 비교한다. 없는 라벨은 빈 문자열이다.
+      #   hikaricp_connections_pending                   : 커넥션 풀 대기 수
+      #   jvm_memory_used_bytes{area="heap"}             : 힙 영역별 사용량. 대시보드에서 Sum 으로 합친다.
+      #   executor_queued_tasks{name="judgmentRunExecutor"}: 판정 실행 풀 대기열
+      - source_labels: [__name__, area, name]
+        regex: "hikaricp_connections_pending;;|jvm_memory_used_bytes;heap;|executor_queued_tasks;;judgmentRunExecutor"
+        action: keep

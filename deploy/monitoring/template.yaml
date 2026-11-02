@@ -28,6 +28,14 @@ Resources:
       LogGroupName: /ktc4/backend
       RetentionInDays: !Ref BackendLogRetentionDays
 
+  # CloudWatch Agent(B2)가 긁은 Prometheus 값을 EMF 로그로 여기에 쓰고, CloudWatch 가 지표로 뽑는다.
+  # 지표로 뽑은 뒤에는 쓸 일이 없어 짧게 둔다.
+  PrometheusLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ktc4/prometheus
+      RetentionInDays: 3
+
   # Lambda 가 처음 실행될 때 자동으로 만드는 그룹은 보존 기간이 무기한이라 미리 만든다.
   AlarmToDiscordLogGroup:
     Type: AWS::Logs::LogGroup

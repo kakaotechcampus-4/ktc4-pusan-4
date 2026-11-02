@@ -248,6 +248,7 @@ sudo docker compose --env-file /etc/ktc4/production.env -f /opt/ktc4/repo/deploy
 | 백엔드 로그 그룹 | `/ktc4/backend` (보존 14일, 스택을 지워도 남는다) |
 | 알림 Lambda | `ktc4-alarm-to-discord` (알람 → Discord 장애 알림 스레드) |
 | 알람 | `ktc4-ec2-cpu-high`, `ktc4-ec2-status-check-failed` |
+| Agent 로그 그룹 | `/ktc4/prometheus` (보존 3일, Agent 가 긁은 앱 지표를 EMF 로그로 쓰는 곳) |
 
 ### 스택 배포
 
@@ -276,3 +277,24 @@ aws cloudwatch set-alarm-state --region ap-northeast-2 \
 ```
 
 Discord에 오지 않으면 Lambda 로그(`/aws/lambda/ktc4-alarm-to-discord`)를 본다. 403이면 웹훅 URL, 로그 자체가 없으면 Lambda 호출 권한(`AlarmInvokePermission`)을 확인한다.
+
+### CloudWatch Agent
+
+EC2에 CloudWatch Agent를 설치해 메모리·디스크와 백엔드 앱 지표 3개를 보낸다. 설정은 `deploy/cloudwatch-agent/`에 있고, 스택을 먼저 배포한 뒤(로그 그룹 `/ktc4/prometheus`) 설치한다. 설정을 바꾼 뒤에도 같은 명령을 다시 돌린다.
+
+```bash
+cd /opt/ktc4/repo && sudo git pull
+sudo bash /opt/ktc4/repo/deploy/cloudwatch-agent/install.sh
+systemctl status amazon-cloudwatch-agent --no-pager   # Memory: 줄로 Agent 사용량을 본다
+sudo tail -n 50 /opt/aws/amazon-cloudwatch-agent/logs/amazon-cloudwatch-agent.log
+```
+
+| 지표 | 네임스페이스 | 차원 |
+| --- | --- | --- |
+| `mem_used_percent` | `CWAgent` | `InstanceId` |
+| `disk_used_percent` (`/`만) | `CWAgent` | `InstanceId`, `path`, `fstype` |
+| `hikaricp_connections_pending`, `jvm_memory_used_bytes`(heap), `executor_queued_tasks`(judgmentRunExecutor) | `ktc4/backend` | `job=ktc4-backend` |
+
+- 앱 지표는 백엔드가 `127.0.0.1:8080/actuator/prometheus`를 연 뒤(A2)부터 나온다. 그 전에는 Agent 로그에 연결 실패가 찍히는 게 정상이다.
+- 긁은 값 중 위 3개만 남기고 버린다(`prometheus.yaml`의 `metric_relabel_configs`). 늘리려면 이 규칙과 `config.json`의 `metric_selectors`를 같이 고친다. 지표 하나가 차원 조합마다 따로 과금된다.
+- 설치 뒤 확인: `aws cloudwatch list-metrics --region ap-northeast-2 --namespace CWAgent`와 `--namespace ktc4/backend`.

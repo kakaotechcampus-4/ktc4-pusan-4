@@ -21,3 +21,26 @@
 - 실제 배포와 `set-alarm-state` 로 Discord 도착 확인은 아직. SSO 역할의 CloudFormation·Lambda·IAM·S3 권한이 실제로 되는지도 그때 확인한다.
 - 호출 권한의 `SourceArn` 은 `alarm:ktc4-*` 와일드카드다. B3 알람 이름도 `ktc4-` 로 시작해야 한다.
 - 단위 테스트는 CI 에 걸지 않았다. `python3 -m unittest discover -s deploy/monitoring` 로 돌린다.
+
+---
+
+# CloudWatch Agent (B2)
+
+- 브랜치: feature/monitoring-agent (feature/monitoring-stack 위)
+- 주요파일: deploy/cloudwatch-agent/config.json, deploy/cloudwatch-agent/prometheus.yaml, deploy/cloudwatch-agent/install.sh
+
+## 한 일
+
+- Agent 가 메모리(`mem_used_percent`)·루트 디스크(`disk_used_percent`)와 백엔드 Prometheus 지표 3개를 CloudWatch 로 보내게 설정했다. 설치·갱신은 `install.sh` 한 번.
+- Agent 가 Prometheus 값을 쓰는 로그 그룹 `/ktc4/prometheus`(보존 3일)를 모니터링 스택에 더했다.
+
+## 왜 이렇게 했나
+
+- 긁은 시계열은 EMF 로그로 전부 나가 로그 요금이 붙는다. `metric_relabel_configs` 로 3개(힙만, judgmentRunExecutor 만)만 남긴다.
+- 앱 지표 차원은 `job` 하나만 둔다. `uri`·`id` 같은 라벨을 차원에 넣으면 조합마다 커스텀 지표가 늘어난다.
+
+## 남은 것 · 아는 문제
+
+- 지표 이름은 계획 문서의 예상값이다. A2 PR 본문의 실제 출력과 다르면 relabel 규칙과 `metric_selectors` 를 고친다.
+- 디스크 지표에서 `fstype` 차원은 Agent 설정으로 뺄 수 없다. 시계열은 하나라 비용은 같다. B3 알람은 설치 뒤 `list-metrics` 로 본 실제 값을 쓴다.
+- 운영 EC2 설치와 Agent 메모리 측정은 아직.
