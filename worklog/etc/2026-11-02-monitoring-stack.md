@@ -21,3 +21,10 @@
 - 실제 배포와 `set-alarm-state` 로 Discord 도착 확인은 아직. SSO 역할의 CloudFormation·Lambda·IAM·S3 권한이 실제로 되는지도 그때 확인한다.
 - 호출 권한의 `SourceArn` 은 `alarm:ktc4-*` 와일드카드다. B3 알람 이름도 `ktc4-` 로 시작해야 한다.
 - 단위 테스트는 CI 에 걸지 않았다. `python3 -m unittest discover -s deploy/monitoring` 로 돌린다.
+
+---
+
+# B1 배포 수정: Lambda zip 을 직접 만든다
+
+- 첫 배포에서 `AlarmToDiscordFunction` 이 "Could not unzip uploaded file" 로 실패했다. 템플릿 `Code` 에 `.py` 를 두면 AWS CLI v2(2.39.3)의 `cloudformation package` 가 zip 으로 묶지 않고 올린다.
+- `deploy.sh` 가 작업 폴더에 템플릿과 `alarm_to_discord.zip` 을 같이 만들고, 템플릿은 `Code: alarm_to_discord.zip` 을 가리키게 바꿨다.
