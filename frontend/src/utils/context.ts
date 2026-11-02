@@ -6,6 +6,11 @@ const INDUSTRY_NAME: Record<string, string> = {
   '940909': '기타자영업 (컴퓨터 프로그래머 등)'
 };
 
+/**
+ * 판정하는 업종인가. 예전에 저장한 문진(62010 등)은 규칙 카드(940909)에 걸리지 않아 거의 다 「확인 필요」가 된다(#214)
+ */
+export const isJudgedIndustry = (industryCode: string) => industryCode in INDUSTRY_NAME;
+
 /** 사업자 문진을 사람이 읽는 표로. 판정 확인 화면과 내 정보 화면이 같이 쓴다 */
 export const contextRows = (context: BusinessContext | StoredBusinessContext) => [
 {

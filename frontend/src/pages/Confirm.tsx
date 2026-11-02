@@ -5,7 +5,7 @@ import { AppShell } from '../components/AppShell';
 import { useSession } from '../contexts/SessionContext';
 import { api, ApiRequestError, useApi } from '../api';
 import { formatNumber, formatPeriod } from '../utils/format';
-import { contextRows } from '../utils/context';
+import { contextRows, isJudgedIndustry } from '../utils/context';
 
 export function Confirm() {
   const navigate = useNavigate();
@@ -25,6 +25,8 @@ export function Confirm() {
   '올린 카드내역이 없습니다. 파일을 먼저 올려 주세요.' :
   !contextRef ?
   '사업자 문진을 먼저 마쳐 주세요.' :
+  context && !isJudgedIndustry(context.industryCode) ?
+  `저장된 문진의 업종(${context.industryCode})은 지금 판정하지 않습니다. 문진을 다시 저장해 주세요.` :
   null;
 
   const start = async () => {
