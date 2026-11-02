@@ -1,7 +1,9 @@
 package com.ktc4.pusan4.user.persistence;
 
+import com.ktc4.pusan4.shared.UuidGenerator;
 import com.ktc4.pusan4.shared.api.ApiException;
 import com.ktc4.pusan4.user.domain.AppUser;
+import com.ktc4.pusan4.user.domain.UserRole;
 import org.junit.jupiter.api.Test;
 
 import java.time.OffsetDateTime;
@@ -16,13 +18,13 @@ import static org.mockito.Mockito.mock;
 class UserServiceTest {
 
     private final AppUserRepository repository = mock(AppUserRepository.class);
-    private final UserService userService = new UserService(repository);
+    private final UserService userService = new UserService(repository, mock(UuidGenerator.class));
 
     @Test
     void returns_user_when_present() {
         // given
         UUID userId = UUID.randomUUID();
-        AppUser user = new AppUser(userId, "user@example.com", OffsetDateTime.parse("2026-09-01T10:00:00+09:00"));
+        AppUser user = new AppUser(userId, "user@example.com", UserRole.USER, OffsetDateTime.parse("2026-09-01T10:00:00+09:00"));
         AppUserEntity entity = mock(AppUserEntity.class);
         given(entity.toDomain()).willReturn(user);
         given(repository.findById(userId)).willReturn(Optional.of(entity));

@@ -1,5 +1,6 @@
 package com.ktc4.pusan4.transaction.persistence;
 
+import com.ktc4.pusan4.judgment.persistence.AssignedIdEntity;
 import com.ktc4.pusan4.merchant.classify.ModelDecision;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -13,11 +14,11 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * 분류 모델이 미분류 거래에 낸 답 (V19). 업로드가 남기고, 분류 확인 목록이 후보를 읽는다. 사전에는 쓰지 않는다.
+ * 분류 모델이 미분류 거래에 낸 답 (V20). 업로드가 남기고, 분류 확인 목록이 후보를 읽는다. 사전에는 쓰지 않는다.
  */
 @Entity
 @Table(name = "merchant_model_decision")
-class MerchantModelDecisionEntity {
+class MerchantModelDecisionEntity extends AssignedIdEntity<UUID> {
 
     @Id
     @Column(name = "transaction_id")
@@ -54,6 +55,11 @@ class MerchantModelDecisionEntity {
         this.refused = decision.refused();
         this.model = decision.model();
         this.createdAt = now;
+    }
+
+    @Override
+    public UUID getId() {
+        return transactionId;
     }
 
     UUID transactionId() {

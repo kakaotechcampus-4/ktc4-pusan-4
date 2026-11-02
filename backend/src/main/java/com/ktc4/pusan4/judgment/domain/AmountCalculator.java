@@ -37,7 +37,7 @@ public final class AmountCalculator {
         long amount = transaction.amount();
         // 엔진은 비율이 없으면 확인필요로 둔다. 비율 없이 가능인 것은 사용자가 가능으로 수정한 경우라 전액이다.
         if (JudgmentEngine.HOME_OFFICE_RATIO.equals(attributes.get(JudgmentEngine.APPORTIONMENT))
-            && context.homeOfficeRatio() != null) {
+            && context.hasHomeOfficeRatio()) {
             amount = amount * context.homeOfficeRatio() / 100;
         }
         if (Boolean.TRUE.equals(attributes.get("자산"))) {

@@ -9,6 +9,8 @@
 > 필드 상세의 단일 원본은 [`docs/rule-card-fields.md`](docs/rule-card-fields.md) (§6 필수 요소).
 >
 > 2026-10-15 · 보고서(핸드오프 문서) 생성을 없앴다. 에이전트 자리는 규칙 카드 생성과 에이전트 비서 Really 두 곳이다.
+> 없앤 것은 AI 가 쓰는 PDF 보고서다. 세무사에게 넘기는 CSV(2026-10-05 협업 미팅 결정)는 그대로 두고,
+> 백엔드는 내보내기 API(`GET /judgments/export`)로 데이터만 주고 파일 변환은 FE 가 한다(2026-11-01).
 > 비서 명세의 단일 원본은 [`docs/agent-secretary.md`](docs/agent-secretary.md).
 
 ---
@@ -296,13 +298,15 @@ B→A 순서: B 통과, A는 150만만
 
 | 타입 | 대상 | 문진 | 처리 |
 |---|---|---|---|
-| **면적 기준** | 월세·관리비·전기·수도·가스 | 작업공간 면적 비율 % | 자동 안분 |
+| **면적 기준** | 월세·관리비·전기·수도·가스 | 작업공간 면적 비율 % | 작업 공간이 따로 나뉘면 자동 안분, 나뉘지 않으면 확인 필요 |
 | **전용 여부** | 통신·인터넷 | 전용/공용 이분법 | 전용=100% / 공용=확인 필요 |
 | **제도** | 차량·주유 | 보유 여부 | **범위 밖 → 핸드오프** |
 
 **휴대폰을 "몇 %"로 안 묻는 이유:** 사용자도 답을 모르고, 대답해도 근거가 없다. 비율이 아니라 "업무 전용 회선인가"로 묻는다.
 
-**혼용으로 답하면 비율을 묻지 않는다(2026-10-31, #65 결정 1번 변경).** 구분할 근거가 되는 사실(전용 회선, 작업공간 면적)이 없으면 확인필요로 두고 세무사 판단에 맡긴다. 세무서가 보는 것은 비율이 아니라 업무 몫이 구분되는지와 그 입증이다(기본통칙 33-3, 대법원 2007두22955). 구간 선택지(30·50·70·100%)도 쓰지 않는다. 근거를 만들지 못하면서 비율을 제안하는 셈이다.
+**혼용으로 답하면 비율을 묻지 않는다(2026-10-31).** #65 결정 1번의 "업무 비중(%)을 묻고 금액 × 비중"은 구현하지 않았다. 결정을 바꿀지는 #65 에서 PM 이 정한다. 구분할 근거가 되는 사실(전용 회선, 작업공간 면적)이 없으면 확인필요로 두고 세무사 판단에 맡긴다. 세무서가 보는 것은 비율이 아니라 업무 몫이 구분되는지와 그 입증이다(기본통칙 33-3, 대법원 2007두22955). 구간 선택지(30·50·70·100%)도 쓰지 않는다. 근거를 만들지 못하면서 비율을 제안하는 셈이다.
+
+**자택은 작업 공간이 따로 나뉘는지까지 묻는다(2026-11-01, R-103 v3, R-210 v4).** 세무사 자문(2026.09, 보고서 Q1): 자택은 업무공간이 물리적으로 구획되어 있는지가 중요하고, 구획이 명확하지 않으면 인정받기 어렵거나 낮은 비율만 반영한다. 나뉘면 면적 비율로 안분하고, 나뉘지 않으면 낮은 비율을 우리가 정할 근거가 없어 확인필요로 두고 세무사에게 넘긴다(#65 결정 2번의 "낮은 비율 또는 불인정"). 월세와 공과금을 같은 면적 비율로 나누는 것도 보고서 Q1("월세, 전기료, 관리비 … 면적 비율")을 따른다.
 
 **차량이 범위 밖인 이유:** 업무용승용차는 안분이 아니라 별도 제도(운행기록부·한도·상각특례). 규칙 카드 몇 장으로 안 끝난다.
 
@@ -675,7 +679,7 @@ js = settleLimits(js, ctx, Mode.잠정);
 [사람] 관리자 페이지
    후보 검토 → 수정 → 승인 / 기각
         ↓
-[반자동] 승인 시 GitHub API로 PR 자동 생성
+[반자동] 승인 후보를 주 1회 모아 GitHub API로 PR 자동 생성 (pipeline/promote.py)
    rules/cards/R-089_온라인교육.yaml 커밋 → PR
         ↓ CI 자동
    평가셋 전건 회귀 + 매칭 충돌 검사
@@ -699,15 +703,15 @@ js = settleLimits(js, ctx, Mode.잠정);
 - Kang → PR에서 CI 확인 후 머지 (기술 판단)
 
 ```python
-def approve_candidate(candidate_id, reviewer):
-    c = db.get(candidate_id)
-    yaml_text = render_rule_card(c)
-    branch = f"rule/{c.rule_id}"
-    github.create_branch(branch)
-    github.commit(branch, f"rules/cards/{c.rule_id}.yaml", yaml_text)
-    pr = github.create_pr(branch, title=f"[규칙] {c.merchant_category}")
-    db.update(candidate_id, status="승인", pr_url=pr.url, reviewed_by=reviewer)
-    return pr.url
+# 승인(관리자 API)은 status 만 바꾼다. PR 은 주 1회 배치가 모아서 만든다.
+def promote_weekly():
+    sync_closed_prs()                     # 닫힌 PR: develop 에 카드가 있으면 promoted_rule_id, 없으면 대기로
+    rows = db.approved_without_pr()       # status='승인' AND pr_url IS NULL
+    files = {f"rules/cards/R-C{c.id}_{c.merchant_category}.yaml":
+             finalize(c.draft_yaml, id=f"R-C{c.id}", start=c.reviewed_at.date())  # 소급 없음
+             for c in rows}
+    pr = github.create_pr(f"feature/rule-candidates-{today}", files)
+    db.update(rows, pr_url=pr.url)        # reviewed_by(이메일)는 공개 레포에 쓰지 않는다
 ```
 
 ### 디렉터리 구조
@@ -904,7 +908,7 @@ review: { by: 외부자문, date: 2026-09-05 }
 > |---|---|---|---|
 > | ① | 되묻기 대기 | R-101 답변 전 | `questions`가 비어 있지 않다 |
 > | ② | **범위 밖 핸드오프** | R-070·R-071 | **`out_of_scope`** |
-> | ③ | 후속 관문 대기 | `연간 일시불`, `업무·개인 혼용`(세무사 판단, #65) (`자택 겸용`은 2026-10-28부터 가능 + `안분` 속성) | 답은 있는데 effect에 verdict가 없다 |
+> | ③ | 후속 관문 대기 | `연간 일시불`, `업무·개인 혼용`(세무사 판단, #65) (`자택 겸용`은 2026-10-28부터 가능 + `안분` 속성, 2026-11-01부터 작업 공간이 따로 나뉠 때만) | 답은 있는데 effect에 verdict가 없다 |
 > | ④ | 미매칭 안전망 | G2에서 카드 0장 | `unmatched_reason = RULE_NOT_FOUND` |
 >
 > **verdict의 네 번째 값으로 만들지 않는다.** 관문 간 병합은 제한 강도 순서
@@ -1439,7 +1443,7 @@ WHERE statute_id = :id
 | **참조데이터 적재** | 1회성 + 연 1회 | 수동 | Kang |
 | **카드내역 정규화** | 온디맨드 | 사용자 업로드 | 프론트+백엔드 |
 | **평가 회귀 하네스** | CI | PR마다 | Kang |
-| **규칙 후보 추출** | 배치 | GH Actions cron 주 1회 | Kang |
+| **규칙 후보 추출** | 배치 | EC2 systemd timer 주 1회 (일 05:00 KST) | Kang |
 
 ### 1. 법령 동기화 → 재색인
 
@@ -1567,7 +1571,7 @@ chunking 전략 변경(**10월에 반드시 겪음**), 임베딩 모델 교체 �
 **⚠️ 분류기 자체는 여기서 빠진다.** 별도 평가셋으로 CI 밖에서 주기 측정.
 **⚠️ 속성 관문 순서 무관 property test**를 넣으면 N-01이 구조적으로 검증된다.
 
-**⭐ 규칙 카드 승인 시에도 이 하네스가 돈다.** 관리자 페이지 승인 → PR 자동 생성 → CI 회귀 → 통과해야 머지.
+**⭐ 규칙 카드 승인 시에도 이 하네스가 돈다.** 관리자 페이지 승인 → 주 1회 모아 PR 자동 생성 → CI 회귀 → 통과해야 머지.
 
 ### 5. 규칙 후보 추출 ⭐ 에이전트
 
@@ -1602,7 +1606,7 @@ chunking 전략 변경(**10월에 반드시 겪음**), 임베딩 모델 교체 �
 
 [6] rule_candidate INSERT (status: 대기 | 보류, draft_yaml)
 ────────── 여기까지 자동 ──────────
-[7] 관리자 페이지 → 세무 검수 승인 → PR 자동 생성 → CI → Kang 머지
+[7] 관리자 페이지 → 세무 검수 승인 → 주 1회 모아 PR 자동 생성 → CI → Kang 머지
 ```
 
 **후보당 LLM 호출은 정확히 3회다.** 조기 종료 판정이 없어 가변 구간이 사라졌다.
@@ -1691,7 +1695,7 @@ def needs_review(ev: Evidence, tier_of: dict[str, str]) -> bool:
 | 다단계·분기 | 질의 → 근거 선택 → 초안. 근거가 없거나 하위뿐이면 보류로 빠진다 |
 | 상태 변화 | 규칙이 늘어 다음 주 판정이 달라짐 |
 
-**절대 자동화하지 않을 것:** 승격은 사람을 거친다. **승인 시점에 `effective_period.start`를 박고 기본값은 "소급 적용 안 함".**
+**절대 자동화하지 않을 것:** 승격은 사람을 거친다. **`effective_period.start`는 승인일로 박는다. 소급 적용하지 않는다.**
 
 ### 데이터 흐름
 
@@ -1903,7 +1907,7 @@ id: E-021
 | **LLM** | **OpenAI API** |
 | **임베딩** | **text-embedding-3-small (1536차원)** |
 | 배포 | **AWS EC2 1대 + docker compose + RDS** |
-| CI·스케줄 | GitHub Actions (CI·배포) · EC2 systemd timer (코퍼스 동기화) |
+| CI·스케줄 | GitHub Actions (CI·배포) · EC2 systemd timer (코퍼스 동기화 · 규칙 후보) |
 | 관측 | Langfuse (LLM 호출 추적) |
 
 ### RDS 확장 지원 (확인 완료)
@@ -1959,7 +1963,7 @@ docker-compose.yml
 | 5 | **G2 매칭 실패 시 에이전트 개입 없음.** (b)안 폐기 |
 | 6 | **조문 append-only + 스냅샷 3필드** (컬럼 추가 완료) |
 | 7 | **규칙 후보는 DB(`rule_candidate`), 확정 카드는 git(`rules/cards/*.yaml`)** |
-| 8 | 승인 시 **GitHub API로 PR 자동 생성** → CI 회귀 → 수동 머지 |
+| 8 | 승인 후보를 주 1회 모아 **GitHub API로 PR 자동 생성** → CI 회귀 → 수동 머지 |
 | 9 | **RDS PostgreSQL 17 + pgvector + pg_bigm** |
 | 10 | **LLM·임베딩은 OpenAI.** text-embedding-3-small (1536) |
 | 11 | **AWS EC2 + docker compose + RDS.** 백엔드 Java, AI Python 별도 서버 |

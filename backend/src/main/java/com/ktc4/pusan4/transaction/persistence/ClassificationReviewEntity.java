@@ -1,5 +1,6 @@
 package com.ktc4.pusan4.transaction.persistence;
 
+import com.ktc4.pusan4.judgment.persistence.AssignedIdEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -14,7 +15,7 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "classification_review")
-class ClassificationReviewEntity {
+class ClassificationReviewEntity extends AssignedIdEntity<UUID> {
 
     @Id
     private UUID id;
@@ -62,5 +63,10 @@ class ClassificationReviewEntity {
         this.status = "RESOLVED";
         this.selectedCategory = category;
         this.resolvedAt = resolvedAt;
+    }
+
+    @Override
+    public UUID getId() {
+        return id;
     }
 }

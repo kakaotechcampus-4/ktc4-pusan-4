@@ -8,5 +8,7 @@ import java.util.UUID;
 
 interface MerchantModelDecisionRepository extends Repository<MerchantModelDecisionEntity, UUID> {
 
+    List<MerchantModelDecisionEntity> saveAll(Iterable<MerchantModelDecisionEntity> decisions);
+
     List<MerchantModelDecisionEntity> findByTransactionIdIn(Collection<UUID> transactionIds);
 }

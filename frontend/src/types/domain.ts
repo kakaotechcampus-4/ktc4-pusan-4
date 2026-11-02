@@ -101,7 +101,7 @@ export interface LoginRequest {
 // ── 3.2 사업자 Context ──────────────────────────────
 
 export interface BusinessContext {
-  /** 업종코드. IT 한정이라 62010 고정 */
+  /** 국세청 업종코드. 인적용역 한정이라 940909 고정 */
   industryCode: string;
   prevYearRevenue: number;
   businessOpenDate: string;
