@@ -71,7 +71,19 @@ def post_discord(webhook_url: str, payload: dict) -> None:
     urllib.request.urlopen(request, timeout=8).close()
 
 
+def should_notify(event: dict) -> bool:
+    # 알람을 새로 만들거나 지표가 처음 들어오면 INSUFFICIENT_DATA → OK 로 바뀐다. 장애가 있었던 게 아니라 알리지 않는다.
+    # INSUFFICIENT_DATA → ALARM 은 처음부터 문제라는 뜻이라 알린다.
+    data = event["alarmData"]
+    previous = data.get("previousState", {}).get("value")
+    return not (previous == "INSUFFICIENT_DATA" and data["state"]["value"] == "OK")
+
+
 def handler(event, context, post=post_discord):
+    name = event["alarmData"]["alarmName"]
+    state = event["alarmData"]["state"]["value"]
+    if not should_notify(event):
+        return {"alarm": name, "state": state, "sent": False}
     # 실패하면 예외를 그대로 올린다. 비동기 호출이라 Lambda 가 두 번 더 재시도하고, 실패는 Lambda 로그에 남는다.
     post(os.environ["DISCORD_WEBHOOK_URL"], build_payload(event))
-    return {"alarm": event["alarmData"]["alarmName"], "state": event["alarmData"]["state"]["value"]}
+    return {"alarm": name, "state": state, "sent": True}

@@ -78,7 +78,27 @@ class HandlerTest(unittest.TestCase):
         self.assertEqual(len(sent), 1)
         self.assertEqual(sent[0][0], "https://discord.test/hook")
         self.assertEqual(sent[0][1], subject.build_payload(EVENT))
-        self.assertEqual(result, {"alarm": "ktc4-ec2-cpu-high", "state": "ALARM"})
+        self.assertEqual(result, {"alarm": "ktc4-ec2-cpu-high", "state": "ALARM", "sent": True})
+
+    def test_skips_first_ok_after_insufficient_data(self):
+        event = copy.deepcopy(EVENT)
+        event["alarmData"]["previousState"]["value"] = "INSUFFICIENT_DATA"
+        event["alarmData"]["state"]["value"] = "OK"
+        sent = []
+        with mock.patch.dict(os.environ, {"DISCORD_WEBHOOK_URL": "https://discord.test/hook"}):
+            result = subject.handler(event, None, post=lambda url, payload: sent.append(payload))
+
+        self.assertEqual(sent, [])
+        self.assertFalse(result["sent"])
+
+    def test_sends_alarm_after_insufficient_data(self):
+        event = copy.deepcopy(EVENT)
+        event["alarmData"]["previousState"]["value"] = "INSUFFICIENT_DATA"
+        sent = []
+        with mock.patch.dict(os.environ, {"DISCORD_WEBHOOK_URL": "https://discord.test/hook"}):
+            subject.handler(event, None, post=lambda url, payload: sent.append(payload))
+
+        self.assertEqual(len(sent), 1)
 
     def test_post_failure_propagates(self):
         def fail(url, payload):
