@@ -92,6 +92,13 @@ app:
     email-verification:
       delivery: ${APP_AUTH_EMAIL_DELIVERY:smtp}
 
+# 운영 로그는 한 줄에 JSON 하나다(logstash 형식). CloudWatch 메트릭 필터가 { $.status >= 500 } 처럼 필드로 걸고,
+# 스택 트레이스가 stack_trace 필드에 들어가 여러 이벤트로 쪼개지지 않는다. 로컬은 application-local.yml 에서 텍스트로 되돌린다.
+logging:
+  structured:
+    format:
+      console: logstash
+
 management:
   endpoints:
     web:

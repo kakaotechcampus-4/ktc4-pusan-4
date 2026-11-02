@@ -3,6 +3,7 @@ package com.ktc4.pusan4.shared.api;
 import com.ktc4.pusan4.shared.UuidGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
@@ -90,7 +91,11 @@ public class ApiExceptionHandler {
         return resolved == null ? "HTTP_" + status.value() : resolved.name();
     }
 
+    /**
+     * 요청 로그와 같은 traceId 를 쓴다(RequestTraceFilter). 필터를 거치지 않은 요청(필터 없이 만든 테스트 MockMvc)만 새로 만든다.
+     */
     private ErrorResponse error(String code, String message) {
-        return new ErrorResponse(code, message, uuidGenerator.generate().toString());
+        String traceId = MDC.get(RequestTraceFilter.TRACE_ID);
+        return new ErrorResponse(code, message, traceId != null ? traceId : uuidGenerator.generate().toString());
     }
 }
