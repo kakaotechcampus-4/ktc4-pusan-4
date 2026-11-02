@@ -1807,7 +1807,7 @@ export const CLASSIFICATION_REVIEWS: ClassificationReview[] = [
   merchantRaw: 'ELEVENLABS IO',
   merchantNorm: '미확인 가맹점',
   status: { code: 'PENDING', label: '대기' },
-  suggestedCategories: ['해외SaaS', '구독서비스', '기타'],
+  suggestedCategories: ['해외SaaS', '구독서비스', '국내SW'],
   createdAt: '2026-09-12T13:58:09+09:00',
   resolvedAt: null
 },
@@ -1818,7 +1818,7 @@ export const CLASSIFICATION_REVIEWS: ClassificationReview[] = [
   merchantRaw: 'XYZ PAYMENTS',
   merchantNorm: 'XYZ PAYMENTS',
   status: { code: 'PENDING', label: '대기' },
-  suggestedCategories: ['해외SaaS', '온라인쇼핑', '기타'],
+  suggestedCategories: ['해외SaaS', '온라인쇼핑', '국내SW'],
   createdAt: '2026-09-12T13:58:10+09:00',
   resolvedAt: null
 },
@@ -1829,7 +1829,8 @@ export const CLASSIFICATION_REVIEWS: ClassificationReview[] = [
   merchantRaw: '(주)케이지이니시스',
   merchantNorm: 'KG이니시스',
   status: { code: 'PENDING', label: '대기' },
-  suggestedCategories: ['PG_미상', '온라인쇼핑', '기타'],
+  // 결제대행사라 모델이 답을 거절한 경우. 후보가 없으면 빈 배열이다(#209)
+  suggestedCategories: [],
   createdAt: '2026-09-12T13:58:11+09:00',
   resolvedAt: null
 },
@@ -1840,7 +1841,7 @@ export const CLASSIFICATION_REVIEWS: ClassificationReview[] = [
   merchantRaw: 'PADDLE.NET* CURSOR AI',
   merchantNorm: 'Paddle',
   status: { code: 'PENDING', label: '대기' },
-  suggestedCategories: ['해외SaaS', '국내SW', '기타'],
+  suggestedCategories: ['해외SaaS', '국내SW', '구독서비스'],
   createdAt: '2026-09-12T13:58:12+09:00',
   resolvedAt: null
 },
@@ -1851,7 +1852,7 @@ export const CLASSIFICATION_REVIEWS: ClassificationReview[] = [
   merchantRaw: 'PADDLE.NET* RAYCAST',
   merchantNorm: 'Paddle',
   status: { code: 'PENDING', label: '대기' },
-  suggestedCategories: ['해외SaaS', '국내SW', '기타'],
+  suggestedCategories: ['해외SaaS', '국내SW', '구독서비스'],
   createdAt: '2026-09-12T13:58:14+09:00',
   resolvedAt: null
 },
@@ -1862,7 +1863,7 @@ export const CLASSIFICATION_REVIEWS: ClassificationReview[] = [
   merchantRaw: 'PADDLE.NET* TABLEPLUS',
   merchantNorm: 'Paddle',
   status: { code: 'PENDING', label: '대기' },
-  suggestedCategories: ['해외SaaS', '국내SW', '기타'],
+  suggestedCategories: ['해외SaaS', '국내SW', '구독서비스'],
   createdAt: '2026-09-12T13:58:15+09:00',
   resolvedAt: null
 }];

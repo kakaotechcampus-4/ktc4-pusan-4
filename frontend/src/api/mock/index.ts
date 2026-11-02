@@ -92,8 +92,11 @@ const MERCHANT_KEYWORDS: [RegExp, string, string][] = [
 /** 시드 판정이 쓴 규칙 커밋. 새로 만드는 판정도 같은 값을 쓴다 */
 const RULES_SHA = JUDGMENTS[0]?.rulesCommitSha ?? '';
 
-/** 분류 확인 화면이 먼저 보여줄 선택지. 서버는 후보를 계산하지만 목업은 고정이다 */
-const SUGGESTED_CATEGORIES = ['해외SaaS', '사무용품', '기타'] as const;
+/**
+ * 분류 확인 화면이 먼저 보여줄 선택지. 서버는 분류 모델이 고르지만 목업은 고정이다.
+ * 서버처럼 최대 3개, 가맹점 카테고리 안의 값만 두고 `기타`·`PG_미상`은 넣지 않는다(#209)
+ */
+const SUGGESTED_CATEGORIES = ['해외SaaS', '사무용품', '구독서비스'] as const;
 
 /** 못 맞히면 category 가 null 이다 */
 const guessMerchant = (raw: string) => {
