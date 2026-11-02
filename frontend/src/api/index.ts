@@ -14,7 +14,7 @@ const useHttp = import.meta.env.VITE_API === 'http';
 
 export const api: Api = useHttp ? httpApi : mockApi;
 
-/** 목업 모드인가. 가짜 데이터로만 해 볼 수 있는 것(샘플 파일)을 실제 서버에서 숨길 때 쓴다 */
+/** 목업 모드인가. 가짜 데이터로만 해 볼 수 있는 것을 실제 서버에서 숨기거나 문구를 바꿀 때 쓴다 */
 export const isMock = !useHttp;
 
 /** 개발용 세션 초기값. 목업일 때만 값이 있고 실제 서버에서는 null 이다. */

@@ -60,6 +60,6 @@ await api.questions.respond({ questionIds, answer: { value } });
 
 - 랜딩 페이지는 디자인 시스템 부품으로 구성됨
 - 앱 화면은 `api` 목업으로 동작. 업로드 → 분류 확인 → 문진 → 판정 → 결과 → 되묻기 순
-- `/upload` 는 파일을 브라우저에서 읽고(`src/parser/`) `POST /upload-batches` 로 보낸다. 샘플 파일은 목업 모드에서만 보인다
+- `/upload` 는 파일을 브라우저에서 읽고(`src/parser/`) `POST /upload-batches` 로 보낸다. 샘플 파일은 실서버에서도 보이고, 실서버에서 올리면 그 계정의 업로드 이력에 남는다
 - `/preview` `/uploads` `/transactions` `/account` 는 라우트만 있는 빈 화면
 - 백엔드 연동 없음
