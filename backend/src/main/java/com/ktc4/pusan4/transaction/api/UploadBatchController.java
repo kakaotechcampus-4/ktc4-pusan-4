@@ -5,7 +5,7 @@ import com.ktc4.pusan4.shared.api.ErrorResponse;
 import com.ktc4.pusan4.shared.api.PageResponse;
 import com.ktc4.pusan4.shared.auth.CurrentUser;
 import com.ktc4.pusan4.transaction.persistence.UploadBatchService;
-import com.ktc4.pusan4.transaction.persistence.UploadService;
+import com.ktc4.pusan4.transaction.persistence.UploadFacade;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import io.swagger.v3.oas.annotations.Operation;
@@ -36,11 +36,11 @@ public class UploadBatchController {
     // 컬럼 크기(V12 idempotency_key.idempotency_key)
     private static final int IDEMPOTENCY_KEY_MAX = 128;
 
-    private final UploadService uploadService;
+    private final UploadFacade uploadFacade;
     private final UploadBatchService batchService;
 
-    public UploadBatchController(UploadService uploadService, UploadBatchService batchService) {
-        this.uploadService = uploadService;
+    public UploadBatchController(UploadFacade uploadFacade, UploadBatchService batchService) {
+        this.uploadFacade = uploadFacade;
         this.batchService = batchService;
     }
 
@@ -71,7 +71,7 @@ public class UploadBatchController {
             throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Idempotency-Key 가 너무 깁니다.");
         }
         return UploadBatchCreatedResponse.from(
-            uploadService.upload(currentUser.id(), idempotencyKey, UploadRequestValidator.validate(request)));
+            uploadFacade.upload(currentUser.id(), idempotencyKey, UploadRequestValidator.validate(request)));
     }
 
     @Operation(summary = "업로드 배치 목록",
