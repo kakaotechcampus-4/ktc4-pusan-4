@@ -505,10 +505,11 @@ class QuestionAnswerIntegrationTest {
     }
 
     @Test
-    void export_lists_current_judgments_with_answers_and_the_limit_allowed_amount() throws Exception {
-        // given: 통신(전용) 가능, 카페 업무미팅 접대비(한도 인정액을 결제금액보다 작게 둔다), 답하지 않은 카페
+    void export_lists_current_judgments_with_answers_and_the_yearly_limit_excess() throws Exception {
+        // given: 통신(전용) 가능, 카페 업무미팅 접대비(한도 인정액을 결제금액보다 작게 두어 그해 한도를 넘긴다), 답하지 않은 카페
+        // 한도는 사용자의 한 해 전체라, 같은 사용자를 쓰는 다른 테스트와 겹치지 않는 해(평일)에 둔다
         UUID telecom = insertTransaction("통신", "KT");
-        UUID meeting = insertTransaction("카페", "스타벅스");
+        UUID meeting = insertTransaction("카페", "스타벅스", 6_500L, "2031-03-04");
         UUID unanswered = insertTransaction("카페", "이디야");
         List.of(telecom, meeting, unanswered).forEach(this::judge);
         answer(List.of(pendingQuestion(telecom, "전용여부")), "전용").andExpect(status().isOk());
@@ -518,11 +519,16 @@ class QuestionAnswerIntegrationTest {
             where judgment_id = (select id from judgment where transaction_id = ? order by revision desc limit 1)
             """, meeting);
 
-        // when / then: 거래마다 현재 판정 하나, 답한 질문과 답, 한도 반영 인정액
+        // when / then: 거래마다 현재 판정 하나, 답한 질문과 답. 한도를 넘은 해의 접대비는 인정액을 비우고 초과액은 limits 에 둔다
         mockMvc.perform(get("/api/v1/judgments/export").param("batchId", batchId.toString()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.items.length()").value(3))
-            .andExpect(jsonPath("$.items[?(@.judgment.transactionId == '%s')].allowedAmount", meeting).value(3000))
+            .andExpect(jsonPath("$.items[?(@.judgment.transactionId == '%s' && @.allowedAmount == null)]", meeting)
+                .exists())
+            .andExpect(jsonPath("$.limits.length()").value(1))
+            .andExpect(jsonPath("$.limits[0].bucket").value("접대비"))
+            .andExpect(jsonPath("$.limits[0].totalAmount").value(6500))
+            .andExpect(jsonPath("$.limits[0].excessAmount").value(3500))
             .andExpect(jsonPath("$.items[?(@.judgment.transactionId == '%s')].judgment.finalAmount", meeting)
                 .value(6500))
             .andExpect(jsonPath("$.items[?(@.judgment.transactionId == '%s')].answers[0].answer", meeting)
@@ -534,6 +540,27 @@ class QuestionAnswerIntegrationTest {
                 .value("전용"))
             .andExpect(jsonPath("$.items[?(@.judgment.transactionId == '%s' && @.answers size 0)]", unanswered)
                 .exists());
+    }
+
+    @Test
+    void batch_summary_adds_entertainment_before_the_limit_and_gives_the_yearly_excess() throws Exception {
+        // given: 업무미팅 접대비 6,500원, 한도 인정액을 3,000원으로 두어 그해(다른 테스트와 겹치지 않는 해) 한도를 넘긴다
+        UUID meeting = insertTransaction("카페", "스타벅스", 6_500L, "2032-03-02");
+        judge(meeting);
+        answer(List.of(pendingQuestion(meeting, "용도")), "업무미팅").andExpect(status().isOk());
+        jdbcTemplate.update("""
+            update limit_bucket_entry set allowed_amount = 3000
+            where judgment_id = (select id from judgment where transaction_id = ? order by revision desc limit 1)
+            """, meeting);
+
+        // when / then: batch 몫은 순서 없이 나눌 수 없어 한도 전 금액으로 더하고, 초과액은 limits 로 따로 준다
+        mockMvc.perform(get("/api/v1/judgments/summary").param("batchId", batchId.toString()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.byVerdict.AVAILABLE.finalAmount").value(6500))
+            .andExpect(jsonPath("$.limits.length()").value(1))
+            .andExpect(jsonPath("$.limits[0].taxYear").value(2032))
+            .andExpect(jsonPath("$.limits[0].totalAmount").value(6500))
+            .andExpect(jsonPath("$.limits[0].excessAmount").value(3500));
     }
 
     @Test
