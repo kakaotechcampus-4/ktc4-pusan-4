@@ -66,6 +66,9 @@ services:
       retries: 12
       start_period: 30s
     mem_limit: 1200m
+    # 호스트의 CloudWatch Agent 가 /actuator/prometheus 를 긁는다. 127.0.0.1 에만 열어 밖에서는 닿지 않는다.
+    ports:
+      - "127.0.0.1:8080:8080"
     # 종료할 때 판정 run 을 app.judgment-run.await-termination(60s)까지 기다린다(application.yml).
     # Docker 기본값(10s)이면 그 전에 SIGKILL 로 꺼진다. 웹 요청 종료 대기(최대 30s) 뒤에 이어지므로 합 90s 에 10s 를 더 둔다.
     stop_grace_period: 100s
