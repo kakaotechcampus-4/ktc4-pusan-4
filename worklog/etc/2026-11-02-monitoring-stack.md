@@ -44,3 +44,24 @@
 - 지표 이름은 계획 문서의 예상값이다. A2 PR 본문의 실제 출력과 다르면 relabel 규칙과 `metric_selectors` 를 고친다.
 - 디스크 지표에서 `fstype` 차원은 Agent 설정으로 뺄 수 없다. 시계열은 하나라 비용은 같다. B3 알람은 설치 뒤 `list-metrics` 로 본 실제 값을 쓴다.
 - 운영 EC2 설치와 Agent 메모리 측정은 아직.
+
+---
+
+# 메트릭 필터·알람·대시보드 (B3)
+
+- 브랜치: feature/monitoring-alarms (feature/monitoring-agent 위)
+- 주요파일: deploy/monitoring/template.yaml, docs/deployment.md
+
+## 한 일
+
+- `/ktc4/backend` 에 메트릭 필터 2개(5xx, 기동), 알람 4개(5xx, 재시작, 메모리, 디스크), 대시보드 `ktc4-backend` 를 스택에 더했다. 커스텀 지표는 계획대로 7개.
+
+## 왜 이렇게 했나
+
+- 5xx·재시작은 일이 생긴 순간만 의미가 있어 복구(OK) 알림을 뺐다. 배포할 때마다 기동·복구 두 번 울리는 걸 막는다.
+- 디스크 `fstype` 차원은 Agent 에서 뺄 수 없어 스택 파라미터(`RootFsType`, 기본 ext4)로 받는다.
+
+## 남은 것 · 아는 문제
+
+- A1 로그 예시가 아직 없어 필터는 계약(`status` 숫자 필드, 기동 문구) 기준이다. A1 머지 뒤 `test-metric-filter` 로 확인하고 다르면 고친다.
+- 알람별 `set-alarm-state` Discord 도착 확인은 배포 뒤.

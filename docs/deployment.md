@@ -247,7 +247,8 @@ sudo docker compose --env-file /etc/ktc4/production.env -f /opt/ktc4/repo/deploy
 | --- | --- |
 | 백엔드 로그 그룹 | `/ktc4/backend` (보존 14일, 스택을 지워도 남는다) |
 | 알림 Lambda | `ktc4-alarm-to-discord` (알람 → Discord 장애 알림 스레드) |
-| 알람 | `ktc4-ec2-cpu-high`, `ktc4-ec2-status-check-failed` |
+| 알람 | `ktc4-ec2-cpu-high`, `ktc4-ec2-status-check-failed`, `ktc4-ec2-memory-high`, `ktc4-ec2-disk-high`, `ktc4-backend-http-5xx`, `ktc4-backend-restarted` |
+| 대시보드 | `ktc4-backend` |
 | Agent 로그 그룹 | `/ktc4/prometheus` (보존 3일, Agent 가 긁은 앱 지표를 EMF 로그로 쓰는 곳) |
 
 ### 스택 배포
@@ -298,3 +299,25 @@ sudo tail -n 50 /opt/aws/amazon-cloudwatch-agent/logs/amazon-cloudwatch-agent.lo
 - 앱 지표는 백엔드가 `127.0.0.1:8080/actuator/prometheus`를 연 뒤(A2)부터 나온다. 그 전에는 Agent 로그에 연결 실패가 찍히는 게 정상이다.
 - 긁은 값 중 위 3개만 남기고 버린다(`prometheus.yaml`의 `metric_relabel_configs`). 늘리려면 이 규칙과 `config.json`의 `metric_selectors`를 같이 고친다. 지표 하나가 차원 조합마다 따로 과금된다.
 - 설치 뒤 확인: `aws cloudwatch list-metrics --region ap-northeast-2 --namespace CWAgent`와 `--namespace ktc4/backend`.
+
+### 알람 기준
+
+| 알람 | 조건 | 복구 알림 |
+| --- | --- | --- |
+| `ktc4-backend-http-5xx` | 요청 로그 `status >= 500`, 5분에 1건 이상 | 없음 |
+| `ktc4-backend-restarted` | 로그 `Started BackendApplication` 1건 이상. 배포 때도 울린다. | 없음 |
+| `ktc4-ec2-cpu-high` | CPU 80% 이상, 5분 단위 2번 연속 | 있음 |
+| `ktc4-ec2-status-check-failed` | 상태 검사 실패 | 있음 |
+| `ktc4-ec2-memory-high` | 메모리 90% 이상 5분 | 있음 |
+| `ktc4-ec2-disk-high` | 루트 디스크 80% 이상 | 있음 |
+
+- 건수 알람(5xx, 기동)은 건이 없으면 지표가 비어 `OK`로 돌아간다. 복구 알림은 소음이라 보내지 않는다.
+- 5xx 필터는 `status`가 숫자 필드일 때만 걸린다. 백엔드 로그 형식을 바꾸면 실제 로그 한 줄로 필터를 다시 시험한다.
+
+```bash
+aws logs test-metric-filter --region ap-northeast-2 \
+  --filter-pattern '{ $.status >= 500 }' \
+  --log-event-messages '<A1 PR 본문의 500 요청 로그 한 줄>'
+```
+
+- 디스크 알람의 `fstype` 차원은 스택 파라미터 `RootFsType`(기본 `ext4`)다. Agent 설치 뒤 `list-metrics`로 본 값과 다르면 `deploy.sh`를 고쳐 `RootFsType=<값>`을 넘긴다.
