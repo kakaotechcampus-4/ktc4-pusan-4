@@ -512,7 +512,25 @@ class ApiResponseContractTest {
         mockMvc.perform(get("/api/v1/no-such-resource"))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.code").value("NOT_FOUND"))
-            .andExpect(jsonPath("$.traceId").isNotEmpty());
+            .andExpect(jsonPath("$.traceId").isNotEmpty())
+            .andExpect(jsonPath("$.runId").doesNotExist());
+    }
+
+    @Test
+    void active_run_conflict_names_the_active_run() throws Exception {
+        // given
+        given(runService.create(any(), any(), any())).willThrow(new ApiException(
+            org.springframework.http.HttpStatus.CONFLICT, "RUN_ALREADY_ACTIVE", "이 업로드는 이미 판정 중입니다.", ID));
+
+        // when / then: api.md 1.3·3.6 — 409 RUN_ALREADY_ACTIVE 는 진행 중인 run 의 id 를 함께 준다
+        mockMvc.perform(request(HttpMethod.POST, "/api/v1/judgment-runs")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"batchId": "%s", "contextId": "%s"}
+                    """.formatted(ID, ID)))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("RUN_ALREADY_ACTIVE"))
+            .andExpect(jsonPath("$.runId").value(ID));
     }
 
     static Stream<String> invalidSummaryScopes() {

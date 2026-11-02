@@ -394,6 +394,8 @@ ID      "0199c8f2-1a2b-7c3d-8e4f-5a6b7c8d9e0f"
 }
 ```
 
+`runId`는 `409 RUN_ALREADY_ACTIVE`(3.6)일 때만 있다. 진행 중인 판정 실행의 id 다. 다른 에러에는 이 필드가 없다.
+
 각 엔드포인트에 명시한 전용 `code` 외에, 전용 코드가 없는 실패는 상태 코드별 공통 코드로 내려간다.
 
 | 상태 | code | 쓰임 |
@@ -1580,11 +1582,17 @@ classificationStatus = CLASSIFIED
 ```
 404 BATCH_NOT_FOUND
 404 CONTEXT_NOT_FOUND
+409 RUN_ALREADY_ACTIVE
 ```
+
+같은 Batch에 진행 중(`QUEUED`, `RUNNING`)인 Run이 있으면 `409 RUN_ALREADY_ACTIVE`다. 본문 `runId`가 그 Run이라 화면은 그 Run의 진행 화면으로 가면 된다. 두 Run이 같은 거래를 동시에 판정하면 늦게 쓴 쪽이 최신이 되어 다른 문진의 결과가 섞이기 때문이다(#187).
+
+- 마지막 진행 뒤 5분이 지난 Run은 진행 중으로 보지 않는다. 서버가 내려가 남은 Run이고, 정리 작업이 곧 `RUN_INTERRUPTED`로 끝낸다.
+- 다른 Batch의 Run과는 상관없다.
 
 ### 재실행
 
-같은 Batch에 여러 JudgmentRun을 실행할 수 있다.
+같은 Batch에 여러 JudgmentRun을 실행할 수 있다. 앞 Run이 끝난 뒤에 새로 실행한다.
 
 새 Run이 기존 Transaction을 다시 판정하면 기존 Judgment를 수정하지 않고 새 revision을 생성한다.
 

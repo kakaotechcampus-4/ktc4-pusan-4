@@ -43,7 +43,7 @@ public class ApiExceptionHandler {
     ResponseEntity<ErrorResponse> handleApiException(ApiException exception) {
         return ResponseEntity.status(exception.getStatus())
             .headers(exception.getHeaders())
-            .body(error(exception.getCode(), exception.getMessage()));
+            .body(new ErrorResponse(exception.getCode(), exception.getMessage(), traceId(), exception.getRunId()));
     }
 
     /**
@@ -91,6 +91,10 @@ public class ApiExceptionHandler {
     }
 
     private ErrorResponse error(String code, String message) {
-        return new ErrorResponse(code, message, uuidGenerator.generate().toString());
+        return new ErrorResponse(code, message, traceId(), null);
+    }
+
+    private String traceId() {
+        return uuidGenerator.generate().toString();
     }
 }
