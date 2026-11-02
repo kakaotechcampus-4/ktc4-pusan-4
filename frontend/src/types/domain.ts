@@ -87,8 +87,8 @@ export interface User {
   email: string | null;
   createdAt: string;
   /**
-   * 관리자 판별. api.md 에는 아직 없다 — 관리자 판별 방식은 10/26 에 정한다(backend_api_plan.md).
-   * 없으면 일반 사용자로 본다
+   * 관리자 판별(api.md 3.15). 가입하면 USER 이고, 관리자는 운영에서 DB 로 지정한다.
+   * 이 필드가 없던 옛 서버에 대비해 없으면 일반 사용자로 본다
    */
   role?: 'USER' | 'ADMIN';
 }
@@ -497,7 +497,7 @@ export interface BulkAnswerResult {
 }
 
 // ── 관리자: 규칙 후보 (M1) ──────────────────────────
-// api.md 에 아직 없다. rule_candidate 테이블(V3)과 AI 파이프라인(ai/pipeline/candidates.py)이 쓰는 값을 따른다
+// api.md 3.15
 
 /** DB 의 대기·검토중·승인·기각·보류 */
 export type RuleCandidateStatus = 'PENDING' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED' | 'ON_HOLD';
@@ -529,8 +529,7 @@ export interface RuleCandidate {
 }
 
 // ── 비서 Really (docs/agent-secretary.md 9·10장) ────
-// 중계·진행 상황·지난번 답은 #185 로 서버에 들어왔다(api.md). 세무대리인 질문 API 만 아직 없다 —
-// 그 모양은 비서 도구 코드(ai/assistant/tools.py)를 따른다
+// 중계·진행 상황·지난번 답은 #185, 세무대리인 질문 API 는 #214 로 서버에 들어왔다(api.md)
 
 export interface AssistantMessage {
   role: 'user' | 'assistant';

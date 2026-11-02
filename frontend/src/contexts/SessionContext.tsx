@@ -48,7 +48,7 @@ interface SessionValue {
   userId: string | null;
   /** 카카오 계정이면 로그인해도 null 이다 */
   email: string | null;
-  /** users/me 의 역할 (가정. backend_api_plan.md 관리자 판별은 10/26 결정) */
+  /** users/me 의 role 이 ADMIN 인가 (api.md 3.15) */
   isAdmin: boolean;
   /** 로그인하고 내 정보를 읽는다. 실패하면 ApiRequestError 를 던진다 */
   signIn: (email: string, password: string) => Promise<void>;

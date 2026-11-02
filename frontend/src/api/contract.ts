@@ -219,7 +219,7 @@ export interface Api {
     list(): Promise<HandoffNote[]>;
     create(body: HandoffNoteRequest): Promise<HandoffNote>;
   };
-  /** 관리자 (M1). 계약이 아직 없다 — 경로·모양은 가정이다 */
+  /** 관리자 (M1, api.md 3.15) */
   admin: {
     ruleCandidates: {
       list(query?: RuleCandidateQuery): Promise<Page<RuleCandidate>>;
