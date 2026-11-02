@@ -1,7 +1,6 @@
 """비서 평가·테스트용 가짜 백엔드. api.md 모양의 JSON을 돌려준다.
 
 국민카드 2026-09 업로드 하나를 흉내 낸다. ID는 채점에 쓰려고 읽기 쉬운 고정값으로 둔다.
-/progress 와 /questions/suggestions 는 아직 백엔드에 없는 API라 docs/agent-secretary.md 10장의 요구대로 만든다.
 """
 
 import copy
@@ -47,17 +46,27 @@ QUESTIONS = [
     ("q-adobe", "merchant:Adobe", "결제기간", "이 결제는 몇 개월치인가요?", ["월 단위 결제", "연간 일시불"], True, "tx10"),
     ("q-pg", "transaction:tx16", "용도", "이 결제는 어떤 용도였나요?", ["업무", "개인"], True, "tx16"),
 ]
+# 백엔드처럼 등급에 해당하지 않는 필드는 키째 뺀다(api.md 3.14). code 는 rules/cards 의 질문 코드다.
 SUGGESTIONS = [
-    {"groupKey": "merchant:SK텔레콤", "factType": "전용여부", "tier": "A", "value": "전용", "sourceLabel": "8월 업로드(국민)"},
-    {"groupKey": "merchant:노션", "factType": "전용여부", "tier": "A", "value": "업무 전용", "sourceLabel": "8월 업로드(국민)"},
-    {"groupKey": "merchant:한국전력", "factType": "공간용도", "tier": "A", "value": None, "conflict": True,
-     "history": [{"value": "자택 겸용", "sourceLabel": "8월 업로드(국민)"}, {"value": "사업 전용", "sourceLabel": "7월 업로드(국민)"}]},
-    {"groupKey": "transaction:tx02", "factType": "용도", "tier": "C", "reason": "소명 대기 질문은 건마다 답해야 합니다"},
-    {"groupKey": "transaction:tx04", "factType": "용도", "tier": "C", "reason": "소명 대기 질문은 건마다 답해야 합니다"},
-    {"groupKey": "merchant:스타벅스", "factType": "용도", "tier": "B", "historyCounts": {"업무미팅": 6, "개인": 1}},
-    {"groupKey": "transaction:tx09", "factType": "업무용여부", "tier": "C", "reason": "온라인쇼핑은 가맹점 이름이 실제 구매처를 말해 주지 않습니다"},
-    {"groupKey": "merchant:Adobe", "factType": "결제기간", "tier": "B", "historyCounts": {"연간 일시불": 1}},
-    {"groupKey": "transaction:tx16", "factType": "용도", "tier": "C", "reason": "PG 결제는 실제 구매처를 알 수 없습니다"},
+    {"groupKey": "merchant:SK텔레콤", "factType": "전용여부", "code": "TELECOM_DEDICATION", "tier": "A", "value": "전용",
+     "sourceLabel": "8월 업로드(국민)"},
+    {"groupKey": "merchant:노션", "factType": "전용여부", "code": "SUBSCRIPTION_DEDICATION", "tier": "A", "value": "업무 전용",
+     "sourceLabel": "8월 업로드(국민)"},
+    {"groupKey": "merchant:한국전력", "factType": "공간용도", "code": "UTILITY_DEDICATION", "tier": "A", "conflict": True,
+     "history": [{"value": "자택 겸용", "sourceLabel": "8월 업로드(국민)", "bulk": False},
+                 {"value": "사업 전용", "sourceLabel": "7월 업로드(국민)", "bulk": False}]},
+    {"groupKey": "transaction:tx02", "factType": "용도", "code": "WEEKEND_CAFE_PURPOSE", "tier": "C",
+     "reason": "소명 대기 질문은 건마다 답해야 합니다"},
+    {"groupKey": "transaction:tx04", "factType": "용도", "code": "WEEKEND_CAFE_PURPOSE", "tier": "C",
+     "reason": "소명 대기 질문은 건마다 답해야 합니다"},
+    {"groupKey": "merchant:스타벅스", "factType": "용도", "code": "CAFE_PURPOSE", "tier": "B",
+     "historyCounts": {"업무미팅": 6, "개인": 1}},
+    {"groupKey": "transaction:tx09", "factType": "업무용여부", "code": "SHOPPING_ITEM_PURPOSE", "tier": "C",
+     "reason": "온라인쇼핑은 가맹점 이름이 실제 구매처를 말해 주지 않습니다"},
+    {"groupKey": "merchant:Adobe", "factType": "결제기간", "code": "SAAS_BILLING_PERIOD", "tier": "B",
+     "historyCounts": {"연간 일시불": 1}},
+    {"groupKey": "transaction:tx16", "factType": "용도", "code": "PG_UNKNOWN_PURPOSE", "tier": "C",
+     "reason": "PG 결제는 실제 구매처를 알 수 없습니다"},
 ]
 STATUTES = {
     3315: {"statuteId": "소득세법-33-1-5", "title": "소득세법 제33조 제1항 제5호", "hierarchy": "법률",
@@ -76,7 +85,7 @@ PROGRESS = {
     "batch": {"label": "국민 · 2026-09", "transactionCount": 18},
     "context": {"version": 4, "bookkeeping": "복식부기", "hasEmployee": False},
     "classification": {"pendingCount": 2, "pendingAmount": 97000},
-    "run": {"status": "SUCCEEDED"},
+    "run": {"id": "run-2026-09", "status": {"code": "COMPLETED", "label": "완료"}},
     "questions": {"pendingCount": 9, "pendingAmount": 1038100, "fillableFromPrevious": 2},
     "next": {"step": "QUESTIONS", "route": "/questions", "label": "질문에 답하기"},
 }

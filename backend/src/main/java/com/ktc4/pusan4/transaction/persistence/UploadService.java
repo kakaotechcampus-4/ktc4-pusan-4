@@ -16,7 +16,6 @@ import com.ktc4.pusan4.transaction.api.SourceStatus;
 import com.ktc4.pusan4.transaction.domain.NewTransaction;
 import com.ktc4.pusan4.transaction.domain.NewUploadBatch;
 import com.ktc4.pusan4.transaction.domain.UploadResult;
-import jakarta.persistence.EntityManager;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,10 +52,10 @@ public class UploadService {
     private static final int KEY_LOOKUP_CHUNK = 1_000;
     private static final Duration IDEMPOTENCY_TTL = Duration.ofHours(24);
 
-    private final EntityManager entityManager;
     private final UploadBatchRepository batchRepository;
     private final TransactionRecordRepository transactionRepository;
     private final IdempotencyKeyRepository idempotencyKeyRepository;
+    private final ClassificationReviewRepository reviewRepository;
     private final MerchantClassifier merchantClassifier;
     private final ObjectMapper objectMapper;
     private final UuidGenerator uuidGenerator;
@@ -64,20 +63,20 @@ public class UploadService {
     private final UserWriteLock userWriteLock;
 
     public UploadService(
-        EntityManager entityManager,
         UploadBatchRepository batchRepository,
         TransactionRecordRepository transactionRepository,
         IdempotencyKeyRepository idempotencyKeyRepository,
+        ClassificationReviewRepository reviewRepository,
         MerchantClassifier merchantClassifier,
         ObjectMapper objectMapper,
         UuidGenerator uuidGenerator,
         Clock clock,
         UserWriteLock userWriteLock
     ) {
-        this.entityManager = entityManager;
         this.batchRepository = batchRepository;
         this.transactionRepository = transactionRepository;
         this.idempotencyKeyRepository = idempotencyKeyRepository;
+        this.reviewRepository = reviewRepository;
         this.merchantClassifier = merchantClassifier;
         this.objectMapper = objectMapper;
         this.uuidGenerator = uuidGenerator;
@@ -115,7 +114,7 @@ public class UploadService {
         if (key == null) {
             key = new IdempotencyKeyEntity(uuidGenerator.generate(), userId, idempotencyKey);
             key.record(requestHash, result, now.plus(IDEMPOTENCY_TTL));
-            entityManager.persist(key);
+            idempotencyKeyRepository.save(key);
         } else {
             key.record(requestHash, result, now.plus(IDEMPOTENCY_TTL));
         }
@@ -131,13 +130,15 @@ public class UploadService {
         int skipped = input.transactions().size() - fresh.size();
 
         UploadBatchEntity batch = new UploadBatchEntity(uuidGenerator.generate(), userId, input, skipped, now);
-        entityManager.persist(batch);
+        batchRepository.save(batch);
 
         List<ClassificationResult> results = merchantClassifier.classifyAll(userId, fresh.stream()
             .map(transaction -> new ClassificationInput(transaction.merchantRaw(), transaction.bizNo()))
             .toList());
 
-        int pending = 0;
+        // 분류 검토는 모아 두었다가 거래를 다 저장한 뒤 저장한다. 거래·검토 insert 가 번갈아 나가면
+        // JDBC 배치(hibernate.jdbc.batch_size)가 테이블이 바뀔 때마다 끊긴다. 부모(거래)가 먼저라 FK 순서도 지킨다.
+        List<ClassificationReviewEntity> reviews = new ArrayList<>();
         for (int i = 0; i < fresh.size(); i++) {
             ClassificationResult result = results.get(i);
             ClassificationStatus status = result.classified()
@@ -146,14 +147,14 @@ public class UploadService {
             TransactionRecordEntity transaction = new TransactionRecordEntity(
                 uuidGenerator.generate(), batch.id(), userId, fresh.get(i),
                 result.merchantNorm(), result.merchantCategory(), status, now);
-            entityManager.persist(transaction);
+            transactionRepository.save(transaction);
             if (status == ClassificationStatus.NEEDS_REVIEW && fresh.get(i).status() == SourceStatus.JUDGEABLE) {
-                entityManager.persist(ClassificationReviewEntity.pending(uuidGenerator.generate(), transaction.id(), now));
-                pending++;
+                reviews.add(ClassificationReviewEntity.pending(uuidGenerator.generate(), transaction.id(), now));
             }
         }
+        reviewRepository.saveAll(reviews);
 
-        return new UploadResult(batch.id(), fresh.size(), skipped, pending, now);
+        return new UploadResult(batch.id(), fresh.size(), skipped, reviews.size(), now);
     }
 
     /**

@@ -13,6 +13,8 @@ import java.util.UUID;
 
 public interface TransactionRecordRepository extends Repository<TransactionRecordEntity, UUID> {
 
+    TransactionRecordEntity save(TransactionRecordEntity transaction);
+
     Optional<TransactionRecordEntity> findById(UUID transactionId);
 
     List<TransactionRecordEntity> findByIdIn(Collection<UUID> transactionIds);

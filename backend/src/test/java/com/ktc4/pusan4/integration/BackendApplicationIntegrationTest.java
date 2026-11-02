@@ -1,10 +1,10 @@
 package com.ktc4.pusan4.integration;
 
+import com.ktc4.pusan4.auth.TestUser;
 import com.ktc4.pusan4.merchant.classify.ClassificationInput;
 import com.ktc4.pusan4.merchant.classify.ClassificationResult;
 import com.ktc4.pusan4.merchant.classify.ClassificationStage;
 import com.ktc4.pusan4.merchant.classify.MerchantClassifier;
-import com.ktc4.pusan4.shared.auth.FixedUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -57,8 +57,8 @@ class BackendApplicationIntegrationTest {
     void users_me_returns_seeded_temporary_user() throws Exception {
         mockMvc.perform(get("/api/v1/users/me"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.id").value(FixedUser.ID.toString()))
-            .andExpect(jsonPath("$.email").value(FixedUser.EMAIL))
+            .andExpect(jsonPath("$.id").value(TestUser.ID.toString()))
+            .andExpect(jsonPath("$.email").value(TestUser.EMAIL))
             .andExpect(jsonPath("$.createdAt").exists());
     }
 
@@ -85,7 +85,7 @@ class BackendApplicationIntegrationTest {
     @Test
     void merchant_classifier_loads_rules_on_startup() {
         List<ClassificationResult> results = merchantClassifier.classifyAll(
-            FixedUser.ID,
+            TestUser.ID,
             List.of(new ClassificationInput("스타벅스코리아 서면점", ""), new ClassificationInput("KG이니시스-스마일카페", "")));
 
         assertThat(results).extracting(ClassificationResult::stage, ClassificationResult::merchantCategory)

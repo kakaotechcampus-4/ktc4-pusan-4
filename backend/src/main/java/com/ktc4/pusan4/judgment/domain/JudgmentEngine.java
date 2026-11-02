@@ -13,6 +13,10 @@ import java.util.Set;
 
 public final class JudgmentEngine {
 
+    /** 안분 속성. 값이 HOME_OFFICE_RATIO 면 결제금액을 문진의 작업공간 비율로 나눈다(자택 겸용). */
+    static final String APPORTIONMENT = "안분";
+    static final String HOME_OFFICE_RATIO = "작업공간비율";
+
     private JudgmentEngine() {
     }
 
@@ -71,6 +75,7 @@ public final class JudgmentEngine {
         List<String> appliedRuleIds = new ArrayList<>();
         List<Integer> appliedRuleVersions = new ArrayList<>();
         LinkedHashSet<Citation> citations = new LinkedHashSet<>();
+        LinkedHashSet<UserFact> usedFacts = new LinkedHashSet<>();
         Verdict resolvedVerdict = null;
         boolean outOfScope = false;
         String defaultAccount = null;
@@ -101,12 +106,14 @@ public final class JudgmentEngine {
                 defaultAccount = rule.account();
             }
             for (QuestionSpec question : rule.questions()) {
-                QuestionEffect effect = resolvedEffect(question, transaction, facts);
-                if (effect == null) {
+                UserFact answer = answerOf(question, transaction, facts);
+                if (answer == null) {
                     questions.add(resolveGroupKey(question, transaction));
                     rebuttable |= question.canLiftUnavailable();
                     continue;
                 }
+                usedFacts.add(answer);
+                QuestionEffect effect = question.effectFor(answer.selectedValue());
                 mergeAttributes(attributes, effect.attributes(), rule.id() + ":" + question.code());
                 if (effect.verdict() != null) {
                     cardVerdict = effect.verdict();
@@ -144,8 +151,10 @@ public final class JudgmentEngine {
         // 미해소 질문이 결과를 바꿀 수 있을 때만 검토로 전환한다. 가산세 플래그만 세우는
         // G5 증빙 질문은 판정을 끌어내리지 않는다 — 경비 인정 여부는 앞 관문이 이미 확정했다.
         // 질문 자체는 그대로 실어 보내므로 화면은 여전히 되묻는다.
+        // 자택 겸용 안분(#65)은 문진의 작업공간 비율로 금액을 나눈다. 비율이 없으면 금액을 정할 수 없다.
         boolean review = questions.stream().anyMatch(JudgmentEngine::changesOutcome)
-            || answeredAccountConflict;
+            || answeredAccountConflict
+            || HOME_OFFICE_RATIO.equals(attributes.get(APPORTIONMENT)) && !context.hasHomeOfficeRatio();
         Verdict verdict = review
             ? moreRestrictive(resolvedVerdict, Verdict.NEEDS_REVIEW)
             : resolvedVerdict;
@@ -154,7 +163,7 @@ public final class JudgmentEngine {
             : answeredAccount == null ? defaultAccount : answeredAccount;
         return new Judgment(
             verdict, blockedAtGate, false, null, outOfScope, account, appliedRuleIds, appliedRuleVersions,
-            List.copyOf(citations), attributes, questions
+            List.copyOf(citations), attributes, questions, List.copyOf(usedFacts)
         );
     }
 
@@ -234,7 +243,8 @@ public final class JudgmentEngine {
             );
     }
 
-    private static QuestionEffect resolvedEffect(
+    /** 이 거래의 질문을 푸는 답. 선택지에 없는 값이면 답이 없는 것과 같다. */
+    private static UserFact answerOf(
         QuestionSpec question,
         TransactionInput transaction,
         List<UserFact> facts
@@ -244,9 +254,7 @@ public final class JudgmentEngine {
                 fact.scopeKey().equals(scopeKey(question.groupBy(), transaction))
                     && fact.factType().equals(question.factType())
             )
-            .map(UserFact::selectedValue)
-            .map(question::effectFor)
-            .filter(java.util.Objects::nonNull)
+            .filter(fact -> question.effectFor(fact.selectedValue()) != null)
             .findFirst()
             .orElse(null);
     }

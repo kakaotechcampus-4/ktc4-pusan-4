@@ -27,8 +27,8 @@ type ReviewState = 'QUESTION' | 'HANDOFF' | 'FOLLOW_UP' | 'NO_RULE' | 'PRESUMED'
 const REVIEW_MESSAGE: Record<ReviewState, string> = {
   QUESTION: '답할 질문이 남아 있습니다. 답하면 바로 다시 판정합니다.',
   HANDOFF: '판정하지 않고 세무사에게 넘겼습니다. 규칙으로 다루지 않는 지출입니다.',
-  // 문서(rule-card-fields.md ③)는 「인정됩니다」라 쓰지만, R-300 혼자작업처럼 조문만으로 갈리지 않는 답도
-  // 여기 들어온다. 둘 다에 맞는 말로 쓴다
+  // rule-card-fields.md ③. 기간배분처럼 뒤에서 금액을 정할 답과, 혼용처럼 세무사 판단에 맡기는 답(#65)이
+  // 함께 들어온다. 둘 다에 맞는 말로 쓴다
   FOLLOW_UP:
   '답을 반영했지만 규칙만으로는 아직 확정하지 못했습니다. 안분 비율·기간처럼 뒤에서 정할 조건이 남았거나 세무사 판단이 필요한 답입니다.',
   NO_RULE: '판정할 규칙이 없습니다. 근거를 지어내지 않고 확인 필요로 두었습니다.',

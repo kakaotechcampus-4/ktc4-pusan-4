@@ -2,7 +2,6 @@ package com.ktc4.pusan4.judgment.persistence;
 
 import com.ktc4.pusan4.judgment.domain.Judgment;
 import com.ktc4.pusan4.judgment.domain.JudgmentOrigin;
-import com.ktc4.pusan4.judgment.domain.UserFact;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -19,12 +18,33 @@ public record SaveJudgmentCommand(
     String merchantCategory,
     String merchantRaw,
     String industryCode,
-    List<UserFact> inputFacts,
-    Judgment judgment
+    List<UUID> inputFactIds,
+    Judgment judgment,
+    Long finalAmount
 ) {
     public SaveJudgmentCommand {
         Objects.requireNonNull(origin, "origin is required");
-        inputFacts = List.copyOf(inputFacts);
+        inputFactIds = List.copyOf(inputFactIds);
+    }
+
+    /** 금액을 계산하지 않고 저장한다(final_amount 가 비어 있다). */
+    public SaveJudgmentCommand(
+        UUID transactionId,
+        JudgmentOrigin origin,
+        String rulesCommitSha,
+        int userContextVersion,
+        int taxYear,
+        LocalDate statuteEffectiveDate,
+        String merchantCategory,
+        String merchantRaw,
+        String industryCode,
+        List<UUID> inputFactIds,
+        Judgment judgment
+    ) {
+        this(
+            transactionId, origin, rulesCommitSha, userContextVersion, taxYear, statuteEffectiveDate,
+            merchantCategory, merchantRaw, industryCode, inputFactIds, judgment, null
+        );
     }
 
     public SaveJudgmentCommand(
@@ -34,12 +54,12 @@ public record SaveJudgmentCommand(
         int userContextVersion,
         int taxYear,
         LocalDate statuteEffectiveDate,
-        List<UserFact> inputFacts,
+        List<UUID> inputFactIds,
         Judgment judgment
     ) {
         this(
             transactionId, origin, rulesCommitSha, userContextVersion, taxYear,
-            statuteEffectiveDate, null, null, null, inputFacts, judgment
+            statuteEffectiveDate, null, null, null, inputFactIds, judgment
         );
     }
 }

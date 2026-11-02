@@ -81,10 +81,11 @@ class JudgmentExecutorIntegrationTest {
         UUID judgmentId = executor.judge(transactionId, contextService.version(userId, 1), runOrigin(runId));
 
         assertThat(jdbcTemplate.queryForMap("""
-            select verdict, rule_card_id, run_id, user_context_version, rules_commit_sha, tax_year
+            select verdict, rule_card_id, run_id, user_context_version, rules_commit_sha, tax_year, final_amount
             from judgment where id = ?
             """, judgmentId))
             .containsEntry("verdict", "NEEDS_REVIEW")
+            .containsEntry("final_amount", 0L)
             .containsEntry("rule_card_id", "R-300")
             .containsEntry("run_id", runId)
             .containsEntry("user_context_version", 1)
@@ -154,17 +155,36 @@ class JudgmentExecutorIntegrationTest {
     }
 
     @Test
+    void records_only_the_facts_the_judgment_used() {
+        UUID transactionId = insertCafeTransaction("2025-10-08");
+        UUID usedId = userFactService.save(userId, batchId, new UserFact(
+            "transaction:" + transactionId, "용도", Map.of("value", "업무미팅")
+        ));
+        userFactService.save(userId, batchId, new UserFact(
+            "transaction:" + UUID.randomUUID(), "용도", Map.of("value", "개인")
+        ));
+
+        UUID judgmentId = executor.judge(
+            transactionId, contextService.version(userId, 1), new JudgmentOrigin(JudgmentOriginType.USER_FACT, usedId)
+        );
+
+        assertThat(jdbcTemplate.queryForList(
+            "select user_fact_id from judgment_input_fact where judgment_id = ?", UUID.class, judgmentId
+        )).containsExactly(usedId);
+    }
+
+    @Test
     void rejudge_uses_the_requested_context_version() {
         UUID transactionId = insertCafeTransaction("2025-10-08");
         insertContext(2);
         UUID runId = insertRun();
 
-        executor.rejudge(userId, List.of(transactionId), runOrigin(runId), 1);
+        executor.rejudge(userId, Map.of(transactionId, runOrigin(runId)), 1);
 
         assertThat(jdbcTemplate.queryForObject(
             "select user_context_version from judgment where transaction_id = ?", Integer.class, transactionId
         )).isEqualTo(1);
-        assertThatThrownBy(() -> executor.rejudge(userId, List.of(transactionId), runOrigin(runId), 9))
+        assertThatThrownBy(() -> executor.rejudge(userId, Map.of(transactionId, runOrigin(runId)), 9))
             .isInstanceOf(ApiException.class)
             .hasMessageContaining("9");
     }
