@@ -234,3 +234,45 @@ sudo docker compose --env-file /etc/ktc4/production.env -f /opt/ktc4/repo/deploy
 - `DB_USERNAME`·`DB_NAME`은 `production.env`의 값이다(`set -a; source /etc/ktc4/production.env; set +a`로 먼저 읽는다).
 - 이메일이 없는 카카오 계정은 `where id = '<사용자 id>'`로 지정한다. id 는 그 계정으로 `GET /api/v1/users/me`를 불러 확인한다.
 - 관리자를 해제할 때는 `role = 'USER'`로 되돌린다. 바뀐 role 은 다음 요청부터 바로 반영된다.
+
+## 13. 로그
+
+트랙 A(A3)가 채운다. 백엔드 로그는 CloudWatch Logs `/ktc4/backend`로 간다. 이 그룹은 14절의 모니터링 스택이 만든다.
+
+## 14. 모니터링
+
+알람·Lambda·로그 그룹은 CloudFormation 스택 `ktc4-monitoring`(`deploy/monitoring/template.yaml`) 하나로 관리한다. 콘솔에서 손으로 고치지 말고 템플릿을 고쳐 다시 배포한다. 계획과 이유는 `docs/monitoring_plan.md`에 있다.
+
+| 리소스 | 이름 |
+| --- | --- |
+| 백엔드 로그 그룹 | `/ktc4/backend` (보존 14일, 스택을 지워도 남는다) |
+| 알림 Lambda | `ktc4-alarm-to-discord` (알람 → Discord 장애 알림 스레드) |
+| 알람 | `ktc4-ec2-cpu-high`, `ktc4-ec2-status-check-failed` |
+
+### 스택 배포
+
+SSO로 로그인한 터미널에서 실행한다. 리전은 스크립트가 `ap-northeast-2`로 고정한다.
+
+```bash
+aws sso login --profile ktc-team
+export AWS_PROFILE=ktc-team
+export ARTIFACT_BUCKET=<Lambda zip을 올릴 S3 버킷>   # 5절의 백업 버킷을 써도 된다. monitoring/ 접두사에 올린다.
+export EC2_INSTANCE_ID=i-...
+read -rs ALARM_DISCORD_WEBHOOK && export ALARM_DISCORD_WEBHOOK   # 장애 알림 스레드 웹훅(?thread_id= 포함)
+deploy/monitoring/deploy.sh
+```
+
+- 장애 알림 웹훅은 PR 알림·코퍼스 동기화와 다른 스레드다. `TEAM_DISCORD_WEBHOOK` 끝에 `?thread_id=<장애 알림 스레드 ID>`를 붙인다.
+- 웹훅은 `NoEcho` 파라미터라 스택 화면에는 보이지 않지만, Lambda 환경 변수에는 평문으로 남는다.
+- 템플릿을 고친 뒤에도 같은 명령으로 다시 배포한다. 바뀐 게 없으면 아무것도 하지 않는다.
+
+### 알림 확인
+
+배포 직후와 알람을 더한 뒤에 알람 상태를 손으로 바꿔 Discord에 오는지 본다. 다음 평가 주기(최대 5분)에 실제 상태로 돌아오며 복구 알림이 한 번 더 온다.
+
+```bash
+aws cloudwatch set-alarm-state --region ap-northeast-2 \
+  --alarm-name ktc4-ec2-cpu-high --state-value ALARM --state-reason "알림 경로 시험"
+```
+
+Discord에 오지 않으면 Lambda 로그(`/aws/lambda/ktc4-alarm-to-discord`)를 본다. 403이면 웹훅 URL, 로그 자체가 없으면 Lambda 호출 권한(`AlarmInvokePermission`)을 확인한다.
