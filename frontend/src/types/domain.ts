@@ -356,11 +356,11 @@ export interface Judgment {
 
 /**
  * GET /judgments/export 한 줄 (#214). 세무사에게 넘길 CSV 의 데이터다. 파일 변환은 FE 가 한다.
- * allowedAmount 는 접대비 한도까지 반영한 인정 금액이라 judgment.finalAmount 와 다를 수 있다
+ * allowedAmount 는 인정 금액(finalAmount)이다. 그해 한도를 넘은 접대비는 null 이다(#226)
  */
 export interface JudgmentExportRow {
   judgment: Judgment;
-  allowedAmount: number;
+  allowedAmount: number | null;
   /** 이 거래에 답한 질문 문구와 답. 없으면 빈 배열 */
   answers: { question: string; answer: string }[];
 }
@@ -372,11 +372,27 @@ export interface VerdictSummary {
 
 export type SummaryScopeType = 'BATCH' | 'YEAR' | 'RUN';
 
+/**
+ * 과세연도별 한도 (#226, api.md 3.7). 그 batch 만이 아니라 그해 사용자 전체 기준이고,
+ * 직전연도 수입금액으로 계산한 잠정치다
+ */
+export interface LimitYear {
+  /** 판정 attributes.limit_bucket 과 같은 값(접대비) */
+  bucket: string;
+  taxYear: number;
+  /** 그해 이 묶음 판정 금액의 합(한도 전) */
+  totalAmount: number;
+  /** 한도를 넘어 필요경비에 넣지 않는 금액. 넘지 않았으면 0 */
+  excessAmount: number;
+}
+
 export interface JudgmentSummary {
   scope: { type: SummaryScopeType; id: string };
   totalCount: number;
   byVerdict: Record<Verdict, VerdictSummary>;
   byAccount: { account: string; count: number; finalAmount: number }[];
+  /** 범위에 접대비 판정이 있는 과세연도마다 하나. runId 범위는 빈 배열 */
+  limits: LimitYear[];
 }
 
 /**

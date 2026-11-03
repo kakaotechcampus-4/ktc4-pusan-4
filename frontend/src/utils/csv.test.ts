@@ -34,7 +34,8 @@ describe('judgmentsCsv', () => {
       citations: [{ statuteVersionId: 1, statuteId: '소득세법-27-1' }]
     } as unknown as import('../types/domain').Judgment;
     const text = judgmentsCsv([
-    { judgment, allowedAmount: 800, answers: [{ question: '용도는?', answer: '업무미팅' }] }]
+    { judgment, allowedAmount: 800, answers: [{ question: '용도는?', answer: '업무미팅' }] }],
+    []
     );
     expect(text.charCodeAt(0)).toBe(0xfeff);
     // 인정 금액은 finalAmount 가 아니라 한도까지 반영한 allowedAmount 다
@@ -55,7 +56,7 @@ describe('judgmentsCsv', () => {
       allowedAmount: 0,
       answers: []
     });
-    const [, review, unavailable] = judgmentsCsv([row('NEEDS_REVIEW', '확인 필요'), row('UNAVAILABLE', '불가')]).split('\r\n');
+    const [, review, unavailable] = judgmentsCsv([row('NEEDS_REVIEW', '확인 필요'), row('UNAVAILABLE', '불가')], []).split('\r\n');
     expect(review).toBe('2026-01-31,가게,,,1000,0,확인 필요,,,,,');
     expect(unavailable).toBe('2026-01-31,가게,,,1000,0,불가,0,,,,');
   });
@@ -75,9 +76,34 @@ describe('judgmentsCsv', () => {
       answers: []
     });
     // 실서버 내보내기는 computedAt DESC 로 온다
-    const lines = judgmentsCsv([row('2026-01-20T09:00:00+09:00'), row('2026-01-03T09:00:00+09:00'), row('2026-01-11T09:00:00+09:00')]).
+    const lines = judgmentsCsv([row('2026-01-20T09:00:00+09:00'), row('2026-01-03T09:00:00+09:00'), row('2026-01-11T09:00:00+09:00')], []).
     split('\r\n').
     slice(1);
     expect(lines.map((line) => line.slice(0, 10))).toEqual(['2026-01-03', '2026-01-11', '2026-01-20']);
+  });
+
+  it('한도를 넘은 해의 접대비는 인정 금액을 비우고, 끝에 그해 초과액을 적는다', async () => {
+    const { judgmentsCsv } = await import('./csv');
+    const judgment = {
+      transaction: { approvedAt: '2026-04-06T12:30:00+09:00', merchantNorm: '카페', merchantRaw: '', merchantCategory: '', amount: 3500000, installmentMonths: 0 },
+      verdict: { code: 'AVAILABLE', label: '가능' },
+      finalAmount: 3500000,
+      origin: { type: 'RUN', id: 'r' },
+      outOfScope: false,
+      citations: []
+    } as unknown as import('../types/domain').Judgment;
+    const lines = judgmentsCsv(
+      [{ judgment, allowedAmount: null, answers: [] }],
+      [
+      { bucket: '접대비', taxYear: 2026, totalAmount: 14011000, excessAmount: 1750000 },
+      // 한도 안인 해는 적지 않는다
+      { bucket: '접대비', taxYear: 2025, totalAmount: 100000, excessAmount: 0 }]
+
+    ).split('\r\n');
+    expect(lines[1]).toBe('2026-04-06,카페,,,3500000,0,가능,,,,,');
+    expect(lines.slice(2)).toEqual([
+    '',
+    '"2026년 접대비 총 14,011,000원 중 1,750,000원은 한도를 넘어 필요경비에 넣지 않습니다(직전연도 수입금액 기준 잠정). 거래별로 나눌 수 없어 이 해 접대비 행의 인정 금액은 비웠습니다."']
+    );
   });
 });

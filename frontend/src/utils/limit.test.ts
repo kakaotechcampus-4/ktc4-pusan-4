@@ -1,27 +1,40 @@
 import { describe, expect, it } from 'vitest';
-import type { Judgment } from '../types/domain';
-import { limitExcess } from './limit';
+import type { Judgment, LimitYear } from '../types/domain';
+import { exceededLimitOf, limitsOf } from './limit';
 
-const row = (code: string, account: string | null, finalAmount: number, allowedAmount: number) => ({
-  judgment: { verdict: { code }, account, finalAmount } as unknown as Judgment,
-  allowedAmount,
-  answers: []
+const limit = (taxYear: number, totalAmount: number, excessAmount: number, bucket = '접대비'): LimitYear => ({
+  bucket,
+  taxYear,
+  totalAmount,
+  excessAmount
 });
 
-describe('limitExcess', () => {
-  it('가능으로 판정한 접대비의 finalAmount − allowedAmount 만 더한다', () => {
-    expect(
-      limitExcess([
-      row('AVAILABLE', '접대비', 500_000, 300_000),
-      row('AVAILABLE', '접대비', 200_000, 200_000),
-      // 한도가 없는 계정과 확인 필요는 차이가 있어도 초과액이 아니다
-      row('AVAILABLE', '소모품비', 90_000, 80_000),
-      row('NEEDS_REVIEW', '접대비', 70_000, 0)]
-      )
-    ).toBe(200_000);
+const judgment = (code: string, approvedAt: string, bucket?: string) =>
+({
+  verdict: { code },
+  attributes: bucket ? { limit_bucket: bucket } : {},
+  transaction: { approvedAt }
+}) as unknown as Judgment;
+
+describe('limitsOf', () => {
+  it('접대비 묶음만 연도순으로 고른다', () => {
+    expect(limitsOf([limit(2026, 1, 0), limit(2025, 2, 0), limit(2026, 3, 0, '기부금')])).toEqual([
+    limit(2025, 2, 0),
+    limit(2026, 1, 0)]
+    );
+  });
+});
+
+describe('exceededLimitOf', () => {
+  const limits = [limit(2025, 10_000_000, 0), limit(2026, 14_000_000, 1_750_000)];
+
+  it('가능으로 판정한 접대비가 한도를 넘은 해에 있으면 그해 한도를 준다', () => {
+    expect(exceededLimitOf(judgment('AVAILABLE', '2026-04-06T12:30:00', '접대비'), limits)).toEqual(limits[1]);
   });
 
-  it('행이 없으면 0 이다', () => {
-    expect(limitExcess([])).toBe(0);
+  it('한도 안인 해, 한도 묶음이 없는 판정, 가능이 아닌 판정은 없다', () => {
+    expect(exceededLimitOf(judgment('AVAILABLE', '2025-12-01T09:00:00', '접대비'), limits)).toBeUndefined();
+    expect(exceededLimitOf(judgment('AVAILABLE', '2026-04-06T12:30:00'), limits)).toBeUndefined();
+    expect(exceededLimitOf(judgment('NEEDS_REVIEW', '2026-04-06T12:30:00', '접대비'), limits)).toBeUndefined();
   });
 });

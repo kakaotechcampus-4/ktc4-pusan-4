@@ -19,6 +19,7 @@ import { api, ApiRequestError, useApi } from '../api';
 import type { Judgment, Verdict } from '../types/domain';
 import { formatFullDate, formatNumber, formatPeriod, formatWon } from '../utils/format';
 import { download, exportRowOf, judgmentsCsv } from '../utils/csv';
+import { exceededLimitOf } from '../utils/limit';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 
 type Filter = 'ALL' | Verdict;
@@ -34,7 +35,7 @@ const readAllJudgments = async (batchId: string) => {
 };
 
 /**
- * 세무사에게 넘길 내보내기. 한도 반영 인정 금액과 답한 내용이 함께 온다.
+ * 세무사에게 넘길 내보내기. 인정 금액, 답한 내용, 연도별 접대비 한도(#226)가 함께 온다.
  * 내보내기가 없는 서버는 `/judgments/export` 를 `/judgments/{judgmentId}` 로 읽어 400 VALIDATION_ERROR(id 가 UUID 가 아님)를,
  * 그 경로도 없으면 404 를 준다. 이때만 판정 목록으로 만든다. 내보내기의 400 INVALID_EXPORT_SCOPE 는 그대로 실패다
  */
@@ -45,10 +46,9 @@ caught.status === 404 || caught.status === 400 && caught.code === 'VALIDATION_ER
 const readExport = (batchId: string) =>
 api.judgments.
 export({ batchId }).
-then((result) => result.items).
 catch(async (caught: unknown) => {
   if (!noExportApi(caught)) throw caught;
-  return (await readAllJudgments(batchId)).map(exportRowOf);
+  return { items: (await readAllJudgments(batchId)).map(exportRowOf), limits: [] };
 });
 
 /**
@@ -173,10 +173,10 @@ export function Results() {
     setExporting(true);
     setNotice(null);
     try {
-      const all = await readExport(batchId);
+      const { items, limits } = await readExport(batchId);
       const batch = batchQ.data;
       const period = batch ? `${batch.periodStart}_${batch.periodEnd}` : batchId.slice(0, 8);
-      download(`PreeT-판정결과-${period}.csv`, judgmentsCsv(all));
+      download(`PreeT-판정결과-${period}.csv`, judgmentsCsv(items, limits));
     } catch {
       setNotice('CSV 를 만들지 못했습니다. 잠시 후 다시 시도해 주세요.');
     } finally {
@@ -185,6 +185,7 @@ export function Results() {
   };
 
   const summary = summaryQ.data;
+  const limits = summary?.limits ?? [];
   const filters = [
   { value: 'ALL' as const, label: '전체', count: summary?.totalCount },
   { value: 'AVAILABLE' as const, label: '가능', count: summary?.byVerdict.AVAILABLE.count },
@@ -246,13 +247,17 @@ export function Results() {
       row.verdict.code === 'AVAILABLE' &&
       row.finalAmount !== null &&
       (asset || row.finalAmount !== transaction.amount);
+      // 한도를 넘은 해의 접대비는 거래별 인정액이 없다(#226). 금액 대신 한도 대상임을 적는다
+      const overLimit = exceededLimitOf(row, limits);
       return (
         <span className="block">
             <span className="whitespace-nowrap font-bold text-ink">{formatWon(transaction.amount)}</span>
-            {partial && row.finalAmount !== null &&
+            {overLimit ?
+          <span className="block whitespace-nowrap text-caption text-warn">연간 한도 대상</span> :
+          partial && row.finalAmount !== null &&
           <span className="block whitespace-nowrap text-caption text-ok">
-                {asset ? '최대' : '산입'} {formatWon(row.finalAmount)}
-              </span>
+                  {asset ? '최대' : '산입'} {formatWon(row.finalAmount)}
+                </span>
           }
           </span>);
 
@@ -382,6 +387,7 @@ export function Results() {
   <JudgmentDetailPanel
     key={selectedId}
     judgment={panelData.judgment}
+    exceededLimit={exceededLimitOf(panelData.judgment, limits)}
     focusKey={focusKey}
     onChanged={changed}
     onExcluded={excluded} /> :

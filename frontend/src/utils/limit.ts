@@ -1,17 +1,22 @@
-import type { JudgmentExportRow } from '../types/domain';
+import type { Judgment, LimitYear } from '../types/domain';
 
-/** 한도가 있는 계정과목(접대비). 백엔드 한도 버킷 이름과 같다 */
+/** 한도가 있는 계정과목(접대비). 백엔드 한도 묶음(`limit_bucket`) 이름과 같다 */
 export const LIMITED_ACCOUNT = '접대비';
 
+/** 응답의 `limits` 에서 접대비 묶음만 연도순으로 (#226) */
+export const limitsOf = (limits: LimitYear[]) =>
+limits.filter((item) => item.bucket === LIMITED_ACCOUNT).sort((a, b) => a.taxYear - b.taxYear);
+
 /**
- * 한도를 넘어 인정 금액에서 빠진 접대비(#202). 내보내기의 finalAmount 와 allowedAmount(한도 인정액)의 차이를 더한다.
- * 요약과 같은 기준이라 요약 합계와 결과 목록 합의 차이가 이 값이다. 「확인 필요」는 allowedAmount 가 0 이라 넣지 않는다
+ * 이 판정이 한도를 넘은 해의 가능 접대비면 그해 한도 (#226).
+ * 넘은 해의 거래별 인정액은 배분 순서로만 정해져(#15) 화면은 금액 대신 「연간 한도 대상」으로 적는다
  */
-export const limitExcess = (rows: JudgmentExportRow[]) =>
-rows.reduce(
-  (sum, { judgment, allowedAmount }) =>
-  judgment.verdict.code === 'AVAILABLE' && judgment.account === LIMITED_ACCOUNT ?
-  sum + Math.max(0, (judgment.finalAmount ?? 0) - allowedAmount) :
-  sum,
-  0
-);
+export const exceededLimitOf = (judgment: Judgment, limits: LimitYear[]) =>
+judgment.verdict.code === 'AVAILABLE' ?
+limits.find(
+  (item) =>
+  item.excessAmount > 0 &&
+  item.bucket === judgment.attributes.limit_bucket &&
+  String(item.taxYear) === judgment.transaction.approvedAt.slice(0, 4)
+) :
+undefined;
