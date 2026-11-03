@@ -40,27 +40,10 @@ class TransactionQueryRepositoryImpl implements TransactionQueryRepository {
     private static final String JUDGMENT_TARGET =
         "t.classification_status = 'CLASSIFIED' and " + EFFECTIVE_STATUS.get(SourceStatus.JUDGEABLE);
 
-    // 현재 판정(api.md §5): 활성 override 가 있으면 그 override revision, 없으면 override 가 아닌 최신 revision.
-    // GET /judgments 의 현재 판정(JudgmentRepository.findPage, #132)과 같은 규칙이다.
+    // 현재 판정(api.md §5)은 거래가 가리킨다(transaction.current_judgment_id). GET /judgments 의 현재 판정
+    // (JudgmentRepository.findPage, #132)과 같은 값이다.
     private static final String CURRENT_VERDICT = """
-        exists (
-          select 1 from judgment j
-          where j.transaction_id = t.id
-            and j.verdict = :verdict
-            and (
-              j.judgment_override_id = (
-                select o.id from judgment_override o where o.transaction_id = t.id and o.active
-              )
-              or (
-                not exists (select 1 from judgment_override o where o.transaction_id = t.id and o.active)
-                and j.judgment_override_id is null
-                and j.revision = (
-                  select max(l.revision) from judgment l
-                  where l.transaction_id = t.id and l.judgment_override_id is null
-                )
-              )
-            )
-        )""";
+        exists (select 1 from judgment j where j.id = t.current_judgment_id and j.verdict = :verdict)""";
 
     private final EntityManager entityManager;
 

@@ -57,7 +57,6 @@ public class LimitSettlementService {
         // 같은 사용자의 집계끼리 limit_bucket_entry 를 동시에 갈아 끼우지 않게 사용자 락을 잡는다.
         // 재판정 쪽은 UserFact 저장에서 이미 잡았다(같은 트랜잭션이라 다시 잡아도 된다).
         lockUser(userId);
-        judgmentRepository.disableJitInTransaction();
 
         Map<Integer, List<LimitCandidate>> byYear = new HashMap<>();
         for (LimitTagged tagged : judgmentRepository.findCurrentLimitTagged(userId, EntertainmentLimit.BUCKET)) {

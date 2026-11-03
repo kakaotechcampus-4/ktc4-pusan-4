@@ -16,7 +16,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -134,22 +133,6 @@ class LimitSettlementIntegrationTest {
         assertThat(jdbcTemplate.queryForList(
             "select judgment_id from limit_bucket_entry where user_id = ?", UUID.class, userId))
             .containsExactly(meal);
-    }
-
-    @Test
-    void settles_without_jit_compilation() {
-        // given
-        judgment(transaction("2025-03-02", "AUTO"), "AVAILABLE", ENTERTAINMENT, 6_500L);
-
-        // when: 집계와 같은 트랜잭션에서 JIT 설정을 읽는다
-        String jit = new TransactionTemplate(transactionManager).execute(status -> {
-            settlementService.settleProvisional(userId);
-            return jdbcTemplate.queryForObject("select current_setting('jit')", String.class);
-        });
-
-        // then: 판정이 쌓여 추정 비용이 커져도 JIT 컴파일 시간이 붙지 않는다 (#218)
-        assertThat(jit).isEqualTo("off");
-        assertThat(jdbcTemplate.queryForObject("select current_setting('jit')", String.class)).isEqualTo("on");
     }
 
     @Test
