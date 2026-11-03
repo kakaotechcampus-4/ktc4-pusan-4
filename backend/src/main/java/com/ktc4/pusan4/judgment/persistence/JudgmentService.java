@@ -59,6 +59,9 @@ public class JudgmentService {
             nextRevision(command.transactionId())
         ));
 
+        // 거래 락은 nextRevision 이 잡았다.
+        transactionRepository.pointCurrentJudgmentUnlessOverridden(command.transactionId(), judgmentId);
+
         saveCitations(judgmentId, judgment.citations(), command.statuteEffectiveDate(), statuteVersions);
         judgment.questions().forEach(question ->
             questionRepository.save(new QuestionQueueEntity(

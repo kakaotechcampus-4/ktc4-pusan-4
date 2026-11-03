@@ -179,6 +179,17 @@ interface JudgmentRepository extends Repository<JudgmentEntity, UUID> {
     record LimitTagged(UUID judgmentId, LocalDate approvedAt, Long finalAmount, long amount) {
     }
 
+    // override 가 아닌 최신 revision. override 를 해제하면 현재 판정이 이것으로 돌아간다(api.md 3.8).
+    @Query("""
+        select judgment.id
+        from JudgmentEntity judgment
+        where judgment.transactionId = :transactionId
+          and judgment.judgmentOverrideId is null
+        order by judgment.revision desc
+        limit 1
+        """)
+    Optional<UUID> findLatestAutomaticId(@Param("transactionId") UUID transactionId);
+
     @Query("""
         select coalesce(max(judgment.revision), 0) + 1
         from JudgmentEntity judgment

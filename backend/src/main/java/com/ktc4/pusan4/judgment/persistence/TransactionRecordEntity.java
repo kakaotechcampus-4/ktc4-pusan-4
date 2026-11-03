@@ -95,6 +95,12 @@ public class TransactionRecordEntity extends AssignedIdEntity<UUID> {
     @Column(name = "source_card")
     private String sourceCard;
 
+    // 현재 판정(api.md §5). 조회 조건에만 쓰고 TransactionRecordRepository.pointCurrentJudgment 로만 바꾼다.
+    // 엔티티가 이 열을 쓰게 두면, 같은 트랜잭션에서 분류 확정 같은 다른 필드 변경이 flush 될 때 엔티티에 남은
+    // 이전 값으로 되돌린다.
+    @Column(name = "current_judgment_id", insertable = false, updatable = false)
+    private UUID currentJudgmentId;
+
     // 응답에 바로 쓰려고 코드가 채운다(DB 기본값 now() 는 SQL 로 넣는 테스트 픽스처용으로 남는다).
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;

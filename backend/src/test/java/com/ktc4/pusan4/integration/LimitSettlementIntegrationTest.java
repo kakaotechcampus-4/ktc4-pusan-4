@@ -367,6 +367,7 @@ class LimitSettlementIntegrationTest {
             ) values (?, ?, 1, 'R-301', 1, '["R-301"]', 'fixture', 1,
                 (select extract(year from approved_at)::int from transaction where id = ?), ?, false, ?, ?::jsonb, ?)
             """, id, transactionId, transactionId, verdict, runId, attributes, finalAmount);
+        CurrentJudgments.refresh(jdbcTemplate);
         return id;
     }
 }

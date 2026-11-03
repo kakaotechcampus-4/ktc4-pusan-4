@@ -34,6 +34,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -356,6 +357,39 @@ class QuestionAnswerIntegrationTest {
     }
 
     @Test
+    void current_judgment_follows_rejudge_override_and_release() throws Exception {
+        // given: 자동 판정 하나
+        UUID cafe = insertTransaction("카페", "스타벅스");
+        judge(cafe);
+        UUID automatic = latestJudgment(cafe);
+        assertThat(currentJudgment(cafe)).isEqualTo(automatic);
+
+        // when: 사용자가 불가로 수정한 뒤 다시 판정한다
+        mockMvc.perform(post("/api/v1/judgments/{id}/override", automatic)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"toVerdict": "UNAVAILABLE"}
+                    """))
+            .andExpect(status().isOk());
+        UUID overridden = latestJudgment(cafe);
+        judge(cafe);
+        UUID rejudged = latestJudgment(cafe);
+
+        // then: 활성 수정이 있는 동안은 새 자동 판정이 생겨도 수정 revision 이 현재다 (api.md 3.8)
+        assertThat(rejudged).isNotEqualTo(overridden);
+        assertThat(currentJudgment(cafe)).isEqualTo(overridden);
+
+        // when: 수정을 해제한다
+        UUID overrideId = jdbcTemplate.queryForObject(
+            "select id from judgment_override where transaction_id = ? and active", UUID.class, cafe);
+        mockMvc.perform(delete("/api/v1/judgment-overrides/{id}", overrideId)).andExpect(status().isNoContent());
+
+        // then: override 가 아닌 최신 revision 으로 돌아가고, 저장된 현재 판정이 모든 거래에서 정의(§5)와 같다
+        assertThat(currentJudgment(cafe)).isEqualTo(rejudged);
+        assertThat(CurrentJudgments.mismatches(jdbcTemplate)).isZero();
+    }
+
+    @Test
     void home_office_answer_saves_the_amount_apportioned_by_the_context_ratio() throws Exception {
         // given: 문진 작업공간 비율 20%, 전기요금 8만원(R-103 공간전용여부)
         jdbcTemplate.update("update user_context set home_office_ratio = 20 where id = ?", context.id());
@@ -650,6 +684,16 @@ class QuestionAnswerIntegrationTest {
 
     private void judge(UUID transactionId) {
         executor.judge(transactionId, context, new JudgmentOrigin(JudgmentOriginType.RUN, runId));
+    }
+
+    private UUID latestJudgment(UUID transactionId) {
+        return jdbcTemplate.queryForObject(
+            "select id from judgment where transaction_id = ? order by revision desc limit 1", UUID.class, transactionId);
+    }
+
+    private UUID currentJudgment(UUID transactionId) {
+        return jdbcTemplate.queryForObject(
+            "select current_judgment_id from transaction where id = ?", UUID.class, transactionId);
     }
 
     private UUID pendingQuestion(UUID transactionId, String factType) {

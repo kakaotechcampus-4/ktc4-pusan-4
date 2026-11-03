@@ -298,6 +298,7 @@ class JudgmentQueryIntegrationTest {
                 rules_commit_sha, user_context_version, tax_year, verdict, is_inference, computed_at, %s
             ) values (?, ?, ?, 'R-300', 1, '["R-300"]', 'fixture', 1, 2025, ?, false, ?::timestamptz, ?)
             """.formatted(originColumn), id, transactionId, revision, verdict, computedAt, originId);
+        CurrentJudgments.refresh(jdbcTemplate);
         return id;
     }
 
@@ -307,6 +308,7 @@ class JudgmentQueryIntegrationTest {
             insert into judgment_override(id, transaction_id, source_judgment_id, to_verdict, active, released_at)
             values (?, ?, ?, 'UNAVAILABLE', ?, case when ? then null else now() end)
             """, id, transactionId, sourceJudgmentId, active, active);
+        CurrentJudgments.refresh(jdbcTemplate);
         return id;
     }
 
