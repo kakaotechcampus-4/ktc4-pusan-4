@@ -310,12 +310,16 @@ const isJudgeable = (t: Transaction) =>
 t.effectiveStatus.code === 'JUDGEABLE' && t.classificationStatus.code === 'CLASSIFIED';
 
 /**
- * 범위의 판정이 든 해마다 접대비 한도 (#226). 값은 그해 현재 판정 전체 기준이다.
+ * 범위의 판정이 든 해마다 접대비 한도 (#226). 값은 그해 판정 대상 거래의 현재 판정 전체 기준이다.
  * 목업은 한도를 계산하지 않아 초과액이 늘 0 이다
  */
 const limitsFor = (rows: JudgmentSeed[]): LimitYear[] => {
   const yearOf = (j: JudgmentSeed) => transactionOf(j.transactionId)?.approvedAt.slice(0, 4);
-  const limited = (j: JudgmentSeed) => j.verdict.code === 'AVAILABLE' && j.attributes.limit_bucket === '접대비';
+  // 서버처럼 제외·미분류 거래는 세지 않는다(findCurrentLimitTagged)
+  const limited = (j: JudgmentSeed) => {
+    const t = transactionOf(j.transactionId);
+    return t !== undefined && isJudgeable(t) && j.verdict.code === 'AVAILABLE' && j.attributes.limit_bucket === '접대비';
+  };
   const years = [...new Set(rows.filter(limited).map(yearOf))].filter((y): y is string => y !== undefined).sort();
   return years.map((year) => ({
     bucket: '접대비',

@@ -68,7 +68,7 @@ export function judgmentsCsv(rows: JudgmentExportRow[], limits: LimitYear[]): st
   [
   [],
   ...exceeded.map(({ taxYear, totalAmount, excessAmount }) => [
-  `${taxYear}년 접대비 총 ${formatWon(totalAmount)} 중 ${formatWon(excessAmount)}은 한도를 넘어 필요경비에 넣지 않습니다(직전연도 수입금액 기준 잠정). 거래별로 나눌 수 없어 이 해 접대비 행의 인정 금액은 비웠습니다.`]
+  `${taxYear}년 접대비 총 ${formatWon(totalAmount)} 중 ${formatWon(excessAmount)}은 한도를 넘어 필요경비에 넣지 않습니다(직전연도 수입금액 기준 잠정). 거래별로 나눌 수 없어 이 해 가능 접대비 행의 인정 금액은 비웠습니다(승인취소·환불 행은 빼고).`]
   )] :
 
   [];

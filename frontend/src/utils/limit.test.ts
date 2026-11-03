@@ -9,11 +9,12 @@ const limit = (taxYear: number, totalAmount: number, excessAmount: number, bucke
   excessAmount
 });
 
-const judgment = (code: string, approvedAt: string, bucket?: string) =>
+const judgment = (code: string, approvedAt: string, bucket?: string, finalAmount: number | null = 50_000) =>
 ({
   verdict: { code },
   attributes: bucket ? { limit_bucket: bucket } : {},
-  transaction: { approvedAt }
+  finalAmount,
+  transaction: { approvedAt, amount: finalAmount ?? 50_000 }
 }) as unknown as Judgment;
 
 describe('limitsOf', () => {
@@ -36,5 +37,12 @@ describe('exceededLimitOf', () => {
     expect(exceededLimitOf(judgment('AVAILABLE', '2025-12-01T09:00:00', '접대비'), limits)).toBeUndefined();
     expect(exceededLimitOf(judgment('AVAILABLE', '2026-04-06T12:30:00'), limits)).toBeUndefined();
     expect(exceededLimitOf(judgment('NEEDS_REVIEW', '2026-04-06T12:30:00', '접대비'), limits)).toBeUndefined();
+  });
+
+  it('승인취소·환불(음수 금액)은 한도에 넣지 않는다. 서버가 인정 금액을 그대로 준다', async () => {
+    expect(exceededLimitOf(judgment('AVAILABLE', '2026-04-10T12:30:00', '접대비', -6_500), limits)).toBeUndefined();
+    // 금액 계산 전 판정은 결제금액으로 본다(LimitSettlementService)
+    const refund = { ...judgment('AVAILABLE', '2026-04-10T12:30:00', '접대비', null), transaction: { approvedAt: '2026-04-10T12:30:00', amount: -6_500 } } as unknown as Judgment;
+    expect(exceededLimitOf(refund, limits)).toBeUndefined();
   });
 });

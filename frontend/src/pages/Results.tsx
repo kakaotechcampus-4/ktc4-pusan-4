@@ -19,7 +19,7 @@ import { api, ApiRequestError, useApi } from '../api';
 import type { Judgment, Verdict } from '../types/domain';
 import { formatFullDate, formatNumber, formatPeriod, formatWon } from '../utils/format';
 import { download, exportRowOf, judgmentsCsv } from '../utils/csv';
-import { exceededLimitOf } from '../utils/limit';
+import { exceededLimitOf, limitsOf } from '../utils/limit';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 
 type Filter = 'ALL' | Verdict;
@@ -186,6 +186,8 @@ export function Results() {
 
   const summary = summaryQ.data;
   const limits = summary?.limits ?? [];
+  // batch 합계는 접대비 한도 전 금액이다(#226). 넘은 해가 있으면 헤더 합계 아래에 알린다
+  const excess = limitsOf(limits).reduce((sum, item) => sum + item.excessAmount, 0);
   const filters = [
   { value: 'ALL' as const, label: '전체', count: summary?.totalCount },
   { value: 'AVAILABLE' as const, label: '가능', count: summary?.byVerdict.AVAILABLE.count },
@@ -294,6 +296,11 @@ export function Results() {
             <strong className="font-bold text-ink">
               {formatWon(summary.byVerdict.AVAILABLE.finalAmount)}
             </strong>
+          </p>
+      }
+        {excess > 0 &&
+      <p className="mt-1 text-small text-warn">
+            접대비 연간 한도 초과 {formatWon(excess)}은 어느 거래 몫인지 정할 수 없어 이 합계에서 빼지 않았습니다.
           </p>
       }
       </div>

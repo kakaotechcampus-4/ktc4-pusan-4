@@ -9,10 +9,11 @@ limits.filter((item) => item.bucket === LIMITED_ACCOUNT).sort((a, b) => a.taxYea
 
 /**
  * 이 판정이 한도를 넘은 해의 가능 접대비면 그해 한도 (#226).
- * 넘은 해의 거래별 인정액은 배분 순서로만 정해져(#15) 화면은 금액 대신 「연간 한도 대상」으로 적는다
+ * 넘은 해의 거래별 인정액은 배분 순서로만 정해져(#15) 화면은 금액 대신 「연간 한도 대상」으로 적는다.
+ * 승인취소·환불(음수 금액)은 서버가 한도에 넣지 않고 인정 금액을 그대로 주므로 빼낸다(LimitSettlementService)
  */
 export const exceededLimitOf = (judgment: Judgment, limits: LimitYear[]) =>
-judgment.verdict.code === 'AVAILABLE' ?
+judgment.verdict.code === 'AVAILABLE' && (judgment.finalAmount ?? judgment.transaction.amount) >= 0 ?
 limits.find(
   (item) =>
   item.excessAmount > 0 &&
