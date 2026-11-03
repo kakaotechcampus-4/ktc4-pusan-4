@@ -6,8 +6,11 @@
 # ⚠️ fact_type 을 '이동목적' 같은 새 이름으로 두지 않는다. 평가셋 E-033 이
 #    (transaction, 용도, 업무출장) 으로 답한다. fact_type 이나 값이 하나라도
 #    어긋나면 답이 카드에 매칭되지 않는다 — v1 에서 '업무목적'으로 썼다가 났던 오류다.
+#
+# '업무·개인 섞임'은 판정 없이 확인필요로 남겨 세무사 판단에 맡긴다(#207 의 혼용 처리와 같다).
+# 카드사 합산 행("지하철 40건")도 이 카드로 와서 한 달치 묶음에 섞이는 경우가 많다(#192).
 id: R-208
-version: 2
+version: 3
 gate: G2
 priority: 500
 effective_period: { start: 2024-01-01, end: null }
@@ -21,10 +24,11 @@ citations:
   - { id: 소득세법시행령-61-1-1, verified: true }
 question:
   code: TRAVEL_PURPOSE
-  text: "이 이동은 업무 목적이었나요?"
+  text: "이 교통비는 업무 목적이었나요?"
   fact_type: 용도
   group_by: transaction
   options:
     - { value: 업무출장, verdict: 가능, account: 여비교통비 }
     - { value: 개인, verdict: 불가 }
+    - { value: 업무·개인 섞임 }
 review: { by: 미검수, date: 2026-09-15 }
