@@ -7,27 +7,16 @@ import { useSession } from '../contexts/SessionContext';
 import { api, useApi } from '../api';
 import type {
   JudgmentSummary,
-  LimitYear,
   StoredBusinessContext,
   UploadBatch,
   UnresolvedSummary } from
 '../types/domain';
 import { formatNumber, formatPeriod, formatWon } from '../utils/format';
-import { LIMITED_ACCOUNT, limitsOf } from '../utils/limit';
+import { excessNote, LIMITED_ACCOUNT, limitLine, limitsOf, PROVISIONAL_NOTE } from '../utils/limit';
 
 type AccountRow = JudgmentSummary['byAccount'][number];
 
-/**
- * 접대비 한도는 연 단위로만 다룬다(#15, #226). batch 요약의 접대비는 한도 전 금액이고, 그해 초과액은 limits 로 따로 온다.
- * 한도는 최신 문진의 직전연도 수입금액으로 잡고, 확정 기능이 없어 늘 잠정이다(CONTEXT.md A6b)
- */
-const PROVISIONAL_NOTE = '직전연도 수입금액 기준 잠정';
-
-/** 「2026년 접대비 총 14,000,000원 중 한도 초과 1,750,000원」. 한도 안이면 「… 한도 안」 */
-const limitLine = ({ taxYear, totalAmount, excessAmount }: LimitYear) =>
-excessAmount > 0 ?
-`${taxYear}년 접대비 총 ${formatWon(totalAmount)} 중 한도 초과 ${formatWon(excessAmount)}` :
-`${taxYear}년 접대비 총 ${formatWon(totalAmount)}, 한도 안`;
+/* 접대비 한도는 연 단위로만 다룬다(#15, #226). batch 요약의 접대비는 한도 전 금액이고, 그해 초과액은 limits 로 따로 온다 */
 
 /** 한 달 배치면 「2026년 1월」, 아니면 기간 그대로 */
 const periodLabel = (batch: UploadBatch) => {
@@ -142,7 +131,7 @@ export function Summary() {
   const unresolved = questionsQ.data?.unresolved;
   const period = batchQ.data ? periodLabel(batchQ.data) : null;
   const limits = summary ? limitsOf(summary.limits) : [];
-  const exceeded = limits.filter((item) => item.excessAmount > 0);
+  const excess = summary ? excessNote(summary.limits) : null;
 
   const header =
   <header className="flex flex-wrap items-end justify-between gap-4">
@@ -314,13 +303,9 @@ export function Summary() {
           '집계를 불러오는 중입니다.'}
         </p>
         {/* 초과액은 그해 사용자 전체 기준이라 이 업로드 몫을 정할 수 없다(#15). 합계에서 빼지 않고 따로 알린다 */}
-        {exceeded.length > 0 &&
+        {excess &&
         <p className="mt-4 rounded-xl border border-warn-line bg-warn-bg px-4 py-3 text-small text-ink2">
-            <strong className="font-bold text-warn">
-              접대비 한도 초과 {formatWon(exceeded.reduce((sum, item) => sum + item.excessAmount, 0))}
-            </strong>{' '}
-            — {exceeded.map(limitLine).join(', ')}입니다({PROVISIONAL_NOTE}). 초과액은 필요경비에 들어가지 않지만,
-            어느 거래 몫인지 정할 수 없어 위 합계에서는 빼지 않았습니다.
+            <strong className="font-bold text-warn">접대비 연간 한도 초과</strong> — {excess}
           </p>
         }
 

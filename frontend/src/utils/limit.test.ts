@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Judgment, LimitYear } from '../types/domain';
-import { exceededLimitOf, limitsOf } from './limit';
+import { exceededLimitOf, excessNote, limitLine, limitsOf } from './limit';
 
 const limit = (taxYear: number, totalAmount: number, excessAmount: number, bucket = '접대비'): LimitYear => ({
   bucket,
@@ -44,5 +44,23 @@ describe('exceededLimitOf', () => {
     // 금액 계산 전 판정은 결제금액으로 본다(LimitSettlementService)
     const refund = { ...judgment('AVAILABLE', '2026-04-10T12:30:00', '접대비', null), transaction: { approvedAt: '2026-04-10T12:30:00', amount: -6_500 } } as unknown as Judgment;
     expect(exceededLimitOf(refund, limits)).toBeUndefined();
+  });
+});
+
+describe('limitLine · excessNote', () => {
+  it('넘은 해는 총액과 초과액, 아니면 한도 안으로 적는다', () => {
+    expect(limitLine(limit(2026, 14_000_000, 1_750_000))).toBe('2026년 접대비 총 14,000,000원 중 한도 초과 1,750,000원');
+    expect(limitLine(limit(2025, 300_000, 0))).toBe('2025년 접대비 총 300,000원, 한도 안');
+  });
+
+  it('넘은 해만 연도별로 적고, 모든 업로드를 합친 값이라 이 업로드 몫이 아니라고 밝힌다', () => {
+    expect(excessNote([limit(2026, 13_300_000, 1_051_000), limit(2025, 300_000, 0), limit(2026, 1, 1, '기부금')])).toBe(
+      '그해 모든 업로드를 합친 기준으로 2026년 접대비 총 13,300,000원 중 한도 초과 1,051,000원입니다(직전연도 수입금액 기준 잠정). 초과액은 필요경비에 들어가지 않지만, 이 업로드 몫은 정할 수 없어 위 합계에서 빼지 않았습니다.'
+    );
+  });
+
+  it('넘은 해가 없으면 안내가 없다', () => {
+    expect(excessNote([limit(2026, 300_000, 0)])).toBeNull();
+    expect(excessNote([])).toBeNull();
   });
 });
