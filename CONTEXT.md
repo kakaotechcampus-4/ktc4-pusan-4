@@ -1303,6 +1303,7 @@ erDiagram
 | `installment_months` | 승인 기준이라 원금 1건 |
 | `natural_key` | `hash(approved_at + merchant_raw + amount)`. **UNIQUE 필수** — 기간 겹쳐 올려도 중복 계상 차단 |
 | `status` | `판정대상`/`취소상계`/`대상제외` |
+| `current_judgment_id` | **현재 판정**(api.md §5: 활성 override 가 있으면 그 revision, 없으면 override 가 아닌 최신 revision). 판정 저장·override·해제가 거래 락을 잡고 바꾼다. 읽을 때마다 상관 서브쿼리로 고르면 플래너가 행 수를 잘못 추정해 계획이 나빠졌다(#218) |
 
 **STATUTE_VERSION** — 4개 섹션 원문을 모두 담는다. **append-only.**
 

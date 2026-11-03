@@ -206,10 +206,10 @@ flowchart TD
 - **탈퇴**: `app_user`를 지우면 사용자 소유 행(문진 Context, batch와 위의 파생 행, UserFact, 개인 `merchant_dict`, 한도 배분)이 지워진다.
 - **남는 것**: 공용 `statute_version`, 전역 `merchant_dict`(`user_id IS NULL`), `rule_candidate`. 앞의 둘은 사용자 데이터가 아니고, `rule_candidate`는 사용자 FK 없이 집계만 담는다.
 - **소유 FK만 CASCADE다.** 소유 경로는 batch → 거래 → 판정, batch → run, 사용자 → batch 같은 것이다. revision을 직접 지우는 경로는 없고(append-only), 판정은 거래를 거쳐서만 지워진다.
-- **참조 FK는 지우지 않고 막는다.** 판정의 origin 4개(`run_id` 등), run의 `context_id`, override의 `source_judgment_id`, 질문의 `answered_fact_id`가 여기에 해당한다(NO ACTION).
+- **참조 FK는 지우지 않고 막는다.** 판정의 origin 4개(`run_id` 등), run의 `context_id`, override의 `source_judgment_id`, 질문의 `answered_fact_id`, 거래의 `current_judgment_id`가 여기에 해당한다(NO ACTION).
   - 참조까지 CASCADE면 잘못 이어진 참조 하나가 다른 batch의 이력을 조용히 지운다. 예를 들어 다른 batch의 run을 가리키는 판정이 있으면, 그 batch를 지울 때 이 판정까지 사라진다.
   - 막아 두면 그런 삭제는 실패하고 데이터가 남는다.
-  - override의 `source_judgment_id`는 `(source_judgment_id, transaction_id)` 쌍으로 판정을 가리킨다. 다른 거래의 판정을 원래 판정으로 둘 수 없다.
+  - override의 `source_judgment_id`는 `(source_judgment_id, transaction_id)` 쌍으로 판정을 가리킨다. 다른 거래의 판정을 원래 판정으로 둘 수 없다. 거래의 `current_judgment_id`도 `(current_judgment_id, id)` 쌍으로 같은 거래의 판정만 가리킨다.
 - **참조 FK는 커밋 때 검사한다**(`DEFERRABLE INITIALLY DEFERRED`). 즉시 검사하면 탈퇴처럼 여러 경로로 함께 지워질 때 순서에 따라 실패한다. 예를 들어 사용자 → UserFact가 batch → 거래 → 판정보다 먼저 지워지면 아직 남은 판정에 걸린다.
 - `answered_fact_id`를 SET NULL로 두지 않은 건 "ANSWERED면 답변 fact 필수" CHECK와 부딪히기 때문이다.
 
