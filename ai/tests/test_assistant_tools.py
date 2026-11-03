@@ -127,6 +127,13 @@ def test_요약은_판정을_한국어_라벨로_준다():
     assert out["unclassified"] == {"count": 2, "amount": 97000}
 
 
+def test_요약은_연도별_접대비_한도를_준다():
+    out = turn().get_summary("year")
+    assert out["scope"] == "year"
+    assert out["limits"] == [{"bucket": "접대비", "taxYear": 2026, "totalAmount": 13006500, "excessAmount": 916500}]
+    assert turn().get_summary("batch")["limits"] == []   # 이 업로드에는 접대비가 없다
+
+
 def test_미분류_그룹은_후보_카테고리를_준다():
     out = turn().list_unclassified(None)
     assert out["groups"][0]["ref"] == "c1"
