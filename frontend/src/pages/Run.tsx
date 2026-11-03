@@ -187,7 +187,23 @@ function RunProgress() {
       setFailures(null);
       setRun(null);
       navigate(`/run/${created.id}`);
-    } catch {
+    } catch (caught) {
+      /*
+       * 이 배치에 이미 돌고 있는 판정이 있다 (#228). 끝난 run 뒤 재실행은 막지 않으니
+       * 여기까지 오면 다른 탭이 눌렀다. 지금 보고 있는 실행과 같은 id 면 주소가 그대로여서
+       * key 가 바뀌지 않고 — 비운 상태로 남는다. 그때는 아래 문구로 떨어뜨린다
+       */
+      if (
+        caught instanceof ApiRequestError &&
+        caught.code === 'RUN_ALREADY_ACTIVE' &&
+        caught.runId &&
+        caught.runId !== runId)
+      {
+        setFailures(null);
+        setRun(null);
+        navigate(`/run/${caught.runId}`);
+        return;
+      }
       setLoadError('다시 판정하지 못했습니다. 잠시 후 시도해 주세요.');
     } finally {
       setRetrying(false);
