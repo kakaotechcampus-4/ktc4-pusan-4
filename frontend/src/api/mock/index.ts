@@ -9,6 +9,7 @@ import type {
   EffectiveStatus,
   HandoffNote,
   Judgment,
+  LimitYear,
   JudgmentRun,
   JudgmentRunFailure,
   Page,
@@ -307,6 +308,28 @@ const withTransaction = (j: JudgmentSeed): Judgment | null => {
 /** §5 판정 대상: 판정대상이면서 분류가 끝난 거래 */
 const isJudgeable = (t: Transaction) =>
 t.effectiveStatus.code === 'JUDGEABLE' && t.classificationStatus.code === 'CLASSIFIED';
+
+/**
+ * 범위의 판정이 든 해마다 접대비 한도 (#226). 값은 그해 판정 대상 거래의 현재 판정 전체 기준이다.
+ * 목업은 한도를 계산하지 않아 초과액이 늘 0 이다
+ */
+const limitsFor = (rows: JudgmentSeed[]): LimitYear[] => {
+  const yearOf = (j: JudgmentSeed) => transactionOf(j.transactionId)?.approvedAt.slice(0, 4);
+  // 서버처럼 제외·미분류 거래는 세지 않는다(findCurrentLimitTagged)
+  const limited = (j: JudgmentSeed) => {
+    const t = transactionOf(j.transactionId);
+    return t !== undefined && isJudgeable(t) && j.verdict.code === 'AVAILABLE' && j.attributes.limit_bucket === '접대비';
+  };
+  const years = [...new Set(rows.filter(limited).map(yearOf))].filter((y): y is string => y !== undefined).sort();
+  return years.map((year) => ({
+    bucket: '접대비',
+    taxYear: Number(year),
+    totalAmount: currentAll().
+    filter((j) => limited(j) && yearOf(j) === year).
+    reduce((sum, j) => sum + (j.finalAmount ?? 0), 0),
+    excessAmount: 0
+  }));
+};
 
 const ratioOf = (answer: string): number | null =>
 /^\d+%$/.test(answer) ? Number(answer.replace('%', '')) : null;
@@ -1094,7 +1117,9 @@ export const mockApi: Api = {
         byVerdict: by,
         byAccount: [...accounts].
         map(([account, v]) => ({ account, ...v })).
-        sort((a, b) => b.finalAmount - a.finalAmount || a.account.localeCompare(b.account))
+        sort((a, b) => b.finalAmount - a.finalAmount || a.account.localeCompare(b.account)),
+        // 과거 Run 범위는 그 시점 한도가 남아 있지 않아 빈 배열이다 (api.md 3.7)
+        limits: scope.runId ? [] : limitsFor(rows)
       });
     },
     list: (q) => {
@@ -1132,7 +1157,7 @@ export const mockApi: Api = {
       const out = j && withTransaction(j);
       return out ? delay(out) : notFound('JUDGMENT_NOT_FOUND', '판정을 찾을 수 없습니다.');
     },
-    // 대상은 같은 조건의 현재 판정이고 페이지가 없다(#214). 목업은 한도를 두지 않아 인정 금액이 finalAmount 다
+    // 대상은 같은 조건의 현재 판정이고 페이지가 없다(#214). 목업은 한도를 넘지 않아 인정 금액이 finalAmount 다
     export: (scope) => {
       if ((scope.batchId === undefined) === (scope.year === undefined))
       return Promise.reject(new ApiRequestError(400, 'INVALID_EXPORT_SCOPE', 'batchId·year 중 하나만 지정해야 합니다.'));
@@ -1140,12 +1165,12 @@ export const mockApi: Api = {
       liveGroups().
       filter((g) => g.pairs.some((p) => p.transaction.id === transactionId) && store.answers.has(g.seed.groupKey)).
       map((g) => ({ question: g.seed.questionText, answer: store.answers.get(g.seed.groupKey)?.value ?? '' }));
-      const items = currentAll().
-      filter((j) => {
+      const inScope = currentAll().filter((j) => {
         const t = transactionOf(j.transactionId);
         if (!t || !isJudgeable(t)) return false;
         return scope.batchId ? t.batchId === scope.batchId : t.approvedAt.startsWith(String(scope.year));
-      }).
+      });
+      const items = inScope.
       map(withTransaction).
       filter((j): j is Judgment => j !== null).
       sort((a, b) => a.transaction.approvedAt.localeCompare(b.transaction.approvedAt)).
@@ -1154,7 +1179,7 @@ export const mockApi: Api = {
         allowedAmount: judgment.verdict.code === 'AVAILABLE' ? judgment.finalAmount ?? 0 : 0,
         answers: answersOf(judgment.transactionId)
       }));
-      return delay({ items });
+      return delay({ items, limits: limitsFor(inScope) });
     },
     // 목업은 Idempotency-Key 재사용을 흉내 내지 않는다 (업로드와 같다)
     override: (id, body) => {
