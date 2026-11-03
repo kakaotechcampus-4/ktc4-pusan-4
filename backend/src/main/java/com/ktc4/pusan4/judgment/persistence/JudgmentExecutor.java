@@ -110,7 +110,7 @@ public class JudgmentExecutor {
      * Context 버전은 호출하는 쪽이 api.md 규칙(질문이 생긴 판정의 버전)으로 정해 넘긴다.
      * 호출한 쪽 트랜잭션에 묶여, 한 건이라도 실패하면 응답 전체가 롤백된다.
      * 판정 입력은 여기서 읽으므로, 호출한 쪽이 먼저 저장한 UserFact(질문 응답)가 반영된다.
-     * 끝나면 한도를 다시 집계한다(같은 트랜잭션). 집계는 사용자 락을 잡으므로, 호출한 쪽이 거래 락보다
+     * 끝나면 한도를 다시 집계한다(같은 트랜잭션, 접대비와 닿지 않으면 건너뜀). 집계는 사용자 락을 잡으므로, 호출한 쪽이 거래 락보다
      * 사용자 락을 먼저 잡아 두어야 한다(UserFactPersistenceService.nextVersion 의 락 순서).
      */
     @Transactional
@@ -118,6 +118,6 @@ public class JudgmentExecutor {
         BusinessContext context = contextService.version(userId, contextVersion);
         JudgmentReferences references = references();
         origins.forEach((transactionId, origin) -> judge(transactionId, context, origin, references));
-        limitSettlement.settleProvisional(userId);
+        limitSettlement.settleAfterRejudge(userId, origins.keySet());
     }
 }

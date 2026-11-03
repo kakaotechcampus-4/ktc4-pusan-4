@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -80,6 +81,17 @@ public class LimitSettlementService {
         long annualLimit = EntertainmentLimit.annual(contextService.current(userId).prevYearRevenue());
         years.forEach(year -> limitService.replaceProvisional(userId, year, EntertainmentLimit.BUCKET,
             AnnualLimitAllocator.allocate(annualLimit, byYear.getOrDefault(year, List.of()))));
+    }
+
+    /**
+     * 재판정 뒤의 집계. 재판정은 그 거래들의 현재 판정만 바꾸므로, 그 거래들의 어느 판정도(이전 revision 포함)
+     * 접대비가 아니면 집계 대상이 그대로라 건너뛴다(#218).
+     */
+    @Transactional
+    public void settleAfterRejudge(UUID userId, Collection<UUID> rejudgedTransactionIds) {
+        if (judgmentRepository.existsLimitTagged(rejudgedTransactionIds, EntertainmentLimit.BUCKET)) {
+            settleProvisional(userId);
+        }
     }
 
     /**

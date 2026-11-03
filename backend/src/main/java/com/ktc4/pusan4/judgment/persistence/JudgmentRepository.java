@@ -165,6 +165,16 @@ interface JudgmentRepository extends Repository<JudgmentEntity, UUID> {
     @Query(value = "select set_config('jit', 'off', true)", nativeQuery = true)
     String disableJitInTransaction();
 
+    // 이 거래들의 판정 중 하나라도(이전 revision 포함) 가능이면서 limit_bucket 이 :bucket 인지.
+    @Query("""
+        select count(judgment) > 0
+        from JudgmentEntity judgment
+        where judgment.transactionId in :transactionIds
+          and judgment.verdict = 'AVAILABLE'
+          and function('jsonb_extract_path_text', judgment.attributes, 'limit_bucket') = :bucket
+        """)
+    boolean existsLimitTagged(@Param("transactionIds") Collection<UUID> transactionIds, @Param("bucket") String bucket);
+
     /** finalAmount 는 금액 계산 전에 저장된 판정이면 비어 있다. */
     record LimitTagged(UUID judgmentId, LocalDate approvedAt, Long finalAmount, long amount) {
     }
