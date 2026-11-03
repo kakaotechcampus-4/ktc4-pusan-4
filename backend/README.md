@@ -138,4 +138,6 @@ PMD는 `backend/config/pmd/ruleset.xml`의 고복잡도·오류 가능성 규칙
 
 기능 코드는 `com.ktc4.pusan4.<feature>` 아래에 모으고, 기능 내부에서 controller, service, repository, entity, dto로 나눕니다. 둘 이상의 기능에서 실제로 공유되기 전에는 공통 계층을 만들지 않습니다.
 
+조회는 기본적으로 리포지토리의 `@Query`(JPQL)로 씁니다. 여러 쿼리가 같은 조건을 쓰거나 조건이 비어서 올 수 있으면 QueryDSL로 씁니다. 리포지토리에 `XxxRepositoryCustom` 인터페이스와 `XxxRepositoryCustomImpl` 구현을 붙이면 호출하는 쪽은 바뀌지 않습니다. 예를 들어 "지금 판정 대상인 거래" 조건은 `TransactionConditions`가 `TransactionDetail.effectiveStatus`에서 뽑아내고, 그 조건을 쓰는 조회는 모두 이 클래스를 가져다 씁니다. Q클래스는 빌드할 때 `build/generated`에 생성되므로 커밋하지 않습니다.
+
 DB 스키마는 Flyway만 변경합니다. 마이그레이션은 `src/main/resources/db/migration`에 `V1__create_member.sql` 형식으로 추가하며, 이미 적용된 파일은 수정하지 않고 새 버전의 파일을 추가합니다. Hibernate는 스키마를 생성하지 않고 애플리케이션 시작 시 매핑을 검증합니다.
