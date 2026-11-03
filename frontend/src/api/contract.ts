@@ -241,7 +241,9 @@ export class ApiRequestError extends Error {
   message: string,
   public readonly traceId = '',
   /** 429 의 Retry-After(초). 없으면 undefined */
-  public readonly retryAfter?: number)
+  public readonly retryAfter?: number,
+  /** 409 RUN_ALREADY_ACTIVE 의 진행 중인 판정 실행 id (#228). 그 밖에는 undefined */
+  public readonly runId?: string)
   {
     super(message);
     this.name = 'ApiRequestError';

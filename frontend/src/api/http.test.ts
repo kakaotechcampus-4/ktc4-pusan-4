@@ -41,6 +41,35 @@ describe('httpApi', () => {
     fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ code: 'INTERNAL_ERROR' }), { status: 500 }));
     await expect(httpApi.handoffNotes.list()).rejects.toMatchObject({ status: 500 });
   });
+
+  it('409 RUN_ALREADY_ACTIVE 의 runId 를 올린다 (#228)', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          code: 'RUN_ALREADY_ACTIVE',
+          message: '이미 판정 중입니다.',
+          traceId: 'tr-1',
+          runId: 'run-9'
+        }),
+        { status: 409 }
+      )
+    );
+    await expect(httpApi.runs.create({ batchId: 'b1', contextId: 'c1' })).rejects.toMatchObject({
+      status: 409,
+      code: 'RUN_ALREADY_ACTIVE',
+      traceId: 'tr-1',
+      runId: 'run-9'
+    });
+  });
+
+  it('runId 가 없는 에러에는 runId 를 만들지 않는다 (#228)', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ code: 'VALIDATION_ERROR', message: '틀렸습니다.' }), { status: 400 })
+    );
+    const caught = await httpApi.runs.create({ batchId: 'b1', contextId: 'c1' }).catch((error) => error);
+    expect(caught.code).toBe('VALIDATION_ERROR');
+    expect(caught.runId).toBeUndefined();
+  });
 });
 
 describe('인증 (#139 가정)', () => {

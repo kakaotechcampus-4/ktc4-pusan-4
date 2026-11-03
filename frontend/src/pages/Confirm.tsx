@@ -37,6 +37,15 @@ export function Confirm() {
       const created = await api.runs.create({ batchId, contextId: contextRef.id });
       navigate(`/run/${created.id}`);
     } catch (caught) {
+      // 탭 두 개에서 동시에 누르면 이미 돌고 있는 판정이 있다 (#228). 새로 시작하는 대신 그것을 보여준다
+      if (
+        caught instanceof ApiRequestError &&
+        caught.code === 'RUN_ALREADY_ACTIVE' &&
+        caught.runId)
+      {
+        navigate(`/run/${caught.runId}`);
+        return;
+      }
       setError(
         caught instanceof ApiRequestError ?
         caught.message :
