@@ -71,3 +71,45 @@
 - 남은 집계 비용은 사용자 거래 수에 비례한다(거래당 약 5µs).
 - 분류 응답은 고친 뒤에도 1건에 215ms 이고, DB 시간은 10ms 안팎이다. 나머지가 어디서 쓰이는지는 보지 않았다.
 - 조건마다 한 번씩만 쟀다.
+
+## 20:34 거래에 현재 판정을 저장해, 현재 판정 조회를 조인 하나로 바꾼다 (#218)
+
+- 브랜치: perf/limit-settlement-on-answer
+- 커밋: 3eb199d..89faa87 (3개)
+- 주요파일: V21__transaction_current_judgment.sql, JudgmentService.java, JudgmentOverrideService.java, JudgmentRepository.java
+
+### 한 일
+
+- `transaction.current_judgment_id` 를 추가했다(V21). 기존 거래는 api.md §5 정의대로 채운다.
+  - 같은 거래의 판정만 가리키도록 `(current_judgment_id, id)` → `judgment(id, transaction_id)` 참조 FK(NO ACTION, 커밋 때 검사)를 두고, 판정 삭제 때 FK 확인용 인덱스를 둔다.
+- 바꾸는 곳은 셋이다. 모두 거래 락을 잡은 뒤다.
+  - 자동 판정 저장(`JudgmentService.save`): 활성 override 가 없을 때만 새 판정을 가리킨다. 확인과 갱신을 한 문장으로 한다.
+  - override: override revision 을 가리킨다.
+  - 해제: override 가 아닌 최신 revision 으로 돌린다. 이미 해제한 수정이면 건드리지 않는다. 해제가 거래 락을 새로 잡는다(사용자 → 거래 순서).
+- 읽는 곳 셋(`findPage`, `findCurrentLimitTagged`, 거래 목록 verdict 필터)과 override 의 "현재 판정인가" 확인을 이 열로 바꿨다.
+- 19:34 에 넣은 lateral 조회와 집계 트랜잭션의 JIT 끄기는 걷어 냈다. 건너뛰기와 분류 응답 변경은 그대로다.
+- 엔티티 필드는 읽기 전용(`insertable/updatable = false`)이고 `pointCurrentJudgment*` 로만 바꾼다.
+
+### 왜 이렇게 했나
+
+- 19:34 의 lateral 은 집계 조회 하나에서만 추정 오류를 피했다. 같은 "현재 판정" 조건이 `findPage`·거래 목록에도 있어 같은 문제가 날 수 있었고, 정의가 세 쿼리에 흩어져 있었다. 사용자와 정해 같은 PR 에서 원인을 고치기로 했다.
+- 엔티티 필드를 읽기 전용으로 둔 이유: Hibernate 는 거래 행 전체를 다시 쓰므로, 엔티티가 이 열을 쓰면 분류 확정 같은 다른 변경이 flush 될 때 엔티티에 남은 이전 값으로 되돌린다.
+- DB 트리거로 유지하는 방법도 있었지만, 동작이 코드 근처에서 보이지 않아 쓰는 쪽 세 곳에서 명시적으로 바꿨다. 대신 어긋남은 테스트로 막는다(아래).
+- FK 는 `docs/architecture.md` 의 참조 FK 정책(NO ACTION, DEFERRABLE)을 따랐다.
+
+### 확인한 것
+
+- 같은 데이터에서 집계 조회(EXPLAIN ANALYZE, 측정용 테스트): 거래 3,000건 138ms(원래) / 17ms(lateral) / 1.0ms(이 열), 6,000건 513 / 37 / 6.3ms. 세 조회 결과가 같다. 추정 비용 618 로 JIT 기준(100,000)보다 한참 낮다.
+- run 3,000건: 판정마다 문장 1개가 늘었다(거래당 왕복 11 → 12, DB 실행 +약 250ms). 전체 시간은 42.3s(이 변경) / 47.5s·39.3s(변경 전 두 번)로 환경 흔들림(왕복 604~686µs) 안이라 차이를 가리지 못했다.
+- 테스트
+  - 재판정 → override → override 중 재판정 → 해제를 서비스로 지나며 열이 정의와 같은지, 그리고 DB 의 모든 거래에서 정의와 같은지(`CurrentJudgments.mismatches`).
+  - V21 직전 스키마에 자동만·활성 수정 뒤 재판정·해제한 수정·판정 없음 네 거래를 넣고 채우기 결과.
+  - SQL 로 판정을 직접 넣는 픽스처는 넣은 뒤 정의대로 열을 채운다(`CurrentJudgments.refresh`).
+- `gradlew -p backend check` 통과(테스트 700, 실패 0, 건너뜀 7 은 환경변수 벤치마크).
+
+### 남은 것 · 아는 문제
+
+- 판정을 새로 만드는 경로가 생기면 이 열을 바꿔야 한다. 빠뜨리면 조용히 틀린다. 지금 판정을 만드는 곳은 `JudgmentService.save` 와 override 뿐이다.
+- 집계 조회의 추정 행 수는 여전히 틀린다(15행 추정, 실제 900행, jsonb 조건). 계획이 인덱스 조인 하나뿐이라 영향은 없었다.
+- `findPage`·거래 목록의 전후 시간은 재지 않았다.
+- 중간 커밋(3eb199d)만 따로 테스트하지는 않았다. 세 커밋을 합친 상태로 check 를 돌렸다.
