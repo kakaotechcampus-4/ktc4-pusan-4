@@ -13,6 +13,7 @@ import java.util.UUID;
  * @param transaction     조회 시점의 거래 값
  * @param overridden      거래에 활성 override 가 있는지
  * @param awaitingExplanation 소명 대기 거래의 질문인지 (api.md 3.11 제외 대상)
+ * @param code            질문을 만든 규칙 카드의 질문 코드 (api.md 3.9)
  */
 public record Question(
     UUID id,
@@ -29,6 +30,7 @@ public record Question(
     OffsetDateTime answeredAt,
     JudgedTransaction transaction,
     boolean overridden,
-    boolean awaitingExplanation
+    boolean awaitingExplanation,
+    String code
 ) {
 }

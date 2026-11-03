@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   AlertTriangleIcon,
   ArrowRightIcon,
@@ -23,7 +24,12 @@ import type {
 '../parser';
 import type { UploadBatchCreated } from '../types/domain';
 import { formatNumber, formatPeriod, formatWon } from '../utils/format';
-import { APPROVAL_EXPORT_STEPS, ASSISTANT_DOES_NOT_SEND, ASSISTANT_SENDS } from '../components/assistant/help';
+import {
+  APPROVAL_EXPORT_STEPS,
+  ASSISTANT_DESTINATION,
+  ASSISTANT_DOES_NOT_SEND,
+  ASSISTANT_SENDS } from
+'../components/assistant/help';
 
 /** 실제 파일은 25–103KB 다. 5MB 면 몇 년치라 브라우저에서 바로 읽어도 느리지 않다 */
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -126,7 +132,7 @@ function sendErrorView(error: ApiRequestError): SendErrorView {
  * 파일은 이 브라우저 안에서 읽고(src/parser), 판정에 필요한 항목만 POST /upload-batches 로 보낸다.
  */
 export function Upload() {
-  const { setBatchId, setRunId } = useSession();
+  const { setBatchId } = useSession();
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
   /** 새 파일·초기화·화면 이탈마다 올린다. 늦게 끝난 읽기·업로드 결과는 버린다 */
   const seq = useRef(0);
@@ -195,11 +201,7 @@ export function Upload() {
       const created = await api.uploads.create(request, key);
       if (mine !== seq.current) return;
       // 모두 중복이면 거래 없는 배치다. 세션을 바꾸지 않고 업로드 이력으로 안내한다
-      if (created.transactionCount > 0) {
-        setBatchId(created.id);
-        // 이전 배치의 실행을 들고 있으면 /run 이 그 실행을 계속 폴링한다
-        setRunId(null);
-      }
+      if (created.transactionCount > 0) setBatchId(created.id);
       setPhase({ kind: 'ready', file, outcome, created });
     } catch (caught) {
       if (mine !== seq.current) return;
@@ -247,7 +249,7 @@ export function Upload() {
                     {phase.error}
                   </p>
               }
-                {isMock && <SampleList onPick={(file) => pick([file])} />}
+                <SampleList onPick={(file) => pick([file])} />
               </div>
             }
 
@@ -331,7 +333,10 @@ function DropZone({ onFiles }: {onFiles: (files: ArrayLike<File>) => void;}) {
 
 }
 
-/** 목업 모드 전용. 실제 서버에 가짜 거래가 들어가지 않도록 http 모드에서는 그리지 않는다 */
+/**
+ * 가짜 거래로 만든 샘플. 시연할 때 올릴 파일이 있어야 해서 실서버에서도 보인다(#215).
+ * 실서버에서는 올린 샘플이 그 계정의 업로드로 남는다
+ */
 function SampleList({ onPick }: {onPick: (file: File) => void;}) {
   const [samples, setSamples] = useState<SampleFile[]>([]);
 
@@ -355,7 +360,7 @@ function SampleList({ onPick }: {onPick: (file: File) => void;}) {
     <section className="mt-7">
       <h2 className="text-body font-bold text-ink">샘플 파일로 해 보기</h2>
       <p className="mt-1 text-small text-muted">
-        목업 모드에서만 보입니다. 가짜 거래로 만든 파일입니다.
+        가짜 거래로 만든 파일입니다.{!isMock && ' 올리면 내 업로드 이력에 남습니다.'}
       </p>
       <ul className="mt-3 space-y-2">
         {samples.map((sample) =>
@@ -493,7 +498,9 @@ function PreviewCard({
   { header: '이유', cell: (u) => <span className="whitespace-nowrap">{UNSENT_REASON[u.code]}</span> }];
 
 
-  const head = rows.slice(0, 10);
+  // 보내지 않는 행은 위 표에 따로 있다. 여기에는 서버로 갈 행만 보인다
+  const unsentIndex = new Set(unsendable.map((u) => u.index));
+  const head = rows.filter((_, index) => !unsentIndex.has(index)).slice(0, 10);
   const rowColumns: Column<ParsedRow>[] = [
   { header: '승인일', cell: (r) => <span className="whitespace-nowrap tabular-nums">{r.approvedAt || '—'}</span> },
   { header: '가맹점명', cell: (r) => r.rawMerchant || '—' },
@@ -556,11 +563,11 @@ function PreviewCard({
       {head.length > 0 &&
       <div className="mt-6">
           <h3 className="text-body font-bold text-ink">
-            처음 {formatNumber(head.length)}행
+            보낼 거래 중 처음 {formatNumber(head.length)}건
           </h3>
           <Table
           className="mt-3"
-          caption={`읽은 행 중 처음 ${head.length}행`}
+          caption={`보낼 거래 중 처음 ${head.length}건`}
           columns={rowColumns}
           rows={head}
           rowKey={(r) => String(rows.indexOf(r))} />
@@ -697,6 +704,10 @@ function DataBoundary() {
           <p className="font-bold text-ink">비서 Really 에게 물을 때 외부 모델로 보내는 것</p>
           <p className="mt-0.5 text-muted">{ASSISTANT_SENDS}</p>
           <p className="mt-1.5 text-caption text-muted">{ASSISTANT_DOES_NOT_SEND} 묻지 않으면 보내지 않습니다.</p>
+          <p className="mt-1.5 text-caption text-muted">
+            {ASSISTANT_DESTINATION}{' '}
+            <Link to="/privacy" className="underline underline-offset-4 hover:text-ink">개인정보처리방침</Link>
+          </p>
         </div>
       </div>
     </aside>);

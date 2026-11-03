@@ -1,5 +1,6 @@
 package com.ktc4.pusan4.judgment.persistence;
 
+import com.ktc4.pusan4.judgment.domain.AnswerSource;
 import com.ktc4.pusan4.judgment.domain.UserFact;
 import com.ktc4.pusan4.shared.UuidGenerator;
 import jakarta.persistence.NoResultException;
@@ -8,7 +9,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.OffsetDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -35,13 +38,19 @@ public class UserFactPersistenceService {
     // UserFact 는 batch 범위다. 다른 batch 의 같은 scope 답은 버전도 따로 매기고 읽지도 않는다 (api.md §3.10).
     @Transactional
     public UUID save(UUID userId, UUID batchId, UserFact fact) {
+        return save(userId, batchId, fact, AnswerSource.USER);
+    }
+
+    @Transactional
+    public UUID save(UUID userId, UUID batchId, UserFact fact, AnswerSource source) {
         UUID factId = uuidGenerator.generate();
         userFactRepository.save(new UserFactEntity(
             factId,
             userId,
             batchId,
             fact,
-            nextVersion(userId, batchId, fact.scopeKey(), fact.factType())
+            nextVersion(userId, batchId, fact.scopeKey(), fact.factType()),
+            source
         ));
         return factId;
     }
@@ -60,6 +69,14 @@ public class UserFactPersistenceService {
         return userFactRepository.findAllLatest(userId, batchId).stream()
             .map(UserFactEntity::toDomain)
             .toList();
+    }
+
+    /** findAllLatest 와 같은 답을 같은 순서로, 행 id 와 함께 준다. 판정에 쓴 답을 id 로 남길 때 쓴다. */
+    @Transactional(readOnly = true)
+    public Map<UserFact, UUID> findAllLatestIds(UUID userId, UUID batchId) {
+        Map<UserFact, UUID> ids = new LinkedHashMap<>();
+        userFactRepository.findAllLatest(userId, batchId).forEach(fact -> ids.put(fact.toDomain(), fact.id()));
+        return ids;
     }
 
     @Transactional

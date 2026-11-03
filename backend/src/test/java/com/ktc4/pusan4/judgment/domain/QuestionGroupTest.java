@@ -81,20 +81,20 @@ class QuestionGroupTest {
         return new Question(question.id(), question.batchId(), question.transactionId(), question.groupKey(),
             question.factType(), question.questionText(), question.options(), question.status(),
             question.answeredFactId(), question.answer(), question.createdAt(), question.answeredAt(),
-            question.transaction(), question.overridden(), true);
+            question.transaction(), question.overridden(), true, question.code());
     }
 
     private static Question withGroupKey(Question question, String groupKey) {
         return new Question(question.id(), question.batchId(), question.transactionId(), groupKey,
             question.factType(), question.questionText(), question.options(), question.status(),
             question.answeredFactId(), question.answer(), question.createdAt(), question.answeredAt(),
-            question.transaction(), question.overridden(), question.awaitingExplanation());
+            question.transaction(), question.overridden(), question.awaitingExplanation(), question.code());
     }
 
     private static Question withFactType(Question question, String factType) {
         return new Question(question.id(), question.batchId(), question.transactionId(), question.groupKey(), factType,
             question.questionText(), question.options(), question.status(), question.answeredFactId(),
             question.answer(), question.createdAt(), question.answeredAt(), question.transaction(),
-            question.overridden(), question.awaitingExplanation());
+            question.overridden(), question.awaitingExplanation(), question.code());
     }
 }

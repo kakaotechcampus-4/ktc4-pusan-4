@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRightIcon, CopyCheckIcon, CopyIcon, SearchXIcon } from 'lucide-react';
+import { ArrowRightIcon, CopyCheckIcon, CopyIcon, PrinterIcon, SearchXIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { Button, Empty, Table, type Column } from '../components/ui';
 import { useSession } from '../contexts/SessionContext';
@@ -12,8 +12,15 @@ import type {
   UnresolvedSummary } from
 '../types/domain';
 import { formatNumber, formatPeriod, formatWon } from '../utils/format';
+import { LIMITED_ACCOUNT, limitExcess } from '../utils/limit';
 
 type AccountRow = JudgmentSummary['byAccount'][number];
+
+/**
+ * 요약은 접대비를 한도 인정액으로 더하고(#184), 확정 기능이 없어 늘 잠정이다.
+ * 한도는 최신 문진의 직전연도 수입금액으로 잡는다(CONTEXT.md A6b)
+ */
+const PROVISIONAL_NOTE = '잠정 · 직전연도 수입금액 기준';
 
 /** 한 달 배치면 「2026년 1월」, 아니면 기간 그대로 */
 const periodLabel = (batch: UploadBatch) => {
@@ -33,13 +40,20 @@ period: string | null,
 summary: JudgmentSummary,
 unclassified: number,
 unresolved: UnresolvedSummary | undefined,
-context: StoredBusinessContext | null | undefined) =>
+context: StoredBusinessContext | null | undefined,
+excess: number | null) =>
 {
   const { AVAILABLE, UNAVAILABLE, NEEDS_REVIEW } = summary.byVerdict;
   // 사용자가 직접 바꾼 판정도 섞여 있으므로 「규칙으로 판정했다」고 쓰지 않는다
   const lines = [
   `${period ? `${period} ` : ''}카드내역 중 판정한 ${formatNumber(summary.totalCount)}건의 결과입니다. 직접 수정한 판정은 수정한 값으로 셉니다.`,
   `필요경비로 볼 수 있는 것 ${formatNumber(AVAILABLE.count)}건(${formatWon(AVAILABLE.finalAmount)}), 볼 수 없는 것 ${formatNumber(UNAVAILABLE.count)}건, 근거를 확정하지 못한 것 ${formatNumber(NEEDS_REVIEW.count)}건입니다.`];
+  const limited = summary.byAccount.find((row) => row.account === LIMITED_ACCOUNT);
+  if (limited)
+  lines.push(
+    `이 중 접대비(${formatWon(limited.finalAmount)})는 연간 한도를 직전연도 수입금액으로 잠정 계산해 반영한 금액입니다.${
+    excess ? ` 한도를 넘은 ${formatWon(excess)}은 뺐습니다.` : ''}`
+  );
 
   if (unclassified > 0)
   lines.push(`가맹점을 분류하지 못한 ${formatNumber(unclassified)}건은 아직 판정하지 않았습니다.`);
@@ -51,7 +65,7 @@ context: StoredBusinessContext | null | undefined) =>
   if (context)
   lines.push(
     `현재 문진(v${context.version}) 응답: 업종코드 ${context.industryCode}, ${context.bookkeepingDuty} 대상, 직원 ${
-    context.hasEmployee ? '있음' : '없음'}, 자택 작업공간 비율 ${
+    context.hasEmployee ? '있음' : '없음'}, 작업 공간 면적 비율 ${
     context.homeOfficeRatio === null ?
     '입력 안 함' :
     context.homeOfficeRatio ?
@@ -95,6 +109,11 @@ export function Summary() {
   const contextQ = useApi(() => api.contexts.current(), []);
   // 비서로 넣어 둔 세무대리인 질문 (FR-16). 사용자 단위로 모은다
   const notesQ = useApi(() => api.handoffNotes.list(), []);
+  // 한도 초과액은 내보내기의 finalAmount − allowedAmount 로 센다(#202). 요약 응답에는 없다
+  const exportQ = useApi(
+    () => batchId ? api.judgments.export({ batchId }) : Promise.resolve(null),
+    [batchId]
+  );
   // 아직 분류하지 못해 판정하지 않은 거래 수. 배치의 분류 대기 수는 분류 확인 뒤 바로 줄지 않을 수 있어 거래에서 센다
   const unclassifiedQ = useApi(
     () =>
@@ -115,13 +134,24 @@ export function Summary() {
   const summary = summaryQ.data;
   const unresolved = questionsQ.data?.unresolved;
   const period = batchQ.data ? periodLabel(batchQ.data) : null;
+  const hasLimited = summary?.byAccount.some((row) => row.account === LIMITED_ACCOUNT) ?? false;
+  const excess = exportQ.data ? limitExcess(exportQ.data.items) : null;
 
   const header =
-  <header>
-      <p className="text-small font-bold text-accent">4단계 · 반영</p>
-      <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
-        {period ? `${period} 요약` : '판정 요약'}
-      </h1>
+  <header className="flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <p className="text-small font-bold text-accent">5단계 · 요약</p>
+        <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
+          {period ? `${period} 요약` : '판정 요약'}
+        </h1>
+      </div>
+      {/* PDF 는 서버에서 만들지 않는다. 인쇄용 스타일(index.css)로 화면 틀을 빼고 브라우저 인쇄로 저장한다 */}
+      {summary && summary.totalCount > 0 &&
+    <Button variant="secondary" size="sm" className="print:hidden" onClick={() => window.print()}>
+          <PrinterIcon className="h-4 w-4" aria-hidden="true" />
+          PDF로 저장
+        </Button>
+    }
     </header>;
 
 
@@ -198,7 +228,19 @@ export function Summary() {
   const accountColumns: Column<AccountRow>[] = [
   {
     header: '계정과목',
-    cell: (row) => <span className="font-normal text-ink">{row.account}</span>
+    cell: (row) =>
+    <span className="block">
+          <span className="font-normal text-ink">{row.account}</span>
+          {row.account === LIMITED_ACCOUNT &&
+      <span className="mt-0.5 block text-caption text-muted">
+              {PROVISIONAL_NOTE} 한도 인정액입니다.{' '}
+              {excess ?
+          `한도를 넘은 ${formatWon(excess)}은 빼서 결과 목록의 합보다 그만큼 적습니다.` :
+          '결과 목록의 합과 다를 수 있습니다.'}
+            </span>
+      }
+        </span>
+
   },
   {
     header: '건수',
@@ -221,13 +263,14 @@ export function Summary() {
 
   const answeredGroups = answeredQ.data?.page.totalElements ?? 0;
   // 문장에 들어갈 건수를 아직 다 읽지 못했으면 복사하지 않는다. 빠진 채로 넘기면 「남은 것 없음」으로 읽힌다
-  const settling = batchQ.loading || questionsQ.loading || unclassifiedQ.loading || contextQ.loading || notesQ.loading;
+  const settling = batchQ.loading || questionsQ.loading || unclassifiedQ.loading || contextQ.loading || notesQ.loading || hasLimited && exportQ.loading;
   const omitted = [
   batchQ.error && '기간',
   questionsQ.error && '답하지 않은 질문',
   unclassifiedQ.error && '분류하지 못한 거래 수',
   contextQ.error && '문진 응답',
-  notesQ.error && '따로 물을 질문'].
+  notesQ.error && '따로 물을 질문',
+  hasLimited && exportQ.error && '한도 초과액'].
   filter(Boolean);
   const notes = notesQ.data ?? [];
   const notesText =
@@ -235,7 +278,7 @@ export function Summary() {
   const unclassified = unclassifiedQ.data?.page.totalElements ?? 0;
   // 못 읽은 항목은 화면에만 알리지 않고, 붙여 넣은 문장에도 남긴다
   const text = summary ?
-  `${handoffText(period, summary, unclassified, unresolved, contextQ.data)}${notesText}${
+  `${handoffText(period, summary, unclassified, unresolved, contextQ.data, excess)}${notesText}${
   omitted.length > 0 ? ` (불러오지 못해 빠진 항목: ${omitted.join(', ')})` : ''}` :
   '';
 
@@ -324,6 +367,13 @@ export function Summary() {
         </dl>
       </section>
 
+      {/* 소득세법 §160의2①, 시행령 §208의2④⑤. 승인내역으로는 보관 여부를 알 수 없어 거래마다 묻지 않고 안내한다 */}
+      <p className="mt-4 rounded-xl border border-line bg-surface px-4 py-3 text-small text-ink2">
+        <strong className="font-bold text-ink">증빙 보관 안내</strong> — 카드 결제 증빙은 카드사에서 받은
+        월별이용대금명세서를 확정신고기간 종료일부터 5년간 보관해 주세요. 올린 이용내역 파일은 명세서로 인정되지 않을 수
+        있습니다. 국세청 현금영수증 홈페이지에 사업용 신용카드로 등록한 카드의 매출전표는 보관하지 않아도 됩니다.
+      </p>
+
       <section className="mt-4">
         <h2 className="text-body font-bold text-ink">계정과목별 인정 경비</h2>
         <Table
@@ -356,7 +406,7 @@ export function Summary() {
             불러오지 못해 문장에서 뺀 것: {omitted.join(', ')}. 새로고침한 뒤 다시 복사해 주세요.
           </p>
         }
-        <div className="mt-4 flex flex-wrap items-center gap-3">
+        <div className="mt-4 flex flex-wrap items-center gap-3 print:hidden">
           <Button variant="secondary" size="sm" disabled={!text || settling} onClick={() => void copyText()}>
             {copy === 'done' ?
             <CopyCheckIcon className="h-4 w-4" aria-hidden="true" /> :

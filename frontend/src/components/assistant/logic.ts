@@ -113,17 +113,25 @@ idempotencyKey: string)
   }
 }
 
-/** 서버 문장은 그대로 띄우지 않는다. 상태 코드로 고른다 */
+/**
+ * 서버 문장은 그대로 띄우지 않는다. code 와 상태 코드로 고른다 (api.md POST /assistant/chat).
+ * 429 는 모두 ASSISTANT_RATE_LIMITED 라 Retry-After 로 가른다 — 하루 한도는 자정까지라 1분보다 길다
+ */
 export const chatErrorText = (caught: unknown): string => {
   const status = caught instanceof ApiRequestError ? caught.status : -1;
+  const code = caught instanceof ApiRequestError ? caught.code : '';
   if (status === 429) {
     const seconds = caught instanceof ApiRequestError ? caught.retryAfter : undefined;
+    if (seconds !== undefined && seconds > 60) return '오늘 물어볼 수 있는 만큼 다 물었습니다. 내일 다시 물어봐 주세요.';
     // 0 초는 「0초 뒤」로 읽혀 기다릴 것이 없는 것처럼 보인다. 기다릴 시간을 모를 때와 같게 적는다
-    return seconds !== undefined && seconds > 0 && seconds <= 60 ?
+    return seconds !== undefined && seconds > 0 ?
     `${formatNumber(seconds)}초 뒤에 다시 물어봐 주세요.` :
     '지금은 더 받을 수 없습니다. 잠시 뒤 다시 물어봐 주세요.';
   }
-  if (status === 400 || status === 422) return '보낸 내용을 받지 못했습니다. 질문을 짧게 다시 적어 주세요.';
+  if (code === 'BATCH_NOT_FOUND')
+  return '보던 업로드를 찾을 수 없습니다. 지워졌을 수 있어 업로드 없이 다시 물어봅니다. 다시 보내 주세요.';
+  if (code === 'TRANSACTION_NOT_FOUND') return '보던 거래를 찾을 수 없습니다. 거래를 빼고 다시 물어봅니다. 다시 보내 주세요.';
+  if (status === 400) return '보낸 내용을 받지 못했습니다. 질문을 짧게 다시 적어 주세요.';
   if (status === 0) return '서버에 연결하지 못했습니다. 잠시 뒤 다시 물어봐 주세요.';
   return '지금은 답하지 못했습니다. 잠시 뒤 다시 물어봐 주세요. 화면 안내는 그대로 쓸 수 있습니다.';
 };
@@ -164,6 +172,12 @@ suggestion: QuestionSuggestion | undefined)
       text: `${suggestion.sourceLabel}에서 '${suggestion.value}'${ro(suggestion.value)} 답했습니다.`
     };
     const history = (suggestion.history ?? []).filter((item) => allowed(item.value));
+    // 충돌이 아니라 가장 최근 답이 일괄 응답이라 값을 주지 않은 경우다. 「서로 다르다」고 하면 틀린 말이 된다
+    if (!suggestion.conflict && history[0]?.bulk)
+    return {
+      kind: 'history',
+      text: `${history[0].sourceLabel}에서는 한 번에 답하기로 '${history[0].value}'${ro(history[0].value)} 답했습니다. 이번에는 직접 골라 주세요.`
+    };
     return history.length > 0 ?
     {
       kind: 'history',

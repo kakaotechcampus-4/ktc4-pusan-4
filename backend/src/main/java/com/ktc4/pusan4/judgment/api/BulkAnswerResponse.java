@@ -1,5 +1,6 @@
 package com.ktc4.pusan4.judgment.api;
 
+import com.ktc4.pusan4.judgment.persistence.BulkAnswerResult;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
@@ -14,4 +15,10 @@ public record BulkAnswerResponse(
     @Schema(description = "중복을 제거한 재판정 거래 수") int rejudgedTransactionCount,
     @Schema(description = "처리 후 해당 Batch 에 남은 미해소 집계") Unresolved unresolved
 ) {
+
+    static BulkAnswerResponse from(BulkAnswerResult result) {
+        return new BulkAnswerResponse(result.answeredCount(), result.skippedCount(), result.excludedCount(),
+            result.factIds(), result.rejudgedTransactionCount(),
+            new Unresolved(result.unresolved().count(), result.unresolved().amount()));
+    }
 }

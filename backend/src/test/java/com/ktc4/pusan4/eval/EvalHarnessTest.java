@@ -73,7 +73,7 @@ class EvalHarnessTest {
         List<String> report = new ArrayList<>(List.of(
             "# 평가셋 리포트", "",
             "규칙: " + rules.toAbsolutePath().normalize() + (hasCards ? "" : " (카드 없음 - 빈 규칙셋)"),
-            "금액: 미채점 (금액 산정 미구현)", "",
+            "금액: 기대 금액이 있는 케이스만 채점 (AmountCalculator)", "",
             "| 관문 | 일치 | 미달 | 치명 | 보류 | 전체 |", "|---|---:|---:|---:|---:|---:|"));
         tally.forEach((group, counts) -> report.add("| %s | %d | %d | %d | %d | %d |".formatted(group,
             counts.getOrDefault(Outcome.MATCH, 0), counts.getOrDefault(Outcome.SHORTFALL, 0),

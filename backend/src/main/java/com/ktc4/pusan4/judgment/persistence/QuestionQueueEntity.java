@@ -115,7 +115,7 @@ class QuestionQueueEntity extends AssignedIdEntity<UUID> {
         boolean overridden, boolean awaitingExplanation) {
         return new Question(id, batchId, transactionId, groupKey, factType, questionText, options,
             QuestionStatus.valueOf(status), answeredFactId, answer, createdAt, answeredAt, transaction, overridden,
-            awaitingExplanation);
+            awaitingExplanation, reasonCode);
     }
 
     void answer(UUID factId, UserFact fact, OffsetDateTime answeredAt) {

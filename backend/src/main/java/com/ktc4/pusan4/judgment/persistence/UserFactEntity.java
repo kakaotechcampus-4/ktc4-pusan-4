@@ -1,5 +1,6 @@
 package com.ktc4.pusan4.judgment.persistence;
 
+import com.ktc4.pusan4.judgment.domain.AnswerSource;
 import com.ktc4.pusan4.judgment.domain.UserFact;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -37,10 +38,17 @@ class UserFactEntity {
     @Column(nullable = false)
     private int version;
 
+    @Column(nullable = false)
+    private String source;
+
     protected UserFactEntity() {
     }
 
     UserFactEntity(UUID id, UUID userId, UUID batchId, UserFact fact, int version) {
+        this(id, userId, batchId, fact, version, AnswerSource.USER);
+    }
+
+    UserFactEntity(UUID id, UUID userId, UUID batchId, UserFact fact, int version, AnswerSource source) {
         this.id = id;
         this.userId = userId;
         this.batchId = batchId;
@@ -48,10 +56,19 @@ class UserFactEntity {
         this.factType = fact.factType();
         this.value = fact.value();
         this.version = version;
+        this.source = source.name();
     }
 
     UUID id() {
         return id;
+    }
+
+    int version() {
+        return version;
+    }
+
+    AnswerSource source() {
+        return AnswerSource.valueOf(source);
     }
 
     UserFact toDomain() {

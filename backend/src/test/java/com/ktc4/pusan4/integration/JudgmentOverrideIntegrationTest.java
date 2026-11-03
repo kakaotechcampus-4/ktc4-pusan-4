@@ -69,6 +69,12 @@ class JudgmentOverrideIntegrationTest {
         long statuteVersionId = insertStatute("소득세법-27-1");
         jdbcTemplate.update("insert into judgment_citation(judgment_id, statute_version_id) values (?, ?)",
             source, statuteVersionId);
+        UUID factId = UUID.randomUUID();
+        jdbcTemplate.update("""
+            insert into user_fact(id, user_id, batch_id, scope_key, fact_type, value, version)
+            values (?, ?, ?, ?, '용도', '{"value": "업무"}', 1)
+            """, factId, USER_ID, batchId, "transaction:" + transactionId);
+        jdbcTemplate.update("insert into judgment_input_fact(judgment_id, user_fact_id) values (?, ?)", source, factId);
 
         // when
         String body = override(source, "UNAVAILABLE", "개인적으로 사용한 비용입니다.")
@@ -77,6 +83,7 @@ class JudgmentOverrideIntegrationTest {
             .andExpect(jsonPath("$.revision").value(2))
             .andExpect(jsonPath("$.origin.type").value("OVERRIDE"))
             .andExpect(jsonPath("$.verdict.code").value("UNAVAILABLE"))
+            .andExpect(jsonPath("$.finalAmount").value(0))
             .andExpect(jsonPath("$.account").value("소모품비"))
             .andExpect(jsonPath("$.ruleCardId").value("R-300"))
             .andExpect(jsonPath("$.computedAt").isNotEmpty())
@@ -94,7 +101,27 @@ class JudgmentOverrideIntegrationTest {
             .containsEntry("active", true);
         assertThat(jdbcTemplate.queryForObject("select verdict from judgment where id = ?", String.class, source))
             .isEqualTo("AVAILABLE");
+        assertThat(jdbcTemplate.queryForList(
+            "select user_fact_id from judgment_input_fact where judgment_id = ?", UUID.class, revision))
+            .containsExactly(factId);
         assertCurrent(revision);
+    }
+
+    @Test
+    void override_to_available_recalculates_the_amount_from_the_inherited_attributes() throws Exception {
+        // given: 자택 겸용 안분 속성이 남은 확인필요 판정(문진에 비율이 없었다)과, 속성 없는 불가 판정
+        UUID homeOffice = insertTransaction(batchId, "JUDGEABLE", "AUTO");
+        UUID homeOfficeSource = insertJudgment(homeOffice, 1, "NEEDS_REVIEW", "run_id", runId);
+        jdbcTemplate.update("update judgment set attributes = '{\"안분\": \"작업공간비율\"}' where id = ?",
+            homeOfficeSource);
+        UUID cafe = insertTransaction(batchId, "JUDGEABLE", "AUTO");
+        UUID cafeSource = insertJudgment(cafe, 1, "UNAVAILABLE", "run_id", runId);
+
+        // when / then: 나눌 비율이 없으면 사용자 판단대로 전액, 속성이 없으면 결제금액 그대로다
+        override(homeOfficeSource, "AVAILABLE", null)
+            .andExpect(status().isOk()).andExpect(jsonPath("$.finalAmount").value(6500));
+        override(cafeSource, "AVAILABLE", null)
+            .andExpect(status().isOk()).andExpect(jsonPath("$.finalAmount").value(6500));
     }
 
     @Test

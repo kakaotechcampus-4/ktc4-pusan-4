@@ -5,6 +5,31 @@ spring:
     hibernate:
       ddl-auto: validate
     open-in-view: false
+    # 한 트랜잭션에서 같은 insert·update 가 이어지면 모아서 보낸다. run 생성의 item 3,000개 insert 가 한 번씩 왕복하지 않게 하려고 켰다.
+    # order_inserts 는 켜지 않는다. 엔티티에 연관관계 매핑이 없어 Hibernate 가 FK 순서를 모르고, 테이블별로 묶다가
+    # 자식 insert 를 새 부모보다 먼저 보낼 수 있다(InsertOrderIntegrationTest).
+    properties:
+      hibernate:
+        jdbc.batch_size: 100
+  datasource:
+    hikari:
+      # PG 드라이버가 모인 insert 를 여러 행 insert 한 문장으로 바꿔 보낸다. DB 가 처리하는 문장 수도 준다.
+      data-source-properties:
+        reWriteBatchedInserts: true
+  # 가입 인증 메일 (app.auth.email-verification). 팀 Gmail 계정과 그 계정의 앱 비밀번호다.
+  # 계정이 비면 인증 요청이 503 EMAIL_VERIFICATION_UNAVAILABLE 이라 이메일 가입을 할 수 없다.
+  mail:
+    host: ${APP_MAIL_HOST:smtp.gmail.com}
+    port: ${APP_MAIL_PORT:587}
+    username: ${APP_MAIL_USERNAME:}
+    password: ${APP_MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+      # 가입 요청이 메일 발송을 기다리므로 짧게 끊는다(ms)
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 5000
+      mail.smtp.writetimeout: 5000
 
 app:
   # 공휴일 동기화 (공공데이터포털 「한국천문연구원_특일 정보」). 키가 비면 동기화를 건너뛰고 표에 있는 값만 쓴다.
@@ -26,18 +51,46 @@ app:
   # - queue-capacity: 기다릴 수 있는 run 수. 멈춘 run 정리(진행 없음 5분)는 QUEUED 도 끝내므로,
   #   queue-capacity × run 하나 시간 / workers 가 5분보다 짧아야 한다. 워커 하나가 초당 약 127건이라 1,200건 run 이
   #   약 9.4초이고 상한은 약 64다. EBS·CPU 크레딧은 측정에 없어 50 으로 둔다.
+  # - await-termination: 서버가 종료될 때(배포) 돌던 run 과 대기열의 run 을 기다리는 최대 시간.
+  #   이 설정이 없으면 Spring 종료 단계 제한(30s)이 지나자 run 이 도는 중에 DB 커넥션 풀을 닫았다(CPU 1개씩, 6,000건 run).
+  #   같은 조건에서 3,000건 run 이 약 28초, 6,000건이 약 47초라 60s 로 둔다.
+  #   deploy/compose.yaml 의 stop_grace_period 는 이것보다 길어야 한다.
   judgment-run:
     workers: 2
     queue-capacity: 50
-  # 인증 (api.md 1.1). 고정 사용자 하나만 로그인한다 — 실제 계정은 B9b, 리프레시 토큰 저장소(Redis)는 B9c.
+    await-termination: 60s
+  # 비서 AI 서버 (api.md 3.14, docs/agent-secretary.md 9장). 내부망에만 있다. 운영은 http://ai:8000 (deploy/compose.yaml).
+  # read-timeout 은 AI 서버의 한 턴 상한(30초)보다 길게 둔다.
+  assistant:
+    base-url: ${ASSISTANT_SERVER_URL:http://localhost:8000}
+    connect-timeout: 3s
+    read-timeout: 40s
+  # 가맹점 분류 모델 (docs/backend_api_plan.md B10). AI 서버 POST /classify/merchants 에 사전·키워드로 못 잡은 가맹점만 보낸다.
+  # 기본은 꺼 둔다. 운영은 CLASSIFY_ENABLED 로 켠다(deploy/compose.yaml).
+  # read-timeout 은 AI 서버 마감(8초)에 여유를 더한다. 넘거나 실패하면 모델 없이 업로드한다(미분류 + 분류 확인).
+  # 모델 답으로 확정하지 않고 분류 확인의 후보로만 쓴다. max-merchants 는 AI 서버 요청 한도(200)다.
+  classify:
+    enabled: ${CLASSIFY_ENABLED:false}
+    base-url: ${CLASSIFY_SERVER_URL:http://localhost:8000}
+    connect-timeout: 2s
+    read-timeout: 10s
+    max-merchants: 200
+  # 인증 (api.md 1.1). 이메일 계정(비밀번호 BCrypt)으로 로그인한다. 리프레시 토큰은 Redis 에 둔다.
   # jwt-secret 이 비면 기동할 때마다 임시 키를 만든다(재기동하면 로그인이 풀린다). 넣는다면 32바이트 이상.
-  # demo-password 가 비면 아무도 로그인할 수 없다.
   auth:
     jwt-secret: ${APP_AUTH_JWT_SECRET:}
-    demo-password: ${APP_AUTH_DEMO_PASSWORD:}
     access-token-ttl: 15m
     refresh-token-ttl: 14d
     cookie-secure: ${APP_AUTH_COOKIE_SECURE:true}
+    # 카카오 로그인 (developers.kakao.com 앱). 키나 redirect-uri 가 비면 카카오 로그인은 503 KAKAO_LOGIN_UNAVAILABLE 이다.
+    # redirect-uri 는 프론트 콜백 페이지 주소로, 카카오 앱에 등록한 값과 같아야 한다.
+    kakao:
+      rest-api-key: ${APP_AUTH_KAKAO_REST_API_KEY:}
+      client-secret: ${APP_AUTH_KAKAO_CLIENT_SECRET:}
+      redirect-uri: ${APP_AUTH_KAKAO_REDIRECT_URI:}
+    # 가입 인증 코드를 보내는 방법. smtp(spring.mail) 또는 log(로컬 전용, 백엔드 로그에 코드를 찍는다)
+    email-verification:
+      delivery: ${APP_AUTH_EMAIL_DELIVERY:smtp}
 
 management:
   endpoints:
@@ -47,6 +100,9 @@ management:
   # Redis 는 리프레시 토큰만 맡는다. Redis 가 내려가도 백엔드 전체를 unhealthy 로 만들어 배포를 멈추지 않게 health 에서 뺀다.
   health:
     redis:
+      enabled: false
+    # 메일도 같은 이유로 뺀다. Gmail 이 잠깐 안 돼도 이메일 가입만 502 가 될 뿐이다.
+    mail:
       enabled: false
 
 # 스웨거는 기본으로 닫는다. 로컬(application-local.yml)에서만 연다.

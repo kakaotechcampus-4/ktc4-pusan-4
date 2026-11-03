@@ -4,6 +4,7 @@ import com.ktc4.pusan4.judgment.domain.Citation;
 import com.ktc4.pusan4.judgment.domain.Gate;
 import com.ktc4.pusan4.judgment.domain.Judgment;
 import com.ktc4.pusan4.judgment.domain.JudgmentEngine;
+import com.ktc4.pusan4.judgment.domain.PreviousAnswer;
 import com.ktc4.pusan4.judgment.domain.RuleCard;
 import com.ktc4.pusan4.judgment.domain.RuleSet;
 import com.ktc4.pusan4.judgment.domain.TransactionInput;
@@ -63,6 +64,21 @@ class RuleCardLoaderRealCardsTest {
         assertThat(rules.get(Gate.G1))
             .extracting(RuleCard::id)
             .contains("R-001", "R-002", "R-003", "R-004", "R-005", "R-007");
+    }
+
+    @Test
+    void 지난번_답은_고정비_6종만_이어받고_건별_용도_4종은_이력만_보여준다() throws IOException {
+        RuleSet rules = load();
+
+        // docs/agent-secretary.md 3.1. 나머지 질문은 띄우지 않는다
+        assertThat(List.of("SUBSCRIPTION_DEDICATION", "UTILITY_DEDICATION", "TELECOM_DEDICATION", "FINANCE_KIND",
+            "LEASE_WORKPLACE", "INSURANCE_KIND"))
+            .allSatisfy(code -> assertThat(rules.previousAnswer(code)).isEqualTo(PreviousAnswer.CARRY));
+        assertThat(List.of("CAFE_PURPOSE", "RESTAURANT_PURPOSE", "DELIVERY_PURPOSE", "SAAS_BILLING_PERIOD"))
+            .allSatisfy(code -> assertThat(rules.previousAnswer(code)).isEqualTo(PreviousAnswer.HISTORY));
+        assertThat(List.of("WEEKEND_CAFE_PURPOSE", "CONVENIENCE_PURPOSE", "TRAVEL_PURPOSE", "LODGING_PURPOSE",
+            "PG_UNKNOWN_PURPOSE", "SHOPPING_ITEM_PURPOSE", "ASSET_UNIT_OVER_LIMIT"))
+            .allSatisfy(code -> assertThat(rules.previousAnswer(code)).isEqualTo(PreviousAnswer.NONE));
     }
 
     @Test
@@ -153,9 +169,10 @@ class RuleCardLoaderRealCardsTest {
         assertThat(비품.verdict()).isEqualTo(Verdict.NEEDS_REVIEW);
         assertThat(비품.questions()).isNotEmpty();
 
-        // 가산세 플래그만 세우는 질문은 앞 관문의 확정을 끌어내리지 않는다.
+        // 3만원 초과 카드 결제는 증빙을 묻지 않는다(R-060 v2, 카드매출전표 자동 인정). 가산세 플래그만 세우는
+        // 질문이 확정을 끌어내리지 않는 경로는 JudgmentEngineTest 의 합성 카드로 지킨다.
         assertThat(증빙만.verdict()).isEqualTo(Verdict.AVAILABLE);
-        assertThat(증빙만.questions()).isNotEmpty();
+        assertThat(증빙만.questions()).isEmpty();
     }
 
     /** 범위 밖은 판정과 축이 다르다. 불가로 확정된 건이 동시에 핸드오프일 수는 없다. */
@@ -180,16 +197,20 @@ class RuleCardLoaderRealCardsTest {
     }
 
     /**
-     * `증빙필요` 는 amount_min 만으로 정해지므로 R-060 의 카드 attributes 에 있다.
-     * 되묻기 effect 로 내리면 답변 전까지 화면에 뜨지 않는다.
+     * 입력이 카드 승인내역뿐이라 카드매출전표를 적격증빙으로 자동 인정한다(R-060 v2, 소득세법 §160의2②3).
+     * 3만원 초과면 묻지 않고 증빙 속성을 고정으로 싣는다. 증빙 질문이 다시 생기면 과잉 질문이 돌아온 것이다.
      */
     @Test
-    void 증빙필요는_답변_전에도_속성으로_실린다() throws IOException {
+    void 카드매출전표는_묻지_않고_적격증빙으로_인정한다() throws IOException {
         Judgment judgment = JudgmentEngine.judge(
             거래("AMAZON WEB SERVICES", "해외SaaS", 50_000), 인적용역, List.of(), load());
 
-        assertThat(judgment.attributes()).containsEntry("증빙필요", true);
-        assertThat(judgment.attributes()).doesNotContainKey("가산세_대상");
+        assertThat(judgment.attributes())
+            .containsEntry("증빙필요", true)
+            .containsEntry("증빙수취", true)
+            .containsEntry("증빙", "카드매출전표")
+            .containsEntry("가산세_대상", false);
+        assertThat(judgment.questions()).noneMatch(q -> "QUALIFIED_RECEIPT".equals(q.code()));
     }
 
     /**

@@ -26,7 +26,7 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "transaction")
-public class TransactionRecordEntity {
+public class TransactionRecordEntity extends AssignedIdEntity<UUID> {
 
     @Id
     private UUID id;
@@ -145,6 +145,11 @@ public class TransactionRecordEntity {
         return id;
     }
 
+    @Override
+    public UUID getId() {
+        return id;
+    }
+
     public String naturalKey() {
         return naturalKey;
     }
@@ -168,6 +173,12 @@ public class TransactionRecordEntity {
     /** 사용자의 포함·제외 (api.md 3.4). 판정 revision 은 만들지 않는다. 취소상계 검사는 부르는 쪽이 한다. */
     public void changeInclusion(UserInclusion inclusion) {
         this.userInclusion = inclusion.name();
+    }
+
+    /** 사용자가 분류 확인에 답한 카테고리로 확정한다 (api.md 3.5). 미분류 검사는 부르는 쪽이 한다. */
+    public void classify(String merchantCategory) {
+        this.merchantCategory = merchantCategory;
+        this.classificationStatus = ClassificationStatus.CLASSIFIED.name();
     }
 
     public TransactionDetail toDetail() {

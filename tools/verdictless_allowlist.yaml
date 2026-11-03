@@ -7,12 +7,10 @@
 allow:
   - { card: R-006, option: "그 외", issue: "#65" }
   - { card: R-101, option: "업무·개인 혼용", issue: "#65" }
-  - { card: R-103, option: "자택 겸용", issue: "#65" }
   - { card: R-104, option: "업무·개인 혼재", issue: "#65" }
   - { card: R-105, option: "기억나지 않음", issue: "#65" }
   - { card: R-107, option: "연간 일시불", issue: "#65" }
   - { card: R-205, option: "공용", issue: "#65" }
   - { card: R-206, option: "사업용 대출이자", issue: "#65" }
-  - { card: R-210, option: "자택 겸용", issue: "#65" }
   - { card: R-211, option: "업무·개인 혼재", issue: "#65" }
   - { card: R-213, option: "모르겠음", issue: "#65" }

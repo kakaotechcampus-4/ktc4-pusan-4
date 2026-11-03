@@ -748,6 +748,34 @@ class JudgmentEngineTest {
             .containsExactly(Verdict.UNAVAILABLE, null, List.of("R-311", "R-060"));
     }
 
+    // 가산세 플래그만 세우는 질문(증빙수취·가산세)은 답이 없어도 앞 관문의 확정을 끌어내리지 않는다.
+    // 실물 R-060 은 카드매출전표 자동 인정(v2)으로 묻지 않게 되어, 이 경로는 합성 카드로 지킨다.
+    // 현금·계좌이체 입력이 생겨 증빙 질문이 돌아오면 이 동작에 기댄다.
+    @Test
+    void unanswered_penalty_only_question_does_not_downgrade() {
+        QuestionSpec receipt = new QuestionSpec(
+            "QUALIFIED_RECEIPT", "적격증빙을 받아두셨나요?", "증빙유무", "transaction",
+            List.of("받아둠", "없음"),
+            Map.of(
+                "받아둠", new QuestionEffect(null, null, Map.of("증빙수취", true, "가산세_대상", false)),
+                "없음", new QuestionEffect(null, null, Map.of("증빙수취", false, "가산세_대상", true, "가산세율", 0.02))
+            )
+        );
+        RuleCard g5 = new RuleCard(
+            "R-060", 1, Gate.G5, 500,
+            new RuleMatch(List.of(), List.of(), List.of(), 30_001L, null, List.of(), false),
+            null, null, List.of(new Citation("소득세법-160의2-2")), Map.of(), List.of(receipt)
+        );
+
+        Judgment result = JudgmentEngine.judge(
+            subscription("사무용품", 50_000), new UserContext("940909", false, null), List.of(),
+            new RuleSet(List.of(g2Available(), g5))
+        );
+
+        assertThat(result.verdict()).isEqualTo(Verdict.AVAILABLE);
+        assertThat(result.questions()).extracting(QuestionSpec::code).containsExactly("QUALIFIED_RECEIPT");
+    }
+
     private static RuleCard g5Receipt() {
         return new RuleCard(
             "R-060", 1, Gate.G5, 500, RuleMatch.categories("음식점"),
@@ -937,6 +965,79 @@ class JudgmentEngineTest {
 
         assertThat(given.attributes()).containsEntry("matched", true);
         assertThat(notGiven.attributes()).doesNotContainKey("matched");
+    }
+
+    @Test
+    void home_office_answer_is_available_when_the_context_has_a_ratio() {
+        TransactionInput utility = subscription("수도광열", 80_000);
+
+        Judgment result = JudgmentEngine.judge(
+            utility, new UserContext("940909", false, 20), List.of(homeOfficeFact(utility)), new RuleSet(List.of(utilityCard()))
+        );
+
+        assertThat(result)
+            .extracting(Judgment::verdict, Judgment::account, Judgment::attributes)
+            .containsExactly(Verdict.AVAILABLE, "수도광열비", Map.of("안분", "작업공간비율"));
+    }
+
+    @Test
+    void home_office_answer_needs_review_without_a_ratio() {
+        TransactionInput utility = subscription("수도광열", 80_000);
+
+        // 금액을 나눌 비율이 없다. 문진에 비율을 넣고 다시 판정해야 한다
+        Judgment result = JudgmentEngine.judge(
+            utility, new UserContext("940909", false, null), List.of(homeOfficeFact(utility)),
+            new RuleSet(List.of(utilityCard()))
+        );
+
+        assertThat(result.verdict()).isEqualTo(Verdict.NEEDS_REVIEW);
+    }
+
+    @Test
+    void home_office_answer_needs_review_when_the_context_ratio_is_zero() {
+        TransactionInput utility = subscription("수도광열", 80_000);
+
+        // 문진에서 자택 작업 "아니오" 는 0 으로 저장된다. 비율이 없는 것과 같다
+        Judgment result = JudgmentEngine.judge(
+            utility, new UserContext("940909", false, 0), List.of(homeOfficeFact(utility)),
+            new RuleSet(List.of(utilityCard()))
+        );
+
+        assertThat(result.verdict()).isEqualTo(Verdict.NEEDS_REVIEW);
+    }
+
+    @Test
+    void used_facts_are_only_the_answers_that_resolved_a_question() {
+        TransactionInput utility = subscription("수도광열", 80_000);
+        UserFact used = homeOfficeFact(utility);
+        UserFact otherMerchant = new UserFact("merchant:다른가맹점", "공간전용여부", Map.of("value", "자택 겸용"));
+        UserFact otherFactType = new UserFact("merchant:" + utility.merchantNorm(), "용도", Map.of("value", "업무"));
+
+        Judgment result = JudgmentEngine.judge(
+            utility, new UserContext("940909", false, 20), List.of(otherMerchant, used, otherFactType),
+            new RuleSet(List.of(utilityCard()))
+        );
+
+        assertThat(result.usedFacts()).containsExactly(used);
+    }
+
+    private static RuleCard utilityCard() {
+        QuestionSpec dedication = new QuestionSpec(
+            "UTILITY_DEDICATION", "사업 전용 공간인가요?", "공간전용여부", "merchant_norm",
+            List.of("사업 전용", "자택 겸용"),
+            Map.of(
+                "사업 전용", new QuestionEffect(Verdict.AVAILABLE, "수도광열비", Map.of()),
+                "자택 겸용", new QuestionEffect(Verdict.AVAILABLE, "수도광열비", Map.of("안분", "작업공간비율"))
+            )
+        );
+        return new RuleCard(
+            "R-103", 1, Gate.G2, 500, RuleMatch.categories("수도광열"), Verdict.NEEDS_REVIEW, null,
+            List.of(new Citation("소득세법-33-1-5")), Map.of(), List.of(dedication)
+        );
+    }
+
+    private static UserFact homeOfficeFact(TransactionInput transaction) {
+        return new UserFact("merchant:" + transaction.merchantNorm(), "공간전용여부", Map.of("value", "자택 겸용"));
     }
 
     private static TransactionInput onDate(LocalDate approvedAt) {

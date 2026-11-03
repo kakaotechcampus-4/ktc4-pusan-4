@@ -49,45 +49,47 @@ export default {content: [
       colors: {
         /** 바탕은 흰색이고 패널이 아주 옅은 회색이다 */
         canvas: '#FFFFFF',
-        surface: '#F5F6F8',
+        surface: '#F3F5F7',
         /** 표처럼 패널 위에서 흰 바탕이 필요할 때 */
         sheet: '#FFFFFF',
-        /** 첫 화면 큰 판 */
-        surface2: '#FFE600',
-        line: '#ECEEF1',
-        line2: '#F5F6F8',
+        /** 첫 화면 큰 판. 어두운 남색이라 글자·그림은 흰색으로 올린다 */
+        surface2: '#122E55',
+        line: '#E8ECF0',
+        /** surface 위에서도 보여야 한다. surface 와 같은 값이면 회색 패널 안의 구분선이 사라진다 */
+        line2: '#EBEEF2',
         /** 괘선 중 굵은 것 — 표 머리 위에 긋는다 */
-        rule: '#1A1A1A',
-        ink: '#0A0A0A',
-        ink2: '#2B2B2B',
-        muted: '#5D6670',
+        rule: '#16181D',
+        ink: '#16181D',
+        ink2: '#30363F',
+        muted: '#626B79',
         /** 주된 동작은 검정이다. 파랑은 문장 속 링크에만 쓴다 */
         accent: {
-          DEFAULT: '#0A0A0A',
-          hover: '#2B2B2B',
-          soft: '#F5F6F8',
-          line: '#DDE1E6',
+          DEFAULT: '#16181D',
+          hover: '#30363F',
+          /** 고른 선택지·진행 중인 단계의 바탕. surface 패널 위에서도 구별돼야 한다 */
+          soft: '#E6ECF4',
+          line: '#DCE1E8',
         },
-        link: '#1A6DFF',
+        link: '#1B64DA',
         /** 한 화면에 한 번만 쓰는 강조 블록 */
         highlight: '#FFE600',
         ok: {
           DEFAULT: '#00703D',
-          bg: '#E6F8F0',
-          line: '#A8E6C9',
+          bg: '#E8F6F0',
+          line: '#B2E3CE',
           /** 막대·점처럼 글자가 안 올라가는 채움. 밝게 쓴다 */
           bar: '#12B76A',
         },
         warn: {
-          DEFAULT: '#955A00',
-          bg: '#FFF6E0',
-          line: '#FFD98A',
+          DEFAULT: '#8A5A10',
+          bg: '#FDF3E3',
+          line: '#EFD7A4',
           bar: '#F7A51B',
         },
         deny: {
-          DEFAULT: '#C92A2A',
-          bg: '#FFEDED',
-          line: '#FFC4C4',
+          DEFAULT: '#C5283D',
+          bg: '#FDEDEF',
+          line: '#F7CDD4',
           bar: '#FF5A5A',
         },
       },
@@ -123,6 +125,19 @@ export default {content: [
           from: { transform: 'rotate(0deg)' },
           to: { transform: 'rotate(-360deg)' },
         },
+        /*
+         * 첫 모션 (Landing·OrbitStage) — 테가 그려지고 그림이 중심에서 제자리로 퍼진다.
+         * 끝이 기본 모습(scale 1 · opacity 1)이라 모션이 끝나도 화면이 움직이지 않는다.
+         * transform 을 통째로 쓰므로 -translate-x-1/2 같은 유틸리티와 같은 요소에 두면 안 된다
+         */
+        draw: {
+          from: { opacity: '0', transform: 'scale(0.88)' },
+          to: { opacity: '1', transform: 'scale(1)' },
+        },
+        spread: {
+          from: { opacity: '0', transform: 'scale(0.42)' },
+          to: { opacity: '1', transform: 'scale(1)' },
+        },
       },
       animation: {
         rise: 'rise 0.32s cubic-bezier(0.23, 1, 0.32, 1) both',
@@ -130,6 +145,8 @@ export default {content: [
         'orbit-back': 'orbit-back 52s linear infinite',
         'orbit-slow': 'orbit-back 78s linear infinite',
         'orbit-slow-back': 'orbit 78s linear infinite',
+        draw: 'draw 0.6s cubic-bezier(0.23, 1, 0.32, 1) both',
+        spread: 'spread 0.7s cubic-bezier(0.23, 1, 0.32, 1) both',
       },
     },
   },

@@ -43,9 +43,16 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: "6379"
+      ASSISTANT_SERVER_URL: http://ai:8000
+      CLASSIFY_ENABLED: ${CLASSIFY_ENABLED:-false}
+      CLASSIFY_SERVER_URL: http://ai:8000
       HOLIDAY_API_KEY: ${HOLIDAY_API_KEY:-}
       APP_AUTH_JWT_SECRET: ${APP_AUTH_JWT_SECRET:-}
-      APP_AUTH_DEMO_PASSWORD: ${APP_AUTH_DEMO_PASSWORD:-}
+      APP_AUTH_KAKAO_REST_API_KEY: ${APP_AUTH_KAKAO_REST_API_KEY:-}
+      APP_AUTH_KAKAO_CLIENT_SECRET: ${APP_AUTH_KAKAO_CLIENT_SECRET:-}
+      APP_AUTH_KAKAO_REDIRECT_URI: ${APP_AUTH_KAKAO_REDIRECT_URI:-}
+      APP_MAIL_USERNAME: ${APP_MAIL_USERNAME:-}
+      APP_MAIL_PASSWORD: ${APP_MAIL_PASSWORD:-}
       JAVA_TOOL_OPTIONS: -Xms128m -Xmx768m
     depends_on:
       postgres:
@@ -59,6 +66,9 @@ services:
       retries: 12
       start_period: 30s
     mem_limit: 1200m
+    # 종료할 때 판정 run 을 app.judgment-run.await-termination(60s)까지 기다린다(application.yml).
+    # Docker 기본값(10s)이면 그 전에 SIGKILL 로 꺼진다. 웹 요청 종료 대기(최대 30s) 뒤에 이어지므로 합 90s 에 10s 를 더 둔다.
+    stop_grace_period: 100s
 
   ai:
     image: ${ECR_REPOSITORY}:ai-${IMAGE_TAG}
@@ -73,6 +83,9 @@ services:
       ASSISTANT_BASE_URL: ${ASSISTANT_BASE_URL:-}
       ASSISTANT_MODEL: ${ASSISTANT_MODEL:-}
       ASSISTANT_REASONING_EFFORT: ${ASSISTANT_REASONING_EFFORT:-}
+      CLASSIFY_API_KEY: ${CLASSIFY_API_KEY:-}
+      CLASSIFY_BASE_URL: ${CLASSIFY_BASE_URL:-}
+      CLASSIFY_MODEL: ${CLASSIFY_MODEL:-}
       BACKEND_BASE_URL: http://backend:8080/api/v1
       EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
       EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-}

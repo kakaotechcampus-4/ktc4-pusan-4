@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   ArrowRightIcon,
@@ -8,9 +8,9 @@ import {
   RadioIcon } from
 'lucide-react';
 import { AppShell } from '../components/AppShell';
-import { useSession } from '../contexts/SessionContext';
 import { useAssistant } from '../components/assistant/context';
-import { api, ApiRequestError } from '../api';
+import { api, ApiRequestError, isMock } from '../api';
+import { useSession } from '../contexts/SessionContext';
 import type { JudgmentRun, JudgmentRunFailure, Transaction } from '../types/domain';
 import { Badge, Button, Card } from '../components/ui';
 import { formatWon } from '../utils/format';
@@ -28,22 +28,44 @@ const FAILURE_TEXT: Record<string, { label: string; detail: string }> = {
 };
 const UNKNOWN_FAILURE = { label: '실패', detail: '처리하지 못했습니다.' };
 
+/** 실패한 거래는 이만큼만 이름과 함께 보이고, 나머지는 「외 N건」으로 센다 */
+const FAILURES_SHOWN = 5;
+
+/**
+ * 판정 엔진의 단계(G0~G6). 사용자가 읽는 화면이라 엔진 용어(불산입 열거·버킷·안분) 대신 하는 일을 적는다.
+ * 단계 id 는 판정 상세의 「막힌 단계」와 맞춰 보도록 남긴다
+ */
 const GATES = [
-{ id: 'G0', label: '형식 검증', detail: '승인내역 여부 · 필수 컬럼 · 중복 키' },
-{ id: 'G1', label: '불산입 열거', detail: '소득세법 제33조 각 호 필터' },
-{ id: 'G2', label: '통상성', detail: '제27조 · 업종 프로파일 62010' },
-{ id: 'G3', label: '속성 추출', detail: '자산 · 안분율 · 기간 · 한도버킷' },
-{ id: 'G4', label: '금액 산정', detail: '안분 후 절사 · 상각범위액' },
-{ id: 'G5', label: '한도 누적', detail: '접대비 · 기부금 버킷' },
-{ id: 'G6', label: '근거 부착 검증', detail: '조문 ID 실재 확인 · 0건이면 저장 거부' }];
+{ id: 'G0', label: '파일 확인', detail: '승인내역인지, 필요한 칸과 중복을 봅니다' },
+{ id: 'G1', label: '법에서 막은 지출 거르기', detail: '소득세법 제33조에 적힌 항목' },
+{ id: 'G2', label: '업종에 맞는 지출인지', detail: '제27조 · 업종 940909 기준' },
+{ id: 'G3', label: '지출 성격 정하기', detail: '자산인지, 업무 비율·기간·한도가 있는지' },
+{ id: 'G4', label: '인정 금액 계산', detail: '업무 비율만큼 나누고, 자산은 한 해 몫만' },
+{ id: 'G5', label: '한도 확인', detail: '접대비·기부금 한도를 넘는지' },
+{ id: 'G6', label: '근거 조문 붙이기', detail: '조문이 없으면 결과를 저장하지 않습니다' }];
 
 
 
 
+/** runId 없이 들어오면 확인 화면으로 보낸다. 판정 실행은 확인 화면에서만 만든다 (#187) */
+export function RunEntry() {
+  return <Navigate to="/confirm" replace />;
+}
+
+/**
+ * 판정 진행. runId 는 주소(`/run/:runId`)에서 읽는다 — 새로고침해도 같은 실행을 이어서 보고,
+ * 새 실행을 만들지 않는다 (#187). 뒤로·앞으로 가기로 다른 실행에 오면 앞 실행의 상태가 남지 않게 새로 그린다
+ */
 export function Run() {
+  const { runId } = useParams<{ runId: string }>();
+  return <RunProgress key={runId} />;
+}
+
+function RunProgress() {
   const navigate = useNavigate();
-  const { runId, batchId, contextRef, setRunId } = useSession();
+  const { runId = null } = useParams<{ runId: string }>();
   const { showNudge } = useAssistant();
+  const { setBatchId } = useSession();
   const [run, setRun] = useState<JudgmentRun | null>(null);
   const [counts, setCounts] = useState({ available: 0, needsReview: 0, unavailable: 0 });
   /** null 은 아직 받지 않음. 빈 배열은 받았는데 비어 있음(run 시작 실패 등, #127) */
@@ -52,14 +74,6 @@ export function Run() {
   const [retrying, setRetrying] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const timer = useRef<number | null>(null);
-
-  // runId 가 없으면 여기서 실행을 만든다 (확인 화면을 거치지 않고 진입한 경우)
-  useEffect(() => {
-    if (runId || !batchId || !contextRef) return;
-    void api.runs.create({ batchId, contextId: contextRef.id }).
-    then((created) => setRunId(created.id)).
-    catch(() => setLoadError('판정을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.'));
-  }, [runId, batchId, contextRef, setRunId]);
 
   // 1초 폴링. SSE 토큰 방식이 정해지면 교체 (명세 4.3 #9)
   useEffect(() => {
@@ -80,11 +94,13 @@ export function Run() {
       void api.runs.
       get(id).
       catch((caught: Error) => {
-        // 404 는 돌아올 리 없으니 멈춘다. 그 밖의 오류는 다음 주기에 다시 해본다
-        const gone = caught instanceof ApiRequestError && caught.status === 404;
+        // 404(없는 실행)·400(실행 id 모양이 아님)은 다시 물어도 같으니 멈춘다. 그 밖의 오류는 다음 주기에 다시 해본다
+        const gone = caught instanceof ApiRequestError && (caught.status === 404 || caught.status === 400);
         if (gone) stop();
         setLoadError(
           gone ?
+          isMock ?
+          '이 판정 실행을 찾을 수 없습니다. 체험 화면은 새로고침하면 처음 상태로 돌아갑니다.' :
           '이 판정 실행을 찾을 수 없습니다. 업로드가 지워졌을 수 있습니다.' :
           '판정 상태를 읽지 못했습니다. 다시 확인하고 있습니다.'
         );
@@ -95,6 +111,8 @@ export function Run() {
         if (stopped || !next) return;
         setLoadError(null);
         setRun(next);
+        // 새로고침하면 세션의 배치는 가장 최근 업로드로 시작한다. 「결과 보기」·질문 안내가 이 실행의 배치를 열게 맞춘다
+        setBatchId(next.batchId);
         const finished =
         next.status.code === 'COMPLETED' ||
         next.status.code === 'PARTIAL_FAILED' ||
@@ -131,12 +149,15 @@ export function Run() {
 
         if (next.failedCount > 0) {
           void api.runs.
-          failures(id, { size: 100 }).
+          failures(id, { size: FAILURES_SHOWN }).
           then(async (page) => {
             setFailures(page.items);
-            // 실패 목록은 transactionId 만 준다. 사람이 알아볼 이름을 붙인다
-            const list = await api.transactions.list({ batchId: next.batchId, size: 100 });
-            setFailedTx(new Map(list.items.map((t) => [t.id, t])));
+            // 실패 목록은 transactionId 만 준다. 보여 줄 거래만 따로 읽어 이름을 붙인다.
+            // 배치 거래를 앞에서부터 읽으면 뒤쪽 거래의 이름이 빠진다
+            const found = await Promise.all(
+              page.items.map((failure) => api.transactions.get(failure.transactionId).catch(() => null))
+            );
+            setFailedTx(new Map(found.filter((t): t is Transaction => t !== null).map((t) => [t.id, t])));
           }).
           catch(() => setLoadError('실패한 거래 목록을 읽지 못했습니다.'));
         }
@@ -146,10 +167,8 @@ export function Run() {
     poll();
     timer.current = window.setInterval(poll, 1000);
     return stop;
-  }, [runId, showNudge]);
+  }, [runId, showNudge, setBatchId]);
 
-  // runId 도 없고 만들 재료(batchId·문진)도 없으면 영원히 "판정하고 있습니다"로 남는다
-  const waiting = !runId && (!batchId || !contextRef);
   const total = run?.totalCount ?? 0;
   const processed = run?.processedCount ?? 0;
   const progress = total ? Math.round(processed / total * 100) : 0;
@@ -167,7 +186,7 @@ export function Run() {
       const created = await api.runs.create({ batchId: run.batchId, contextId: run.contextId });
       setFailures(null);
       setRun(null);
-      setRunId(created.id);
+      navigate(`/run/${created.id}`);
     } catch {
       setLoadError('다시 판정하지 못했습니다. 잠시 후 시도해 주세요.');
     } finally {
@@ -184,7 +203,7 @@ export function Run() {
       <div className="mx-auto max-w-3xl">
         <header className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-small font-bold text-accent">2단계 · 계획</p>
+            <p className="text-small font-bold text-accent">4단계 · 판정</p>
             <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
               {loadError && !run ?
               '판정 상태를 확인할 수 없습니다' :
@@ -194,15 +213,13 @@ export function Run() {
               '일부를 판정하지 못했습니다' :
               done ?
               '판정을 마쳤습니다' :
-              waiting ?
-              '판정할 준비가 되지 않았습니다' :
               '판정하고 있습니다'}
             </h1>
           </div>
           <p className="flex items-center gap-1.5 text-caption tabular-nums text-muted">
             <RadioIcon className="h-3.5 w-3.5" aria-hidden="true" />
-            {runId ? `run ${runId.slice(0, 13)}` : '실행 없음'}
-            {runId && !loadError && ' · 새로고침해도 이어집니다'}
+            {runId ? `실행 ${runId.slice(0, 8)}` : '실행 없음'}
+            {runId && !loadError && !isMock && ' · 새로고침해도 이어집니다'}
           </p>
         </header>
 
@@ -216,22 +233,7 @@ export function Run() {
           </Card>
         }
 
-        {waiting &&
-        <Card as="section" padding="md" className="mt-6">
-            <p className="text-body text-ink2">
-              판정에 필요한 것이 아직 없습니다.{' '}
-              {!batchId ? '카드내역을 먼저 올려 주세요.' : '사업자 문진을 먼저 마쳐 주세요.'}
-            </p>
-            <div className="mt-4 flex gap-2">
-              <Button to={!batchId ? '/upload' : '/interview'} size="sm">
-                {!batchId ? '카드내역 올리기' : '문진 하러 가기'}
-              </Button>
-              <Button to="/uploads" variant="secondary" size="sm">업로드 이력</Button>
-            </div>
-          </Card>
-        }
-
-        {!loadError && !waiting &&
+        {!loadError &&
         <>
         <section className="mt-6 rounded-2xl border border-line bg-surface p-6">
           <div className="flex items-end justify-between gap-4">
@@ -384,7 +386,7 @@ export function Run() {
             }
             {failures && failures.length > 0 &&
             <ul className="mt-4 divide-y divide-line2 rounded-xl border border-line2 bg-canvas">
-              {failures.slice(0, 5).map((failure) => {
+              {failures.slice(0, FAILURES_SHOWN).map((failure) => {
               const transaction = failedTx.get(failure.transactionId);
               const text = FAILURE_TEXT[failure.errorCode] ?? UNKNOWN_FAILURE;
               return (
@@ -411,9 +413,9 @@ export function Run() {
                   </li>);
 
             })}
-              {run && run.failedCount > 5 &&
+              {run && run.failedCount > FAILURES_SHOWN &&
             <li className="px-3.5 py-2 text-caption text-muted">
-                  외 {formatNumber(run.failedCount - 5)}건
+                  외 {formatNumber(run.failedCount - FAILURES_SHOWN)}건
                 </li>
             }
             </ul>

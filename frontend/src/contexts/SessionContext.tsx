@@ -7,34 +7,55 @@ import React, {
   useRef,
   useState } from
 'react';
-import type { BusinessContext, BusinessContextRef, StoredBusinessContext, User } from '../types/domain';
+import type {
+  BusinessContext,
+  BusinessContextRef,
+  SignupRequest,
+  StoredBusinessContext,
+  User } from
+'../types/domain';
 import { api, seedSession } from '../api';
 
-/** 업종은 IT(62010) 고정 */
+/** 업종은 프리랜서·인적용역(국세청 업종코드 940909) 고정 */
 export const DEFAULT_CONTEXT: BusinessContext = {
-  industryCode: '62010',
+  industryCode: '940909',
   prevYearRevenue: 83_000_000,
   businessOpenDate: '2024-03-01',
   bookkeepingDuty: '복식부기',
   hasEmployee: false,
-  homeOfficeRatio: 20
+  // 정해 두지 않는다. 그냥 두면 그 값으로 자택 경비 금액이 계산된다(#214). 문진에서 직접 고른다
+  homeOfficeRatio: null
 };
 
 /** restoring: 새로고침 뒤 리프레시 쿠키로 로그인을 이어 가는 중. 이때는 로그인 화면으로 보내지 않는다 */
 export type AuthStatus = 'restoring' | 'anonymous' | 'signedIn';
 
+/** 가입은 됐지만 그 뒤 내 정보를 읽지 못해 로그인하지 못했다. reason 은 실제 실패다 */
+export class SignedUpError extends Error {
+  constructor(readonly reason: unknown) {
+    super('가입은 마쳤지만 로그인하지 못했습니다.');
+  }
+}
+
 /**
- * 클라이언트 세션. 로그인 상태와 "지금 어느 배치·문진·실행을 보고 있는지"만 든다.
+ * 클라이언트 세션. 로그인 상태와 "지금 어느 배치·문진을 보고 있는지"만 든다. 판정 실행은 주소에 싣는다(`/run/:runId`).
  * 판정·질문 같은 서버 상태는 여기 두지 않고 api.* 로 읽는다. 토큰은 api 층 안에만 있다.
  */
 interface SessionValue {
   status: AuthStatus;
   isAuthenticated: boolean;
+  /** 로그인한 사용자 id. 계정이 바뀌면 바뀐다 */
+  userId: string | null;
+  /** 카카오 계정이면 로그인해도 null 이다 */
   email: string | null;
-  /** users/me 의 역할 (가정. backend_api_plan.md 관리자 판별은 10/26 결정) */
+  /** users/me 의 role 이 ADMIN 인가 (api.md 3.15) */
   isAdmin: boolean;
   /** 로그인하고 내 정보를 읽는다. 실패하면 ApiRequestError 를 던진다 */
   signIn: (email: string, password: string) => Promise<void>;
+  /** 가입하고 바로 로그인한다. 가입이 실패하면 ApiRequestError, 가입은 됐는데 로그인을 못 하면 SignedUpError 를 던진다 */
+  signUp: (body: SignupRequest) => Promise<void>;
+  /** 카카오 인가 코드로 로그인한다. 실패하면 ApiRequestError 를 던진다 */
+  signInWithKakao: (code: string) => Promise<void>;
   /** 이 브라우저의 로그인을 바로 지우고, 서버 로그아웃은 기다리지 않는다 */
   signOut: () => void;
   /** 서버에 저장된 배치 id */
@@ -45,9 +66,6 @@ interface SessionValue {
   setContext: (context: BusinessContext | StoredBusinessContext) => void;
   contextRef: BusinessContextRef | null;
   setContextRef: (ref: BusinessContextRef | null) => void;
-  /** 현재 판정 실행 */
-  runId: string | null;
-  setRunId: (id: string | null) => void;
 }
 
 const SessionContext = createContext<SessionValue | null>(null);
@@ -55,11 +73,11 @@ const SessionContext = createContext<SessionValue | null>(null);
 export function SessionProvider({ children }: {children: React.ReactNode;}) {
   const [status, setStatus] = useState<AuthStatus>('restoring');
   const [user, setUser] = useState<User | null>(null);
+  const userId = user?.id ?? null;
   const email = user?.email ?? null;
   const [batchId, setBatchId] = useState<string | null>(seedSession?.batchId ?? null);
   const [context, setContext] = useState<BusinessContext | StoredBusinessContext | null>(null);
   const [contextRef, setContextRef] = useState<BusinessContextRef | null>(seedSession?.contextRef ?? null);
-  const [runId, setRunId] = useState<string | null>(seedSession?.runId ?? null);
 
   /**
    * 로그인·로그아웃·풀림마다 올린다. 그 전에 시작한 이어 가기·내 정보·최근 업로드 응답이 늦게 와도
@@ -75,7 +93,6 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
     setBatchId(seedSession?.batchId ?? null);
     setContext(null);
     setContextRef(seedSession?.contextRef ?? null);
-    setRunId(seedSession?.runId ?? null);
   }, []);
 
   /**
@@ -121,12 +138,13 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
   // 재발급까지 실패했다. 서버 로그아웃은 부르지 않는다 — 이미 풀린 세션이고, 부르면 다시 401 이 난다
   useEffect(() => api.auth.onLost(clear), [clear]);
 
-  const signIn = useCallback(async (nextEmail: string, password: string) => {
+  /** 로그인·가입·카카오 로그인이 같이 쓴다. 토큰을 받고 나서 내 정보를 읽어야 로그인한 것이다 */
+  const enter = useCallback(async (authenticate: () => Promise<void>) => {
     // 로그인한 채로 /login 에서 다른 계정으로 들어오면 앞 사람의 배치·문진·실행이 남는다.
     // start 는 이미 있는 배치를 덮지 않고, 문진 효과는 서버에 문진이 없으면 그대로 둔다 (#142 리뷰)
     clear();
     const startedAt = epoch.current;
-    await api.auth.login({ email: nextEmail, password });
+    await authenticate();
     try {
       const me = await api.users.me();
       // 그사이 로그아웃했거나 다시 로그인했다
@@ -138,13 +156,32 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
     }
   }, [clear, start]);
 
+  const signIn = useCallback(
+    (nextEmail: string, password: string) => enter(() => api.auth.login({ email: nextEmail, password })),
+    [enter]
+  );
+  const signUp = useCallback(async (body: SignupRequest) => {
+    let created = false;
+    try {
+      await enter(async () => {
+        await api.auth.signup(body);
+        created = true;
+      });
+    } catch (caught) {
+      // 계정은 만들어졌고 인증 토큰도 썼다. 같은 가입을 다시 보내면 실패하니 로그인으로 보내야 한다
+      throw created ? new SignedUpError(caught) : caught;
+    }
+  }, [enter]);
+  const signInWithKakao = useCallback((code: string) => enter(() => api.auth.kakao({ code })), [enter]);
+
   /**
    * 3.2 — 서버에 이미 문진이 있으면 그것을 쓴다. 저장만 하고 다시 읽지 않으면
    * 새로고침할 때마다 「사업자 문진을 먼저 마쳐 주세요」로 돌아간다.
    * 문진 전이면 404 이고 http 구현이 null 로 바꿔 준다.
    */
   useEffect(() => {
-    if (email === null) return;
+    // 카카오 계정은 email 이 null 이라 사용자 id 로 본다
+    if (userId === null) return;
     let cancelled = false;
     void api.contexts.
     current().
@@ -159,7 +196,7 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
     return () => {
       cancelled = true;
     };
-  }, [email]);
+  }, [userId]);
 
   const signOut = useCallback(() => {
     void api.auth.logout().catch(() => undefined);
@@ -170,20 +207,21 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
     () => ({
       status,
       isAuthenticated: status === 'signedIn',
+      userId,
       email,
       isAdmin: user?.role === 'ADMIN',
       signIn,
+      signUp,
+      signInWithKakao,
       signOut,
       batchId,
       setBatchId,
       context,
       setContext,
       contextRef,
-      setContextRef,
-      runId,
-      setRunId
+      setContextRef
     }),
-    [status, email, user, signIn, signOut, batchId, context, contextRef, runId]
+    [status, userId, email, user, signIn, signUp, signInWithKakao, signOut, batchId, context, contextRef]
   );
 
   return (

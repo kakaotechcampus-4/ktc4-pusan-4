@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { cn } from './cn';
 
 interface ModalProps {
@@ -17,6 +18,7 @@ interface ModalProps {
 /**
  * 확인 대화상자. 되돌릴 수 없는 동작 앞에서만 쓴다.
  * Esc 와 바깥 클릭으로 닫히고, 열릴 때 대화상자로 초점을 옮긴다.
+ * body 에 바로 그린다. 머리말처럼 backdrop-filter·transform 이 걸린 조상 안에 두면 fixed 가 그 조상 크기에 갇힌다
  */
 export function Modal({
   open,
@@ -84,7 +86,7 @@ export function Modal({
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       onClick={onClose}>
@@ -117,6 +119,7 @@ export function Modal({
         {children && <div className="mt-4">{children}</div>}
         <div className="mt-6 flex justify-end gap-2">{footer}</div>
       </div>
-    </div>);
-
+    </div>,
+    document.body
+  );
 }

@@ -25,30 +25,31 @@ import {
 /** 토큰 값은 tailwind.config.js와 같아야 한다. 여기서는 보여주기용으로만 적는다. */
 const COLORS: { name: string; cls: string; hex: string; use: string }[] = [
 { name: 'canvas', cls: 'bg-canvas', hex: '#FFFFFF', use: '페이지 바탕' },
-{ name: 'surface', cls: 'bg-surface', hex: '#F5F6F8', use: '패널, 카드' },
-{ name: 'surface2', cls: 'bg-surface2', hex: '#FFE600', use: '첫 화면 큰 판' },
+{ name: 'surface', cls: 'bg-surface', hex: '#F3F5F7', use: '패널, 카드' },
+{ name: 'surface2', cls: 'bg-surface2', hex: '#122E55', use: '첫 화면 큰 판 (글자는 흰색)' },
 { name: 'sheet', cls: 'bg-sheet', hex: '#FFFFFF', use: '패널 위 흰 바탕, 표' },
-{ name: 'line', cls: 'bg-line', hex: '#ECEEF1', use: '테두리 기본, 행 괘선' },
-{ name: 'line2', cls: 'bg-line2', hex: '#F5F6F8', use: '약한 구분선' },
-{ name: 'rule', cls: 'bg-rule', hex: '#1A1A1A', use: '표 머리 위 굵은 괘선' },
-{ name: 'ink', cls: 'bg-ink', hex: '#0A0A0A', use: '제목, 주된 동작, 어두운 판' },
-{ name: 'ink2', cls: 'bg-ink2', hex: '#2B2B2B', use: '본문' },
-{ name: 'muted', cls: 'bg-muted', hex: '#5D6670', use: '보조 설명, 캡션' },
-{ name: 'accent', cls: 'bg-accent', hex: '#0A0A0A', use: 'CTA, 지금 자리 알약' },
-{ name: 'accent-line', cls: 'bg-accent-line', hex: '#DDE1E6', use: '테두리 버튼, 패널 안 구분선' },
-{ name: 'link', cls: 'bg-link', hex: '#1A6DFF', use: '문장 속 링크' },
+{ name: 'line', cls: 'bg-line', hex: '#E8ECF0', use: '테두리 기본, 행 괘선' },
+{ name: 'line2', cls: 'bg-line2', hex: '#EBEEF2', use: '약한 구분선 (surface 위에서도 보임)' },
+{ name: 'rule', cls: 'bg-rule', hex: '#16181D', use: '표 머리 위 굵은 괘선' },
+{ name: 'ink', cls: 'bg-ink', hex: '#16181D', use: '제목, 주된 동작, 어두운 판' },
+{ name: 'ink2', cls: 'bg-ink2', hex: '#30363F', use: '본문' },
+{ name: 'muted', cls: 'bg-muted', hex: '#626B79', use: '보조 설명, 캡션' },
+{ name: 'accent', cls: 'bg-accent', hex: '#16181D', use: 'CTA, 지금 자리 알약' },
+{ name: 'accent-soft', cls: 'bg-accent-soft', hex: '#E6ECF4', use: '연한 채움 — 고른 선택지, 진행 중 단계' },
+{ name: 'accent-line', cls: 'bg-accent-line', hex: '#DCE1E8', use: '테두리 버튼, 패널 안 구분선' },
+{ name: 'link', cls: 'bg-link', hex: '#1B64DA', use: '문장 속 링크' },
 { name: 'highlight', cls: 'bg-highlight', hex: '#FFE600', use: '한 화면에 한 번 쓰는 강조' },
 { name: 'ok', cls: 'bg-ok', hex: '#00703D', use: '가능 — 글자' },
-{ name: 'ok-bg', cls: 'bg-ok-bg', hex: '#E6F8F0', use: '가능 — 박스 바탕' },
-{ name: 'ok-line', cls: 'bg-ok-line', hex: '#A8E6C9', use: '가능 — 박스 테두리' },
+{ name: 'ok-bg', cls: 'bg-ok-bg', hex: '#E8F6F0', use: '가능 — 박스 바탕' },
+{ name: 'ok-line', cls: 'bg-ok-line', hex: '#B2E3CE', use: '가능 — 박스 테두리' },
 { name: 'ok-bar', cls: 'bg-ok-bar', hex: '#12B76A', use: '가능 — 막대·점' },
-{ name: 'warn', cls: 'bg-warn', hex: '#955A00', use: '확인 필요 — 글자' },
-{ name: 'warn-bg', cls: 'bg-warn-bg', hex: '#FFF6E0', use: '확인 필요 — 박스 바탕' },
-{ name: 'warn-line', cls: 'bg-warn-line', hex: '#FFD98A', use: '확인 필요 — 박스 테두리' },
+{ name: 'warn', cls: 'bg-warn', hex: '#8A5A10', use: '확인 필요 — 글자' },
+{ name: 'warn-bg', cls: 'bg-warn-bg', hex: '#FDF3E3', use: '확인 필요 — 박스 바탕' },
+{ name: 'warn-line', cls: 'bg-warn-line', hex: '#EFD7A4', use: '확인 필요 — 박스 테두리' },
 { name: 'warn-bar', cls: 'bg-warn-bar', hex: '#F7A51B', use: '확인 필요 — 막대·점' },
-{ name: 'deny', cls: 'bg-deny', hex: '#C92A2A', use: '불가 — 글자' },
-{ name: 'deny-bg', cls: 'bg-deny-bg', hex: '#FFEDED', use: '불가 — 박스 바탕' },
-{ name: 'deny-line', cls: 'bg-deny-line', hex: '#FFC4C4', use: '불가 — 박스 테두리' },
+{ name: 'deny', cls: 'bg-deny', hex: '#C5283D', use: '불가 — 글자' },
+{ name: 'deny-bg', cls: 'bg-deny-bg', hex: '#FDEDEF', use: '불가 — 박스 바탕' },
+{ name: 'deny-line', cls: 'bg-deny-line', hex: '#F7CDD4', use: '불가 — 박스 테두리' },
 { name: 'deny-bar', cls: 'bg-deny-bar', hex: '#FF5A5A', use: '불가 — 막대·점' }];
 
 
@@ -105,7 +106,7 @@ function Block({
 }
 
 export function Styleguide() {
-  const [industry, setIndustry] = useState('62010');
+  const [industry, setIndustry] = useState('940909');
   const [verdictFilter, setVerdictFilter] = useState('ALL');
   const [tablePage, setTablePage] = useState(0);
   const [pickedRow, setPickedRow] = useState<string | null>(null);
@@ -115,7 +116,7 @@ export function Styleguide() {
       <Container className="py-16">
         <SectionHeading
           eyebrow="Design System · 초안"
-          title="경비판정 스타일가이드"
+          title="PreeT 스타일가이드"
           description="화면을 새로 만들 때 이 부품과 토큰만 씁니다. 규칙과 이유는 DESIGN.md에 있습니다." />
 
 
@@ -232,9 +233,9 @@ export function Styleguide() {
         <Block title="Field · Input · Select" note="라벨은 body-lg semibold, 힌트는 small muted, 오류는 small deny + role=alert.">
           <div className="grid max-w-xl gap-5">
             <Field label="1. 업종" htmlFor="sg-industry" hint="업종 프로파일과 경비율 조회의 기준이 됩니다.">
-              <Select id="sg-industry" defaultValue="62010">
-                <option value="62010">62010 · 컴퓨터 프로그래밍 서비스업</option>
-                <option value="62021">62021 · 시스템 통합 자문·구축 서비스업</option>
+              <Select id="sg-industry" defaultValue="940909">
+                <option value="940909">940909 · 기타자영업</option>
+                <option value="940926">940926 · 소프트웨어 프리랜서</option>
               </Select>
             </Field>
             <Field label="2. 직전연도 수입금액" htmlFor="sg-revenue">
@@ -255,7 +256,7 @@ export function Styleguide() {
               value={industry}
               onChange={setIndustry}
               options={[
-              { value: '62010', label: 'IT 개발 · 프리랜서', hint: '62010 컴퓨터 프로그래밍' },
+              { value: '940909', label: '프리랜서 · 인적용역', hint: '940909 기타자영업 (컴퓨터 프로그래머 등)' },
               { value: '73203', label: '디자이너', disabled: true },
               { value: '85699', label: '온라인 강사', disabled: true },
               { value: 'ETC', label: '그 외', disabled: true, disabledLabel: '문의' }]

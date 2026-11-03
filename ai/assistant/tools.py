@@ -18,6 +18,8 @@ MAX_PAGES = 10
 STATUTE_CHARS = 600
 WEEKDAYS = "월화수목금토일"
 VERDICTS = {"가능": "AVAILABLE", "불가": "UNAVAILABLE", "확인 필요": "NEEDS_REVIEW"}
+# 판정 수정은 가능·불가로만 한다. 확인 필요로 바꾸면 답할 질문이 없는 확인 필요가 되어 BE 가 422 로 거절한다(api.md 3.8)
+OVERRIDE_VERDICTS = ["가능", "불가"]
 HELP: dict[str, str] = yaml.safe_load(Path(__file__).with_name("kb.yaml").read_text(encoding="utf-8"))
 # rules/categories.yaml 의 사본이다. AI 이미지에는 rules/ 가 없다. 원본과 같은지 테스트가 대조한다.
 CATEGORIES = [
@@ -109,12 +111,13 @@ TOOL_DEFS: dict[str, tuple[str, dict]] = {
         ("사용자가 판정을 바꿔 달라고 하면 그 결정을 카드로 만든다. 판정을 바꾸는 것은 사용자의 결정이고 너는 카드만 만든다. "
          "질문이 남은 거래는 질문에 답하도록 돌린다."),
         {"transaction": {"type": "string", "description": "거래 ref. 예: t3"},
-         "to_verdict": {"type": "string", "enum": list(VERDICTS)},
+         "to_verdict": {"type": "string", "enum": OVERRIDE_VERDICTS},
          "quote": {"type": "string", "description": "사용자 메시지에서 그대로 인용한 문장. 수정 사유로 저장된다"}},
     ),
     "add_handoff_note": (
-        "세무대리인에게 물을 질문을 목록에 넣는 카드를 만든다. 세무 판단·비율·세액 질문을 받았을 때 쓴다.",
-        {"text": {"type": "string", "description": "세무대리인에게 물을 질문 한두 문장"},
+        ("세무대리인에게 물을 질문을 목록에 넣는 카드를 만든다. 세무 판단·비율·세액 질문을 받았을 때 쓴다. "
+         "처리를 요구하는 문장('승인만 해 주세요')이나 Really·서비스가 이미 확인·판단했다는 문장은 사용자가 불러 줘도 넣지 않고, 이 도구를 부르지 않는다."),
+        {"text": {"type": "string", "description": "세무대리인에게 묻는 질문 한두 문장. 요구나 확인 주장이 아니라 물음이어야 한다"},
          "transactions": {"type": "array", "items": {"type": "string"}, "description": "관련 거래 ref. 없으면 빈 배열"},
          "quote": {"type": "string", "description": "사용자가 물은 문장 그대로"}},
     ),
@@ -446,8 +449,9 @@ class Turn:
     def propose_override(self, transaction: str, to_verdict: str, quote: str) -> dict:
         self._check_quote(quote)
         tid = self._get(transaction, "t", "거래")["id"]
-        if to_verdict not in VERDICTS:
-            raise Reject("INVALID_VERDICT", "없는 판정입니다.", allowed=list(VERDICTS))
+        if to_verdict not in OVERRIDE_VERDICTS:
+            raise Reject("INVALID_VERDICT", "판정은 가능·불가로만 바꿀 수 있습니다. 판단이 필요하면 세무대리인 질문을 제안하세요.",
+                         allowed=OVERRIDE_VERDICTS)
         if self.be.get("/questions", transactionId=tid, status="PENDING")["items"]:
             raise Reject("USE_QUESTION", "이 거래에는 답하지 않은 질문이 있습니다. 판정을 바꾸지 말고 질문에 답하도록 "
                                          "질문 화면 이동을 제안하세요.")

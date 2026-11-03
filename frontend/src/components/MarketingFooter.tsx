@@ -1,4 +1,6 @@
+import { Link } from 'react-router-dom';
 import { Container } from './ui';
+import { SUPPORT_EMAIL } from '../utils/contact';
 
 export function MarketingFooter() {
   return (
@@ -6,7 +8,7 @@ export function MarketingFooter() {
       <Container className="py-12">
         <div className="flex flex-wrap items-start justify-between gap-8">
           <div className="max-w-xl">
-            <p className="text-body-lg font-bold text-ink">경비판정</p>
+            <p className="text-body-lg font-bold text-ink">PreeT</p>
             <p className="mt-3 text-small leading-6 text-muted">
               이 서비스는 확인할 항목과 근거까지만 제시합니다. 세액을 확정하거나
               세무 신고를 대리하지 않으며, 최종 판단에는 세무대리인의 확인이
@@ -29,16 +31,35 @@ export function MarketingFooter() {
             </div>
             <div className="flex gap-3">
               <dt className="text-muted">문의</dt>
-              <dd className="text-ink2">help@expense-verdict.kr</dd>
+              <dd className="break-all text-ink2">{SUPPORT_EMAIL}</dd>
             </div>
           </dl>
         </div>
 
         <div className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t border-line2 pt-6 text-caption text-muted">
-          <p>© 2026 경비판정. 무자격 세무대리를 하지 않습니다.</p>
-          <ul className="flex gap-5">
-            <li>이용약관</li>
-            <li>개인정보처리방침</li>
+          <p>© 2026 PreeT. 무자격 세무대리를 하지 않습니다.</p>
+          <ul className="flex flex-wrap items-center gap-5">
+            <li>
+              <Link to="/faq" className="transition-colors hover:text-ink">
+                자주 묻는 질문
+              </Link>
+            </li>
+            <li>
+              <Link to="/bug-report" className="transition-colors hover:text-ink">
+                버그 신고
+              </Link>
+            </li>
+            <li>
+              <Link to="/terms" className="transition-colors hover:text-ink">
+                이용약관
+              </Link>
+            </li>
+            <li>
+              <Link to="/privacy" className="font-bold transition-colors hover:text-ink">
+                개인정보처리방침
+              </Link>
+            </li>
+            <li aria-hidden="true" className="h-3 w-px bg-accent-line" />
             <li>데이터 경계 안내</li>
           </ul>
         </div>

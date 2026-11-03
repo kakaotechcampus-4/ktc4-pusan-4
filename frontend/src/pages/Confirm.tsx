@@ -4,11 +4,12 @@ import { CheckIcon, PlayIcon, ShieldCheckIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { useSession } from '../contexts/SessionContext';
 import { api, ApiRequestError, useApi } from '../api';
-import { formatFullDate, formatNumber, formatPeriod } from '../utils/format';
+import { formatNumber, formatPeriod } from '../utils/format';
+import { contextRows, isJudgedIndustry } from '../utils/context';
 
 export function Confirm() {
   const navigate = useNavigate();
-  const { batchId, context, contextRef, setRunId } = useSession();
+  const { batchId, context, contextRef } = useSession();
   // 업로드 이력에서 고르고 들어올 수도 있으므로 세션의 파싱 결과가 아니라 서버에서 읽는다
   const batchQ = useApi(
     () => batchId ? api.uploads.get(batchId) : Promise.resolve(null),
@@ -24,6 +25,8 @@ export function Confirm() {
   '올린 카드내역이 없습니다. 파일을 먼저 올려 주세요.' :
   !contextRef ?
   '사업자 문진을 먼저 마쳐 주세요.' :
+  context && !isJudgedIndustry(context.industryCode) ?
+  `저장된 문진의 업종(${context.industryCode})은 지금 판정하지 않습니다. 문진을 다시 저장해 주세요.` :
   null;
 
   const start = async () => {
@@ -32,8 +35,7 @@ export function Confirm() {
     setError(null);
     try {
       const created = await api.runs.create({ batchId, contextId: contextRef.id });
-      setRunId(created.id);
-      navigate('/run');
+      navigate(`/run/${created.id}`);
     } catch (caught) {
       setError(
         caught instanceof ApiRequestError ?
@@ -60,33 +62,14 @@ export function Confirm() {
   [];
 
 
-  const contextRows = context ?
-  [
-  { term: '업종', value: `${context.industryCode} · 컴퓨터 프로그래밍` },
-  {
-    term: '직전연도 수입금액',
-    value: `${formatNumber(context.prevYearRevenue)}원`
-  },
-  { term: '개업일', value: formatFullDate(context.businessOpenDate) },
-  { term: '기장의무', value: context.bookkeepingDuty },
-  { term: '직원', value: context.hasEmployee ? '있음' : '없음 (1인)' },
-  {
-    term: '자택 작업 비율',
-    value:
-    context.homeOfficeRatio === null ?
-    '입력 안 함' :
-    context.homeOfficeRatio > 0 ?
-    `${context.homeOfficeRatio}%` :
-    '해당 없음'
-  }] :
-  [];
+  const contextList = context ? contextRows(context) : [];
 
 
   return (
     <AppShell>
       <div className="mx-auto max-w-3xl">
         <header>
-          <p className="text-small font-bold text-accent">사람 게이트 ①</p>
+          <p className="text-small font-bold text-accent">4단계 · 판정 전 확인</p>
           <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
             이 입력으로 판정합니다
           </h1>
@@ -132,12 +115,12 @@ export function Confirm() {
             사업자 문진{contextRef && ` · 버전 ${contextRef.version}`}
           </h2>
           <dl className="divide-y divide-line2">
-            {contextRows.length === 0 &&
+            {contextList.length === 0 &&
             <div className="px-5 py-3">
                 <p className="text-small text-muted">아직 문진을 마치지 않았습니다.</p>
               </div>
             }
-            {contextRows.map((row) =>
+            {contextList.map((row) =>
             <div key={row.term} className="flex gap-4 px-5 py-3">
                 <dt className="w-36 shrink-0 text-small text-muted">
                   {row.term}
