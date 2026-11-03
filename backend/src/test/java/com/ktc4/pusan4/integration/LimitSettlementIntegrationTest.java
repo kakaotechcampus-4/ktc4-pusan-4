@@ -182,6 +182,21 @@ class LimitSettlementIntegrationTest {
     }
 
     @Test
+    void unclassified_transactions_are_left_out_of_the_limit() {
+        // given: 분류 확인을 기다리는 거래의 판정은 지금 판정 대상이 아니다
+        UUID unclassified = transaction("2025-01-15", "AUTO");
+        judgment(unclassified, "AVAILABLE", ENTERTAINMENT, 10_000_000L);
+        jdbcTemplate.update("update transaction set classification_status = 'NEEDS_REVIEW' where id = ?", unclassified);
+        judgment(transaction("2025-03-02", "AUTO"), "AVAILABLE", ENTERTAINMENT, 5_000_000L);
+
+        // when
+        settlementService.settleProvisional(userId);
+
+        // then
+        assertThat(allowedByTagged()).containsExactly(tuple(5_000_000L, 5_000_000L));
+    }
+
+    @Test
     void excluding_and_including_a_transaction_settle_the_limit_again() {
         // given
         UUID january = transaction("2025-01-15", "AUTO");

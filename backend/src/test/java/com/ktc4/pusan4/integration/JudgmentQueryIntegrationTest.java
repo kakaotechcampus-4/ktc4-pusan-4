@@ -116,6 +116,18 @@ class JudgmentQueryIntegrationTest {
     }
 
     @Test
+    void transaction_scoped_list_returns_the_current_judgment_of_an_excluded_transaction() throws Exception {
+        // given: 사용자가 제외한 거래. 거래를 지정하면 판정 대상이 아니어도 현재 판정을 보여 준다(api.md 3.7).
+        UUID excluded = insertTransaction(batchId, "2025-10-08", "JUDGEABLE", "EXCLUDED");
+        UUID current = insertJudgment(excluded, 1, "AVAILABLE", "run_id", runId, "2025-10-09T10:00:00+09:00");
+
+        // when / then
+        mockMvc.perform(get("/api/v1/judgments").param("transactionId", excluded.toString()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items[*].id", contains(current.toString())));
+    }
+
+    @Test
     void active_override_is_current_even_if_a_later_automatic_revision_exists() throws Exception {
         // given: 수정한 뒤 다시 판정한 거래, 수정을 해제한 거래
         UUID overridden = insertTransaction(batchId, "2025-10-08", "JUDGEABLE", "AUTO");
