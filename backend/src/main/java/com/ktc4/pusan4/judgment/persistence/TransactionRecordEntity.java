@@ -209,11 +209,10 @@ public class TransactionRecordEntity extends AssignedIdEntity<UUID> {
         return merchantRaw;
     }
 
-    /** 지금 판정 대상인가. 조건은 TransactionRecordRepository.findRunTargetIds 와 같다(api.md 2.3, 3.6). */
+    /** 지금 판정 대상인가. 쿼리 쪽은 TransactionConditions.judgmentTarget 이다(api.md 2.3, 3.6). */
     boolean judgeable() {
-        return "CLASSIFIED".equals(classificationStatus)
-            && (("JUDGEABLE".equals(sourceStatus) && !"EXCLUDED".equals(userInclusion))
-                || ("EXCLUDED".equals(sourceStatus) && "INCLUDED".equals(userInclusion)));
+        return ClassificationStatus.CLASSIFIED.name().equals(classificationStatus)
+            && toDetail().effectiveStatus() == SourceStatus.JUDGEABLE;
     }
 
     JudgedTransaction toJudged() {
