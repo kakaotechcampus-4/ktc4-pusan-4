@@ -76,7 +76,11 @@ TOOL_DEFS: dict[str, tuple[str, dict]] = {
         {"transaction": {"type": "string", "description": "거래 ref. 예: t6"}},
     ),
     "get_summary": (
-        "판정별·계정별 합계와 남은 질문·미분류 집계를 가져온다.",
+        ("판정별·계정별 합계, 남은 질문·미분류 집계, 과세연도별 접대비 한도(limits)를 가져온다. "
+         "limits 의 totalAmount 는 그해 접대비의 한도 전 합계, excessAmount 는 한도 초과액이다. "
+         "limits 는 이번 업로드 몫이 아니라 그해 사용자 전체 기준이고, 직전연도 수입금액으로 계산한 잠정치다. "
+         "year 의 '가능' 합계는 초과액을 이미 뺀 값이라 다시 빼지 않는다. "
+         "batch 의 '가능' 합계는 초과액을 빼기 전 값이다. 초과액만큼 필요경비에서 빠지지만 직접 빼서 말하지 않는다."),
         {"scope": nullable("string", "batch=지금 업로드, year=귀속연도 전체. null 이면 지금 업로드", ["batch", "year"])},
     ),
     "list_unclassified": (
@@ -361,6 +365,7 @@ class Turn:
             "by_verdict": {label[k]: v for k, v in s["byVerdict"].items()},
             "by_account": s["byAccount"][:LIST_LIMIT],
             "unresolved_questions": questions["unresolved"], "unclassified": reviews["unresolved"],
+            "limits": s["limits"],
         }
 
     def list_unclassified(self, merchant: str | None) -> dict:

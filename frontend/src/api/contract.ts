@@ -23,6 +23,7 @@ import type {
   JudgmentRunFailure,
   JudgmentSummary,
   KakaoLoginRequest,
+  LimitYear,
   LoginRequest,
   OverrideRequest,
   Page,
@@ -181,8 +182,11 @@ export interface Api {
     summary(scope: SummaryScope): Promise<JudgmentSummary>;
     list(query?: JudgmentQuery): Promise<Page<Judgment>>;
     get(judgmentId: string): Promise<Judgment>;
-    /** 세무사에게 넘길 내보내기(#214). 현재 판정 전부를 페이지 없이 준다. 다른 사용자의 batchId 면 빈 목록 */
-    export(scope: ExportScope): Promise<{items: JudgmentExportRow[];}>;
+    /**
+     * 세무사에게 넘길 내보내기(#214). 현재 판정 전부를 페이지 없이 준다. 다른 사용자의 batchId 면 빈 목록.
+     * limits 는 summary 의 limits 와 같다(#226)
+     */
+    export(scope: ExportScope): Promise<{items: JudgmentExportRow[];limits: LimitYear[];}>;
     /**
      * 3.8 사용자 수정. 새 revision 을 만들고 이전 판정은 보존한다.
      * 현재 판정이 아니거나 판정 대상이 아닌 거래면 409 (#62). idempotencyKey 는 같은 내용을 다시 보낼 때만 재사용한다
@@ -237,7 +241,9 @@ export class ApiRequestError extends Error {
   message: string,
   public readonly traceId = '',
   /** 429 의 Retry-After(초). 없으면 undefined */
-  public readonly retryAfter?: number)
+  public readonly retryAfter?: number,
+  /** 409 RUN_ALREADY_ACTIVE 의 진행 중인 판정 실행 id (#228). 그 밖에는 undefined */
+  public readonly runId?: string)
   {
     super(message);
     this.name = 'ApiRequestError';

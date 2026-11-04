@@ -156,7 +156,12 @@ retried = false)
   }
 
   if (!response.ok) {
-    const error = (data ?? {}) as { code?: string; message?: string; traceId?: string };
+    const error = (data ?? {}) as {
+      code?: string;
+      message?: string;
+      traceId?: string;
+      runId?: string;
+    };
     // 초 단위만 읽는다. 날짜 형식이면 버린다
     const retryAfter = Number(response.headers.get('Retry-After'));
     throw new ApiRequestError(
@@ -164,7 +169,9 @@ retried = false)
       error.code ?? 'UNKNOWN',
       error.message ?? `요청을 처리하지 못했습니다. (${response.status})`,
       error.traceId ?? '',
-      response.headers.has('Retry-After') && Number.isFinite(retryAfter) ? retryAfter : undefined
+      response.headers.has('Retry-After') && Number.isFinite(retryAfter) ? retryAfter : undefined,
+      // 409 RUN_ALREADY_ACTIVE 에만 붙는다 (#228). 문자열이 아니면 없는 것으로 둔다
+      typeof error.runId === 'string' ? error.runId : undefined
     );
   }
   return data as T;

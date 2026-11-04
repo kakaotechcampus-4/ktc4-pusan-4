@@ -53,6 +53,20 @@ describe('판정 (3.7)', () => {
     expect((await api.judgments.summary({ batchId })).totalCount).toBe(before.totalCount - 1);
     expect(await currentOf(tx('1005'))).toBeDefined();
   });
+
+  it('접대비 한도 총액은 판정 대상 거래만 센다. 제외한 거래는 요약 계정과 같이 빠진다 (#226)', async () => {
+    for (const id of ['1005', '1016']) {
+      const group = await groupOf(tx(id));
+      await api.questions.respond({ questionIds: group.questionIds, answer: { value: '업무미팅' } });
+    }
+    await api.transactions.exclude(tx('1005'));
+    const summary = await api.judgments.summary({ batchId });
+    const entertainment = summary.byAccount.find((row) => row.account === '접대비');
+    expect(entertainment).toBeDefined();
+    expect(summary.limits).toHaveLength(1);
+    expect(summary.limits[0].totalAmount).toBe(entertainment?.finalAmount);
+    expect(summary.limits[0].excessAmount).toBe(0);
+  });
 });
 
 describe('사용자 수정 (3.8, #62)', () => {

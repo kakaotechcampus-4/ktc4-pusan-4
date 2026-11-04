@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRightIcon, TriangleAlertIcon } from 'lucide-react';
-import type { Judgment, JudgmentOriginType, Verdict } from '../../types/domain';
+import type { Judgment, JudgmentOriginType, LimitYear, Verdict } from '../../types/domain';
 import { api, ApiRequestError, useApi } from '../../api';
 import { Badge, Button, ChoiceGroup, Input } from '../ui';
 import { VerdictBadge } from '../VerdictBadge';
@@ -77,6 +77,8 @@ value === true ? '예' : value === false ? '아니오' : String(value);
 interface JudgmentDetailPanelProps {
   /** 거래의 현재 판정. 거래 요약(judgment.transaction)도 여기서 읽는다 */
   judgment: Judgment;
+  /** 한도를 넘은 해의 접대비면 그해 한도(#226). 거래별 인정액 대신 한도 대상임을 보인다 */
+  exceededLimit?: LimitYear;
   /** 사용자가 행을 고를 때마다 늘어난다. 바뀌면 제목으로 초점을 옮긴다(같은 행을 다시 골라도) */
   focusKey?: number;
   /** 수정·해제로 현재 판정이 바뀌었을 때 */
@@ -87,6 +89,7 @@ interface JudgmentDetailPanelProps {
 
 export function JudgmentDetailPanel({
   judgment,
+  exceededLimit,
   focusKey = 0,
   onChanged,
   onExcluded
@@ -296,16 +299,26 @@ export function JudgmentDetailPanel({
           <dt className="text-caption text-muted">
             {asset ? `${transaction.approvedAt.slice(0, 4)}년에 넣을 수 있는 금액` : '필요경비 산입액'}
           </dt>
+          {exceededLimit ?
+          <dd className="mt-1">
+              <span className="block text-h4 font-bold text-warn">연간 한도 대상</span>
+              <span className="mt-1 block text-caption text-muted">
+                {exceededLimit.taxYear}년 접대비가 한도를 {formatWon(exceededLimit.excessAmount)} 넘어, 거래별 인정액은
+                정하지 않습니다.
+              </span>
+            </dd> :
+
           <dd
             className={`mt-1 text-h3 font-bold tabular-nums tracking-ir-sm ${
             judgment.finalAmount ? 'text-ok' : 'text-muted'}`
             }>
 
-            {/* 서버는 가능이 아니면 0 을 준다(#184). 「0원」은 확인 필요를 금액이 정해진 것처럼 보이게 해 비워 둔다 */}
-            {judgment.verdict.code === 'AVAILABLE' && judgment.finalAmount !== null ?
+              {/* 서버는 가능이 아니면 0 을 준다(#184). 「0원」은 확인 필요를 금액이 정해진 것처럼 보이게 해 비워 둔다 */}
+              {judgment.verdict.code === 'AVAILABLE' && judgment.finalAmount !== null ?
             `${formatWon(judgment.finalAmount)}${asset ? '까지' : ''}` :
             '—'}
-          </dd>
+            </dd>
+          }
         </div>
       </dl>
 
