@@ -1,6 +1,6 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { Logo } from './Logo';
 
 const PRINCIPLES = [
 '판정마다 조문의 시행 버전을 붙입니다',
@@ -15,16 +15,7 @@ export function AuthLayout({ title, children }: {title: string;children: React.R
     <div className="flex min-h-full w-full bg-surface">
       {/* 좌측 브랜드 패널 */}
       <aside className="hidden w-[46%] flex-col justify-between bg-ink px-12 py-12 lg:flex">
-        <Link to="/" className="flex items-center gap-2" aria-label="PreeT 홈">
-          <span aria-hidden="true" className="flex gap-[3px]">
-            <span className="block h-5 w-[5px] rounded-sm bg-white" />
-            <span className="block h-5 w-[5px] rounded-sm bg-white" />
-            <span className="block h-5 w-[5px] rounded-sm bg-accent" />
-          </span>
-          <span className="text-[17px] font-bold tracking-tight text-white">
-            PreeT
-          </span>
-        </Link>
+        <Logo tone="light" />
 
         <div>
           <h2 className="max-w-md text-[30px] font-bold leading-[1.35] tracking-tight text-white">
@@ -56,20 +47,10 @@ export function AuthLayout({ title, children }: {title: string;children: React.R
 
       <div className="flex flex-1 items-center justify-center px-6 py-14">
         <div className="w-full max-w-[380px]">
-          <Link
-            to="/"
-            className="mb-10 flex items-center gap-2 lg:hidden"
-            aria-label="PreeT 홈">
-            
-            <span aria-hidden="true" className="flex gap-[3px]">
-              <span className="block h-5 w-[5px] rounded-sm bg-ink" />
-              <span className="block h-5 w-[5px] rounded-sm bg-ink" />
-              <span className="block h-5 w-[5px] rounded-sm bg-accent" />
-            </span>
-            <span className="text-[17px] font-bold tracking-tight text-ink">
-              PreeT
-            </span>
-          </Link>
+          {/* 좁은 화면에서는 왼쪽 판이 없어 여기에 로고를 둔다 */}
+          <div className="mb-10 lg:hidden">
+            <Logo />
+          </div>
           {children}
         </div>
       </div>

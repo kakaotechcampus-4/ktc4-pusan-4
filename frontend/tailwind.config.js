@@ -107,6 +107,11 @@ export default {content: [
       boxShadow: {
         card: 'none',
         panel: 'none',
+        /**
+         * 머리띠에만 쓴다. 머리띠는 바탕(canvas)과 같은 색이라 흰 화면에서 경계가 사라진다.
+         * 괘선만으로는 스크롤한 내용이 밑으로 지나가는 것이 안 보여서 아주 옅은 음영을 같이 둔다
+         */
+        header: '0 1px 0 0 rgba(22, 24, 29, 0.06), 0 6px 16px -10px rgba(22, 24, 29, 0.22)',
       },
       transitionTimingFunction: {
         snap: 'cubic-bezier(0.23, 1, 0.32, 1)',

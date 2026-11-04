@@ -85,6 +85,8 @@
 - 섹션 세로 여백: 랜딩 `pt-28`, 구분 띠(숫자) `py-16`.
 - 라운드: 패널·카드 `rounded-2xl`(24px), 큰 판 `rounded-[20px]`, 중간 `rounded-xl`(16px)·`rounded-lg`(12px), **버튼·알약은 `rounded-full`**.
 - **그림자를 쓰지 않는다.** `shadow-card`·`shadow-panel` 은 `none` 이다. 겹침은 바탕색과 괘선으로만 가른다.
+  - 예외는 머리띠 하나다. `shadow-header` 를 `border-b border-line` 과 같이 쓴다. 머리띠는 바탕과 같은 흰색이라
+    괘선만으로는 스크롤한 내용이 밑으로 지나가는 것이 안 보인다. 다른 곳에는 쓰지 않는다.
 - **패널에 테두리를 두르지 않는다.** 흰 바탕 위 `surface` 회색으로만 가른다. 테두리가 필요한 것은 표의 행 괘선과 `secondary` 버튼뿐이다.
 - 표는 패널에 넣지 않는다. 머리 위 굵은 괘선(`border-t-2 border-rule`) 하나, 행 사이 얇은 괘선, 숫자는 오른쪽 정렬.
 - 전환: `transition-colors duration-150 ease-snap`. 등장 애니메이션은 `animate-rise` 하나.

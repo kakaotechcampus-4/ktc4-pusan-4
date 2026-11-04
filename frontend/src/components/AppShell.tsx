@@ -5,6 +5,7 @@ import { CheckIcon, UserIcon } from 'lucide-react';
 import { DisclaimerBar } from './DisclaimerBar';
 import { Button } from './ui';
 import { BugReportButton } from './BugReport';
+import { Logo } from './Logo';
 
 import { useSession } from '../contexts/SessionContext';
 import { accountLabel } from '../utils/account';
@@ -80,24 +81,19 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
 
   return (
     <div className="flex min-h-full w-full flex-col bg-canvas">
-      <header className="sticky top-0 z-30 bg-canvas/95 backdrop-blur print:hidden">
+      <header className="sticky top-0 z-30 border-b border-line bg-canvas/95 shadow-header backdrop-blur print:hidden">
         {/*
           한 줄을 넘기면 한글이 음절 단위로 꺾인다. 줄바꿈을 막고, 폭이 모자라면 덜 중요한 것부터 접는다:
           xl 미만 — 지금 단계가 아닌 단계 이름 · lg 미만 — 귀속 연도, 이메일(아이콘으로) · md 미만 — 단계 표시
         */}
         <div className="mx-auto flex h-[72px] max-w-page items-center justify-between gap-3 whitespace-nowrap px-6">
-          <Link to="/" className="flex shrink-0 items-center gap-2" aria-label="PreeT 홈">
-            <span aria-hidden="true" className="flex gap-[3px]">
-              <span className="block h-[18px] w-[4px] rounded-sm bg-ink" />
-              <span className="block h-[18px] w-[4px] rounded-sm bg-ink" />
-              <span className="block h-[18px] w-[4px] rounded-sm bg-highlight" />
-            </span>
-            <span className="text-h4 font-bold tracking-tight text-ink">
-              PreeT
-            </span>
-            <span aria-hidden="true" className="hidden h-3.5 w-px bg-accent-line sm:block" />
-            <span className="hidden text-body text-ink2 sm:block">판정</span>
-          </Link>
+          <Logo
+            suffix={
+            <>
+                <span aria-hidden="true" className="hidden h-3.5 w-px bg-accent-line sm:block" />
+                <span className="hidden text-body text-ink2 sm:block">판정</span>
+              </>
+            } />
 
           {/* 자료 화면(거래·업로드 이력·내 정보)에서도 보여 결과로 돌아올 수 있게 한다 */}
           {showSteps &&
