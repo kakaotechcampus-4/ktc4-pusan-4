@@ -65,9 +65,9 @@ const Bubble = () =>
     d="M32 13c12.7 0 23 7.6 23 17s-10.3 17-23 17a30 30 0 0 1-5.6-.5l-10.6 5.3 3-8.6C12.4 40 9 35 9 30c0-9.4 10.3-17 23-17z"
     fill="#FF5C9A" />
 
-    <circle cx="23" cy="30" r="3" fill="#1B2B4B" />
-    <circle cx="32" cy="30" r="3" fill="#1B2B4B" />
-    <circle cx="41" cy="30" r="3" fill="#1B2B4B" />
+    <circle cx="23" cy="30" r="3" fill="#192F57" />
+    <circle cx="32" cy="30" r="3" fill="#192F57" />
+    <circle cx="41" cy="30" r="3" fill="#192F57" />
   </svg>;
 
 
