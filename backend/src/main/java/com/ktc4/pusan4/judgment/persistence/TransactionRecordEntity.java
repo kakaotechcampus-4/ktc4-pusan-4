@@ -98,6 +98,8 @@ public class TransactionRecordEntity extends AssignedIdEntity<UUID> {
     // 현재 판정(api.md §5). 조회 조건에만 쓰고 TransactionRecordRepository.pointCurrentJudgment 로만 바꾼다.
     // 엔티티가 이 열을 쓰게 두면, 같은 트랜잭션에서 분류 확정 같은 다른 필드 변경이 flush 될 때 엔티티에 남은
     // 이전 값으로 되돌린다.
+    // 같은 이유로 pointCurrentJudgment 뒤에도 이미 읽어 둔 엔티티에는 이전 값이 남는다. 이 필드 값을 읽지 말고,
+    // 현재 판정이 필요하면 TransactionRecordRepository.findCurrentJudgmentId 로 DB 에서 읽는다.
     @Column(name = "current_judgment_id", insertable = false, updatable = false)
     private UUID currentJudgmentId;
 
