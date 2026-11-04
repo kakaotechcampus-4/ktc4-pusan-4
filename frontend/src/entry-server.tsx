@@ -21,6 +21,6 @@ export function render(url: string) {
   );
 }
 
-export { PAGES, SITE_URL } from './seo';
+export { PAGES, SITE_URL, TAGLINE } from './seo';
 export { documentTitle } from './hooks/useDocumentTitle';
 export { NOT_DOING } from './mock/marketing';

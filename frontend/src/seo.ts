@@ -11,6 +11,9 @@
 /** 배포 주소. canonical·og:url·sitemap 의 절대 주소가 된다 (deploy/production.env 의 DOMAIN) */
 export const SITE_URL = 'https://ktc4-pusan-4.duckdns.org';
 
+/** 서비스 한 줄 소개. 공유 이미지(public/og-image.png)에 적힌 문구와 같다 */
+export const TAGLINE = '개인 사업자를 위한 종합소득세 경비 판정 서비스';
+
 export interface PublicPage {
   path: string;
   /** dist 안에 쓸 파일. Caddy 가 /faq 를 faq.html 로 찾는다(deploy/Caddyfile) */
