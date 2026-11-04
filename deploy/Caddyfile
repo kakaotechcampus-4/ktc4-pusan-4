@@ -13,6 +13,10 @@
         }
     }
 
+    # 한 번 들어온 브라우저는 1년 동안 http 주소도 https 로 바꿔 접속한다(HSTS).
+    # http→https 넘김 직전의 암호화 안 된 첫 요청을 없앤다. 인증서가 깨지면 그동안 우회할 수 없으니 갱신이 멈추지 않게 본다
+    header Strict-Transport-Security "max-age=31536000"
+
     handle /api/v1/* {
         # 로그인 뒤 API 요청은 기록하지 않는다
         log_skip

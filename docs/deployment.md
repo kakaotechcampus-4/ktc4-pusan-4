@@ -244,6 +244,7 @@ sudo docker compose --env-file /etc/ktc4/production.env -f /opt/ktc4/repo/deploy
 - 그 밖의 주소(로그인 뒤 화면, 로그인 화면, 없는 주소)는 본문 없는 `app.html`이 나가고 화면은 브라우저가 그린다. `app.html`은 `noindex`라 검색에 잡히지 않는다.
 - `/robots.txt`, `/sitemap.xml`, `/llms.txt`는 빌드가 만든다. 검색엔진과 AI 크롤러(학습·검색·열람)를 모두 허용한다.
 - 화면 파일은 zstd·gzip으로 압축하고, `/assets/*`는 1년 동안 캐시한다(파일명에 내용 해시가 붙는다). API 응답은 손대지 않는다.
+- 모든 https 응답에 HSTS(`Strict-Transport-Security: max-age=31536000`)를 붙인다. 한 번 들어온 브라우저는 1년 동안 http 주소도 https로 바꿔 접속한다. 그 기간에는 인증서가 깨져도 http로 우회할 수 없으므로, Caddy 인증서 갱신이 실패하지 않는지 본다.
 
 배포 뒤 확인:
 
@@ -252,6 +253,7 @@ curl -s https://<도메인>/ | grep -c '<h1'                      # 1
 curl -s https://<도메인>/no-such-page | grep -c noindex         # 1
 curl -s https://<도메인>/robots.txt                             # User-agent: * …
 curl -s -o /dev/null -w '%{content_type}\n' https://<도메인>/llms.txt   # text/plain
+curl -sI https://<도메인>/ | grep -i strict-transport           # max-age=31536000
 ```
 
 카카오톡 미리보기는 카카오가 캐시한다. 제목·설명·이미지를 바꿨으면 [카카오 공유 디버거](https://developers.kakao.com/tool/debugger/sharing)에서 주소의 캐시를 지운다.
