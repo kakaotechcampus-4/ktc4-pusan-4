@@ -48,7 +48,8 @@ export function AuthLayout({ title, children }: {title: string;children: React.R
           </ul>
         </div>
 
-        <p className="max-w-md text-[12px] leading-6 text-white/40">
+        {/* /40 은 bg-ink 위에서 대비 3.80 이라 본문 글자로 모자란다 (접근성 보고서 2026-10-22). /60 이면 7.03 */}
+        <p className="max-w-md text-[12px] leading-6 text-white/60">
           이 서비스는 확인할 항목과 근거까지만 제시합니다. 세액을 확정하거나 세무
           신고를 대리하지 않습니다.
         </p>

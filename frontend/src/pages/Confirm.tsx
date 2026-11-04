@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { CheckIcon, PlayIcon, ShieldCheckIcon } from 'lucide-react';
+import { PlayIcon, ShieldCheckIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { useSession } from '../contexts/SessionContext';
 import { api, ApiRequestError, useApi } from '../api';
@@ -167,26 +167,19 @@ export function Confirm() {
             </div>
           </div>
 
+          {/*
+            네모를 직접 그리지 않고 브라우저 것을 쓴다. 접근성 보고서(2026-10-22)가 이 자리에서
+            세 가지를 지적했다 — 키보드 초점이 안 보이고, 레이블이 안 잡히고, 선택 전 테두리가
+            흰 바탕 대비 1.19 다. 셋 다 `sr-only` 로 진짜 입력을 숨기고 span 으로 흉내 낸 탓이다.
+            Signup.tsx·Questions.tsx 가 이미 브라우저 네모를 쓰고 있어 관례도 이쪽이다
+          */}
           <label className="mt-4 flex cursor-pointer items-start gap-2.5 rounded-xl bg-canvas p-3.5">
-            <span
-              className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors duration-150 ${
-              agreed ? 'border-accent bg-accent' : 'border-line bg-surface'}`
-              }>
-              
-              {agreed &&
-              <CheckIcon
-                className="h-3 w-3 text-white"
-                aria-hidden="true"
-                strokeWidth={3} />
-
-              }
-            </span>
             <input
               type="checkbox"
               checked={agreed}
               onChange={(event) => setAgreed(event.target.checked)}
-              className="sr-only" />
-            
+              className="mt-1 h-4 w-4 shrink-0 accent-accent" />
+
             <span className="text-small leading-6 text-ink2">
               이 결과가 세무 신고를 확정하는 것이 아니며, 최종 판단에는 세무대리인의
               확인이 필요하다는 점을 이해했습니다.

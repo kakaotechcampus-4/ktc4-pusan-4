@@ -226,9 +226,13 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
                 홈
               </Link>
             </li>
-            <li aria-hidden="true">›</li>
+            {/*
+              구분 기호를 aria-hidden 으로 숨기지 않는다. 접근성 보고서(2026-10-22)가
+              「경로 영역의 기호(>) 정보 인식 불가」로 지적했다 — 단계 사이를 가르는 정보다
+            */}
+            <li>›</li>
             <li>{crumb[0]}</li>
-            <li aria-hidden="true">›</li>
+            <li>›</li>
             <li className="text-ink2">{crumb[1]}</li>
           </ol>
         </nav>
