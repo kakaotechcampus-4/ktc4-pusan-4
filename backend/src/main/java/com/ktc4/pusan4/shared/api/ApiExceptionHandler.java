@@ -43,7 +43,7 @@ public class ApiExceptionHandler {
     ResponseEntity<ErrorResponse> handleApiException(ApiException exception) {
         return ResponseEntity.status(exception.getStatus())
             .headers(exception.getHeaders())
-            .body(new ErrorResponse(exception.getCode(), exception.getMessage(), traceId(), exception.getRunId()));
+            .body(error(exception.getCode(), exception.getMessage(), exception.getRunId()));
     }
 
     /**
@@ -91,10 +91,11 @@ public class ApiExceptionHandler {
     }
 
     private ErrorResponse error(String code, String message) {
-        return new ErrorResponse(code, message, traceId(), null);
+        return error(code, message, null);
     }
 
-    private String traceId() {
-        return uuidGenerator.generate().toString();
+    /** 모든 에러 본문이 여기서 traceId 를 얻는다. */
+    private ErrorResponse error(String code, String message, String runId) {
+        return new ErrorResponse(code, message, uuidGenerator.generate().toString(), runId);
     }
 }
