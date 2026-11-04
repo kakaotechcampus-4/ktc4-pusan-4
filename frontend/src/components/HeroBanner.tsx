@@ -45,9 +45,16 @@ function FigureGrid({ children }: {children: React.ReactNode;}) {
 
 }
 
+/** 칸 높이를 셋이 같게 맞춘다. 글 쓰는 칸은 svg 가 아니라 이쪽을 쓴다 */
+function HtmlCell({ children }: {children: React.ReactNode;}) {
+  return (
+    <div className="flex h-[104px] items-center lg:h-[124px]">{children}</div>);
+
+}
+
 /**
  * 판정 흐름. 칸마다 그 단계를 그린다 —
- * 올린 거래 목록 / 문진에 답한 카드 / 세 갈래로 갈린 결과
+ * 올린 거래 목록 / 문진에 답한 카드 / 실제로 나오는 판정 카드 한 장
  */
 function FlowFigure() {
   return (
@@ -81,19 +88,24 @@ function FlowFigure() {
         <rect x="22" y="80" width="58" height="10" rx="5" fill="#FFE600" />
       </FigureCell>
 
-      {/* 3. 건별 판정과 근거 — 가능·확인 필요·불가 */}
-      <FigureCell>
-        {[
-        { y: 24, width: 158, color: '#12B76A' },
-        { y: 60, width: 120, color: '#F7A51B' },
-        { y: 96, width: 82, color: '#FF5A5A' }].
-        map((lane) =>
-        <g key={lane.y}>
-            <circle cx="8" cy={lane.y} r="8" fill={lane.color} />
-            <rect x="24" y={lane.y - 7} width={lane.width} height="14" rx="7" fill={lane.color} />
-          </g>
-        )}
-      </FigureCell>
+      {/*
+        3. 건별 판정과 근거 — 막대 대신 결과 화면에 실제로 나오는 카드를 그대로 줄여 놓는다 (#238 리뷰).
+        배지 기호·색은 utils/verdict.ts 의 VERDICT_META(AVAILABLE = ✓ / ok)와 같다
+      */}
+      <HtmlCell>
+        <div className="w-full max-w-[232px] rounded-xl bg-surface p-3.5">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-small font-bold leading-5 text-ink">AWS</p>
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-ok-line bg-ok-bg px-2 py-0.5 text-caption font-bold text-ok">
+              ✓ 가능
+            </span>
+          </div>
+          <p className="mt-0.5 text-body font-bold tabular-nums text-ink">128,000원</p>
+          <p className="mt-2.5 border-t border-line pt-2 text-caption text-muted">
+            소득세법 제27조 ①
+          </p>
+        </div>
+      </HtmlCell>
     </FigureGrid>);
 
 }
@@ -129,13 +141,21 @@ function NotDoingFigure() {
         </Forbidden>
       </FigureCell>
 
-      {/* 2. 세액 확정 제시 — 줄을 긋고 아래에 확정 금액을 적는다 */}
+      {/*
+        2. 세액 확정 제시 — 계산기. 앞의 그림(줄 아래 굵은 금액)은 무슨 뜻인지 안 읽혔다 (#238 리뷰).
+        세액을 계산해 답을 내놓는 도구라 글자 없이도 읽힌다
+      */}
       <FigureCell>
         <Forbidden>
-          <rect x="34" y="36" width="48" height="8" rx="4" fill="#FFFFFF" fillOpacity="0.6" />
-          <rect x="34" y="52" width="32" height="8" rx="4" fill="#FFFFFF" fillOpacity="0.6" />
-          <rect x="30" y="70" width="56" height="3" rx="1.5" fill="#FFFFFF" fillOpacity="0.6" />
-          <rect x="34" y="80" width="48" height="12" rx="6" fill="#FFFFFF" fillOpacity="0.7" />
+          <rect x="36" y="26" width="44" height="64" rx="8" fill="#FFFFFF" fillOpacity="0.6" />
+          {/* 표시창 */}
+          <rect x="43" y="33" width="30" height="13" rx="3" fill="#152F56" fillOpacity="0.55" />
+          {/* 버튼 여섯 개 */}
+          {[54, 67, 80].map((y) =>
+          [45, 56, 67].map((x) =>
+          <rect key={`${x}-${y}`} x={x} y={y} width="7" height="7" rx="2" fill="#152F56" fillOpacity="0.45" />
+          )
+          )}
         </Forbidden>
       </FigureCell>
 
@@ -190,11 +210,18 @@ export function HeroBanner() {
   const track = useRef<HTMLUListElement>(null);
   const [page, setPage] = useState(0);
 
+  /**
+   * 끝에서 한 번 더 누르면 반대쪽 끝으로 돈다 (#238 리뷰). 3 다음은 1 이다.
+   * 도는 걸음만 즉시 옮긴다 — 부드럽게 끌면 중간 장면을 거꾸로 훑고 지나가 되감기처럼 보인다
+   */
   const move = (direction: -1 | 1) => {
     const el = track.current;
     if (!el) return;
-    const next = Math.min(Math.max(page + direction, 0), SLIDE_COUNT - 1);
-    const smooth = !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const raw = page + direction;
+    const wrapping = raw < 0 || raw > SLIDE_COUNT - 1;
+    const next = (raw + SLIDE_COUNT) % SLIDE_COUNT;
+    const smooth =
+    !wrapping && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     el.scrollTo({ left: next * el.clientWidth, behavior: smooth ? 'smooth' : 'auto' });
   };
 
@@ -250,9 +277,8 @@ export function HeroBanner() {
         <button
           type="button"
           aria-label="이전 장면"
-          disabled={page === 0}
           onClick={() => move(-1)}
-          className="flex h-7 w-7 items-center justify-center rounded-full transition-colors hover:bg-white/15 disabled:opacity-30 disabled:hover:bg-transparent">
+          className="flex h-7 w-7 items-center justify-center rounded-full transition-colors hover:bg-white/15">
 
           <ChevronLeftIcon className="h-4 w-4" aria-hidden="true" />
         </button>
@@ -262,9 +288,8 @@ export function HeroBanner() {
         <button
           type="button"
           aria-label="다음 장면"
-          disabled={page === SLIDE_COUNT - 1}
           onClick={() => move(1)}
-          className="flex h-7 w-7 items-center justify-center rounded-full transition-colors hover:bg-white/15 disabled:opacity-30 disabled:hover:bg-transparent">
+          className="flex h-7 w-7 items-center justify-center rounded-full transition-colors hover:bg-white/15">
 
           <ChevronRightIcon className="h-4 w-4" aria-hidden="true" />
         </button>
