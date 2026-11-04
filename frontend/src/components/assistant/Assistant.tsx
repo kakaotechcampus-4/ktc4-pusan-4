@@ -43,6 +43,7 @@ export function Assistant() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const button = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLElement>(null);
   const wasOpen = useRef(false);
 
   // 접으면 버튼으로 초점을 돌려준다
@@ -51,6 +52,27 @@ export function Assistant() {
     wasOpen.current = open;
   }, [open]);
 
+  /*
+   * 패널 밖을 누르면 접는다. 버튼은 빼 둔다 — 버튼에도 접는 일이 걸려 있어서,
+   * 여기서 먼저 접으면 버튼이 다시 펴고 그대로 열려 있다.
+   *
+   * click 이 아니라 pointerdown 으로 듣는다. 누른 자리의 요소가 그 사이에 사라지면
+   * click 때는 패널 안이었는지 밖이었는지 알 수 없다.
+   * 좁은 화면에서는 패널이 화면을 다 덮어서 밖이 없다 — 그대로 둬도 달라지지 않는다
+   */
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (panel.current?.contains(target)) return;
+      if (button.current?.contains(target)) return;
+      setOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, [open, setOpen]);
+
   if (status !== 'signedIn') {
     // 이어 가기를 기다리는 동안 버튼이 번쩍 나타났다 바뀌지 않게, 메인에서만 로그인 버튼을 둔다
     return pathname === '/' && status !== 'restoring' ? <SignInLauncher /> : null;
@@ -58,7 +80,7 @@ export function Assistant() {
 
   return (
     <>
-      {open && <Panel onClose={() => setOpen(false)} />}
+      {open && <Panel onClose={() => setOpen(false)} panelRef={panel} />}
       {/* 적용 결과는 왼쪽 아래에 띄운다. 오른쪽은 패널과 버튼이 차지한다.
           좁은 화면에서 패널이 열려 있으면 아래는 입력칸이라 위로 올리고, 눌러도 뒤로 지나가게 한다 */}
       {toast &&
@@ -123,7 +145,13 @@ export function Assistant() {
 
 }
 
-function Panel({ onClose }: {onClose: () => void;}) {
+function Panel({
+  onClose,
+  panelRef
+
+
+
+}: {onClose: () => void; panelRef: React.RefObject<HTMLElement>;}) {
   const { entries, pending, error, draft, setDraft, send, showHelp, showNext } = useAssistant();
   const input = useRef<HTMLInputElement>(null);
   const end = useRef<HTMLDivElement>(null);
@@ -175,6 +203,7 @@ function Panel({ onClose }: {onClose: () => void;}) {
 
   return (
     <section
+      ref={panelRef}
       role="dialog"
       aria-label="비서 Really"
       onKeyDown={onKeyDown}
