@@ -80,6 +80,24 @@ class RequestTraceFilterTest {
     }
 
     @Test
+    void api_exception_trace_id_matches_header(CapturedOutput output) throws Exception {
+        // given: 404·409 같은 전용 코드 에러는 500 과 다른 핸들러(handleApiException)로 나간다
+        given(userService.get(any())).willThrow(
+            new ApiException(org.springframework.http.HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "없음"));
+
+        // when
+        MvcResult result = mockMvc.perform(get("/api/v1/users/me"))
+            .andExpect(status().isNotFound())
+            .andReturn();
+
+        // then
+        String traceId = result.getResponse().getHeader("X-Trace-Id");
+        assertThat(objectMapper.readTree(result.getResponse().getContentAsString()).get("traceId").asText())
+            .isEqualTo(traceId);
+        assertThat(requestLog(logLines(output, traceId)).path("status").asInt()).isEqualTo(404);
+    }
+
+    @Test
     void request_log_has_contract_fields_without_query_string(CapturedOutput output) throws Exception {
         // given
         given(userService.get(any())).willReturn(new AppUser(
