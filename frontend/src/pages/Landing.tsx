@@ -9,13 +9,12 @@ import { IntroOverlay } from '../components/IntroOverlay';
 import { ExampleCarousel } from '../components/ExampleCarousel';
 import {
   FLOW_STEPS,
-  HERO_SUMMARY,
   NOT_DOING,
+  RULE_CARD_COUNT,
   STATS,
-  SYSTEM_FEATURES } from
+  SYSTEM_FEATURES,
+  VERDICTS } from
 '../mock/marketing';
-
-const won = (value: number) => value.toLocaleString('ko-KR');
 
 /** 인트로를 봤다는 표시. 처음 한 번만 띄운다 — 로고로 다녀와도 다시 뜨지 않는다 */
 const INTRO_SEEN = 'preet.intro.seen';
@@ -112,7 +111,6 @@ const BOARDS = [
 
 export function Landing() {
   const { status } = useSession();
-  const [ok, ask] = HERO_SUMMARY.distribution;
 
   const [intro, setIntro] = useState(wantsIntro);
 
@@ -154,50 +152,50 @@ export function Landing() {
               </div>
             </div>
 
-            {/* 첫 장은 검정에 큰 숫자, 아래로 회색 (레퍼런스 wrap_banner) */}
+            {/*
+              첫 장은 남색에 큰 숫자, 아래로 회색 (레퍼런스 wrap_banner).
+              로그인 전에는 보여 줄 실제 판정 결과가 없다. 지어낸 금액·건수 대신
+              세어서 확인되는 것(규칙 카드 수)과 제품이 하는 일만 둔다
+            */}
             <div className="flex flex-col gap-2">
               <div className="rounded-2xl bg-surface2 p-5 text-white">
-                <p className="text-caption text-white">이번 달 인정 경비</p>
+                <p className="text-caption text-white">검수를 마친 규칙 카드</p>
                 <p className="mt-2 whitespace-nowrap text-ir-num font-bold tracking-ir-sm tabular-nums">
-                  {won(HERO_SUMMARY.availableAmount)}
-                  <span className="ml-0.5 text-body font-normal">원</span>
+                  {RULE_CARD_COUNT}
+                  <span className="ml-0.5 text-body font-normal">장</span>
                 </p>
-                <p className="mt-2 text-caption text-white tabular-nums">
-                  {HERO_SUMMARY.total}건 중 {ok.count}건 가능
+                <p className="mt-2 text-caption leading-5 text-white [word-break:keep-all]">
+                  판정마다 어느 카드가 걸렸는지 함께 보여줍니다
                 </p>
               </div>
 
               <div className="rounded-2xl bg-surface p-5">
-                <p className="text-caption text-muted">판정 분포</p>
-                <ul className="mt-4 space-y-3">
-                  {HERO_SUMMARY.distribution.map((item) =>
+                <p className="text-caption text-muted">판정 세 갈래</p>
+                <ul className="mt-4 space-y-3.5">
+                  {VERDICTS.map((item) =>
                   <li key={item.label}>
-                      <div className="flex items-baseline justify-between text-small">
-                        <span className="text-ink2">{item.label}</span>
-                        <span className="font-bold tabular-nums text-ink">
-                          {item.count}건
-                        </span>
-                      </div>
-                      <div className="mt-1.5 h-1 w-full rounded-full bg-accent-line">
-                        <div
-                        className={`h-1 rounded-full ${item.bar}`}
-                        style={{
-                          width: `${Math.round(item.count / HERO_SUMMARY.total * 100)}%`
-                        }} />
+                      <div className="flex items-center gap-1.5 text-small">
+                        <span
+                        className={`h-1.5 w-1.5 shrink-0 rounded-full ${item.bar}`}
+                        aria-hidden="true" />
 
+                        <span className="font-bold text-ink">{item.label}</span>
                       </div>
+                      <p className="mt-1 text-caption leading-5 text-ink2 [word-break:keep-all]">
+                        {item.body}
+                      </p>
                     </li>
                   )}
                 </ul>
               </div>
 
               <div className="flex-1 rounded-2xl bg-surface p-5">
-                <p className="text-caption text-muted">지금 할 일</p>
+                <p className="text-caption text-muted">되돌릴 수 없는 동작</p>
                 <p className="mt-2 text-h4 font-bold tracking-ir-sm text-ink">
-                  확인 필요 {ask.count}건
+                  없습니다
                 </p>
                 <p className="mt-2 text-small leading-6 text-ink2 [word-break:keep-all]">
-                  같은 사유끼리 묶어 두었습니다. 답하면 그 자리에서 다시
+                  신고·제출·발송을 만들지 않습니다. 답을 고치면 그 자리에서 다시
                   판정합니다.
                 </p>
               </div>
@@ -270,7 +268,7 @@ export function Landing() {
 
         {/* 숫자 줄 — 위아래 괘선만 */}
         <section id="evidence" className="mt-28 border-y border-line">
-          <dl className={`${SHELL} grid grid-cols-2 gap-10 py-16 md:grid-cols-4`}>
+          <dl className={`${SHELL} grid grid-cols-2 gap-10 py-16 md:grid-cols-3`}>
             {STATS.map((stat) =>
             <div key={stat.label}>
                 <dt className="sr-only">{stat.label}</dt>
