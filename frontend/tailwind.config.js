@@ -53,7 +53,7 @@ export default {content: [
         /** 표처럼 패널 위에서 흰 바탕이 필요할 때 */
         sheet: '#FFFFFF',
         /** 첫 화면 큰 판. 어두운 남색이라 글자·그림은 흰색으로 올린다 */
-        surface2: '#2B6CF2',
+        surface2: '#2C6AE8',
         line: '#E5E8EB',
         /** surface 위에서도 보여야 한다. surface 와 같은 값이면 회색 패널 안의 구분선이 사라진다 */
         line2: '#EDEFF2',
@@ -64,13 +64,13 @@ export default {content: [
         muted: '#6B7684',
         /** 주된 동작은 검정이다. 파랑은 문장 속 링크에만 쓴다 */
         accent: {
-          DEFAULT: '#2B6CF2',
+          DEFAULT: '#2C6AE8',
           hover: '#1C5FD4',
           /** 고른 선택지·진행 중인 단계의 바탕. surface 패널 위에서도 구별돼야 한다 */
           soft: '#E4EDFB',
           line: '#DCE3EB',
         },
-        link: '#2B6CF2',
+        link: '#2C6AE8',
         /** 한 화면에 한 번만 쓰는 강조 블록 */
         highlight: '#FF5C9A',
         ok: {
