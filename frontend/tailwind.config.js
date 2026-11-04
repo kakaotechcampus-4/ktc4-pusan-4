@@ -49,30 +49,30 @@ export default {content: [
       colors: {
         /** 바탕은 흰색이고 패널이 아주 옅은 회색이다 */
         canvas: '#FFFFFF',
-        surface: '#F3F5F7',
+        surface: '#F2F4F6',
         /** 표처럼 패널 위에서 흰 바탕이 필요할 때 */
         sheet: '#FFFFFF',
         /** 첫 화면 큰 판. 어두운 남색이라 글자·그림은 흰색으로 올린다 */
-        surface2: '#122E55',
-        line: '#E8ECF0',
+        surface2: '#2C6AE8',
+        line: '#E5E8EB',
         /** surface 위에서도 보여야 한다. surface 와 같은 값이면 회색 패널 안의 구분선이 사라진다 */
-        line2: '#EBEEF2',
+        line2: '#EDEFF2',
         /** 괘선 중 굵은 것 — 표 머리 위에 긋는다 */
-        rule: '#16181D',
-        ink: '#16181D',
-        ink2: '#30363F',
-        muted: '#626B79',
+        rule: '#191F28',
+        ink: '#191F28',
+        ink2: '#4E5968',
+        muted: '#6B7684',
         /** 주된 동작은 검정이다. 파랑은 문장 속 링크에만 쓴다 */
         accent: {
-          DEFAULT: '#16181D',
-          hover: '#30363F',
+          DEFAULT: '#2C6AE8',
+          hover: '#1C5FD4',
           /** 고른 선택지·진행 중인 단계의 바탕. surface 패널 위에서도 구별돼야 한다 */
-          soft: '#E6ECF4',
-          line: '#DCE1E8',
+          soft: '#E4EDFB',
+          line: '#DCE3EB',
         },
-        link: '#1B64DA',
+        link: '#2C6AE8',
         /** 한 화면에 한 번만 쓰는 강조 블록 */
-        highlight: '#FFE600',
+        highlight: '#FF5C9A',
         ok: {
           DEFAULT: '#00703D',
           bg: '#E8F6F0',
@@ -107,6 +107,11 @@ export default {content: [
       boxShadow: {
         card: 'none',
         panel: 'none',
+        /**
+         * 머리띠에만 쓴다. 머리띠는 바탕(canvas)과 같은 색이라 흰 화면에서 경계가 사라진다.
+         * 괘선만으로는 스크롤한 내용이 밑으로 지나가는 것이 안 보여서 아주 옅은 음영을 같이 둔다
+         */
+        header: '0 1px 0 0 rgba(22, 24, 29, 0.06), 0 6px 16px -10px rgba(22, 24, 29, 0.22)',
       },
       transitionTimingFunction: {
         snap: 'cubic-bezier(0.23, 1, 0.32, 1)',

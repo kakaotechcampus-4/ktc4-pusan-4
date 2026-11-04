@@ -52,14 +52,14 @@ export function IntroOverlay({ onDone }: {onDone: () => void;}) {
       <button
         type="button"
         onClick={() => setLeaving(true)}
-        className="absolute right-6 top-6 z-20 rounded-full border border-white/20 px-4 py-1.5 text-small text-white/70 transition-colors hover:border-white/40 hover:text-white sm:right-8 sm:top-8">
+        className="absolute right-6 top-6 z-20 rounded-full border border-white/20 px-4 py-1.5 text-small text-white transition-colors hover:border-white/40 hover:text-white sm:right-8 sm:top-8">
 
         건너뛰기
       </button>
 
       {/* 글은 궤도 위에 올린다. 첫 모션에서 제일 먼저 올라온다 */}
       <div className="relative z-10 px-8 pt-20 animate-rise motion-reduce:animate-none sm:px-16 sm:pt-24">
-        <p className="text-body text-highlight">
+        <p className="text-body text-white">
           1인 IT 개발 사업자를 위한 경비 판정
         </p>
         <strong className="mt-5 block text-h2 font-normal leading-tight tracking-ir text-white [word-break:keep-all] lg:text-ir-display">
