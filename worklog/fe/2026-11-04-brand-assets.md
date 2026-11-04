@@ -16,3 +16,9 @@
 ## 남은 것 · 아는 문제
 
 - `index.html` 은 지금 `favicon.svg` 만 연결돼 있다. `favicon.ico`, `apple-touch-icon.png`, `site.webmanifest` 연결은 화면 적용 때 한다.
+
+## 15:00 기존 파일은 건드리지 않고 폴더만 올리는 것으로 바꿈
+
+- `frontend/public/favicon.svg` 덮어쓰기를 되돌리고, `public/` 에 넣었던 파비콘 세트를 뺐다.
+- 브랜드 폴더를 원본 구조 그대로 `frontend/src/assets/brand/` 한 곳에만 넣었다(`favicon/` 포함).
+- 이 PR 은 새 파일 추가만 한다. 탭 아이콘·헤더 로고·Really 버튼 적용은 FE 담당이 따로 한다.
