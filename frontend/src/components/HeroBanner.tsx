@@ -50,14 +50,66 @@ function FigureGrid({ children }: {children: React.ReactNode;}) {
  * 제목과 도식 사이가 비어 보인다는 지적 때문에 넣었다 (#238 리뷰) — 세 장면이 한 판으로 읽힌다.
  * 글과 도식보다 연하게 둔다. 같은 농도로 두면 테가 앞으로 나와 읽는 것을 방해한다
  */
-function RingBackdrop() {
+function RingBackdrop({ variant }: {variant: 'flow' | 'bound';}) {
+  const id = `ring-${variant}`;
+  const flow = variant === 'flow';
+  /** 테 위에 찍는 점. flow 는 세 단계를 궤도에 올리고, bound 는 넘지 않는 선만 남긴다 */
+  const nodes = flow ?
+  [
+  { angle: -118, r: 34, fill: '#12B76A' },
+  { angle: -34, r: 34, fill: '#F7A51B' },
+  { angle: 48, r: 34, fill: '#FF5A5A' }] :
+  [];
+
   return (
     <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
-      <div className="absolute left-1/2 top-1/2 aspect-square w-[88%] -translate-x-1/2 -translate-y-1/2 lg:left-[66%] lg:h-[94%] lg:w-auto">
-        <span className="absolute left-1/2 top-1/2 aspect-square w-[104%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10" />
-        <span className="absolute left-1/2 top-1/2 aspect-square w-[72%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10" />
-        <span className="absolute left-1/2 top-1/2 aspect-square w-[40%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10" />
-      </div>
+      <svg
+        viewBox="0 0 100 100"
+        className="absolute left-1/2 top-1/2 aspect-square w-[92%] -translate-x-1/2 -translate-y-1/2 lg:left-[66%] lg:h-[98%] lg:w-auto">
+
+        <defs>
+          {/* 테만 있으면 선 세 줄로 보인다. 가운데를 아주 옅게 밝혀 판이 비어 보이지 않게 한다 */}
+          <radialGradient id={`${id}-glow`}>
+            <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.09" />
+            <stop offset="55%" stopColor="#FFFFFF" stopOpacity="0.035" />
+            <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
+          </radialGradient>
+        </defs>
+
+        <circle cx="50" cy="50" r="50" fill={`url(#${id}-glow)`} />
+
+        {/*
+          바깥 테는 장면마다 다르다. 「하지 않는 일」은 끊어진 선으로 둔다 —
+          넘지 않는 경계를 그대로 그린 것이고, 안쪽을 비워 두면 뜻이 더 분명해진다
+        */}
+        <circle
+          cx="50"
+          cy="50"
+          r="48"
+          fill="none"
+          stroke="#FFFFFF"
+          strokeOpacity={flow ? 0.16 : 0.22}
+          strokeWidth="0.4"
+          strokeDasharray={flow ? undefined : '2.4 2.2'} />
+
+        <circle cx="50" cy="50" r="34" fill="none" stroke="#FFFFFF" strokeOpacity="0.13" strokeWidth="0.4" />
+        {flow &&
+        <circle cx="50" cy="50" r="19" fill="none" stroke="#FFFFFF" strokeOpacity="0.1" strokeWidth="0.4" />
+        }
+
+        {nodes.map((node) => {
+          const rad = node.angle * Math.PI / 180;
+          return (
+            <circle
+              key={node.angle}
+              cx={50 + node.r * Math.cos(rad)}
+              cy={50 + node.r * Math.sin(rad)}
+              r="1.7"
+              fill={node.fill}
+              fillOpacity="0.85" />);
+
+        })}
+      </svg>
     </div>);
 
 }
@@ -196,15 +248,16 @@ function TextSlide({
   eyebrow,
   title,
   items,
-  figure
+  figure,
+  backdrop
 
 
 
 
-}: {eyebrow: string; title: string; items: string[]; figure: React.ReactNode;}) {
+}: {eyebrow: string; title: string; items: string[]; figure: React.ReactNode; backdrop: 'flow' | 'bound';}) {
   return (
     <div className="absolute inset-0 flex flex-col px-8 pt-12 sm:px-16 sm:pt-16">
-      <RingBackdrop />
+      <RingBackdrop variant={backdrop} />
       <p className="relative text-body text-highlight">{eyebrow}</p>
       <strong className="mt-5 block whitespace-pre-line relative text-h2 font-normal leading-tight tracking-ir text-white [word-break:keep-all] lg:text-ir-display">
         {title}
@@ -273,7 +326,8 @@ export function HeroBanner() {
             eyebrow="판정 흐름"
             title={'카드내역 한 번에\n건별 판정까지'}
             items={FLOW_STEPS.slice(0, 3).map((step) => step.title)}
-            figure={<FlowFigure />} />
+            figure={<FlowFigure />}
+            backdrop="flow" />
 
         </Slide>
 
@@ -282,7 +336,8 @@ export function HeroBanner() {
             eyebrow="하지 않는 일"
             title={'할 수 있는 것보다\n하지 않는 것을 먼저'}
             items={NOT_DOING.map((item) => item.title)}
-            figure={<NotDoingFigure />} />
+            figure={<NotDoingFigure />}
+            backdrop="bound" />
 
         </Slide>
       </ul>
