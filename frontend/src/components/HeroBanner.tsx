@@ -45,6 +45,23 @@ function FigureGrid({ children }: {children: React.ReactNode;}) {
 
 }
 
+/**
+ * 2·3번 장면 뒤에 까는 궤도 테. 1번 장면(OrbitStage)과 중심·크기가 같고 그림과 문구만 없다.
+ * 제목과 도식 사이가 비어 보인다는 지적 때문에 넣었다 (#238 리뷰) — 세 장면이 한 판으로 읽힌다.
+ * 글과 도식보다 연하게 둔다. 같은 농도로 두면 테가 앞으로 나와 읽는 것을 방해한다
+ */
+function RingBackdrop() {
+  return (
+    <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
+      <div className="absolute left-1/2 top-1/2 aspect-square w-[88%] -translate-x-1/2 -translate-y-1/2 lg:left-[66%] lg:h-[94%] lg:w-auto">
+        <span className="absolute left-1/2 top-1/2 aspect-square w-[104%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10" />
+        <span className="absolute left-1/2 top-1/2 aspect-square w-[72%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10" />
+        <span className="absolute left-1/2 top-1/2 aspect-square w-[40%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10" />
+      </div>
+    </div>);
+
+}
+
 /** 칸 높이를 셋이 같게 맞춘다. 글 쓰는 칸은 svg 가 아니라 이쪽을 쓴다 */
 function HtmlCell({ children }: {children: React.ReactNode;}) {
   return (
@@ -187,13 +204,14 @@ function TextSlide({
 }: {eyebrow: string; title: string; items: string[]; figure: React.ReactNode;}) {
   return (
     <div className="absolute inset-0 flex flex-col px-8 pt-12 sm:px-16 sm:pt-16">
-      <p className="text-body text-highlight">{eyebrow}</p>
-      <strong className="mt-5 block whitespace-pre-line text-h2 font-normal leading-tight tracking-ir text-white [word-break:keep-all] lg:text-ir-display">
+      <RingBackdrop />
+      <p className="relative text-body text-highlight">{eyebrow}</p>
+      <strong className="mt-5 block whitespace-pre-line relative text-h2 font-normal leading-tight tracking-ir text-white [word-break:keep-all] lg:text-ir-display">
         {title}
       </strong>
       {/* 도식은 제목과 항목 사이 빈 자리를 채운다. 좁은 화면에서는 자리가 없어 숨는다 */}
-      <div className="flex min-h-0 flex-1 items-center sm:py-8">{figure}</div>
-      <ul className="grid gap-6 pb-24 sm:grid-cols-3">
+      <div className="relative flex min-h-0 flex-1 items-center sm:py-8">{figure}</div>
+      <ul className="relative grid gap-6 pb-24 sm:grid-cols-3">
         {items.map((item) =>
         <li key={item} className="border-t border-white/20 pt-5">
             <strong className="block text-h4 font-bold leading-tight tracking-ir-sm text-white [word-break:keep-all]">
