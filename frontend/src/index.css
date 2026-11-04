@@ -28,6 +28,15 @@ body {
   background: #ffe600;
 }
 
+/* 인트로가 뜨기 전에 미리 깔아 두는 판(index.html). 인트로(IntroOverlay, z-50)와 같은 색이라 이어져 보인다 */
+html.intro-cover body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: theme('colors.surface2');
+}
+
 /* 요약을 PDF 로 저장할 때(Summary.tsx 「PDF로 저장」). 비서 패널이 준 오른쪽 여백과 배경색을 빼고 본문만 찍는다 */
 @media print {
   @page {
