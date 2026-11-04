@@ -235,3 +235,40 @@ sudo docker compose --env-file /etc/ktc4/production.env -f /opt/ktc4/repo/deploy
 - `DB_USERNAME`·`DB_NAME`은 `production.env`의 값이다(`set -a; source /etc/ktc4/production.env; set +a`로 먼저 읽는다).
 - 이메일이 없는 카카오 계정은 `where id = '<사용자 id>'`로 지정한다. id 는 그 계정으로 `GET /api/v1/users/me`를 불러 확인한다.
 - 관리자를 해제할 때는 `role = 'USER'`로 되돌린다. 바뀐 role 은 다음 요청부터 바로 반영된다.
+
+## 13. 웹과 검색 노출
+
+웹 컨테이너의 Caddy(`deploy/Caddyfile`)가 화면 파일을 낸다.
+
+- 공개 페이지(`/`, `/faq`, `/terms`, `/privacy`)는 빌드 때 미리 그린 HTML(`index.html`, `faq.html` …)이 나간다. 크롤러와 카카오톡 미리보기가 자바스크립트 없이 본문·제목을 읽는다. 목록은 `frontend/src/seo.ts`다.
+- 그 밖의 주소(로그인 뒤 화면, 로그인 화면, 없는 주소)는 본문 없는 `app.html`이 나가고 화면은 브라우저가 그린다. `app.html`은 `noindex`라 검색에 잡히지 않는다.
+- `/robots.txt`, `/sitemap.xml`, `/llms.txt`는 빌드가 만든다. 검색엔진과 AI 크롤러(학습·검색·열람)를 모두 허용한다.
+- 화면 파일은 zstd·gzip으로 압축하고, `/assets/*`는 1년 동안 캐시한다(파일명에 내용 해시가 붙는다). API 응답은 손대지 않는다.
+
+배포 뒤 확인:
+
+```bash
+curl -s https://<도메인>/ | grep -c '<h1'                      # 1
+curl -s https://<도메인>/no-such-page | grep -c noindex         # 1
+curl -s https://<도메인>/robots.txt                             # User-agent: * …
+curl -s -o /dev/null -w '%{content_type}\n' https://<도메인>/llms.txt   # text/plain
+```
+
+카카오톡 미리보기는 카카오가 캐시한다. 제목·설명·이미지를 바꿨으면 [카카오 공유 디버거](https://developers.kakao.com/tool/debugger/sharing)에서 주소의 캐시를 지운다.
+
+### 접근 기록
+
+검색엔진·AI 크롤러가 언제 얼마나 읽어 가는지 세려고 남긴다.
+
+- `caddy-data` 볼륨의 `/data/access.log`에 JSON 한 줄씩 쌓는다. 10MB를 넘으면 gzip으로 압축한 파일로 굴리고 5개까지만 둔다.
+- IP는 앞 두 자리만 남긴다(IPv4 /16, IPv6 /32). 쿠키·인증 헤더는 Caddy가 지운다. `/api/v1/*` 요청은 남기지 않는다.
+- 남기는 항목을 바꾸면 개인정보처리방침(`frontend/src/pages/public/Privacy.tsx`)의 「접속 기록」도 같이 고친다.
+
+크롤러별 방문 수:
+
+```bash
+sudo docker compose --env-file /etc/ktc4/production.env -f /opt/ktc4/repo/deploy/compose.yaml exec -T web \
+  sh -c 'cat /data/access.log; zcat /data/access-*.log.gz 2>/dev/null' \
+  | grep -oiE 'GPTBot|OAI-SearchBot|ChatGPT-User|ClaudeBot|Claude-SearchBot|Claude-User|PerplexityBot|Perplexity-User|CCBot|Googlebot|bingbot|Yeti' \
+  | sort | uniq -c
+```
