@@ -18,7 +18,7 @@ export interface PublicPage {
   path: string;
   /** dist 안에 쓸 파일. Caddy 가 /faq 를 faq.html 로 찾는다(deploy/Caddyfile) */
   file: string;
-  /** 「제목 · PreeT」 꼴로 붙는다 */
+  /** 「제목 · PreeT」 꼴로 붙는다. PreeT 로 시작하면 그대로 쓴다 */
   title: string;
   description: string;
 }
@@ -27,7 +27,8 @@ export const PAGES = {
   home: {
     path: '/',
     file: 'index.html',
-    title: '개인 사업자 종합소득세 경비 판정',
+    // 홈은 브랜드를 앞에 둔다. 좁은 탭에도 PreeT 가 보이고, 검색 제목에는 키워드가 남는다
+    title: 'PreeT · 개인 사업자 종합소득세 경비 판정',
     description: '카드 이용내역을 올리면 거래마다 경비 가능·불가·확인 필요를 판정하고 근거 조문을 붙입니다.'
   },
   faq: {
