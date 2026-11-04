@@ -3,11 +3,14 @@ package com.ktc4.pusan4.integration;
 import com.ktc4.pusan4.judgment.domain.JudgmentSummary;
 import com.ktc4.pusan4.judgment.domain.LimitYearTotal;
 import com.ktc4.pusan4.judgment.domain.Verdict;
+import com.ktc4.pusan4.judgment.persistence.BusinessContextRevisionService;
 import com.ktc4.pusan4.judgment.persistence.JudgmentOverrideService;
 import com.ktc4.pusan4.judgment.persistence.JudgmentQueryService;
 import com.ktc4.pusan4.judgment.persistence.LimitSettlementService;
 import com.ktc4.pusan4.transaction.persistence.TransactionService;
 import com.ktc4.pusan4.transaction.persistence.UploadBatchService;
+import com.ktc4.pusan4.user.domain.BookkeepingDuty;
+import com.ktc4.pusan4.user.domain.NewBusinessContext;
 import org.assertj.core.groups.Tuple;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,6 +23,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -60,6 +64,9 @@ class LimitSettlementIntegrationTest {
 
     @Autowired
     private UploadBatchService batchService;
+
+    @Autowired
+    private BusinessContextRevisionService contextRevisionService;
 
     private UUID userId;
     private UUID batchId;
@@ -267,6 +274,22 @@ class LimitSettlementIntegrationTest {
             new LimitYearTotal("접대비", 2024, 50_000L, 0L),
             new LimitYearTotal("접대비", 2025, 15_000_000L, 2_910_000L));
         assertThat(byYear).containsExactly(new LimitYearTotal("접대비", 2025, 15_000_000L, 2_910_000L));
+    }
+
+    @Test
+    void revising_the_context_settles_the_limit_with_the_new_revenue() {
+        // given: 수입금액 3,000만원 → 한도 1,209만원, 2025년 1,500만원이라 291만원 초과
+        judgment(transaction("2025-01-15", "AUTO"), "AVAILABLE", ENTERTAINMENT, 10_000_000L);
+        judgment(transaction("2025-03-02", "AUTO"), "AVAILABLE", ENTERTAINMENT, 5_000_000L);
+        settlementService.settleProvisional(userId);
+
+        // when: 수입금액을 1억원으로 고친다 → 한도 1,230만원
+        contextRevisionService.create(userId, new NewBusinessContext(
+            "940909", 100_000_000L, LocalDate.parse("2023-01-01"), BookkeepingDuty.간편장부, false, null));
+
+        // then
+        assertThat(queryService.limits(userId, null, 2025))
+            .containsExactly(new LimitYearTotal("접대비", 2025, 15_000_000L, 2_700_000L));
     }
 
     @Test

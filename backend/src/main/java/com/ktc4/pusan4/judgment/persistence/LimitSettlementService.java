@@ -49,7 +49,7 @@ public class LimitSettlementService {
 
     /**
      * 현재 판정이나 판정 대상이 바뀌는 곳에서 부른다: run 완료, 재판정(질문 응답·분류 응답), override 와 그 해제,
-     * 거래 제외/포함, batch 삭제.
+     * 거래 제외/포함, batch 삭제, 문진 수정(수입금액이 바뀌므로).
      * 수입금액은 최신 문진의 직전연도 수입금액이다(연중 잠정치, CONTEXT.md §4 잠정/확정).
      */
     @Transactional

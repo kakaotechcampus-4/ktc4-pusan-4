@@ -24,6 +24,7 @@ import com.ktc4.pusan4.judgment.domain.RuleCandidateStatus;
 import com.ktc4.pusan4.judgment.domain.StatuteVersion;
 import com.ktc4.pusan4.judgment.domain.Verdict;
 import com.ktc4.pusan4.judgment.persistence.BulkAnswerResult;
+import com.ktc4.pusan4.judgment.persistence.BusinessContextRevisionService;
 import com.ktc4.pusan4.judgment.persistence.JudgmentOverrideService;
 import com.ktc4.pusan4.judgment.persistence.JudgmentQueryService;
 import com.ktc4.pusan4.judgment.persistence.JudgmentRunService;
@@ -125,6 +126,9 @@ class ApiResponseContractTest {
     private BusinessContextService contextService;
 
     @MockitoBean
+    private BusinessContextRevisionService contextRevisionService;
+
+    @MockitoBean
     private JudgmentRunService runService;
 
     @MockitoBean
@@ -199,7 +203,7 @@ class ApiResponseContractTest {
         BusinessContext context = new BusinessContext(UUID.fromString(ID),
             TestUser.ID, 1, "940909", 82_000_000L, LocalDate.parse("2024-03-15"),
             BookkeepingDuty.간편장부, false, 20, OffsetDateTime.parse("2026-09-01T10:05:00+09:00"));
-        given(contextService.create(any(), any())).willReturn(context);
+        given(contextRevisionService.create(any(), any())).willReturn(context);
         given(contextService.current(any())).willReturn(context);
         given(contextService.history(any())).willReturn(List.of(context));
 

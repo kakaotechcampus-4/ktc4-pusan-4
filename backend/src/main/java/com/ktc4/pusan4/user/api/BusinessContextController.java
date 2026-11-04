@@ -1,5 +1,6 @@
 package com.ktc4.pusan4.user.api;
 
+import com.ktc4.pusan4.judgment.persistence.BusinessContextRevisionService;
 import com.ktc4.pusan4.shared.api.ErrorResponse;
 import com.ktc4.pusan4.shared.auth.CurrentUser;
 import com.ktc4.pusan4.user.persistence.BusinessContextService;
@@ -25,16 +26,21 @@ import java.util.List;
 public class BusinessContextController {
 
     private final BusinessContextService contextService;
+    private final BusinessContextRevisionService contextRevisionService;
 
-    public BusinessContextController(BusinessContextService contextService) {
+    public BusinessContextController(
+        BusinessContextService contextService,
+        BusinessContextRevisionService contextRevisionService
+    ) {
         this.contextService = contextService;
+        this.contextRevisionService = contextRevisionService;
     }
 
     @Operation(summary = "사업자 Context 생성", description = "기존 버전을 고치지 않고 다음 버전을 만든다")
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ContextCreatedResponse create(CurrentUser currentUser, @Valid @RequestBody CreateContextRequest request) {
-        return ContextCreatedResponse.from(contextService.create(currentUser.id(), request.toInput()));
+        return ContextCreatedResponse.from(contextRevisionService.create(currentUser.id(), request.toInput()));
     }
 
     @Operation(summary = "현재 Context 조회", description = "가장 높은 version")
