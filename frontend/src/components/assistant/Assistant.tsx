@@ -1,20 +1,46 @@
 import React, { useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { BotIcon, ChevronDownIcon, SendIcon, XIcon } from 'lucide-react';
 import { Badge, Button, Input, cn } from '../ui';
+import { useSession } from '../../contexts/SessionContext';
 import { useAssistant } from './context';
 import type { ChatEntry } from './context';
 import { HELP_TOPICS } from './help';
 import { blockedReason, MESSAGE_CHARS, PROPOSAL_LABEL } from './logic';
 
+/** 로그인 전 메인에 서는 같은 모양의 버튼. 누르면 대화 대신 로그인으로 보낸다 */
+function SignInLauncher() {
+  const navigate = useNavigate();
+  return (
+    <div className="fixed bottom-5 right-5 z-40">
+      <button
+        type="button"
+        onClick={() => navigate('/login', { state: { from: '/' } })}
+        className="flex items-center gap-2 rounded-full bg-ink px-4 py-3 text-body font-bold text-white shadow-panel transition-transform duration-150 ease-snap hover:-translate-y-0.5">
+
+        <BotIcon className="h-5 w-5" aria-hidden="true" />
+        Really
+        <span className="sr-only">로그인하고 비서에게 묻기</span>
+      </button>
+    </div>);
+
+}
+
 /**
- * 비서 Really. 로그인 뒤 모든 화면 오른쪽 아래의 버튼과 대화 패널 (FR-1).
+ * 비서 Really. 오른쪽 아래의 버튼과 대화 패널 (FR-1).
  * 비서는 제안 카드만 만들고, 바꾸는 일은 사용자가 [적용]을 눌러야 기존 API 로 일어난다.
  * 패널은 화면 위에 떠 있는 대화창이다(Modal 이 아니다). 화면을 밀지 않고 덮기 때문에 버튼은 늘 두고,
  * 다시 누르면 접는다 — 질문 카드를 가리면 바로 접고 답할 수 있게 (#143 리뷰)
+ *
+ * 어디에 서는지는 여기서 정한다.
+ * - 로그인했으면 메인을 포함한 모든 화면. 로고로 메인에 다녀와도 버튼이 사라지지 않는다
+ * - 로그인 전이면 메인에만, 그리고 로그인으로 보내는 버튼이다.
+ *   `POST /assistant/chat` 은 토큰이 없으면 401 이라 대화를 열어 봐야 실패한다
  */
 export function Assistant() {
   const { open, setOpen, nudge, dismissNudge, toast } = useAssistant();
+  const { status } = useSession();
+  const { pathname } = useLocation();
   const navigate = useNavigate();
   const button = useRef<HTMLButtonElement>(null);
   const wasOpen = useRef(false);
@@ -24,6 +50,11 @@ export function Assistant() {
     if (wasOpen.current && !open) button.current?.focus();
     wasOpen.current = open;
   }, [open]);
+
+  if (status !== 'signedIn') {
+    // 이어 가기를 기다리는 동안 버튼이 번쩍 나타났다 바뀌지 않게, 메인에서만 로그인 버튼을 둔다
+    return pathname === '/' && status !== 'restoring' ? <SignInLauncher /> : null;
+  }
 
   return (
     <>
