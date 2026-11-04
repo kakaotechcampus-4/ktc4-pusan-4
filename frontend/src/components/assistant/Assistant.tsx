@@ -1,22 +1,49 @@
 import React, { useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { BotIcon, ChevronDownIcon, SendIcon, XIcon } from 'lucide-react';
 import { Badge, Button, Input, cn } from '../ui';
+import { useSession } from '../../contexts/SessionContext';
 import { useAssistant } from './context';
 import type { ChatEntry } from './context';
 import { HELP_TOPICS } from './help';
 import { blockedReason, MESSAGE_CHARS, PROPOSAL_LABEL } from './logic';
 
+/** 로그인 전 메인에 서는 같은 모양의 버튼. 누르면 대화 대신 로그인으로 보낸다 */
+function SignInLauncher() {
+  const navigate = useNavigate();
+  return (
+    <div className="fixed bottom-5 right-5 z-40">
+      <button
+        type="button"
+        onClick={() => navigate('/login', { state: { from: '/' } })}
+        className="flex items-center gap-2 rounded-full bg-ink px-4 py-3 text-body font-bold text-white shadow-panel transition-transform duration-150 ease-snap hover:-translate-y-0.5">
+
+        <BotIcon className="h-5 w-5" aria-hidden="true" />
+        Really
+        <span className="sr-only">로그인하고 비서에게 묻기</span>
+      </button>
+    </div>);
+
+}
+
 /**
- * 비서 Really. 로그인 뒤 모든 화면 오른쪽 아래의 버튼과 대화 패널 (FR-1).
+ * 비서 Really. 오른쪽 아래의 버튼과 대화 패널 (FR-1).
  * 비서는 제안 카드만 만들고, 바꾸는 일은 사용자가 [적용]을 눌러야 기존 API 로 일어난다.
  * 패널은 화면 위에 떠 있는 대화창이다(Modal 이 아니다). 화면을 밀지 않고 덮기 때문에 버튼은 늘 두고,
  * 다시 누르면 접는다 — 질문 카드를 가리면 바로 접고 답할 수 있게 (#143 리뷰)
+ *
+ * 어디에 서는지는 여기서 정한다.
+ * - 로그인했으면 메인을 포함한 모든 화면. 로고로 메인에 다녀와도 버튼이 사라지지 않는다
+ * - 로그인 전이면 메인에만, 그리고 로그인으로 보내는 버튼이다.
+ *   `POST /assistant/chat` 은 토큰이 없으면 401 이라 대화를 열어 봐야 실패한다
  */
 export function Assistant() {
   const { open, setOpen, nudge, dismissNudge, toast } = useAssistant();
+  const { status } = useSession();
+  const { pathname } = useLocation();
   const navigate = useNavigate();
   const button = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLElement>(null);
   const wasOpen = useRef(false);
 
   // 접으면 버튼으로 초점을 돌려준다
@@ -25,9 +52,35 @@ export function Assistant() {
     wasOpen.current = open;
   }, [open]);
 
+  /*
+   * 패널 밖을 누르면 접는다. 버튼은 빼 둔다 — 버튼에도 접는 일이 걸려 있어서,
+   * 여기서 먼저 접으면 버튼이 다시 펴고 그대로 열려 있다.
+   *
+   * click 이 아니라 pointerdown 으로 듣는다. 누른 자리의 요소가 그 사이에 사라지면
+   * click 때는 패널 안이었는지 밖이었는지 알 수 없다.
+   * 좁은 화면에서는 패널이 화면을 다 덮어서 밖이 없다 — 그대로 둬도 달라지지 않는다
+   */
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (panel.current?.contains(target)) return;
+      if (button.current?.contains(target)) return;
+      setOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, [open, setOpen]);
+
+  if (status !== 'signedIn') {
+    // 이어 가기를 기다리는 동안 버튼이 번쩍 나타났다 바뀌지 않게, 메인에서만 로그인 버튼을 둔다
+    return pathname === '/' && status !== 'restoring' ? <SignInLauncher /> : null;
+  }
+
   return (
     <>
-      {open && <Panel onClose={() => setOpen(false)} />}
+      {open && <Panel onClose={() => setOpen(false)} panelRef={panel} />}
       {/* 적용 결과는 왼쪽 아래에 띄운다. 오른쪽은 패널과 버튼이 차지한다.
           좁은 화면에서 패널이 열려 있으면 아래는 입력칸이라 위로 올리고, 눌러도 뒤로 지나가게 한다 */}
       {toast &&
@@ -92,7 +145,13 @@ export function Assistant() {
 
 }
 
-function Panel({ onClose }: {onClose: () => void;}) {
+function Panel({
+  onClose,
+  panelRef
+
+
+
+}: {onClose: () => void; panelRef: React.RefObject<HTMLElement>;}) {
   const { entries, pending, error, draft, setDraft, send, showHelp, showNext } = useAssistant();
   const input = useRef<HTMLInputElement>(null);
   const end = useRef<HTMLDivElement>(null);
@@ -144,6 +203,7 @@ function Panel({ onClose }: {onClose: () => void;}) {
 
   return (
     <section
+      ref={panelRef}
       role="dialog"
       aria-label="비서 Really"
       onKeyDown={onKeyDown}
