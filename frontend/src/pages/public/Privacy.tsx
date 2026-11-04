@@ -1,6 +1,7 @@
 import { LegalHeader, LegalSection, PublicLayout } from '../../components/PublicLayout';
 import { ASSISTANT_DOES_NOT_SEND, ASSISTANT_SENDS } from '../../components/assistant/help';
 import { SUPPORT_EMAIL } from '../../utils/contact';
+import { PAGES } from '../../seo';
 
 const COLLECTED = [
 {
@@ -66,7 +67,7 @@ const SENT = [
 /** 개인정보처리방침. 외부로 보내는 항목은 코드에서 확인한 것만 적는다(ai/app/config.py, ai/pipeline/llm.py) */
 export function Privacy() {
   return (
-    <PublicLayout title="개인정보처리방침">
+    <PublicLayout title={PAGES.privacy.title}>
       <LegalHeader title="개인정보처리방침" effective="2026년 11월 6일" />
 
       <LegalSection title="1. 모으는 정보와 쓰는 곳">

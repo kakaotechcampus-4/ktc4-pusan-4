@@ -313,11 +313,12 @@ export function HeroBanner() {
             <p className="text-body text-highlight">
               1인 IT 개발 사업자를 위한 경비 판정
             </p>
-            <strong className="mt-5 block text-h2 font-normal leading-tight tracking-ir text-white [word-break:keep-all] lg:text-ir-display">
+            {/* 페이지의 h1. 프리렌더가 공개 페이지마다 h1 이 하나인지 본다(scripts/prerender.mjs) */}
+            <h1 className="mt-5 block text-h2 font-normal leading-tight tracking-ir text-white [word-break:keep-all] lg:text-ir-display">
               이 카드값이 경비인지,
               <br />
               조문까지 붙여 답합니다
-            </strong>
+            </h1>
           </div>
         </Slide>
 

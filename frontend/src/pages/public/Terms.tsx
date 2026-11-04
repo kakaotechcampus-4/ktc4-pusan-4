@@ -1,11 +1,12 @@
 import { Link } from 'react-router-dom';
 import { LegalHeader, LegalSection, PublicLayout } from '../../components/PublicLayout';
 import { SUPPORT_EMAIL } from '../../utils/contact';
+import { PAGES } from '../../seo';
 
 /** 이용약관. 가입 화면의 [필수] 동의가 이 문서를 가리킨다 */
 export function Terms() {
   return (
-    <PublicLayout title="이용약관">
+    <PublicLayout title={PAGES.terms.title}>
       <LegalHeader title="이용약관" effective="2026년 11월 6일" />
 
       <LegalSection title="1. 서비스">

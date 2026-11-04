@@ -15,12 +15,15 @@ import {
   SYSTEM_FEATURES,
   VERDICTS } from
 '../mock/marketing';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { PAGES } from '../seo';
 
 /** 인트로를 봤다는 표시. 처음 한 번만 띄운다 — 로고로 다녀와도 다시 뜨지 않는다 */
 const INTRO_SEEN = 'preet.intro.seen';
 
-/** 움직임을 줄이라는 설정이면 아예 띄우지 않는다 */
+/** 움직임을 줄이라는 설정이면 아예 띄우지 않는다. 빌드 때 미리 그리는 HTML(entry-server.tsx)에는 넣지 않는다 */
 function wantsIntro() {
+  if (typeof window === 'undefined') return false;
   if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return false;
   try {
     return window.localStorage.getItem(INTRO_SEEN) === null;
@@ -111,6 +114,7 @@ const BOARDS = [
 
 export function Landing() {
   const { status } = useSession();
+  useDocumentTitle(PAGES.home.title);
 
   const [intro, setIntro] = useState(wantsIntro);
 
