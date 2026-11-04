@@ -1,5 +1,5 @@
-import React, { useRef, useState } from 'react';
-import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ChevronLeftIcon, ChevronRightIcon, PauseIcon, PlayIcon } from 'lucide-react';
 import { OrbitStage } from './OrbitStage';
 import { FLOW_STEPS, NOT_DOING } from '../mock/marketing';
 
@@ -9,8 +9,27 @@ import { FLOW_STEPS, NOT_DOING } from '../mock/marketing';
  * ExampleCarousel 과 같은 스크롤 스냅이다. 폭을 재서 transform 으로 미는 방식은 한 줄에
  * 몇 장 보이는지를 자바스크립트가 알아야 하는데, 스냅은 브라우저가 알아서 맞추고
  * 손가락·트랙패드로도 그대로 넘어간다.
+ *
+ * 4초마다 저절로 다음 장면으로 넘어가고, 3 다음은 1 이다. 알약의 ⏸ 로 멈춘다(WCAG 2.2.2).
  */
 const SLIDE_COUNT = 3;
+
+/** 저절로 넘어가는 간격. 손으로 넘기면 거기서 다시 센다 */
+const AUTOPLAY_MS = 4000;
+
+/**
+ * 끝을 넘어 도는 중인 상태. 갈 장면(slide)을 지금 장면 옆으로 옮겨 붙여 둔 것이다.
+ * step 1 은 1번을 3번 뒤로, -1 은 3번을 1번 앞으로 옮겼다는 뜻이다
+ */
+type Wrap = {slide: HTMLElement;step: 1 | -1;};
+
+/** 지금 보이는 장면 번호. 도는 중이면 옮겨 붙인 만큼 되돌려 센다 */
+function pageOf(el: HTMLElement, wrap: Wrap | null) {
+  const at = Math.round(el.scrollLeft / el.clientWidth);
+  return wrap ? (at + wrap.step + SLIDE_COUNT) % SLIDE_COUNT : at;
+}
+
+const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 /** 장면 하나. 높이는 셋이 같아야 넘길 때 판이 들썩이지 않는다 */
 function Slide({ children }: {children: React.ReactNode;}) {
@@ -277,32 +296,96 @@ function TextSlide({
 
 }
 
-export function HeroBanner() {
+/** autoplay: 저절로 넘길지. 랜딩은 인트로가 덮는 동안 끈다 — 걷혔을 때 1번 장면부터 보이게 */
+export function HeroBanner({ autoplay = true }: {autoplay?: boolean;}) {
   const track = useRef<HTMLUListElement>(null);
   const [page, setPage] = useState(0);
+  const wrap = useRef<Wrap | null>(null);
+  /** ⏸ 로 멈췄는지 */
+  const [stopped, setStopped] = useState(false);
+  /** 마우스가 올라가 있거나 키보드 포커스가 안에 있다. 읽거나 누르는 동안은 넘기지 않는다 */
+  const [holding, setHolding] = useState(false);
+  const playing = autoplay && !stopped && !holding;
+
+  /** 옮겨 붙였던 장면을 제자리로 돌린다. 보이던 장면이 그대로 보이게 스크롤을 같이 맞춘다 */
+  const unwrap = useCallback(() => {
+    const el = track.current;
+    if (!el || !wrap.current) return;
+    const at = pageOf(el, wrap.current);
+    wrap.current.slide.style.order = '';
+    wrap.current = null;
+    el.scrollLeft = at * el.clientWidth;
+    setPage(at);
+  }, []);
 
   /**
-   * 끝에서 한 번 더 누르면 반대쪽 끝으로 돈다 (#238 리뷰). 3 다음은 1 이다.
-   * 도는 걸음만 즉시 옮긴다 — 부드럽게 끌면 중간 장면을 거꾸로 훑고 지나가 되감기처럼 보인다
+   * 끝에서 한 번 더 가면 반대쪽 끝으로 돈다 (#238 리뷰). 3 다음은 1 이다.
+   * 그냥 끌면 중간 장면을 거꾸로 훑고 지나가 되감기처럼 보인다. 그래서 갈 장면을 지금 장면
+   * 옆으로 잠깐 옮겨 붙이고(CSS order) 한 칸만 미끄러진 뒤, 도착하면 onScroll 이 제자리로 돌린다.
+   * 장면을 복제하지 않으니 h1 이 둘이 되지 않는다
    */
-  const move = (direction: -1 | 1) => {
+  const move = useCallback((direction: -1 | 1) => {
     const el = track.current;
     if (!el) return;
-    const raw = page + direction;
-    const wrapping = raw < 0 || raw > SLIDE_COUNT - 1;
+    // 손으로 끌다 만 돌기가 남아 있으면 먼저 정리한다
+    unwrap();
+    const width = el.clientWidth;
+    const raw = Math.round(el.scrollLeft / width) + direction;
     const next = (raw + SLIDE_COUNT) % SLIDE_COUNT;
-    const smooth =
-    !wrapping && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    el.scrollTo({ left: next * el.clientWidth, behavior: smooth ? 'smooth' : 'auto' });
-  };
+    if (raw === next || reducedMotion()) {
+      el.scrollTo({ left: next * width, behavior: reducedMotion() ? 'auto' : 'smooth' });
+      return;
+    }
+    const slide = el.children[next] as HTMLElement;
+    slide.style.order = String(direction);
+    wrap.current = { slide, step: direction };
+    // 옮겨 붙이면 지금 장면이 한 칸 밀린다. 같은 장면이 보이도록 스크롤을 먼저 옮긴다
+    el.scrollLeft = (direction === 1 ? SLIDE_COUNT - 2 : 1) * width;
+    el.scrollTo({ left: (direction === 1 ? SLIDE_COUNT - 1 : 0) * width, behavior: 'smooth' });
+  }, [unwrap]);
+
+  // 움직임을 줄이라는 설정이면 멈춘 채로 시작한다. ▶ 로 켤 수는 있다.
+  // 첫 렌더가 아니라 effect 에서 읽는다 — 빌드 때 미리 그리는 HTML 에는 window 가 없다
+  useEffect(() => {
+    if (reducedMotion()) setStopped(true);
+  }, []);
+
+  // 장면이 바뀔 때마다(손으로 넘겨도) 간격을 새로 센다
+  useEffect(() => {
+    if (!playing) return;
+    const id = window.setTimeout(() => move(1), AUTOPLAY_MS);
+    return () => window.clearTimeout(id);
+  }, [playing, page, move]);
 
   return (
-    <div className="relative">
+    <div
+      className="relative"
+      onPointerEnter={(e) => {
+        // 터치는 손을 떼도 hover 가 남는다. 마우스만 본다
+        if (e.pointerType === 'mouse') setHolding(true);
+      }}
+      onPointerLeave={(e) => {
+        if (e.pointerType === 'mouse') setHolding(false);
+      }}
+      onFocus={(e) => {
+        // 마우스로 누른 버튼에 남는 포커스까지 잡으면 손을 치운 뒤에도 계속 멈춰 있다. 키보드 포커스만 본다
+        if (e.target.matches(':focus-visible')) setHolding(true);
+      }}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget)) setHolding(false);
+      }}>
       <ul
         ref={track}
         onScroll={() => {
           const el = track.current;
-          if (el) setPage(Math.round(el.scrollLeft / el.clientWidth));
+          if (!el) return;
+          const w = wrap.current;
+          // 돌아서 도착했으면 옮겨 붙인 장면을 제자리로
+          if (w && Math.abs(el.scrollLeft - (w.step === 1 ? SLIDE_COUNT - 1 : 0) * el.clientWidth) < 2) {
+            unwrap();
+            return;
+          }
+          setPage(pageOf(el, w));
         }}
         className="flex snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain rounded-[20px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 
@@ -348,6 +431,10 @@ export function HeroBanner() {
         좁은 화면에서는 그 띠(72px)를 피해 위로 올린다
       */}
       <div className="absolute bottom-24 right-6 z-20 flex items-center gap-1 rounded-full bg-white/10 px-2 py-1 text-small text-white/80 sm:bottom-8 sm:right-8">
+        {/* 저절로 넘어가는 동안 읽으면 4초마다 끼어든다. 멈췄을 때만 읽는다 */}
+        <span className="pl-1.5 pr-1 tabular-nums" aria-live={playing ? 'off' : 'polite'}>
+          {page + 1} / {SLIDE_COUNT}
+        </span>
         <button
           type="button"
           aria-label="이전 장면"
@@ -356,9 +443,16 @@ export function HeroBanner() {
 
           <ChevronLeftIcon className="h-4 w-4" aria-hidden="true" />
         </button>
-        <span className="px-1 tabular-nums" aria-live="polite">
-          {page + 1} / {SLIDE_COUNT}
-        </span>
+        <button
+          type="button"
+          aria-label={stopped ? '자동 넘김 켜기' : '자동 넘김 멈추기'}
+          onClick={() => setStopped((value) => !value)}
+          className="flex h-7 w-7 items-center justify-center rounded-full transition-colors hover:bg-white/15">
+
+          {stopped ?
+          <PlayIcon className="h-4 w-4" aria-hidden="true" /> :
+          <PauseIcon className="h-4 w-4" aria-hidden="true" />}
+        </button>
         <button
           type="button"
           aria-label="다음 장면"
