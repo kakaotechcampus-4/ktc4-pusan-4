@@ -53,7 +53,7 @@ export default {content: [
         /** 표처럼 패널 위에서 흰 바탕이 필요할 때 */
         sheet: '#FFFFFF',
         /** 첫 화면 큰 판. 어두운 남색이라 글자·그림은 흰색으로 올린다 */
-        surface2: '#192F57',
+        surface2: '#2B6CF2',
         line: '#E5E8EB',
         /** surface 위에서도 보여야 한다. surface 와 같은 값이면 회색 패널 안의 구분선이 사라진다 */
         line2: '#EDEFF2',

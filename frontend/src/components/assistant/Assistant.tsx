@@ -1,6 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BotIcon, ChevronDownIcon, SendIcon, XIcon } from 'lucide-react';
+import { ChevronDownIcon, SendIcon, XIcon } from 'lucide-react';
+// 비서 얼굴. 봇 아이콘 대신 브랜드 Really 를 쓴다 (assets/brand/really-fab)
+import really from '../../assets/brand/really-fab/really-fab-blue.svg';
 import { Badge, Button, Input, cn } from '../ui';
 import { useAssistant } from './context';
 import type { ChatEntry } from './context';
@@ -83,7 +85,7 @@ export function Assistant() {
 
           {open ?
           <ChevronDownIcon className="h-5 w-5" aria-hidden="true" /> :
-          <BotIcon className="h-5 w-5" aria-hidden="true" />}
+          <img src={really} alt="" className="h-6 w-6 rounded-full" />}
           Really
           <span className="sr-only">{open ? '비서 접기' : '비서에게 묻기'}</span>
         </button>

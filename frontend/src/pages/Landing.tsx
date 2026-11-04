@@ -157,12 +157,12 @@ export function Landing() {
             {/* 첫 장은 검정에 큰 숫자, 아래로 회색 (레퍼런스 wrap_banner) */}
             <div className="flex flex-col gap-2">
               <div className="rounded-2xl bg-surface2 p-5 text-white">
-                <p className="text-caption text-white/60">이번 달 인정 경비</p>
+                <p className="text-caption text-white">이번 달 인정 경비</p>
                 <p className="mt-2 whitespace-nowrap text-ir-num font-bold tracking-ir-sm tabular-nums">
                   {won(HERO_SUMMARY.availableAmount)}
                   <span className="ml-0.5 text-body font-normal">원</span>
                 </p>
-                <p className="mt-2 text-caption text-white/60 tabular-nums">
+                <p className="mt-2 text-caption text-white tabular-nums">
                   {HERO_SUMMARY.total}건 중 {ok.count}건 가능
                 </p>
               </div>

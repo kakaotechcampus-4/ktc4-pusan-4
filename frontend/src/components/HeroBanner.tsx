@@ -36,7 +36,7 @@ function TextSlide({
 }: {eyebrow: string; title: string; items: string[];}) {
   return (
     <div className="absolute inset-0 flex flex-col px-8 pt-12 sm:px-16 sm:pt-16">
-      <p className="text-body text-highlight">{eyebrow}</p>
+      <p className="text-body text-white">{eyebrow}</p>
       <strong className="mt-5 block whitespace-pre-line text-h2 font-normal leading-tight tracking-ir text-white [word-break:keep-all] lg:text-ir-display">
         {title}
       </strong>
@@ -79,7 +79,7 @@ export function HeroBanner() {
           <OrbitStage />
           {/* 글은 궤도 위에 올린다 */}
           <div className="relative z-10 px-8 pt-12 sm:px-16 sm:pt-16">
-            <p className="text-body text-highlight">
+            <p className="text-body text-white">
               1인 IT 개발 사업자를 위한 경비 판정
             </p>
             <strong className="mt-5 block text-h2 font-normal leading-tight tracking-ir text-white [word-break:keep-all] lg:text-ir-display">
@@ -111,7 +111,7 @@ export function HeroBanner() {
         오른쪽 아래 현재/전체. 왼쪽 아래는 「바로가기」가 베어 낸 자리라,
         좁은 화면에서는 그 띠(72px)를 피해 위로 올린다
       */}
-      <div className="absolute bottom-24 right-6 z-20 flex items-center gap-1 rounded-full bg-white/10 px-2 py-1 text-small text-white/80 sm:bottom-8 sm:right-8">
+      <div className="absolute bottom-24 right-6 z-20 flex items-center gap-1 rounded-full bg-white/10 px-2 py-1 text-small text-white sm:bottom-8 sm:right-8">
         <button
           type="button"
           aria-label="이전 장면"

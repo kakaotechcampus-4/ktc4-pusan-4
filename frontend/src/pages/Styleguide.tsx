@@ -26,7 +26,7 @@ import {
 const COLORS: { name: string; cls: string; hex: string; use: string }[] = [
 { name: 'canvas', cls: 'bg-canvas', hex: '#FFFFFF', use: '페이지 바탕' },
 { name: 'surface', cls: 'bg-surface', hex: '#F2F4F6', use: '패널, 카드' },
-{ name: 'surface2', cls: 'bg-surface2', hex: '#192F57', use: '첫 화면 큰 판 (글자는 흰색)' },
+{ name: 'surface2', cls: 'bg-surface2', hex: '#2B6CF2', use: '첫 화면 큰 판 (글자는 흰색)' },
 { name: 'sheet', cls: 'bg-sheet', hex: '#FFFFFF', use: '패널 위 흰 바탕, 표' },
 { name: 'line', cls: 'bg-line', hex: '#E5E8EB', use: '테두리 기본, 행 괘선' },
 { name: 'line2', cls: 'bg-line2', hex: '#EDEFF2', use: '약한 구분선 (surface 위에서도 보임)' },
