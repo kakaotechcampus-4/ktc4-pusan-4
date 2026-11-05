@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PreeT 팀 문서</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@900&display=swap">
+<style>
+  :root { --blue:#2F5BFF; --blue-d:#1E3FD0; --pink:#FF5B8F; --pink-l:#FFEEF3; --blue-l:#F0F3FF; --line:#E6E9F2; --text:#171B2E; --muted:#6B7088; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",sans-serif; color:var(--text); background:#fff; }
+  a { color:var(--blue); }
+  /* 상단 바 */
+  .top { position:sticky; top:0; z-index:10; display:flex; align-items:center; gap:28px; height:64px; padding:0 32px; background:rgba(255,255,255,.88); backdrop-filter:blur(10px); border-bottom:1px solid var(--line); }
+  .mark { font-family:"Nunito",sans-serif; font-weight:900; font-size:26px; letter-spacing:-.5px; color:#0F1B3D; text-decoration:none; line-height:1; }
+  .mark span { position:relative; color:var(--blue); }
+  /* 핑크 점: T 가로획 오른쪽 위 */
+  .mark span::after { content:""; position:absolute; left:100%; top:.28em; width:.27em; height:.27em; margin-left:.04em; border-radius:50%; background:var(--pink); }
+  .tabs { display:flex; gap:4px; height:100%; }
+  .tabs a { display:flex; align-items:center; padding:0 14px; color:var(--muted); text-decoration:none; font-size:15px; font-weight:600; border-bottom:2px solid transparent; }
+  .tabs a:hover { color:var(--text); }
+  .tabs a.on { color:var(--blue); border-color:var(--blue); }
+  .gh { margin-left:auto; font-size:14px; font-weight:600; text-decoration:none; padding:8px 14px; border:1px solid var(--line); border-radius:10px; color:var(--text); }
+  .gh:hover { border-color:var(--blue); color:var(--blue); }
+  /* 홈 */
+  .hero { background:var(--blue); color:#fff; padding:72px 32px 104px; }
+  .hero > div, .home { max-width:1080px; margin:0 auto; }
+  .hero .k { margin:0; opacity:.75; font-weight:600; font-size:14px; }
+  .hero h1 { font-size:44px; line-height:1.3; margin:12px 0 16px; letter-spacing:-1px; }
+  .hero h1 em { font-style:normal; color:var(--pink); background:#fff; padding:0 10px; border-radius:10px; }
+  .hero p { font-size:17px; opacity:.92; margin:0 0 28px; line-height:1.7; }
+  .btn { display:inline-block; background:#fff; color:var(--blue); font-weight:700; padding:13px 22px; border-radius:12px; text-decoration:none; }
+  .btn:hover { background:var(--pink); color:#fff; }
+  .home { padding:0 32px 64px; margin-top:-56px; }
+  .home h2 { font-size:18px; margin:40px 0 14px; }
+  .home section:first-child h2 { color:#fff; margin-top:0; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px; }
+  .card { display:block; background:#fff; border:1px solid var(--line); border-radius:18px; padding:22px; text-decoration:none; color:var(--text); transition:transform .15s, box-shadow .15s, border-color .15s; }
+  .card:hover { transform:translateY(-3px); border-color:var(--blue); box-shadow:0 12px 28px rgba(47,91,255,.12); }
+  .card b { display:block; font-size:16px; margin-bottom:6px; }
+  .card small { color:var(--muted); font-size:13px; line-height:1.6; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .home section:first-child .card { box-shadow:0 8px 24px rgba(23,27,46,.08); }
+  /* 문서 */
+  .page { max-width:1080px; margin:0 auto; padding:40px 32px 72px; display:grid; grid-template-columns:minmax(0,1fr) 220px; gap:56px; }
+  .crumb { font-size:13px; color:var(--muted); }
+  .crumb a { color:var(--muted); text-decoration:none; }
+  .crumb a:hover { color:var(--blue); }
+  .sib { display:flex; flex-wrap:wrap; gap:8px; margin:18px 0 8px; }
+  .sib a { font-size:13px; font-weight:600; padding:6px 12px; border-radius:999px; background:var(--blue-l); color:var(--blue-d); text-decoration:none; }
+  .sib a.on { background:var(--blue); color:#fff; }
+  article h1 { font-size:34px; letter-spacing:-.8px; margin:10px 0 8px; }
+  article h2 { font-size:21px; margin:44px 0 12px; scroll-margin-top:84px; }
+  article h3 { font-size:16px; margin-top:28px; color:var(--blue-d); }
+  p, li { line-height:1.8; }
+  blockquote { margin:14px 0; padding:14px 18px; border-left:3px solid var(--pink); background:var(--pink-l); border-radius:0 12px 12px 0; }
+  code { background:var(--blue-l); color:var(--blue-d); padding:2px 6px; border-radius:6px; font-size:.88em; }
+  pre { background:#12172B; color:#E1E6FF; padding:18px 20px; border-radius:14px; overflow-x:auto; font-size:13px; line-height:1.65; }
+  pre code { background:none; color:inherit; padding:0; }
+  table { border-collapse:collapse; width:100%; margin:14px 0; font-size:14px; }
+  th, td { padding:10px 12px; text-align:left; vertical-align:top; border-bottom:1px solid var(--line); }
+  th { font-size:13px; color:var(--muted); font-weight:700; border-bottom:2px solid var(--text); }
+  .todo { display:inline-block; background:#FFF4E0; color:#B26A00; font-size:12px; font-weight:600; padding:2px 10px; border-radius:999px; }
+  .toc { position:sticky; top:96px; align-self:start; font-size:13px; }
+  .toc p { margin:0 0 10px; font-weight:700; color:var(--muted); font-size:12px; }
+  .toc a { display:block; padding:5px 0 5px 12px; border-left:2px solid var(--line); color:var(--muted); text-decoration:none; cursor:pointer; }
+  .toc a:hover { color:var(--blue); border-color:var(--blue); }
+  a.repo { text-decoration:none; white-space:nowrap; }
+  a.repo:hover code { background:var(--blue); color:#fff; }
+  .rel { margin-top:56px; padding:22px; background:var(--blue-l); border-radius:18px; display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px; }
+  .rel p { grid-column:1/-1; margin:0 0 4px; font-size:13px; font-weight:700; color:var(--blue-d); }
+  .rel a { background:#fff; border-radius:12px; padding:12px 14px; text-decoration:none; color:var(--text); border:1px solid transparent; }
+  .rel a:hover { border-color:var(--blue); }
+  .rel b { display:block; font-size:14px; }
+  .rel small { color:var(--muted); font-size:12px; }
+  .pager { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:56px; }
+  .pager a { padding:16px 18px; border:1px solid var(--line); border-radius:14px; text-decoration:none; color:var(--text); font-weight:700; font-size:15px; }
+  .pager a small { display:block; color:var(--muted); font-weight:500; font-size:12px; margin-bottom:4px; }
+  .pager a:hover { border-color:var(--blue); color:var(--blue); }
+  .pager .n { text-align:right; grid-column:2; }
+  @media (max-width:860px) { .page { grid-template-columns:1fr; } .toc { display:none; } .top { gap:12px; padding:0 16px; } .tabs a { padding:0 8px; font-size:14px; white-space:nowrap; } .gh { display:none; } .hero h1 { font-size:32px; } }
+  /* 오른쪽 아래 홈 버튼 (Really 블루, 팀 저장소 frontend/src/assets/brand/really-fab) */
+  .fab { position:fixed; right:28px; bottom:28px; z-index:20; width:64px; height:64px; border-radius:50%; box-shadow:0 10px 24px rgba(47,91,255,.35); transition:transform .15s; }
+  .fab:hover { transform:translateY(-3px) scale(1.05); }
+  .fab svg { width:100%; height:100%; display:block; }
+  @media (max-width:860px) { .fab { width:56px; height:56px; right:16px; bottom:16px; } }
+  .why { margin:6px 0 0; font-size:13px; color:var(--muted); line-height:1.7; }
+  .why-label { display:inline-block; font-size:11px; font-weight:700; color:var(--pink); background:var(--pink-l); padding:1px 8px; border-radius:999px; margin-right:6px; }
+  .shot { margin:12px 0; padding:28px; border:2px dashed var(--line); border-radius:14px; text-align:center; color:var(--muted); font-size:13px; }
+  .team { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:14px; margin:16px 0; }
+  .role { border:1px solid var(--line); border-radius:16px; padding:18px; }
+  .role b { font-size:16px; } .role small { display:block; color:var(--muted); font-size:13px; margin:4px 0 12px; }
+  .ppl { display:flex; flex-wrap:wrap; gap:8px; }
+  .person { display:flex; align-items:center; gap:8px; padding:5px 12px 5px 5px; border-radius:999px; background:var(--blue-l); color:var(--blue-d); font-size:13px; font-weight:600; text-decoration:none; }
+  .person:hover { background:var(--blue); color:#fff; }
+  .person img { width:26px; height:26px; border-radius:50%; background:#fff; }
+  .btn.ghost { background:transparent; color:#fff; border:1.5px solid rgba(255,255,255,.6); margin-left:8px; }
+  .btn.ghost:hover { background:#fff; color:var(--blue); }
+  /* 노션 작업 보드 요약 */
+  .board { margin:16px 0 8px; padding:24px; border:1px solid var(--line); border-radius:20px; background:linear-gradient(180deg,#fff, var(--blue-l)); }
+  .board-head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:16px; }
+  .board-head b { font-size:16px; } .board-head small { color:var(--muted); font-size:12px; }
+  .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .stats > div { background:#fff; border-radius:14px; padding:14px 16px; border:1px solid var(--line); }
+  .stats small { display:block; color:var(--muted); font-size:12px; }
+  .stats b { display:block; font-size:30px; font-weight:800; color:var(--blue); letter-spacing:-1px; line-height:1.3; }
+  .stats > div:nth-child(2) b { color:var(--pink); }
+  .stats em { font-style:normal; font-size:14px; margin-left:2px; color:var(--muted); font-weight:600; }
+  .board-sub { margin:22px 0 10px; font-size:13px; font-weight:700; color:var(--blue-d); }
+  .bars { display:grid; gap:8px; }
+  .bar { display:grid; grid-template-columns:72px 1fr 32px; align-items:center; gap:10px; font-size:13px; }
+  .bar span { color:var(--muted); font-weight:600; }
+  .bar i { display:block; height:14px; width:var(--w); border-radius:999px; background:linear-gradient(90deg,var(--blue),#6C8BFF); }
+  .bar:first-child i { background:linear-gradient(90deg,var(--pink),#FF8DB0); }
+  .bar b { text-align:right; }
+  .steps { list-style:none; padding:0; margin:0; display:grid; grid-template-columns:repeat(3,1fr); gap:12px; counter-reset:st; }
+  .steps li { position:relative; background:#fff; border:1px solid var(--line); border-radius:14px; padding:14px 16px 14px 50px; line-height:1.5; counter-increment:st; }
+  .steps li::before { content:counter(st); position:absolute; left:14px; top:14px; width:24px; height:24px; border-radius:50%; background:var(--blue); color:#fff; font-size:13px; font-weight:700; display:grid; place-items:center; }
+  .steps li b { display:block; font-size:14px; } .steps li span { font-size:12px; color:var(--muted); }
+  @media (max-width:700px) { .stats, .steps { grid-template-columns:1fr; } }
+  /* 협업 흐름 그림 */
+  .flow { list-style:none; padding:0; margin:16px 0; display:grid; grid-template-columns:repeat(3,1fr); gap:14px 26px; counter-reset:fl; }
+  .flow li { position:relative; padding:16px 16px 16px 52px; border:1px solid var(--line); border-radius:16px; background:#fff; counter-increment:fl; line-height:1.5; }
+  .flow li::before { content:counter(fl); position:absolute; left:14px; top:16px; width:26px; height:26px; border-radius:50%; background:var(--blue); color:#fff; font-weight:700; font-size:13px; display:grid; place-items:center; }
+  .flow li:not(:nth-child(3n)):not(:last-child)::after { content:"→"; position:absolute; right:-21px; top:50%; transform:translateY(-50%); color:var(--blue); font-weight:800; }
+  .flow small { display:block; font-size:11px; font-weight:700; color:var(--muted); letter-spacing:.04em; }
+  .flow b { display:flex; align-items:center; gap:6px; font-size:15px; }
+  .flow span { display:block; font-size:12px; color:var(--muted); margin-top:2px; }
+  .flow em, .auto-key { font-style:normal; font-size:10px; font-weight:700; color:var(--pink); background:var(--pink-l); padding:1px 7px; border-radius:999px; }
+  .week { list-style:none; padding:0; margin:0 0 8px; display:flex; position:relative; }
+  .week::before { content:""; position:absolute; left:10%; right:10%; top:9px; height:2px; background:var(--line); }
+  .week li { flex:1; text-align:center; position:relative; padding-top:26px; }
+  .week li::before { content:""; position:absolute; left:50%; top:3px; width:14px; height:14px; margin-left:-7px; border-radius:50%; background:#fff; border:3px solid var(--blue); }
+  .week li:first-child::before { border-color:var(--pink); }
+  .week b { display:block; font-size:13px; } .week span { font-size:12px; color:var(--muted); }
+  @media (max-width:700px) { .flow { grid-template-columns:1fr; } .flow li::after { display:none; } .week { flex-direction:column; gap:10px; } .week::before { display:none; } .week li { text-align:left; padding:0 0 0 24px; } .week li::before { left:0; top:4px; margin:0; } }
+  .bar .track { display:flex; flex-direction:column; gap:3px; }
+  .bar .track small { font-size:11px; color:var(--muted); }
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="mark" href="#">Pree<span>T</span></a>
+  <nav class="tabs" id="tabs"></nav>
+  <a class="gh" href="https://github.com/kakaotechcampus-4/ktc4-pusan-4" target="_blank">GitHub ↗</a>
+</header>
+<main id="view"></main>
+<a class="fab" href="#" aria-label="홈으로" title="홈으로"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" aria-hidden="true">
+<defs>
+  <clipPath id="rf-blue-ci"><circle cx="100" cy="100" r="100"/></clipPath>
+  <radialGradient id="rf-blue-hd" cx="35%" cy="25%" r="85%"><stop offset="0" stop-color="#FFD3E4"/><stop offset="0.55" stop-color="#FFA6CA"/><stop offset="1" stop-color="#F27CB0"/></radialGradient>
+  <radialGradient id="rf-blue-bl" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="#FF9CC8"/><stop offset="1" stop-color="#F0609E"/></radialGradient>
+  <radialGradient id="rf-blue-sn" cx="40%" cy="30%" r="80%"><stop offset="0" stop-color="#FFC4DC"/><stop offset="1" stop-color="#FF8FBD"/></radialGradient>
+</defs>
+<g clip-path="url(#rf-blue-ci)">
+  <circle cx="100" cy="100" r="100" fill="#2F5BFF"/>
+  <path d="M44 52 l-8 -10 M30 66 l-12 -3" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round"/>
+  <g transform="translate(124 146) rotate(-20)">
+    <!-- ears -->
+    <path d="M-78 -26 C-96 -66 -76 -90 -36 -70 Z" fill="#FF9CC4"/>
+    <path d="M-70 -34 C-82 -60 -70 -76 -44 -66 Z" fill="#FF7FB3"/>
+    <path d="M70 -36 C84 -78 60 -96 22 -74 Z" fill="#FF9CC4"/>
+    <path d="M62 -42 C70 -70 56 -80 30 -70 Z" fill="#FF7FB3"/>
+    <!-- antenna -->
+    <path d="M-6 -70 C-8 -90 -6 -102 4 -112" fill="none" stroke="#F27BAE" stroke-width="8" stroke-linecap="round"/>
+    <ellipse cx="-6" cy="-71" rx="9" ry="3.5" fill="#F27BAE"/>
+    <circle cx="10" cy="-124" r="17" fill="url(#rf-blue-bl)"/>
+    <ellipse cx="4" cy="-130" rx="5" ry="3.5" fill="#FFFFFF" opacity="0.45"/>
+    
+    <!-- head -->
+    <ellipse cx="0" cy="0" rx="84" ry="76" fill="url(#rf-blue-hd)"/>
+    <!-- eyes look up-left -->
+    <ellipse cx="-44" cy="-16" rx="7" ry="10.5" fill="#2A36C4"/>
+    <ellipse cx="14" cy="-22" rx="7" ry="10.5" fill="#2A36C4"/>
+    <circle cx="-46" cy="-20" r="2.4" fill="#FFFFFF"/>
+    <circle cx="12" cy="-26" r="2.4" fill="#FFFFFF"/>
+    <!-- blush -->
+    <ellipse cx="-62" cy="12" rx="12" ry="7" fill="#FF5C9A" opacity="0.35"/>
+    <ellipse cx="34" cy="6" rx="12" ry="7" fill="#FF5C9A" opacity="0.35"/>
+    <!-- snout -->
+    <ellipse cx="-18" cy="8" rx="27" ry="20" fill="url(#rf-blue-sn)"/>
+    <ellipse cx="-27" cy="9" rx="4.5" ry="8.5" fill="#D9518C"/>
+    <ellipse cx="-9" cy="9" rx="4.5" ry="8.5" fill="#D9518C"/>
+    
+  </g>
+</g>
+</svg></a>
+
+<script>
+// 문서 = [그룹, [[id, 제목, html], ...]]. 페이지 추가는 여기에 한 줄.
+const DOCS = [
+['개요', [
+['01-Overview', '1. 프로젝트 개요', `
+<p>1인 개인사업자의 카드 승인내역을 받아, 지출 건별로 <b>필요경비 인정 여부를 조문 근거와 함께 판정</b>하는 서비스입니다. <a href="https://ktc4-pusan-4.duckdns.org/" target="_blank">서비스 바로가기 ↗</a></p>
+<blockquote>"AI가 규칙을 만들고, 규칙이 판정한다."</blockquote>
+<h2>AI가 들어가는 곳</h2>
+<p>판정은 결정론적 룰 엔진이 합니다. AI는 판정 전 <b>가맹점 카테고리 분류</b>, 그리고 <b>신규 규칙 카드 생성</b>과 <b>에이전트 비서 Really</b> 두 곳에 있습니다.</p>
+<blockquote>비서는 판정하지 않는다. 제안은 비서가, 확정은 사용자가, 판정은 룰엔진이 한다. (<code>docs/agent-secretary.md</code>)</blockquote>
+<h2>문제 정의</h2>
+<p>1인 개인사업자는 같은 지출도 업종·매출·직원 유무에 따라 경비 인정 여부가 갈리는데, 자기 기준을 확인할 방법이 없어 5월에 1년 치를 놓고도 애매한 것은 그냥 빼는 식으로 넘어갑니다.</p>
+<h2>포지셔닝</h2>
+<ul>
+  <li><b>세무사를 대체하지 않는다.</b> 세무사에게 맡기기 전에 필요한 자료와 질문 목록을 취합해 준다.</li>
+  <li>신고·제출·환급 대행, 세액 확정 제시, 절세 컨설팅을 하지 않는다.</li>
+</ul>
+<h2>페르소나</h2>
+<ul>
+  <li>1인 IT 사업자 + 강의 병행, 30대 (업종코드 940909, 직원·물적시설 없음)</li>
+  <li>연매출 8,200만원 → 복식부기 의무자</li>
+  <li>사업용 카드 1장 + 개인 카드 2장 혼용, 자택 겸 작업실</li>
+</ul>
+<h2>히어로 시나리오</h2>
+<p><b>"맥북 350만원 → 올해 경비는 583,333원"</b></p>
+<pre><code>100만원 초과 → 자산 처리, 내용연수 5년 정액법
+3월 취득 → 10개월분: 3,500,000 ÷ 5 × 10/12 = 583,333원</code></pre>
+<h2>일정</h2>
+<table><tr><th>항목</th><th>내용</th></tr>
+<tr><td>기간</td><td>2026-09 ~ 2026-11 (11주)</td></tr>
+<tr><td>v1.0 배포</td><td>2026-11-06</td></tr></table>
+`],
+['02-Principles', '2. 핵심 설계 원칙', `
+<h3>원칙 1. 판정 경로에 LLM이 없다</h3>
+<pre><code>카드내역 → 정규화 → [모델: 카테고리 분류] → judge() → 판정
+                        ↑ 확률적              ↑ 순수 함수 (같은 입력 → 같은 출력)</code></pre>
+<p><code>judge()</code> 안에는 LLM·외부 API·랜덤·현재 시각 조회가 없습니다. 분류가 틀리면 규칙 매칭이 실패해 '확인 필요'로 떨어질 뿐, 틀린 판정이 나가지 않습니다.</p>
+<blockquote>최악의 결과가 틀린 답이 아니라 질문 하나 더가 되는 구조.</blockquote>
+<h3>원칙 2. 근거를 지어내느니 비워둔다</h3>
+<p>규칙 카드가 없으면 판정하지 않고 <code>is_inference: true</code>로 표시합니다. 확정 판정(가능/불가)에는 반드시 조문 ID가 붙습니다.</p>
+<h3>원칙 3. RAG는 판정 경로에 없다</h3>
+<p>RAG는 <b>신규 규칙 카드 생성</b> 한 곳에만 씁니다. 범위를 넓히려면 팀 합의가 필요합니다.</p>
+<h3>원칙 4. 조문 ID는 하드코딩, 원문은 DB에서</h3>
+<p>LLM은 조문을 고르기만 하고 인용 문자열은 생성하지 않습니다.</p>
+<h3>원칙 5. 사람이 승인해야 규칙이 된다</h3>
+<table><tr><th></th><th>Fact</th><th>규칙 카드</th></tr>
+<tr><td>만드는 주체</td><td>사용자 (되묻기 응답)</td><td>팀 + 세무 검수자</td></tr>
+<tr><td>적용 범위</td><td>그 사용자 1명</td><td>전체 사용자</td></tr>
+<tr><td>저장</td><td><code>user_fact</code> 테이블</td><td><code>rules/cards/*.yaml</code> (git)</td></tr></table>
+<h3>원칙 6. 되돌릴 수 없는 칸 0개</h3>
+<p>신고·제출·결제·금전 이동·외부 발송을 만들지 않습니다. 모든 판정은 사용자가 뒤집을 수 있습니다.</p>
+`],
+['03-Team', '3. 팀 리소스', `
+<p>6명이 함께 만듭니다. 이름을 누르면 GitHub 프로필로 갑니다.</p>
+<div class="team"><div class="role"><b>PM</b><small>주간 develop → main PR, 머지</small><div class="ppl"><a class="person" href="https://github.com/IwanttobeaHokage" target="_blank"><img src="https://github.com/IwanttobeaHokage.png?size=80" alt="">@IwanttobeaHokage</a></div></div><div class="role"><b>백엔드</b><small>판정 엔진 · 인증 · 배포 · 모니터링</small><div class="ppl"><a class="person" href="https://github.com/yuyeol3" target="_blank"><img src="https://github.com/yuyeol3.png?size=80" alt="">@yuyeol3</a><a class="person" href="https://github.com/memoryhong" target="_blank"><img src="https://github.com/memoryhong.png?size=80" alt="">@memoryhong</a></div></div><div class="role"><b>프론트엔드</b><small>React · 화면 · 카드내역 파서</small><div class="ppl"><a class="person" href="https://github.com/Jaeseong22" target="_blank"><img src="https://github.com/Jaeseong22.png?size=80" alt="">@Jaeseong22</a><a class="person" href="https://github.com/cho104" target="_blank"><img src="https://github.com/cho104.png?size=80" alt="">@cho104</a></div></div><div class="role"><b>AI</b><small>법령 파이프라인 · RAG · 에이전트 비서 Really · 팀 자동화</small><div class="ppl"><a class="person" href="https://github.com/RainDrop3" target="_blank"><img src="https://github.com/RainDrop3.png?size=80" alt="">@RainDrop3</a></div></div></div>
+<h2>링크</h2>
+<ul>
+  <li><a href="https://ktc4-pusan-4.duckdns.org/" target="_blank">PreeT 실제 서비스 ↗</a></li>
+  <li><a href="https://github.com/kakaotechcampus-4/ktc4-pusan-4" target="_blank">GitHub 저장소</a> · <a href="https://github.com/kakaotechcampus-4/ktc4-pusan-4/pulls" target="_blank">PR 목록</a></li>
+  <li>상세 설계: 저장소의 <code>CONTEXT.md</code>, <code>docs/architecture.md</code></li>
+</ul>
+`],
+]],
+['협업 가이드', [
+['00-Ground-Rules', '0. 그라운드 룰', `
+<p>부산대 4팀이 함께 일하는 방식입니다. 규칙마다 <span class="why-label">왜</span>를 같이 적었습니다.</p>
+
+<h2>소통</h2>
+<table><tr><th style="width:22%">항목</th><th>규칙</th></tr>
+<tr><td>대화 채널</td><td>평소 팀 대화는 <b>카카오톡</b>으로 합니다.<br><b>디스코드</b>는 카카오테크 캠퍼스 멘토님·매니저님과 이야기할 때 씁니다.</td></tr>
+<tr><td>일정 공유</td><td>참여가 어려운 시간은 미리 <b>카톡으로</b> 서로 공유합니다.</td></tr>
+<tr><td>의사결정</td><td>큰 틀은 <b>다수결</b>로 정하고, 정해지지 않으면 <b>PM이 결정</b>합니다.</td></tr>
+<tr><td>작업 관리</td><td><b>노션</b>으로 관리합니다. 노션 안에 직접 만든 지라 보드에서 할 일을 관리합니다.</td></tr></table>
+<div class="board">
+  <div class="board-head"><b>작업 현황</b><small>GitHub PR 기준 · 2026-11-06</small></div>
+  <div class="stats">
+    <div><small>완료한 작업 (머지된 PR)</small><b>196<em>개</em></b></div>
+    <div><small>진행률</small><b>97.5<em>%</em></b><small>열린 PR 5개 남음</small></div>
+    <div><small>파트</small><b>4<em>개</em></b><small>백엔드 · AI · 프론트엔드 · PM</small></div>
+  </div>
+  <p class="board-sub">파트별 머지된 PR</p>
+  <div class="bars"><div class="bar"><span>백엔드</span><div class="track"><i style="--w:100.0%"></i><small>yuyeol3 69 · memoryhong 31</small></div><b>100</b></div><div class="bar"><span>AI</span><div class="track"><i style="--w:38.0%"></i><small>RainDrop3 38</small></div><b>38</b></div><div class="bar"><span>프론트엔드</span><div class="track"><i style="--w:32.0%"></i><small>Jaeseong22 24 · cho104 8</small></div><b>32</b></div><div class="bar"><span>PM</span><div class="track"><i style="--w:25.0%"></i><small>IwanttobeaHokage 25</small></div><b>25</b></div><div class="bar"><span>운영진</span><div class="track"><i style="--w:1.0%"></i><small>junseok-elice 1</small></div><b>1</b></div></div>
+  <p class="why"><span class="why-label">기준</span> PR 작성자의 역할로 나눴습니다. 진행률 = 머지된 PR ÷ (머지된 PR + 열린 PR). 머지 없이 닫힌 PR 4개는 뺐습니다. PM 수에는 주간 <code>develop → main</code>, <code>develop → release</code> PR이 포함됩니다.</p>
+  <p class="board-sub">노션 보드 쓰는 법</p>
+  <ol class="steps">
+    <li><b>할 일 추가</b><span>주차별로 우리 파트 칸 맨 아래 <code>+ New</code></span></li>
+    <li><b>진행 중</b><span>작업을 시작하면 상태를 "진행 중"으로</span></li>
+    <li><b>완료</b><span>끝나면 "완료" 체크, 진행 현황은 차트에서 확인</span></li>
+  </ol>
+</div>
+
+<h2>회의</h2>
+<table><tr><th style="width:22%">기간</th><th>규칙</th></tr>
+<tr><td>평소</td><td>매주 <b>목요일 오후 9시</b> 정기 회의</td></tr>
+<tr><td>마지막 2주</td><td>매일 <b>오후 11시, 10분</b> 브리핑 — 오늘 한 일과 내일 할 일을 공유합니다.</td></tr></table>
+
+<h2>PR 리뷰</h2>
+<ul>
+  <li>PR이 올라오면 <b>24시간 안에</b> 리뷰합니다.</li>
+  <li>주중 <b>오후 5시 전</b>에 올라온 PR은 <b>그날 안에</b>, 오후 5시 이후에 올라온 PR은 <b>다음 날 오후 5시까지</b> 봅니다.</li>
+  <li>팀원 1명 이상이 리뷰한 뒤 <b>PM이 머지</b>합니다. 각자 머지하지 않습니다.
+    <p class="why"><span class="why-label">참고</span> 승인 1명 이상은 GitHub 룰셋이 강제합니다. 머지 버튼을 PM이 누르는 것은 팀 약속입니다 (<a href="#06b-Automation">협업 자동화</a>).</p></li>
+  <li>매주 <b>수요일 오후 4시까지</b> 파트별로 한 내용을 정리해 PM에게 보내고, PM이 확인한 뒤 오후 6시 전에 develop에 머지합니다. 주간 일정은 <a href="#06-PR">PR · 리뷰 규칙</a>에 있습니다.</li>
+</ul>
+<p class="why"><span class="why-label">자동 알림</span> 리뷰 요청 후 24시간 동안 리뷰가 없으면 디스코드에서 리뷰어를 멘션하고, 그 뒤 12시간마다 다시 알립니다 (<code>.github/workflows/pr-review-reminder.yml</code>).</p>
+
+<h2>코드 · 저장소</h2>
+<h3>판정 경로에 AI를 넣지 않는다</h3>
+<p><code>judge()</code>에는 LLM·외부 API·랜덤·현재 시각이 들어가지 않습니다. RAG는 규칙 카드 생성에만 쓰고, 범위를 넓히려면 팀 합의가 필요합니다.</p>
+<p class="why"><span class="why-label">왜</span> 같은 입력에는 항상 같은 판정이 나와야 하고, 모델이 틀려도 틀린 판정이 나가지 않게 하려는 설계입니다 (<code>CONTEXT.md</code> 원칙 1·3, <a href="#02-Principles">핵심 설계 원칙</a>).</p>
+
+<h3>키·토큰은 절대 커밋하지 않는다</h3>
+<p>비밀 값은 <code>.env</code>에 두고, 저장소에는 <code>.env.example</code>만 올립니다. 실수로 올렸다면 지우는 것으로 끝내지 말고 <b>그 키를 바로 폐기</b>하고, 팀과 담임 매니저님께 알립니다.</p>
+<p class="why"><span class="why-label">왜</span> 저장소가 public입니다. 커밋을 지워도 히스토리에는 남습니다. 1단계에서 학생 API 토큰 8건이 실제로 유출됐습니다 (<code>.gitignore</code> 머리말).</p>
+
+<h3>push 할 때마다 worklog를 남긴다</h3>
+<p>코드가 바뀐 push에는 <code>worklog/</code> 문서가 함께 들어가야 합니다. Claude Code에서 <code>/worklog</code>를 실행하면 작성해 줍니다.</p>
+<p class="why"><span class="why-label">왜</span> <code>.githooks/pre-push</code>가 worklog 없는 push를 막습니다.</p>
+
+<h3>브랜치 이름은 처음부터 규칙대로</h3>
+<p><code>feature/…</code>, <code>refactor/…</code> 형식으로 만들고, PR이 열린 브랜치는 이름을 바꾸지 않습니다. 바꿔야 하면 새 PR을 엽니다.</p>
+<p class="why"><span class="why-label">왜</span> 2026-09-07에 <code>feat/rule-data</code>를 <code>feature/rule-data</code>로 바꿨다가 열려 있던 PR이 닫혔고, 다시 열 수도 없어서 새 PR을 만들었습니다.</p>
+
+<h3>운영진 영역은 건드리지 않는다</h3>
+<p><code>.github/CODEOWNERS</code>의 운영진 4줄과 워크플로 3개(<code>assign-mentor</code>, <code>notify-discord</code>, <code>convention-check</code>)는 수정·삭제하지 않습니다. 그 밖의 워크플로 추가와 템플릿 수정은 자유입니다.</p>
+<p class="why"><span class="why-label">왜</span> 이 파일들이 멘토 자동 지정과 디스코드 알림을 돌립니다. 지우면 팀 PR에 멘토가 붙지 않습니다.</p>
+
+<h3>결정은 날짜와 이유를 함께 남긴다</h3>
+<p>설계 결정은 이유와 버린 대안까지 <code>CONTEXT.md</code>나 <code>docs/</code>에 적습니다. 같은 명세가 여러 문서에 흩어지면 하나를 단일 원본으로 정합니다.</p>
+<p class="why"><span class="why-label">왜</span> <code>CONTEXT.md</code> 머리말에 날짜별 변경 기록이 있고, 규칙 카드 필드는 <code>docs/rule-card-fields.md</code>가 단일 원본입니다.</p>
+`],
+['04-Branch', '1. 브랜치 전략', `
+<table><tr><th>브랜치</th><th>용도</th></tr>
+<tr><td><code>main</code></td><td>멘토님 리뷰 대상. <code>develop</code>에서만 PR을 받습니다.</td></tr>
+<tr><td><code>develop</code></td><td>기본 브랜치. 팀 작업이 모이는 곳.</td></tr>
+<tr><td><code>release</code></td><td>AWS 자동 배포 대상. 검증된 <code>develop</code> 커밋을 PR로 승격합니다.</td></tr>
+<tr><td><code>feature/*</code></td><td>기능 작업. <code>develop</code>에서 따고 <code>develop</code>으로 머지.</td></tr>
+<tr><td><code>refactor/*</code></td><td>멘토님 리뷰사항 반영.</td></tr></table>
+<blockquote><code>feat/</code>가 아니라 <code>feature/</code>입니다. PR이 열린 브랜치는 이름을 바꾸지 마세요 (PR이 닫힙니다).</blockquote>
+`],
+['05-Commit', '2. 커밋 컨벤션', `
+<pre><code>&lt;type&gt;: &lt;subject&gt;
+
+feat: G6 한도 버킷 판정 추가
+fix: 카드사 CSV 헤더 공백 처리
+docs: 커밋 컨벤션 추가</code></pre>
+<h2>type</h2>
+<table><tr><th>타입</th><th>설명</th></tr>
+<tr><td>feat</td><td>새로운 기능 추가</td></tr>
+<tr><td>fix</td><td>버그 수정</td></tr>
+<tr><td>docs</td><td>문서 수정</td></tr>
+<tr><td>style</td><td>코드 포맷팅 등 코드 변경이 없는 경우</td></tr>
+<tr><td>refactor</td><td>코드 리팩토링</td></tr>
+<tr><td>test</td><td>테스트 코드 추가</td></tr>
+<tr><td>chore</td><td>빌드 업무, 패키지</td></tr>
+<tr><td>design</td><td>CSS 등 UI 디자인 변경</td></tr>
+<tr><td>rename / remove / move</td><td>파일명 수정 / 삭제 / 이동</td></tr>
+<tr><td>add</td><td>코드·테스트·예제·문서 추가 생성</td></tr>
+<tr><td>improve</td><td>호환성, 검증, 접근성 등 향상</td></tr></table>
+<h2>subject</h2>
+<ul><li>한국어로 씁니다.</li><li>명사로 마치고 마침표를 찍지 않습니다.</li><li>50자 이내 권장.</li></ul>
+`],
+['06-PR', '3. PR · 리뷰 규칙', `
+<p>열려 있는 PR은 <a href="https://github.com/kakaotechcampus-4/ktc4-pusan-4/pulls" target="_blank">GitHub PR 목록 ↗</a>에서 봅니다.</p>
+<h2>PR 본문</h2>
+<p><code>.github/pull_request_template.md</code> 섹션 제목을 그대로 씁니다.</p>
+<table><tr><th>섹션</th><th>쓰는 법</th></tr>
+<tr><td>이번에 한 일</td><td>2~3줄. 화면이 있으면 스크린샷/GIF</td></tr>
+<tr><td>리뷰에서 봐주셨으면 하는 곳</td><td>"전체 봐주세요" 대신 콕 집어서</td></tr>
+<tr><td>고민했던 점 · 다른 선택지</td><td>없으면 지워도 됨</td></tr>
+<tr><td>지난 리뷰 반영</td><td>재리뷰 요청일 때만</td></tr></table>
+<h2>머지</h2>
+<ul>
+  <li>팀원 <b>1명 이상 승인</b>해야 머지 버튼이 열립니다 (GitHub 룰셋). 머지는 <b>PM</b>이 합니다.</li>
+  <li>리뷰 기한은 24시간. 주중 오후 5시 전 PR은 그날 안에, 이후는 다음 날 오후 5시까지.</li>
+  <li>멘토 리뷰용 PR은 base가 <code>main</code>인지 꼭 확인 (기본값이 <code>develop</code>).</li>
+</ul>
+<h2>주간 사이클</h2>
+<p>카카오테크 캠퍼스 전체 공통 일정에, 우리 팀은 수요일 오후 4시 정리 단계를 더했습니다.</p>
+<table><tr><th style="width:22%">시점</th><th>할 일</th></tr>
+<tr><td>수 16:00 <span class="why-label">우리 팀</span></td><td>파트별로 이번 주에 한 내용을 정리해 PM에게 전달</td></tr>
+<tr><td>수 16:00 ~ 18:00</td><td>PM이 정리 내용을 확인한 뒤 develop에 머지</td></tr>
+<tr><td>수 18:00</td><td>PM이 develop → main PR</td></tr>
+<tr><td>목 22:00</td><td>멘토 1차 리뷰</td></tr>
+<tr><td>토 10:00</td><td>재리뷰 요청</td></tr>
+<tr><td>일 23:59</td><td>main 머지</td></tr></table>
+<blockquote>수요일 오후 6시 전까지 develop에 머지되지 않은 작업은 그 주 멘토 리뷰에서 빠집니다.</blockquote>
+`],
+['06b-Automation', '4. 협업 자동화', `
+<p>사람이 챙기다 빠뜨리기 쉬운 일은 자동으로 돌립니다. 아래는 모두 저장소에서 실제로 돌고 있는 것들입니다.</p>
+
+<h2>한눈에 보기</h2>
+<p>할 일 하나가 노션에서 시작해 <code>develop</code>에 머지되기까지의 흐름입니다. <em class="auto-key">자동</em> 표시는 사람이 챙기지 않아도 도구가 처리하는 단계입니다.</p>
+<ol class="flow"><li><small>Notion</small><b>할 일 등록</b><span>파트 보드에 할 일 추가, 시작하면 "진행 중"</span></li><li><small>Git</small><b>브랜치에서 작업<em>자동</em></b><span><code>feature/…</code> 브랜치, push 때 worklog 자동 작성</span></li><li><small>GitHub</small><b>PR 올리기</b><span>PR 템플릿 4칸 채우기</span></li><li><small>Discord</small><b>바로 알림<em>자동</em></b><span>새 PR · 리뷰어 멘션, 24시간 지나면 다시 알림</span></li><li><small>GitHub</small><b>리뷰 · 승인<em>자동</em></b><span>1명 이상 승인해야 머지 버튼이 열림</span></li><li><small>GitHub</small><b>PM이 머지</b><span><code>develop</code>에 합쳐지고 노션은 "완료"</span></li></ol>
+<p class="board-sub">그리고 매주 멘토 리뷰로</p>
+<ol class="week"><li><b>수 16:00</b><span>파트별 정리 → PM</span></li><li><b>수 18:00</b><span>develop → main PR</span></li><li><b>목 22:00</b><span>멘토 리뷰</span></li><li><b>토 10:00</b><span>재리뷰 요청</span></li><li><b>일 23:59</b><span>main 머지</span></li></ol>
+<h2>PR · 리뷰 알림 (AI 도구로 직접 만든 디스코드 봇)</h2>
+<p>팀이 AI 코딩 도구를 활용해 직접 만든 알림 봇입니다. PR이나 Issue에 변화가 생기면 팀 디스코드 채널로 바로 알림이 옵니다. GitHub에 들어가 확인하지 않아도 리뷰 요청을 놓치지 않습니다.</p>
+<table><tr><th style="width:34%">이럴 때</th><th>알림</th></tr>
+<tr><td>PR이 열리거나 리뷰 가능 상태가 됨</td><td>새 PR 알림 + 지정된 리뷰어 멘션 (2분 기다렸다가 한 번에 묶어서 보냄)</td></tr>
+<tr><td>나중에 리뷰어가 추가됨</td><td>추가된 리뷰어만 따로 멘션</td></tr>
+<tr><td>리뷰 · 댓글이 달림</td><td>PR 작성자 멘션</td></tr>
+<tr><td>리뷰 요청 후 24시간 동안 리뷰 없음</td><td>리뷰어 멘션, 그 뒤로 12시간마다 다시 알림</td></tr>
+<tr><td>Issue 생성 · 담당자 지정</td><td>새 Issue 알림, 담당자 멘션</td></tr></table>
+<p class="why"><span class="why-label">파일</span> <code>.github/workflows/pr-discord-notify.yml</code>, <code>.github/workflows/pr-review-reminder.yml</code>, 로직은 <code>tools/pr_discord_bot.py</code>. 운영진이 준 멘토 리뷰 알림(<code>notify-discord</code>)과 별개로, 팀 내부 PR(<code>feature/*</code> → <code>develop</code>)용으로 팀이 만들었습니다.</p>
+
+<h2>승인 없이는 머지되지 않는다 (GitHub 룰셋)</h2>
+<p>규칙을 사람의 약속에만 맡기지 않고 GitHub 설정으로 강제합니다.</p>
+<table><tr><th style="width:18%">브랜치</th><th>머지 조건</th></tr>
+<tr><td><code>develop</code></td><td>PR로만 머지, <b>승인 1명 이상</b>, 강제 push 금지</td></tr>
+<tr><td><code>main</code></td><td>PR로만 머지, <b>승인 1명 이상</b> + 코드 오너(멘토) 리뷰, 강제 push · 삭제 금지</td></tr>
+<tr><td><code>release</code></td><td><b>승인 1명 이상</b> + 백엔드 · AI · 웹 검사 통과, <code>develop</code>에서 온 PR만 허용, 강제 push · 삭제 금지</td></tr></table>
+<p class="why"><span class="why-label">참고</span> 누가 머지 버튼을 누르는지까지는 막지 않습니다. "PM이 머지"는 팀 약속입니다.</p>
+
+<h2>push 할 때마다 작업 기록 (Claude Code 활용)</h2>
+<p>코드를 바꾼 push에는 작업 기록(<code>worklog/</code>)이 반드시 함께 올라가야 합니다. 기록이 없으면 push가 막히고, Claude Code가 이번 push 분량의 변경을 읽어 기록을 대신 작성합니다.</p>
+<pre><code>git push
+  → pre-push 훅: "worklog 문서가 없습니다" 로 막음
+  → Claude Code 훅이 감지 → /worklog 스킬 실행
+  → 변경 내용을 읽고 worklog/{fe|be|ai|etc}/날짜-주제.md 작성 · 커밋
+  → 다시 push</code></pre>
+<p class="why"><span class="why-label">파일</span> <code>.githooks/pre-push</code>, <code>.claude/hooks/push-nudge.sh</code>, <code>.claude/skills/worklog/SKILL.md</code></p>
+
+<h2>CI · 배포</h2>
+<table><tr><th style="width:30%">워크플로</th><th>하는 일</th></tr>
+<tr><td>Backend CI</td><td>백엔드·규칙 카드·평가셋이 바뀐 PR에서 단위 테스트와 통합 테스트 실행</td></tr>
+<tr><td>AI CI</td><td><code>ai/</code>가 바뀐 PR에서 ruff 검사와 pytest 실행</td></tr>
+<tr><td>Backend Code Health</td><td>백엔드 PR마다 JaCoCo(커버리지)·PMD·CPD(중복 코드)·Codelens 리포트를 참고용으로 남김</td></tr>
+<tr><td>AWS release</td><td><code>release</code> PR에서 백엔드·AI·웹을 빌드·테스트하고, 머지되면 이미지를 ECR에 올려 SSM으로 EC2에 배포</td></tr>
+<tr><td>Release source</td><td><code>release</code>는 <code>develop</code>에서 온 PR만 받도록 검사</td></tr></table>
+<p class="why"><span class="why-label">참고</span> 규칙 카드 판정은 평가셋 60건(<code>eval/</code>)으로 회귀 검사합니다. 기대값은 규칙 카드가 아니라 조문에서 뽑습니다.</p>
+
+<h2>서버에서 정기적으로 도는 작업</h2>
+<table><tr><th style="width:30%">언제</th><th>하는 일</th></tr>
+<tr><td>매주 일요일 04:00</td><td>국가법령정보 API에서 법령 코퍼스 동기화</td></tr>
+<tr><td>매주 일요일 05:00</td><td>① 관리자가 승인한 규칙 후보를 카드로 만들어 <code>develop</code>에 PR 자동 생성 ② 새 규칙 후보 추출 (AI) ③ 결과를 디스코드로 알림</td></tr>
+<tr><td>매일 03:00</td><td>PostgreSQL 백업</td></tr></table>
+<p class="why"><span class="why-label">파일</span> <code>deploy/</code>의 systemd 타이머(<code>ktc4-corpus</code>, <code>ktc4-rule-candidates</code>, <code>ktc4-backup</code>). 시간은 한국 시간입니다.</p>
+
+<h2>장애 알림 (CloudWatch → 디스코드)</h2>
+<p>백엔드 로그와 서버 CPU·메모리·디스크 지표를 CloudWatch에 모으고, 알람이 울리면 Lambda가 디스코드로 알립니다.</p>
+<p class="why"><span class="why-label">파일</span> <code>deploy/monitoring/alarm_to_discord.py</code>, <code>docs/monitoring_plan.md</code></p>
+
+<h2>AI와 함께 개발하는 방식</h2>
+<ul>
+  <li><b>AI 작업 지침을 저장소에 둔다:</b> 코딩 에이전트가 따를 원칙을 <code>CLAUDE.md</code>에 적고, <code>AGENTS.md</code>가 모든 에이전트에게 이 파일을 먼저 읽게 합니다.</li>
+  <li><b>코드는 에이전트가, 리뷰와 머지는 사람이:</b> 모니터링 작업 계획에서 이렇게 역할을 나눴습니다 (<code>docs/monitoring_plan.md</code>).</li>
+  <li><b>AI 비서 보안 실험:</b> 비서 Really에 프롬프트 인젝션 공격 7종을 시험하고, 방어를 고친 뒤 다시 시험했습니다 (<code>docs/really-prompt-injection-report.md</code>).</li>
+</ul>
+
+<h2>숫자로 보기</h2>
+<table><tr><th style="width:30%">항목</th><th>값 (2026-11-06 기준)</th></tr>
+<tr><td>머지된 PR</td><td>196개</td></tr>
+<tr><td>작업 기록(worklog)</td><td>177개</td></tr>
+<tr><td>확정된 규칙 카드</td><td>53장 (<code>rules/cards/</code>)</td></tr>
+<tr><td>판정 평가셋</td><td>60건</td></tr></table>
+`],
+]],
+['개발 가이드', [
+['07-Architecture', '1. 아키텍처 · 6관문', `
+<pre><code>[게이트 0] 입력 검증  승인/청구내역 판별 · 취소 상계 · 대상 판별
+   ↓
+[G1] §33 명백 불산입   차단형 · 첫 히트에서 종료 → 불가
+   ↓
+[G2] §27 통상성        차단형 · 규칙 카드 매칭, 실패 → 확인 필요
+   ↓
+[G3] 안분 · [G4] 자산화 · [G5] 증빙 · [G6] 한도   속성형
+   ↓
+[금액 산정] → [집계: 한도 버킷 연 누적] → 판정 응답</code></pre>
+<table><tr><th></th><th>관문</th><th>동작</th></tr>
+<tr><td><b>차단형</b></td><td>G1, G2</td><td>걸리면 즉시 종료, 판정 확정</td></tr>
+<tr><td><b>속성형</b></td><td>G3~G6</td><td>걸려도 계속 진행, <code>attributes</code>에 누적</td></tr></table>
+<ul>
+  <li><b>G1을 G2보다 먼저</b> 보는 이유: 뒤집으면 "업무 중 과태료 → 통상적 → 가능" 오탐이 납니다.</li>
+  <li><b>G6 한도는 건별로 계산하지 않습니다.</b> 순서에 따라 답이 바뀌기 때문에 집계 단계에서 계산합니다.</li>
+</ul>
+`],
+['08-Stack', '2. 기술 스택 · 구조', `
+<table><tr><th>층</th><th>결정</th></tr>
+<tr><td>프론트</td><td>Vite + React 18 + TypeScript + Tailwind. 카드내역 .xls 는 SheetJS 로 브라우저에서 읽음</td></tr>
+<tr><td>백엔드</td><td>Java 21 + Spring Boot 3.5 + JPA. 판정 엔진·금액 산정·집계·정규화</td></tr>
+<tr><td>AI 서버</td><td>Python 3.12 + FastAPI. 법령 동기화·RAG·규칙 후보 추출·분류</td></tr>
+<tr><td>DB</td><td>PostgreSQL 17 + pgvector + pg_bigm (컨테이너, <code>docker/postgres/</code>)</td></tr>
+<tr><td>캐시</td><td>Redis 7.4 — 리프레시 토큰 저장</td></tr>
+<tr><td>LLM / 임베딩</td><td>OpenAI API / text-embedding-3-small, 호출 추적은 Langfuse</td></tr>
+<tr><td>배포</td><td>AWS EC2 1대에서 docker compose 로 PostgreSQL·Redis·백엔드·AI·웹 실행. 이미지는 ECR, 배포 명령은 SSM, HTTPS 는 Caddy</td></tr>
+<tr><td>CI · 모니터링</td><td>GitHub Actions, CloudWatch</td></tr></table>
+<p class="why"><span class="why-label">참고</span> <code>CONTEXT.md</code> 초기 계획은 RDS 였지만, 실제 배포는 EC2 안의 PostgreSQL 컨테이너입니다 (<code>docs/deployment.md</code>).</p>
+<h2>디렉터리</h2>
+<table><tr><th>경로</th><th>내용</th></tr>
+<tr><td><code>backend/</code></td><td>Spring Boot 백엔드</td></tr>
+<tr><td><code>frontend/</code></td><td>React 프론트엔드</td></tr>
+<tr><td><code>ai/</code></td><td>FastAPI AI 서버 (pipeline, assistant, eval)</td></tr>
+<tr><td><code>rules/</code></td><td>규칙 카드(<code>cards/</code>)와 카테고리·키워드·PG 차단 목록</td></tr>
+<tr><td><code>profiles/</code></td><td>업종 프로파일</td></tr>
+<tr><td><code>eval/</code></td><td>판정 평가셋 (회귀 검사)</td></tr>
+<tr><td><code>db/</code></td><td>DB 스키마</td></tr>
+<tr><td><code>deploy/</code></td><td>운영 compose, 배포 스크립트, 정기 작업 타이머, 모니터링</td></tr>
+<tr><td><code>tools/</code></td><td>디스코드 봇, 카드내역 파서·정규화 실험 등 보조 스크립트</td></tr>
+<tr><td><code>worklog/</code></td><td>push마다 남기는 작업 기록</td></tr>
+<tr><td><code>docs/</code></td><td>설계·평가 문서</td></tr>
+<tr><td><code>CONTEXT.md</code></td><td>설계 결정과 이유 (먼저 읽기)</td></tr></table>
+`],
+['09-Local', '3. 로컬 실행', `
+<h2>백엔드</h2>
+<p>JDK 21과 Docker가 필요합니다.</p>
+<pre><code>docker compose up -d postgres
+
+# Windows
+.\\backend\\gradlew.bat -p backend bootRun --args="--spring.profiles.active=local"
+
+# macOS / Linux
+bash ./backend/gradlew -p backend bootRun --args='--spring.profiles.active=local'</code></pre>
+<p>확인: <code>GET http://localhost:8080/actuator/health</code></p>
+<h2>프론트엔드</h2>
+<pre><code>cd frontend
+npm install
+npm run dev   # http://localhost:5173</code></pre>
+<p>기본은 <b>인메모리 목업</b> API로 동작합니다. 실제 백엔드에 붙이려면 <code>VITE_API=http npm run dev</code>로 실행합니다 (<code>frontend/src/api/index.ts</code>).</p>
+<h2>테스트</h2>
+<table><tr><th>종류</th><th>명령</th><th>Docker</th></tr>
+<tr><td>단위</td><td><code>gradlew -p backend test</code></td><td>불필요</td></tr>
+<tr><td>통합 (<code>*IntegrationTest</code>)</td><td><code>gradlew -p backend integrationTest</code></td><td>필요</td></tr>
+<tr><td>프론트</td><td><code>npm test</code></td><td>-</td></tr></table>
+`],
+]],
+];
+
+const name = t => t.replace(/^\d+\.\s*/, '');   // 메뉴 번호 떼기
+const text = h => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+const DESC = {   // 홈 카드 한 줄 설명
+  '01-Overview': '무엇을, 누구를 위해 만드는지와 히어로 시나리오',
+  '02-Principles': '판정 경로에 LLM이 없는 이유와 6가지 원칙',
+  '03-Team': 'PM · 백엔드 · 프론트 · AI 팀원과 자주 쓰는 링크',
+  '00-Ground-Rules': '소통 · 회의 · 리뷰 시간과 저장소에서 지킬 것',
+  '04-Branch': 'main · develop · release · feature 브랜치의 쓰임',
+  '05-Commit': 'type: subject 형식과 타입 목록',
+  '06-PR': 'PR 본문 쓰는 법, 머지 규칙, 주간 리뷰 사이클',
+  '06b-Automation': 'PR 알림 봇, 승인 필수 룰셋, worklog 자동 작성, CI·배포, 모니터링',
+  '07-Architecture': '입력 검증부터 집계까지, 6관문 판정 흐름',
+  '08-Stack': '프론트 · 백엔드 · AI 서버 · DB 구성과 디렉터리',
+  '09-Local': '백엔드·프론트 로컬 실행과 테스트 명령',
+};
+const RELATED = {   // 페이지 끝 "함께 보면 좋은 문서"
+  '01-Overview': ['02-Principles', '07-Architecture'],
+  '02-Principles': ['07-Architecture', '01-Overview'],
+  '03-Team': ['00-Ground-Rules', '06-PR'],
+  '00-Ground-Rules': ['06-PR', '06b-Automation'],
+  '04-Branch': ['06-PR', '05-Commit'],
+  '05-Commit': ['04-Branch', '06-PR'],
+  '06-PR': ['06b-Automation', '04-Branch', '00-Ground-Rules'],
+  '06b-Automation': ['06-PR', '00-Ground-Rules'],
+  '07-Architecture': ['02-Principles', '08-Stack'],
+  '08-Stack': ['09-Local', '07-Architecture'],
+  '09-Local': ['08-Stack', '04-Branch'],
+};
+// 본문의 저장소 경로(<code>docs/x.md</code> 등)를 GitHub 링크로
+const REPO = 'https://github.com/kakaotechcampus-4/ktc4-pusan-4';
+const repoLink = html => html.replace(/<code>((?:\.github|\.githooks|\.claude|tools|worklog|deploy|docker|eval|rules|profiles|db|docs|backend|frontend|ai)\/[\w.\-\/]*|[\w\-]+\.md)<\/code>/g,
+  (_, p) => `<a class="repo" href="${REPO}/${p.endsWith('/') ? 'tree' : 'blob'}/develop/${p}" target="_blank"><code>${p}</code> ↗</a>`);
+const flat = DOCS.flatMap(([g, pages]) => pages.map(([id, t, html]) => ({ id, t: name(t), html, g })));
+const view = document.getElementById('view');
+
+function home() {
+  view.innerHTML = `<div class="hero"><div>
+      <p class="k">카카오테크 캠퍼스 4기 · 부산대 4팀 · 초안(데모)</p>
+      <h1>AI가 규칙을 만들고,<br><em>규칙이 판정한다</em></h1>
+      <p>PreeT는 카드 승인내역을 받아 지출마다 필요경비 인정 여부를 조문 근거와 함께 판정합니다.<br>팀 규칙, 설계 원칙, 실행 방법을 여기 한곳에 모았습니다.</p>
+      <a class="btn" href="#${flat[0].id}">문서 읽기 시작 →</a> <a class="btn ghost" href="https://ktc4-pusan-4.duckdns.org/" target="_blank">서비스 열어 보기 ↗</a></div></div>
+    <div class="home">${DOCS.map(([g]) => `<section><h2>${g}</h2><div class="grid">${
+      flat.filter(d => d.g === g).map(d => `<a class="card" href="#${d.id}"><b>${d.t}</b><small>${DESC[d.id] ?? text(d.html).slice(0, 90)}</small></a>`).join('')
+    }</div></section>`).join('')}</div>`;
+}
+
+function doc(i) {
+  const d = flat[i], prev = flat[i - 1], next = flat[i + 1];
+  const sib = flat.filter(x => x.g === d.g);
+  view.innerHTML = `<div class="page"><article>
+      <div class="crumb"><a href="#">홈</a> / ${d.g}</div>
+      <h1>${d.t}</h1>
+      <div class="sib">${sib.map(x => `<a href="#${x.id}" class="${x.id === d.id ? 'on' : ''}">${x.t}</a>`).join('')}</div>
+      ${repoLink(d.html)}
+      ${RELATED[d.id] ? `<div class="rel"><p>함께 보면 좋은 문서</p>${RELATED[d.id].map(r => flat.find(x => x.id === r)).map(x => `<a href="#${x.id}"><b>${x.t}</b><small>${DESC[x.id]}</small></a>`).join('')}</div>` : ''}
+      <div class="pager">${prev ? `<a href="#${prev.id}"><small>← 이전</small>${prev.t}</a>` : ''}${next ? `<a class="n" href="#${next.id}"><small>다음 →</small>${next.t}</a>` : ''}</div>
+    </article><aside class="toc" id="toc"></aside></div>`;
+  const hs = [...view.querySelectorAll('article h2')];
+  const toc = document.getElementById('toc');
+  if (hs.length) toc.innerHTML = '<p>이 페이지에서</p>';
+  hs.forEach(h => {   // 해시는 페이지 이동에 쓰므로 목차는 스크롤만
+    const a = document.createElement('a');
+    a.textContent = h.textContent;
+    a.onclick = () => h.scrollIntoView();
+    toc.append(a);
+  });
+}
+
+function render(id = location.hash.slice(1)) {
+  const i = flat.findIndex(d => d.id === id);
+  i < 0 ? home() : doc(i);
+  document.querySelector('.fab').hidden = i < 0;   // 홈에서는 숨김
+  const g = i < 0 ? null : flat[i].g;
+  document.getElementById('tabs').innerHTML = DOCS.map(([n]) =>
+    `<a href="#${flat.find(d => d.g === n).id}" class="${n === g ? 'on' : ''}">${n}</a>`).join('');
+  document.title = (i < 0 ? '' : flat[i].t + ' · ') + 'PreeT 팀 문서';
+  scrollTo(0, 0);
+}
+// 내부 링크는 직접 처리: 앱 파일 미리보기처럼 주소(#) 이동이 막힌 곳에서도 동작
+document.addEventListener('click', e => {
+  const a = e.target.closest('a[href^="#"]');
+  if (!a) return;
+  e.preventDefault();
+  const id = a.getAttribute('href').slice(1);
+  try { history.pushState(null, '', '#' + id); } catch {}   // 주소 갱신은 되는 곳에서만
+  render(id);
+});
+addEventListener('popstate', () => render());
+render();
+</script>
+</body>
+</html>
