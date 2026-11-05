@@ -1,6 +1,7 @@
 import { LegalHeader, LegalSection, PublicLayout } from '../../components/PublicLayout';
 import { ASSISTANT_DOES_NOT_SEND, ASSISTANT_SENDS } from '../../components/assistant/help';
 import { SUPPORT_EMAIL } from '../../utils/contact';
+import { PAGES } from '../../seo';
 
 const COLLECTED = [
 {
@@ -32,6 +33,12 @@ const COLLECTED = [
   item: '세무대리인 질문',
   fields: '비서가 제안하고 이용자가 [적용]한 질문 문장(300자 이내), 관련 거래 id',
   purpose: '요약 화면에서 세무대리인에게 넘길 문장'
+},
+{
+  // 웹 서버(deploy/Caddyfile)의 접근 기록. 거기서 남기는 항목을 바꾸면 여기도 맞춘다
+  item: '접속 기록',
+  fields: '화면을 요청한 시각, 요청한 주소, 응답 결과, 브라우저·검색 로봇 종류 같은 요청 헤더(쿠키·인증 정보는 지움), 앞 두 자리만 남긴 IP 주소. 로그인 뒤 서버에 보내는 요청(API)은 남기지 않습니다.',
+  purpose: '서비스 운영, 검색엔진·AI 크롤러 방문 확인'
 }];
 
 
@@ -66,7 +73,7 @@ const SENT = [
 /** 개인정보처리방침. 외부로 보내는 항목은 코드에서 확인한 것만 적는다(ai/app/config.py, ai/pipeline/llm.py) */
 export function Privacy() {
   return (
-    <PublicLayout title="개인정보처리방침">
+    <PublicLayout title={PAGES.privacy.title}>
       <LegalHeader title="개인정보처리방침" effective="2026년 11월 6일" />
 
       <LegalSection title="1. 모으는 정보와 쓰는 곳">
@@ -103,6 +110,7 @@ export function Privacy() {
           함께 지웁니다. 세무대리인 질문은 업로드를 지워도 남고, 탈퇴하면 지웁니다.
         </p>
         <p>데이터베이스 백업은 7일이 지나면 자동으로 지워집니다. 그래서 지운 정보도 백업에는 최대 7일 동안 남습니다.</p>
+        <p>접속 기록은 10MB 파일 5개까지만 두고, 넘으면 오래된 것부터 지웁니다. 계정과 묶어 두지 않아 탈퇴와 상관없이 이 방식으로 지워집니다.</p>
       </LegalSection>
 
       <LegalSection title="3. 외부로 보내는 정보">

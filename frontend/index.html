@@ -5,6 +5,25 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>PreeT</title>
+    <script>
+      // 첫 방문의 랜딩은 인트로가 덮는다(Landing.tsx). 빌드 때 미리 그린 본문이 인트로보다 먼저
+      // 번쩍이지 않게, 자바스크립트가 뜨기 전부터 인트로와 같은 색 판을 깐다(index.css 의 intro-cover).
+      // Landing 이 뜨면 걷는다. 번들이 끝내 못 뜨면 본문이라도 보이게 8초 뒤 걷는다
+      try {
+        if (
+          location.pathname === '/' &&
+          !matchMedia('(prefers-reduced-motion: reduce)').matches &&
+          localStorage.getItem('preet.intro.seen') === null
+        ) {
+          document.documentElement.classList.add('intro-cover');
+          setTimeout(function () {
+            document.documentElement.classList.remove('intro-cover');
+          }, 8000);
+        }
+      } catch (e) {
+        // 저장소를 막아 둔 브라우저. 판 없이 그대로 둔다
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRightIcon } from 'lucide-react';
 import { useSession } from '../contexts/SessionContext';
@@ -15,12 +15,18 @@ import {
   SYSTEM_FEATURES,
   VERDICTS } from
 '../mock/marketing';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { PAGES } from '../seo';
 
-/** 인트로를 봤다는 표시. 처음 한 번만 띄운다 — 로고로 다녀와도 다시 뜨지 않는다 */
+/**
+ * 인트로를 봤다는 표시. 처음 한 번만 띄운다 — 로고로 다녀와도 다시 뜨지 않는다.
+ * index.html 의 덮개 스크립트도 이 키를 읽는다. 바꾸면 거기도 바꾼다
+ */
 const INTRO_SEEN = 'preet.intro.seen';
 
-/** 움직임을 줄이라는 설정이면 아예 띄우지 않는다 */
+/** 움직임을 줄이라는 설정이면 아예 띄우지 않는다. 빌드 때 미리 그리는 HTML(entry-server.tsx)에는 넣지 않는다 */
 function wantsIntro() {
+  if (typeof window === 'undefined') return false;
   if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return false;
   try {
     return window.localStorage.getItem(INTRO_SEEN) === null;
@@ -111,8 +117,14 @@ const BOARDS = [
 
 export function Landing() {
   const { status } = useSession();
+  useDocumentTitle(PAGES.home.title);
 
   const [intro, setIntro] = useState(wantsIntro);
+
+  // index.html 이 미리 깔아 둔 판을 걷는다. 인트로가 뜨면 그 아래로 가려져 이어져 보이고, 안 뜨면 본문이 드러난다
+  useEffect(() => {
+    document.documentElement.classList.remove('intro-cover');
+  }, []);
 
   const closeIntro = useCallback(() => {
     setIntro(false);
@@ -138,7 +150,7 @@ export function Landing() {
         <section className={`${SHELL} pt-10`}>
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_206px]">
             <div className="relative">
-              <HeroBanner />
+              <HeroBanner autoplay={!intro} />
 
               {/* 왼쪽 아래 모서리를 바탕색으로 베어 내고 그 자리에 링크를 둔다 */}
               <div className="absolute bottom-0 left-0 flex h-[72px] items-center rounded-tr-[20px] bg-canvas pr-7 pt-2">
