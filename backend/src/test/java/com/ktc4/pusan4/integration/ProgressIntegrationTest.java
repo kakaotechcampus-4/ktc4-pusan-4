@@ -118,6 +118,20 @@ class ProgressIntegrationTest {
     }
 
     @Test
+    void classification_pending_leaves_out_excluded_transactions() throws Exception {
+        UUID batch = insertBatch(USER_ID, "2025-10-01", "2025-10-31");
+        UUID excluded = insertTransaction(batch, "미분류", "가맹점A", 30_000L);
+        insertReview(excluded);
+        insertReview(insertTransaction(batch, "미분류", "가맹점B", 67_000L));
+        jdbcTemplate.update("update transaction set user_inclusion = 'EXCLUDED' where id = ?", excluded);
+
+        mockMvc.perform(get("/api/v1/progress").param("batchId", batch.toString()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.classification.pendingCount").value(1))
+            .andExpect(jsonPath("$.classification.pendingAmount").value(67_000));
+    }
+
+    @Test
     void another_users_upload_is_not_found() throws Exception {
         UUID otherUser = UUID.randomUUID();
         jdbcTemplate.update("insert into app_user(id, email) values (?, ?)", otherUser, otherUser + "@example.com");

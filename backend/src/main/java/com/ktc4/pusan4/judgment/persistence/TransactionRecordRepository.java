@@ -12,52 +12,15 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface TransactionRecordRepository extends Repository<TransactionRecordEntity, UUID> {
+/** 판정 대상 조건을 쓰는 조회(findRunTargetIds 등)는 {@link TransactionRecordRepositoryCustom} 에 있다. */
+public interface TransactionRecordRepository
+    extends Repository<TransactionRecordEntity, UUID>, TransactionRecordRepositoryCustom {
 
     TransactionRecordEntity save(TransactionRecordEntity transaction);
 
     Optional<TransactionRecordEntity> findById(UUID transactionId);
 
     List<TransactionRecordEntity> findByIdIn(Collection<UUID> transactionIds);
-
-    // run 대상: effectiveStatus = JUDGEABLE 이고 classificationStatus = CLASSIFIED (api.md 3.6).
-    // effectiveStatus 는 저장하지 않고 sourceStatus·userInclusion 으로 계산한다(api.md 2.3).
-    // 판정대상은 사용자가 제외하지 않은 JUDGEABLE, 또는 사용자가 포함한 EXCLUDED 다. CANCELED_OFFSET 은 늘 빠진다.
-    @Query("""
-        select transaction.id
-        from TransactionRecordEntity transaction
-        where transaction.batchId = :batchId
-          and transaction.classificationStatus = 'CLASSIFIED'
-          and (
-            (transaction.sourceStatus = 'JUDGEABLE' and transaction.userInclusion <> 'EXCLUDED')
-            or (transaction.sourceStatus = 'EXCLUDED' and transaction.userInclusion = 'INCLUDED')
-          )
-        order by transaction.approvedAt, transaction.id
-        """)
-    List<UUID> findRunTargetIds(@Param("batchId") UUID batchId);
-
-    // 가맹점 단위 답(api.md 3.10)이 바꾸는 거래 중 다시 판정할 거래. 지금 판정 대상이면서(findRunTargetIds 와 같은 조건)
-    // 판정한 적이 있는 거래만 고른다. 분류 전·제외·아직 run 이 돌지 않은 거래에 run 밖 판정을 만들지 않는다.
-    @Query("""
-        select transaction.id
-        from TransactionRecordEntity transaction
-        where transaction.batchId = :batchId
-          and transaction.merchantNorm = :merchantNorm
-          and transaction.classificationStatus = 'CLASSIFIED'
-          and (
-            (transaction.sourceStatus = 'JUDGEABLE' and transaction.userInclusion <> 'EXCLUDED')
-            or (transaction.sourceStatus = 'EXCLUDED' and transaction.userInclusion = 'INCLUDED')
-          )
-          and exists (
-            select judgment.id
-            from JudgmentEntity judgment
-            where judgment.transactionId = transaction.id
-          )
-        """)
-    List<UUID> findJudgedTargetIdsByMerchant(
-        @Param("batchId") UUID batchId,
-        @Param("merchantNorm") String merchantNorm
-    );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""

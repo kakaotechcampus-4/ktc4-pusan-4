@@ -46,6 +46,10 @@ dependencies {
     implementation("org.springframework.security:spring-security-crypto")
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
+    // 원래 com.querydsl 은 5.1.0(2024-01) 이후 릴리스가 없어 OpenFeign 포크를 쓴다. 6.x 는 Hibernate 6.6(Boot 3.5) 용, 7.x 는 Hibernate 7 용이다.
+    implementation("io.github.openfeign.querydsl:querydsl-jpa:6.12")
+    annotationProcessor("io.github.openfeign.querydsl:querydsl-apt:6.12:jpa")
+    annotationProcessor("jakarta.persistence:jakarta.persistence-api")
     runtimeOnly("org.postgresql:postgresql")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
