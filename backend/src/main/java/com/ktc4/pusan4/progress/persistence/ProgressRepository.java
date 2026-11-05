@@ -12,8 +12,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-/** 진행 상황 (api.md 3.14) 에 필요한 업로드·분류 대기·판정 실행 값. */
-interface ProgressRepository extends Repository<UploadBatchEntity, UUID> {
+/**
+ * 진행 상황 (api.md 3.14) 에 필요한 업로드·분류 대기·판정 실행 값.
+ * 판정 대상 조건을 쓰는 분류 대기 집계(countPendingClassification)는 {@link ProgressRepositoryCustom} 에 있다.
+ */
+interface ProgressRepository extends Repository<UploadBatchEntity, UUID>, ProgressRepositoryCustom {
 
     @Query("""
         select new com.ktc4.pusan4.progress.persistence.ProgressRepository$BatchRow(
@@ -27,21 +30,6 @@ interface ProgressRepository extends Repository<UploadBatchEntity, UUID> {
 
     record BatchRow(UUID id, String cardIssuer, LocalDate periodStart, LocalDate periodEnd, long transactionCount) {
     }
-
-    // 업로드 목록의 classificationPendingCount 와 같은 조건이다(UploadBatchCountRepository.countPendingReviews).
-    @Query("""
-        select new com.ktc4.pusan4.progress.persistence.ProgressRepository$Pending(
-            count(review), coalesce(sum(transaction.amount), 0))
-        from ClassificationReviewEntity review, TransactionRecordEntity transaction
-        where review.transactionId = transaction.id
-          and transaction.batchId = :batchId
-          and review.status = 'PENDING'
-          and (
-            (transaction.sourceStatus = 'JUDGEABLE' and transaction.userInclusion <> 'EXCLUDED')
-            or (transaction.sourceStatus = 'EXCLUDED' and transaction.userInclusion = 'INCLUDED')
-          )
-        """)
-    Pending countPendingClassification(@Param("batchId") UUID batchId);
 
     record Pending(long count, long amount) {
     }

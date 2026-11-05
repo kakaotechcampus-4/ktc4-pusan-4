@@ -13,7 +13,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-interface ClassificationReviewRepository extends Repository<ClassificationReviewEntity, UUID> {
+/** 판정 대상 조건을 쓰는 분류 확인 목록(findRows)은 {@link ClassificationReviewRepositoryCustom} 에 있다. */
+interface ClassificationReviewRepository
+    extends Repository<ClassificationReviewEntity, UUID>, ClassificationReviewRepositoryCustom {
 
     ClassificationReviewEntity save(ClassificationReviewEntity review);
 
@@ -39,44 +41,6 @@ interface ClassificationReviewRepository extends Repository<ClassificationReview
         limit 1
         """)
     Optional<Integer> findLatestCompletedRunContextVersion(@Param("batchId") UUID batchId);
-
-    /**
-     * 이 batch 의 분류 확인 요청과 거래 요약. 정렬: createdAt ASC, id ASC (api.md 3.5).
-     * 지금 판정 대상(effectiveStatus = JUDGEABLE)인 거래만 본다. 제외한 거래의 요청은 지우지 않고 여기서 거른다.
-     */
-    @Query("""
-        select new com.ktc4.pusan4.transaction.persistence.ClassificationReviewRepository$ReviewRow(
-            review.id, transaction.batchId, transaction.id, review.status, review.createdAt, review.resolvedAt,
-            transaction.approvedAt, transaction.merchantRaw, transaction.merchantNorm, transaction.merchantCategory,
-            transaction.amount, transaction.installmentMonths)
-        from ClassificationReviewEntity review, TransactionRecordEntity transaction
-        where review.transactionId = transaction.id
-          and transaction.userId = :userId
-          and transaction.batchId = :batchId
-          and (
-            (transaction.sourceStatus = 'JUDGEABLE' and transaction.userInclusion <> 'EXCLUDED')
-            or (transaction.sourceStatus = 'EXCLUDED' and transaction.userInclusion = 'INCLUDED')
-          )
-        order by review.createdAt, review.id
-        """)
-    List<ReviewRow> findRows(@Param("userId") UUID userId, @Param("batchId") UUID batchId);
-
-    /** batchId 없이 부르면 사용자의 모든 batch. 정렬은 {@link #findRows(UUID, UUID)} 와 같다. */
-    @Query("""
-        select new com.ktc4.pusan4.transaction.persistence.ClassificationReviewRepository$ReviewRow(
-            review.id, transaction.batchId, transaction.id, review.status, review.createdAt, review.resolvedAt,
-            transaction.approvedAt, transaction.merchantRaw, transaction.merchantNorm, transaction.merchantCategory,
-            transaction.amount, transaction.installmentMonths)
-        from ClassificationReviewEntity review, TransactionRecordEntity transaction
-        where review.transactionId = transaction.id
-          and transaction.userId = :userId
-          and (
-            (transaction.sourceStatus = 'JUDGEABLE' and transaction.userInclusion <> 'EXCLUDED')
-            or (transaction.sourceStatus = 'EXCLUDED' and transaction.userInclusion = 'INCLUDED')
-          )
-        order by review.createdAt, review.id
-        """)
-    List<ReviewRow> findRows(@Param("userId") UUID userId);
 
     record ReviewRow(
         UUID reviewId,

@@ -349,6 +349,7 @@ class JudgmentOverrideIntegrationTest {
                 rules_commit_sha, user_context_version, tax_year, verdict, is_inference, %s
             ) values (?, ?, ?, 'R-300', 1, '["R-300"]', 'fixture', 1, 2025, ?, false, ?)
             """.formatted(originColumn), id, transactionId, revision, verdict, originId);
+        CurrentJudgments.refresh(jdbcTemplate);
         return id;
     }
 
