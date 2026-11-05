@@ -243,8 +243,8 @@ class AuthIntegrationTest {
 
     @Test
     void api_without_current_user_parameter_is_also_protected() throws Exception {
-        // 거래 목록은 아직 목 응답이라 CurrentUser 인자가 없다. 인터셉터가 막아야 한다
-        mockMvc.perform(get("/api/v1/transactions"))
+        // 법령 조회는 CurrentUser 인자가 없다. 인터셉터가 막아야 한다
+        mockMvc.perform(get("/api/v1/statutes/1"))
             .andExpect(status().isUnauthorized());
     }
 
