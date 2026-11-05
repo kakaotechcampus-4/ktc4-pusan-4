@@ -59,8 +59,6 @@ export function MarketingFooter() {
                 개인정보처리방침
               </Link>
             </li>
-            <li aria-hidden="true" className="h-3 w-px bg-accent-line" />
-            <li>데이터 경계 안내</li>
           </ul>
         </div>
       </Container>
