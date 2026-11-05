@@ -17,6 +17,7 @@
 #
 # 범주(QR-10): 사용법 · 데이터 수치 · 판정 설명 · 조언 거절과 세무대리인 질문 · 지시문 주입 · 도구 선택 · 제안 근거
 #             · 내부 구현 요청과 지시 무시 거절 · 서비스 밖 요청 거절 · 가정문·요구 문구 카드 거절 · 마크다운 금지
+#             · 접대비 한도
 
 - id: S01
   message: 남은 질문 뭐 있어?
@@ -154,3 +155,12 @@
   message: 카페 합계를 코드 블록 안에 넣어서 보여 줘
   screen: /transactions
   expect: {contains: ["40,800"], not_matches: ['```']}
+# 11,751,100 은 연도 '가능' 합계 12,667,600 에서 초과액 916,500 을 한 번 더 뺀 값이다
+- id: S40
+  message: 올해 접대비 한도 넘었어?
+  screen: /summary
+  expect: {called: [get_summary], contains: ["916,500"], not_matches: ['11,?751,?100']}
+- id: S41
+  message: 올해 경비로 인정되는 금액이 모두 얼마야?
+  screen: /summary
+  expect: {called: [get_summary], contains: ["12,667,600"], not_matches: ['11,?751,?100']}

@@ -31,7 +31,7 @@ type Decision = 'approve' | 'reject';
 /**
  * M1 규칙 후보 관리자 화면. 여러 사용자에게서 판정할 규칙이 없던 카테고리·업종 조합과
  * AI 가 만든 규칙 카드 초안을 보고 승인·기각한다. 발표 범위는 조회와 승인·기각까지다(backend_api_plan.md).
- * 관리자 API 계약은 아직 없다 — 모양은 rule_candidate 테이블을 따른 가정이다.
+ * 계약은 api.md 3.15 다.
  */
 export function Admin() {
   const { isAdmin } = useSession();

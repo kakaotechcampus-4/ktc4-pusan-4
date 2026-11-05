@@ -1,0 +1,81 @@
+# 모니터링 스택·Discord 알림 (B1)
+
+- 브랜치: feature/monitoring-stack
+- 주요파일: deploy/monitoring/template.yaml, deploy/monitoring/alarm_to_discord.py, deploy/monitoring/deploy.sh, docs/deployment.md
+
+## 한 일
+
+- `docs/monitoring_plan.md`(#220)의 B1. CloudFormation 스택 `ktc4-monitoring` 에 로그 그룹 `/ktc4/backend`(보존 14일), 알림 Lambda `ktc4-alarm-to-discord`, EC2 알람 2개(CPU, 상태 검사)를 넣었다.
+- Lambda 는 알람 이벤트를 한국어 메시지(상태·이전 상태·이유·콘솔 링크)로 바꿔 Discord 웹훅으로 보낸다. 표준 라이브러리만 쓰고 단위 테스트 7개를 붙였다.
+- `docs/deployment.md` 에 13절 "로그"(A3 몫, 제목만)와 14절 "모니터링"(배포·알림 확인)을 만들었다.
+
+## 왜 이렇게 했나
+
+- Lambda 코드를 템플릿에 인라인하지 않고 파일로 둬 테스트한다. 대신 `cloudformation package` 가 zip 을 S3 에 올려야 해서 배포 스크립트가 버킷을 받는다.
+- `/ktc4/backend` 는 `DeletionPolicy: Retain`. 스택을 실수로 지워도 로그는 남는다.
+- Lambda 로그 그룹을 미리 만들어 보존 기간을 건다. 자동 생성 그룹은 무기한이다.
+- 기본 `Python-urllib` User-Agent 는 Discord 가 403 으로 막아 User-Agent 를 지정했다(`tools/pr_discord_bot.py` 와 같은 이유).
+
+## 남은 것 · 아는 문제
+
+- 실제 배포와 `set-alarm-state` 로 Discord 도착 확인은 아직. SSO 역할의 CloudFormation·Lambda·IAM·S3 권한이 실제로 되는지도 그때 확인한다.
+- 호출 권한의 `SourceArn` 은 `alarm:ktc4-*` 와일드카드다. B3 알람 이름도 `ktc4-` 로 시작해야 한다.
+- 단위 테스트는 CI 에 걸지 않았다. `python3 -m unittest discover -s deploy/monitoring` 로 돌린다.
+
+---
+
+# CloudWatch Agent (B2)
+
+- 브랜치: feature/monitoring-agent (feature/monitoring-stack 위)
+- 주요파일: deploy/cloudwatch-agent/config.json, deploy/cloudwatch-agent/prometheus.yaml, deploy/cloudwatch-agent/install.sh
+
+## 한 일
+
+- Agent 가 메모리(`mem_used_percent`)·루트 디스크(`disk_used_percent`)와 백엔드 Prometheus 지표 3개를 CloudWatch 로 보내게 설정했다. 설치·갱신은 `install.sh` 한 번.
+- Agent 가 Prometheus 값을 쓰는 로그 그룹 `/ktc4/prometheus`(보존 3일)를 모니터링 스택에 더했다.
+
+## 왜 이렇게 했나
+
+- 긁은 시계열은 EMF 로그로 전부 나가 로그 요금이 붙는다. `metric_relabel_configs` 로 3개(힙만, judgmentRunExecutor 만)만 남긴다.
+- 앱 지표 차원은 `job` 하나만 둔다. `uri`·`id` 같은 라벨을 차원에 넣으면 조합마다 커스텀 지표가 늘어난다.
+
+## 남은 것 · 아는 문제
+
+- 지표 이름은 계획 문서의 예상값이다. A2 PR 본문의 실제 출력과 다르면 relabel 규칙과 `metric_selectors` 를 고친다.
+- 디스크 지표에서 `fstype` 차원은 Agent 설정으로 뺄 수 없다. 시계열은 하나라 비용은 같다. B3 알람은 설치 뒤 `list-metrics` 로 본 실제 값을 쓴다.
+- 운영 EC2 설치와 Agent 메모리 측정은 아직.
+
+---
+
+# 메트릭 필터·알람·대시보드 (B3)
+
+- 브랜치: feature/monitoring-alarms (feature/monitoring-agent 위)
+- 주요파일: deploy/monitoring/template.yaml, docs/deployment.md
+
+## 한 일
+
+- `/ktc4/backend` 에 메트릭 필터 2개(5xx, 기동), 알람 4개(5xx, 재시작, 메모리, 디스크), 대시보드 `ktc4-backend` 를 스택에 더했다. 커스텀 지표는 계획대로 7개.
+
+## 왜 이렇게 했나
+
+- 5xx·재시작은 일이 생긴 순간만 의미가 있어 복구(OK) 알림을 뺐다. 배포할 때마다 기동·복구 두 번 울리는 걸 막는다.
+- 디스크 `fstype` 차원은 Agent 에서 뺄 수 없어 스택 파라미터(`RootFsType`, 기본 ext4)로 받는다.
+
+## 남은 것 · 아는 문제
+
+- A1 로그 예시가 아직 없어 필터는 계약(`status` 숫자 필드, 기동 문구) 기준이다. A1 머지 뒤 `test-metric-filter` 로 확인하고 다르면 고친다.
+- 알람별 `set-alarm-state` Discord 도착 확인은 배포 뒤.
+
+---
+
+# B1 배포 수정: Lambda zip 을 직접 만든다
+
+- 첫 배포에서 `AlarmToDiscordFunction` 이 "Could not unzip uploaded file" 로 실패했다. 템플릿 `Code` 에 `.py` 를 두면 AWS CLI v2(2.39.3)의 `cloudformation package` 가 zip 으로 묶지 않고 올린다.
+- `deploy.sh` 가 작업 폴더에 템플릿과 `alarm_to_discord.zip` 을 같이 만들고, 템플릿은 `Code: alarm_to_discord.zip` 을 가리키게 바꿨다.
+
+---
+
+# 첫 정상 판정 알림 끄기
+
+- 배포 직후 `ktc4-ec2-status-check-failed` 가 장애 없이 "✅ 복구" 를 보냈다. 알람이 INSUFFICIENT_DATA 로 시작해 첫 판정에서 OK 가 되기 때문이다. Agent 를 설치하면 메모리·디스크 알람도 같은 메시지를 보낸다.
+- Lambda 가 INSUFFICIENT_DATA → OK 만 보내지 않는다. INSUFFICIENT_DATA → ALARM 은 처음부터 문제라는 뜻이라 보낸다.

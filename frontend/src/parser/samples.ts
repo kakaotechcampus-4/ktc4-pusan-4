@@ -1,7 +1,7 @@
 import { loadXlsx } from './kb';
 
 /**
- * 테스트와 목업 모드 「샘플 파일로 해 보기」에 쓰는 카드내역 파일. 값은 모두 가짜다.
+ * 테스트와 「샘플 파일로 해 보기」(목업·실서버 모두)에 쓰는 카드내역 파일. 값은 모두 가짜다.
  * 저장소가 공개라 실제 파일은 넣지 않고, 실제 파일과 같은 모양을 메모리에서 만든다.
  * 행마다 노리는 규칙은 계획서의 Fixtures 표와 같다 — 행을 바꾸면 파이프라인 · 요청 테스트의 합계가 바뀐다.
  */
@@ -166,7 +166,7 @@ export function buildIbkHtml(variant: IbkSample = 'full'): string {
   ].join('\n');
 }
 
-/** 목업 모드의 「샘플 파일로 해 보기」. 가짜 거래로 만든 파일이다 */
+/** 「샘플 파일로 해 보기」(목업·실서버 모두). 가짜 거래로 만든 파일이다 */
 export async function sampleFiles(): Promise<SampleFile[]> {
   const type = 'application/vnd.ms-excel';
   return [

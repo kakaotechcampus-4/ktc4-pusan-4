@@ -190,7 +190,8 @@ public final class JudgmentEngine {
         if (match.amountMax() != null && transaction.amount() > match.amountMax()) {
             return false;
         }
-        if (match.holiday() && !isHoliday(transaction.approvedAt(), publicHolidays)) {
+        // 합산 행의 날짜는 결제일이 아니라 묶음 기준일이라 요일로 볼 수 없다(#192).
+        if (match.holiday() && (transaction.aggregated() || !isHoliday(transaction.approvedAt(), publicHolidays))) {
             return false;
         }
         return match.industries().isEmpty() || match.industries().contains(context.industryCode());

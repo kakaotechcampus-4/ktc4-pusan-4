@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRightIcon, CopyCheckIcon, CopyIcon, SearchXIcon } from 'lucide-react';
+import { ArrowRightIcon, CopyCheckIcon, CopyIcon, PrinterIcon, SearchXIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { Button, Empty, Table, type Column } from '../components/ui';
 import { useSession } from '../contexts/SessionContext';
@@ -12,8 +12,11 @@ import type {
   UnresolvedSummary } from
 '../types/domain';
 import { formatNumber, formatPeriod, formatWon } from '../utils/format';
+import { excessNote, LIMITED_ACCOUNT, limitLine, limitsOf, PROVISIONAL_NOTE } from '../utils/limit';
 
 type AccountRow = JudgmentSummary['byAccount'][number];
+
+/* 접대비 한도는 연 단위로만 다룬다(#15, #226). batch 요약의 접대비는 한도 전 금액이고, 그해 초과액은 limits 로 따로 온다 */
 
 /** 한 달 배치면 「2026년 1월」, 아니면 기간 그대로 */
 const periodLabel = (batch: UploadBatch) => {
@@ -40,6 +43,18 @@ context: StoredBusinessContext | null | undefined) =>
   const lines = [
   `${period ? `${period} ` : ''}카드내역 중 판정한 ${formatNumber(summary.totalCount)}건의 결과입니다. 직접 수정한 판정은 수정한 값으로 셉니다.`,
   `필요경비로 볼 수 있는 것 ${formatNumber(AVAILABLE.count)}건(${formatWon(AVAILABLE.finalAmount)}), 볼 수 없는 것 ${formatNumber(UNAVAILABLE.count)}건, 근거를 확정하지 못한 것 ${formatNumber(NEEDS_REVIEW.count)}건입니다.`];
+  const limited = summary.byAccount.find((row) => row.account === LIMITED_ACCOUNT);
+  const limits = limitsOf(summary.limits);
+  if (limited)
+  lines.push(
+    `이 중 접대비는 ${formatWon(limited.finalAmount)}이고 연간 한도 대상입니다.${
+    limits.length > 0 ?
+    ` 사용자 전체 기준으로 ${limits.map(limitLine).join(', ')}입니다(${PROVISIONAL_NOTE}).` :
+    ''}${
+    limits.some((item) => item.excessAmount > 0) ?
+    ' 초과액은 연 단위라 위 합계에서 빼지 않았습니다.' :
+    ''}`
+  );
 
   if (unclassified > 0)
   lines.push(`가맹점을 분류하지 못한 ${formatNumber(unclassified)}건은 아직 판정하지 않았습니다.`);
@@ -51,7 +66,7 @@ context: StoredBusinessContext | null | undefined) =>
   if (context)
   lines.push(
     `현재 문진(v${context.version}) 응답: 업종코드 ${context.industryCode}, ${context.bookkeepingDuty} 대상, 직원 ${
-    context.hasEmployee ? '있음' : '없음'}, 자택 작업공간 비율 ${
+    context.hasEmployee ? '있음' : '없음'}, 작업 공간 면적 비율 ${
     context.homeOfficeRatio === null ?
     '입력 안 함' :
     context.homeOfficeRatio ?
@@ -115,13 +130,24 @@ export function Summary() {
   const summary = summaryQ.data;
   const unresolved = questionsQ.data?.unresolved;
   const period = batchQ.data ? periodLabel(batchQ.data) : null;
+  const limits = summary ? limitsOf(summary.limits) : [];
+  const excess = summary ? excessNote(summary.limits) : null;
 
   const header =
-  <header>
-      <p className="text-small font-bold text-accent">4단계 · 반영</p>
-      <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
-        {period ? `${period} 요약` : '판정 요약'}
-      </h1>
+  <header className="flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <p className="text-small font-bold text-accent">5단계 · 요약</p>
+        <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
+          {period ? `${period} 요약` : '판정 요약'}
+        </h1>
+      </div>
+      {/* PDF 는 서버에서 만들지 않는다. 인쇄용 스타일(index.css)로 화면 틀을 빼고 브라우저 인쇄로 저장한다 */}
+      {summary && summary.totalCount > 0 &&
+    <Button variant="secondary" size="sm" className="print:hidden" onClick={() => window.print()}>
+          <PrinterIcon className="h-4 w-4" aria-hidden="true" />
+          PDF로 저장
+        </Button>
+    }
     </header>;
 
 
@@ -198,7 +224,16 @@ export function Summary() {
   const accountColumns: Column<AccountRow>[] = [
   {
     header: '계정과목',
-    cell: (row) => <span className="font-normal text-ink">{row.account}</span>
+    cell: (row) =>
+    <span className="block">
+          <span className="font-normal text-ink">{row.account}</span>
+          {row.account === LIMITED_ACCOUNT &&
+      <span className="mt-0.5 block text-caption text-muted">
+              연간 한도 대상 · {limits.length > 0 ? `${limits.map(limitLine).join(', ')}(${PROVISIONAL_NOTE})` : PROVISIONAL_NOTE}
+            </span>
+      }
+        </span>
+
   },
   {
     header: '건수',
@@ -267,6 +302,12 @@ export function Summary() {
           `전체 ${formatNumber(total)}건 중 가능으로 판정한 것만 더했습니다.` :
           '집계를 불러오는 중입니다.'}
         </p>
+        {/* 초과액은 그해 사용자 전체 기준이라 이 업로드 몫을 정할 수 없다(#15). 합계에서 빼지 않고 따로 알린다 */}
+        {excess &&
+        <p className="mt-4 rounded-xl border border-warn-line bg-warn-bg px-4 py-3 text-small text-ink2">
+            <strong className="font-bold text-warn">접대비 연간 한도 초과</strong> — {excess}
+          </p>
+        }
 
         {/* count 는 질문 수, amount 는 그 질문이 걸린 거래 금액이다 (3.9). 거래 수로 쓰지 않는다 */}
         {unresolved && unresolved.count > 0 &&
@@ -363,7 +404,7 @@ export function Summary() {
             불러오지 못해 문장에서 뺀 것: {omitted.join(', ')}. 새로고침한 뒤 다시 복사해 주세요.
           </p>
         }
-        <div className="mt-4 flex flex-wrap items-center gap-3">
+        <div className="mt-4 flex flex-wrap items-center gap-3 print:hidden">
           <Button variant="secondary" size="sm" disabled={!text || settling} onClick={() => void copyText()}>
             {copy === 'done' ?
             <CopyCheckIcon className="h-4 w-4" aria-hidden="true" /> :

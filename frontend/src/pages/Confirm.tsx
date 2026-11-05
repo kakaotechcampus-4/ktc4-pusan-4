@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { CheckIcon, PlayIcon, ShieldCheckIcon } from 'lucide-react';
+import { PlayIcon, ShieldCheckIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { useSession } from '../contexts/SessionContext';
 import { api, ApiRequestError, useApi } from '../api';
-import { formatFullDate, formatNumber, formatPeriod } from '../utils/format';
+import { formatNumber, formatPeriod } from '../utils/format';
+import { contextRows, isJudgedIndustry } from '../utils/context';
 
 export function Confirm() {
   const navigate = useNavigate();
-  const { batchId, context, contextRef, setRunId } = useSession();
+  const { batchId, context, contextRef } = useSession();
   // 업로드 이력에서 고르고 들어올 수도 있으므로 세션의 파싱 결과가 아니라 서버에서 읽는다
   const batchQ = useApi(
     () => batchId ? api.uploads.get(batchId) : Promise.resolve(null),
@@ -24,6 +25,8 @@ export function Confirm() {
   '올린 카드내역이 없습니다. 파일을 먼저 올려 주세요.' :
   !contextRef ?
   '사업자 문진을 먼저 마쳐 주세요.' :
+  context && !isJudgedIndustry(context.industryCode) ?
+  `저장된 문진의 업종(${context.industryCode})은 지금 판정하지 않습니다. 문진을 다시 저장해 주세요.` :
   null;
 
   const start = async () => {
@@ -32,9 +35,17 @@ export function Confirm() {
     setError(null);
     try {
       const created = await api.runs.create({ batchId, contextId: contextRef.id });
-      setRunId(created.id);
-      navigate('/run');
+      navigate(`/run/${created.id}`);
     } catch (caught) {
+      // 탭 두 개에서 동시에 누르면 이미 돌고 있는 판정이 있다 (#228). 새로 시작하는 대신 그것을 보여준다
+      if (
+        caught instanceof ApiRequestError &&
+        caught.code === 'RUN_ALREADY_ACTIVE' &&
+        caught.runId)
+      {
+        navigate(`/run/${caught.runId}`);
+        return;
+      }
       setError(
         caught instanceof ApiRequestError ?
         caught.message :
@@ -60,33 +71,14 @@ export function Confirm() {
   [];
 
 
-  const contextRows = context ?
-  [
-  { term: '업종', value: `${context.industryCode} · 컴퓨터 프로그래밍` },
-  {
-    term: '직전연도 수입금액',
-    value: `${formatNumber(context.prevYearRevenue)}원`
-  },
-  { term: '개업일', value: formatFullDate(context.businessOpenDate) },
-  { term: '기장의무', value: context.bookkeepingDuty },
-  { term: '직원', value: context.hasEmployee ? '있음' : '없음 (1인)' },
-  {
-    term: '자택 작업 비율',
-    value:
-    context.homeOfficeRatio === null ?
-    '입력 안 함' :
-    context.homeOfficeRatio > 0 ?
-    `${context.homeOfficeRatio}%` :
-    '해당 없음'
-  }] :
-  [];
+  const contextList = context ? contextRows(context) : [];
 
 
   return (
     <AppShell>
       <div className="mx-auto max-w-3xl">
         <header>
-          <p className="text-small font-bold text-accent">사람 게이트 ①</p>
+          <p className="text-small font-bold text-accent">4단계 · 판정 전 확인</p>
           <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
             이 입력으로 판정합니다
           </h1>
@@ -132,12 +124,12 @@ export function Confirm() {
             사업자 문진{contextRef && ` · 버전 ${contextRef.version}`}
           </h2>
           <dl className="divide-y divide-line2">
-            {contextRows.length === 0 &&
+            {contextList.length === 0 &&
             <div className="px-5 py-3">
                 <p className="text-small text-muted">아직 문진을 마치지 않았습니다.</p>
               </div>
             }
-            {contextRows.map((row) =>
+            {contextList.map((row) =>
             <div key={row.term} className="flex gap-4 px-5 py-3">
                 <dt className="w-36 shrink-0 text-small text-muted">
                   {row.term}
@@ -175,26 +167,19 @@ export function Confirm() {
             </div>
           </div>
 
+          {/*
+            네모를 직접 그리지 않고 브라우저 것을 쓴다. 접근성 보고서(2026-10-22)가 이 자리에서
+            세 가지를 지적했다 — 키보드 초점이 안 보이고, 레이블이 안 잡히고, 선택 전 테두리가
+            흰 바탕 대비 1.19 다. 셋 다 `sr-only` 로 진짜 입력을 숨기고 span 으로 흉내 낸 탓이다.
+            Signup.tsx·Questions.tsx 가 이미 브라우저 네모를 쓰고 있어 관례도 이쪽이다
+          */}
           <label className="mt-4 flex cursor-pointer items-start gap-2.5 rounded-xl bg-canvas p-3.5">
-            <span
-              className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors duration-150 ${
-              agreed ? 'border-accent bg-accent' : 'border-line bg-surface'}`
-              }>
-              
-              {agreed &&
-              <CheckIcon
-                className="h-3 w-3 text-white"
-                aria-hidden="true"
-                strokeWidth={3} />
-
-              }
-            </span>
             <input
               type="checkbox"
               checked={agreed}
               onChange={(event) => setAgreed(event.target.checked)}
-              className="sr-only" />
-            
+              className="mt-1 h-4 w-4 shrink-0 accent-accent" />
+
             <span className="text-small leading-6 text-ink2">
               이 결과가 세무 신고를 확정하는 것이 아니며, 최종 판단에는 세무대리인의
               확인이 필요하다는 점을 이해했습니다.

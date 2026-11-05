@@ -127,6 +127,13 @@ def test_요약은_판정을_한국어_라벨로_준다():
     assert out["unclassified"] == {"count": 2, "amount": 97000}
 
 
+def test_요약은_연도별_접대비_한도를_준다():
+    out = turn().get_summary("year")
+    assert out["scope"] == "year"
+    assert out["limits"] == [{"bucket": "접대비", "taxYear": 2026, "totalAmount": 13006500, "excessAmount": 916500}]
+    assert turn().get_summary("batch")["limits"] == []   # 이 업로드에는 접대비가 없다
+
+
 def test_미분류_그룹은_후보_카테고리를_준다():
     out = turn().list_unclassified(None)
     assert out["groups"][0]["ref"] == "c1"
@@ -247,6 +254,8 @@ def test_판정_수정_카드는_현재_판정_id_와_사용자_문장을_사유
     ref = t.find_transactions(None, None, "넷플릭스", None, None)["items"][0]["ref"]
 
     assert t.run("propose_override", {"transaction": ref, "to_verdict": "불가", "quote": "넷플릭스는"})["error"] == "SAME_VERDICT"
+    # BE 는 확인 필요로 바꾸는 수정을 422 로 거절한다(api.md 3.8). 카드를 만들지 않는다
+    assert t.run("propose_override", {"transaction": ref, "to_verdict": "확인 필요", "quote": "넷플릭스는"})["error"] == "INVALID_VERDICT"
     assert t.run("propose_override", {"transaction": ref, "to_verdict": "가능", "quote": "판정 바꿔 줘"})["error"] == "AMBIGUOUS_TARGET"
     out = t.propose_override(ref, "가능", "넷플릭스는 강의 자료 조사용이라 업무용이야")
 

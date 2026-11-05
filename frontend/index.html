@@ -2,9 +2,34 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="theme-color" content="#2F5BFF" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- 네이버 서치어드바이저 소유 확인(docs/deployment.md 13절). 지우면 확인이 풀린다 -->
+    <meta name="naver-site-verification" content="d417909b31f6bcbb6512d221ba824e0f1d7bbed2" />
     <title>PreeT</title>
+    <script>
+      // 첫 방문의 랜딩은 인트로가 덮는다(Landing.tsx). 빌드 때 미리 그린 본문이 인트로보다 먼저
+      // 번쩍이지 않게, 자바스크립트가 뜨기 전부터 인트로와 같은 색 판을 깐다(index.css 의 intro-cover).
+      // Landing 이 뜨면 걷는다. 번들이 끝내 못 뜨면 본문이라도 보이게 8초 뒤 걷는다
+      try {
+        if (
+          location.pathname === '/' &&
+          !matchMedia('(prefers-reduced-motion: reduce)').matches &&
+          localStorage.getItem('preet.intro.seen') === null
+        ) {
+          document.documentElement.classList.add('intro-cover');
+          setTimeout(function () {
+            document.documentElement.classList.remove('intro-cover');
+          }, 8000);
+        }
+      } catch (e) {
+        // 저장소를 막아 둔 브라우저. 판 없이 그대로 둔다
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

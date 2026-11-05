@@ -11,8 +11,14 @@ export const APPROVAL_EXPORT_STEPS = '카드사 홈페이지·앱 → 이용(승
  * 업로드 화면의 데이터 경계 안내와 도움말이 같은 문장을 쓴다
  */
 export const ASSISTANT_SENDS =
-'묻는 말과 최근 대화, 지금 화면, 답에 필요한 거래(승인일·가맹점명·카테고리·금액)·판정·질문·근거 조문';
+'묻는 말과 최근 대화, 지금 화면, 사업자 문진 중 기장의무·직원 유무, 진행 상황(건수·금액 합계), 답에 필요한 거래(승인일·가맹점명·카테고리·금액)·판정·질문·근거 조문';
 export const ASSISTANT_DOES_NOT_SEND = '소득 금액·이름·이메일은 보내지 않습니다.';
+/**
+ * 받는 곳. 모델은 ai/app/config.py, 품질 점검 기록은 ai/pipeline/llm.py 의 mask() 를 거친다.
+ * 개인정보처리방침(pages/public/Privacy.tsx)도 같은 내용이다
+ */
+export const ASSISTANT_DESTINATION =
+'엘리스 LLM 게이트웨이를 거쳐 OpenAI 모델로 보냅니다. 품질 점검 기록(Langfuse, 일본)에는 이메일·전화번호·주민등록번호·카드번호를 가린 뒤 남깁니다.';
 
 export interface HelpTopic {
   id: string;
@@ -44,7 +50,7 @@ export const HELP_TOPICS: HelpTopic[] = [
 {
   id: 'boundary',
   label: '비서에게 보내는 것',
-  text: `비서에게 물으면 ${ASSISTANT_SENDS}을 외부 모델로 보냅니다. ${ASSISTANT_DOES_NOT_SEND}`
+  text: `비서에게 물으면 ${ASSISTANT_SENDS}을 외부 모델로 보냅니다. ${ASSISTANT_DOES_NOT_SEND} ${ASSISTANT_DESTINATION}`
 },
 {
   id: 'scope',

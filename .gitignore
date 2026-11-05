@@ -41,6 +41,7 @@ Thumbs.db
 # ── JavaScript / TypeScript ─────────────────────────
 node_modules/
 dist/
+dist-ssr/
 *.tsbuildinfo
 build/
 .next/

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Container } from './ui';
+import { SUPPORT_EMAIL } from '../utils/contact';
 
 export function MarketingFooter() {
   return (
@@ -30,7 +31,7 @@ export function MarketingFooter() {
             </div>
             <div className="flex gap-3">
               <dt className="text-muted">문의</dt>
-              <dd className="text-ink2">help@expense-verdict.kr</dd>
+              <dd className="break-all text-ink2">{SUPPORT_EMAIL}</dd>
             </div>
           </dl>
         </div>
@@ -48,9 +49,17 @@ export function MarketingFooter() {
                 버그 신고
               </Link>
             </li>
+            <li>
+              <Link to="/terms" className="transition-colors hover:text-ink">
+                이용약관
+              </Link>
+            </li>
+            <li>
+              <Link to="/privacy" className="font-bold transition-colors hover:text-ink">
+                개인정보처리방침
+              </Link>
+            </li>
             <li aria-hidden="true" className="h-3 w-px bg-accent-line" />
-            <li>이용약관</li>
-            <li>개인정보처리방침</li>
             <li>데이터 경계 안내</li>
           </ul>
         </div>

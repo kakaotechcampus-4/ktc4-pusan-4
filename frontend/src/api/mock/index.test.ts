@@ -53,6 +53,20 @@ describe('판정 (3.7)', () => {
     expect((await api.judgments.summary({ batchId })).totalCount).toBe(before.totalCount - 1);
     expect(await currentOf(tx('1005'))).toBeDefined();
   });
+
+  it('접대비 한도 총액은 판정 대상 거래만 센다. 제외한 거래는 요약 계정과 같이 빠진다 (#226)', async () => {
+    for (const id of ['1005', '1016']) {
+      const group = await groupOf(tx(id));
+      await api.questions.respond({ questionIds: group.questionIds, answer: { value: '업무미팅' } });
+    }
+    await api.transactions.exclude(tx('1005'));
+    const summary = await api.judgments.summary({ batchId });
+    const entertainment = summary.byAccount.find((row) => row.account === '접대비');
+    expect(entertainment).toBeDefined();
+    expect(summary.limits).toHaveLength(1);
+    expect(summary.limits[0].totalAmount).toBe(entertainment?.finalAmount);
+    expect(summary.limits[0].excessAmount).toBe(0);
+  });
 });
 
 describe('사용자 수정 (3.8, #62)', () => {
@@ -107,6 +121,21 @@ describe('분류 확인 (3.5)', () => {
     const before = (await api.uploads.get(batchId)).classificationPendingCount;
     await api.classificationReviews.respond({ reviewIds: group.reviewIds, merchantCategory: '카페' });
     expect((await api.uploads.get(batchId)).classificationPendingCount).toBe(before - group.count);
+  });
+
+  it('제외한 거래의 분류 확인은 목록과 대기 수에서 빠지고, 다시 넣으면 돌아온다', async () => {
+    const { items } = await api.classificationReviews.list({ batchId, status: 'PENDING' });
+    const target = items[0];
+    const before = (await api.uploads.get(batchId)).classificationPendingCount;
+
+    await api.transactions.exclude(target.transactionId);
+    expect((await api.uploads.get(batchId)).classificationPendingCount).toBe(before - 1);
+    const after = await api.classificationReviews.list({ batchId, status: 'PENDING' });
+    expect(after.items.some((r) => r.id === target.id)).toBe(false);
+    expect(after.unresolved.count).toBe(before - 1);
+
+    await api.transactions.include(target.transactionId);
+    expect((await api.uploads.get(batchId)).classificationPendingCount).toBe(before);
   });
 });
 
@@ -379,5 +408,103 @@ describe('로그인·관리자 (목업)', () => {
     expect(approved).toMatchObject({ status: { code: 'APPROVED' }, reviewedBy: 'admin@example.com' });
     expect((await api.admin.ruleCandidates.list({ status: 'PENDING' })).items).toHaveLength(items.length - 1);
     await expect(api.admin.ruleCandidates.reject(items[0].id)).rejects.toMatchObject({ status: 409 });
+  });
+});
+
+describe('가입·카카오 로그인 (목업, #193·#176)', () => {
+  it('코드 받기 → 확인 → 가입하면 바로 로그인되고, 그 비밀번호로 다시 들어온다', async () => {
+    await api.auth.requestEmailVerification({ email: ' New@Example.com ' });
+    const { verificationToken } = await api.auth.confirmEmailVerification({ email: 'new@example.com', code: '123456' });
+    await api.auth.signup({ email: 'new@example.com', password: 'longenough', verificationToken });
+    expect(await api.users.me()).toMatchObject({ email: 'new@example.com' });
+
+    await api.auth.logout();
+    await api.auth.login({ email: 'NEW@example.com', password: 'longenough' });
+    expect((await api.users.me()).email).toBe('new@example.com');
+    // 가입한 이메일은 코드를 다시 받을 수 없다
+    await expect(api.auth.requestEmailVerification({ email: 'new@example.com' })).rejects.toMatchObject({
+      status: 409,
+      code: 'EMAIL_ALREADY_EXISTS'
+    });
+  });
+
+  it('60초 안에 다시 받으면 429 이고 남은 초를 message 에 담는다', async () => {
+    await api.auth.requestEmailVerification({ email: 'a@example.com' });
+    const caught = await api.auth.requestEmailVerification({ email: 'a@example.com' }).catch((error: unknown) => error);
+    expect(caught).toMatchObject({ status: 429, code: 'VERIFICATION_RESEND_TOO_SOON' });
+    expect((caught as Error).message).toMatch(/\d+초/);
+  });
+
+  it('틀린 코드는 400 INVALID 이고, 5번 틀리면 맞는 코드도 EXPIRED 다', async () => {
+    await api.auth.requestEmailVerification({ email: 'b@example.com' });
+    for (let i = 0; i < 5; i += 1)
+    await expect(api.auth.confirmEmailVerification({ email: 'b@example.com', code: '000000' })).rejects.toMatchObject({
+      code: 'INVALID_VERIFICATION_CODE'
+    });
+    await expect(api.auth.confirmEmailVerification({ email: 'b@example.com', code: '123456' })).rejects.toMatchObject({
+      code: 'VERIFICATION_CODE_EXPIRED'
+    });
+  });
+
+  it('다른 이메일의 토큰이나 짧은 비밀번호로는 가입하지 못한다', async () => {
+    await api.auth.requestEmailVerification({ email: 'c@example.com' });
+    const { verificationToken } = await api.auth.confirmEmailVerification({ email: 'c@example.com', code: '123456' });
+    await expect(
+      api.auth.signup({ email: 'd@example.com', password: 'longenough', verificationToken })
+    ).rejects.toMatchObject({ code: 'EMAIL_NOT_VERIFIED' });
+    await expect(
+      api.auth.signup({ email: 'c@example.com', password: 'short', verificationToken })
+    ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    await expect(api.users.me()).rejects.toMatchObject({ status: 401 });
+  });
+
+  it('카카오 계정은 email 이 null 이다', async () => {
+    await api.auth.kakao({ code: 'any-code' });
+    expect(await api.users.me()).toMatchObject({ email: null, role: 'USER' });
+  });
+});
+
+describe('내보내기 (#214)', () => {
+  it('현재 판정 전부와 답한 내용을 주고, 스코프가 하나가 아니면 400 이다', async () => {
+    const group = await groupOf(tx('1005'));
+    await api.questions.respond({ questionIds: group.questionIds, answer: { value: '업무미팅' } });
+
+    const { items } = await api.judgments.export({ batchId });
+    const summary = await api.judgments.summary({ batchId });
+    expect(items).toHaveLength(summary.totalCount);
+    const row = items.find((item) => item.judgment.transactionId === tx('1005'));
+    expect(row?.answers).toEqual([{ question: group.questionText, answer: '업무미팅' }]);
+    expect(row?.allowedAmount).toBe(row?.judgment.finalAmount ?? 0);
+
+    await expect(api.judgments.export({} as never)).rejects.toMatchObject({ status: 400, code: 'INVALID_EXPORT_SCOPE' });
+  });
+
+  it('자택 관리비는 작업 공간이 따로 나뉜다고 답하면 문진의 면적 비율만큼 인정한다 (R-103 v3)', async () => {
+    const group = await groupOf(tx('1008'));
+    expect(group.options).toEqual(['사업 전용', '자택 겸용(작업 공간이 따로 나뉨)', '자택 겸용(따로 나뉘지 않음)']);
+    await api.questions.respond({ questionIds: group.questionIds, answer: { value: '자택 겸용(작업 공간이 따로 나뉨)' } });
+    const judgment = await currentOf(tx('1008'));
+    const amount = (await api.transactions.get(tx('1008'))).amount;
+    expect(judgment.verdict.code).toBe('AVAILABLE');
+    // 시드 문진의 면적 비율은 20% 다
+    expect(judgment.finalAmount).toBe(Math.floor(amount * 20 / 100));
+  });
+
+  it('문진의 면적 비율이 0(해당 없음)이면 엔진처럼 비율이 없는 것으로 보고 확인 필요로 둔다', async () => {
+    const context = await api.contexts.create({
+      industryCode: '940909',
+      prevYearRevenue: 1,
+      businessOpenDate: '2024-01-01',
+      bookkeepingDuty: '간편장부',
+      hasEmployee: false,
+      homeOfficeRatio: 0
+    });
+    let run = await api.runs.create({ batchId, contextId: context.id });
+    while (run.status.code !== 'COMPLETED') run = await api.runs.get(run.id);
+    const group = await groupOf(tx('1008'));
+    await api.questions.respond({ questionIds: group.questionIds, answer: { value: '자택 겸용(작업 공간이 따로 나뉨)' } });
+    const judgment = await currentOf(tx('1008'));
+    expect(judgment.verdict.code).toBe('NEEDS_REVIEW');
+    expect(judgment.finalAmount).toBeNull();
   });
 });

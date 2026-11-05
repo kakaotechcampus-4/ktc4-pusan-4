@@ -1,9 +1,14 @@
 import React from 'react';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { CheckIcon, UserIcon } from 'lucide-react';
 import { DisclaimerBar } from './DisclaimerBar';
+import { Button } from './ui';
+import { BugReportButton } from './BugReport';
+import { Logo } from './Logo';
 
 import { useSession } from '../contexts/SessionContext';
+import { accountLabel } from '../utils/account';
 
 /**
  * 진행 단계. 순서는 PM 확정 흐름을 따른다:
@@ -14,8 +19,12 @@ const STEPS = [
 { path: '/upload', label: '카드내역' },
 { path: '/preview', label: '분류 확인' },
 { path: '/interview', label: '사업자 문진' },
-{ path: '/run', label: '판정' },
+// 판정 진행은 실행 id 가 주소에 있어야 한다(/run/:runId). 단계를 누르면 판정 전 확인으로 간다
+{ path: '/run', to: '/confirm', label: '판정' },
 { path: '/results', label: '결과' }];
+
+/** /upload 가 /uploads 에도 걸리지 않게 경로 조각 단위로 맞춘다 */
+const under = (pathname: string, prefix: string) => pathname === prefix || pathname.startsWith(`${prefix}/`);
 
 /** 빵부스러기에 쓸 이름. [무리, 화면] */
 const CRUMB: Record<string, [string, string]> = {
@@ -29,20 +38,24 @@ const CRUMB: Record<string, [string, string]> = {
   '/results': ['판정', '판정 결과'],
   '/questions': ['판정', '되묻기'],
   '/summary': ['판정', '세무사 전달 요약'],
-  '/account': ['내 정보', '내 정보']
+  '/account': ['내 정보', '내 정보'],
+  '/admin': ['관리자', '규칙 후보']
 };
 
 /** 흐름의 단계가 아니라 언제든 들러보는 자료 화면 */
-const REFS = [
+/** short 는 640px 보다 좁을 때 보이는 이름이다 */
+interface NavRef {path: string;label: string;short?: string;}
+
+const REFS: NavRef[] = [
 { path: '/transactions', label: '거래' },
-{ path: '/uploads', label: '업로드 이력' }];
+{ path: '/uploads', label: '업로드 이력', short: '이력' }];
 
 /** 관리자에게만 보인다 (M1) */
-const ADMIN_REF = { path: '/admin', label: '관리자' };
+const ADMIN_REF: NavRef = { path: '/admin', label: '관리자' };
 
 /** 단계 표시에 포함되지 않지만 특정 단계에 속하는 화면 */
 const STEP_ALIAS: Record<string, number> = {
-  '/confirm': 2,
+  '/confirm': 3,
   '/questions': 4,
   '/summary': 4,
   '/judgments': 4
@@ -60,39 +73,30 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
   const navigate = useNavigate();
   const { email, isAdmin, signOut } = useSession();
   const refs = isAdmin ? [...REFS, ADMIN_REF] : REFS;
-  const activeIndex = STEPS.findIndex((step) =>
-  pathname.startsWith(step.path)
-  );
-  const alias = Object.entries(STEP_ALIAS).find(([prefix]) =>
-  pathname.startsWith(prefix)
-  );
+  const activeIndex = STEPS.findIndex((step) => under(pathname, step.path));
+  const alias = Object.entries(STEP_ALIAS).find(([prefix]) => under(pathname, prefix));
   const currentIndex = alias ? alias[1] : activeIndex;
-  const crumb = Object.entries(CRUMB).find(([prefix]) =>
-  pathname.startsWith(prefix)
-  )?.[1];
+  const crumb = Object.entries(CRUMB).find(([prefix]) => under(pathname, prefix))?.[1];
+  useDocumentTitle(crumb?.[1]);
 
   return (
     <div className="flex min-h-full w-full flex-col bg-canvas">
-      <header className="sticky top-0 z-30 bg-canvas/95 backdrop-blur">
+      <header className="sticky top-0 z-30 border-b border-line bg-canvas/95 shadow-header backdrop-blur print:hidden">
         {/*
           한 줄을 넘기면 한글이 음절 단위로 꺾인다. 줄바꿈을 막고, 폭이 모자라면 덜 중요한 것부터 접는다:
           xl 미만 — 지금 단계가 아닌 단계 이름 · lg 미만 — 귀속 연도, 이메일(아이콘으로) · md 미만 — 단계 표시
         */}
         <div className="mx-auto flex h-[72px] max-w-page items-center justify-between gap-3 whitespace-nowrap px-6">
-          <Link to="/" className="flex shrink-0 items-center gap-2" aria-label="PreeT 홈">
-            <span aria-hidden="true" className="flex gap-[3px]">
-              <span className="block h-[18px] w-[4px] rounded-sm bg-ink" />
-              <span className="block h-[18px] w-[4px] rounded-sm bg-ink" />
-              <span className="block h-[18px] w-[4px] rounded-sm bg-highlight" />
-            </span>
-            <span className="text-h4 font-bold tracking-tight text-ink">
-              PreeT
-            </span>
-            <span aria-hidden="true" className="h-3.5 w-px bg-accent-line" />
-            <span className="text-body text-ink2">판정</span>
-          </Link>
+          <Logo
+            suffix={
+            <>
+                <span aria-hidden="true" className="hidden h-3.5 w-px bg-accent-line sm:block" />
+                <span className="hidden text-body text-ink2 sm:block">판정</span>
+              </>
+            } />
 
-          {showSteps && currentIndex >= 0 &&
+          {/* 자료 화면(거래·업로드 이력·내 정보)에서도 보여 결과로 돌아올 수 있게 한다 */}
+          {showSteps &&
           <nav aria-label="진행 단계" className="hidden shrink-0 md:block">
               <ol className="flex items-center gap-1.5">
                 {STEPS.map((step, index) => {
@@ -100,15 +104,16 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
                 const active = index === currentIndex;
                 return (
                   <li key={step.path}>
-                      <span
+                      <Link
+                      to={step.to ?? step.path}
                       aria-current={active ? 'step' : undefined}
                       title={active ? undefined : step.label}
-                      className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-small ${
+                      className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-small transition-colors duration-150 ease-snap ${
                       active ?
                       'bg-accent font-bold text-white' :
                       done ?
-                      'text-ink2' :
-                      'text-muted'}`
+                      'text-ink2 hover:bg-surface' :
+                      'text-muted hover:bg-surface hover:text-ink2'}`
                       }>
                       
                         {done ?
@@ -122,7 +127,7 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
                           </span>
                       }
                         {step.label}
-                      </span>
+                      </Link>
                     </li>);
 
               })}
@@ -130,20 +135,30 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
             </nav>
           }
 
-          <div className="flex min-w-0 items-center gap-3 text-small text-muted">
-            <nav aria-label="자료" className="flex shrink-0 items-center gap-1.5">
+          {/* 360px 에서도 로고·자료·내 정보·로그아웃이 한 줄에 들어가도록 좁은 폭에서는 간격과 이름을 줄인다.
+              그래도 넘치면(관리자 메뉴까지 있을 때) 자료 메뉴만 옆으로 밀리고 화면은 가로로 늘지 않는다 */}
+          <div className="flex min-w-0 items-center gap-2 text-small text-muted sm:gap-3">
+            <nav
+              aria-label="자료"
+              className="flex min-w-0 items-center gap-1 overflow-x-auto [scrollbar-width:none] sm:shrink-0 sm:gap-1.5 sm:overflow-visible">
               {refs.map((ref) => {
-                const active = pathname.startsWith(ref.path);
+                const active = under(pathname, ref.path);
                 return (
                   <Link
                     key={ref.path}
                     to={ref.path}
                     aria-current={active ? 'page' : undefined}
-                    className={`rounded-full px-3 py-1.5 font-bold transition-colors duration-150 ease-snap ${
+                    aria-label={ref.short ? ref.label : undefined}
+                    className={`shrink-0 whitespace-nowrap rounded-full px-2.5 py-1.5 font-bold transition-colors duration-150 ease-snap sm:px-3 ${
                     active ? 'bg-accent text-white' : 'text-ink2 hover:bg-surface'}`
                     }>
 
-                    {ref.label}
+                    {ref.short ?
+                    <>
+                        <span className="sm:hidden">{ref.short}</span>
+                        <span className="hidden sm:inline">{ref.label}</span>
+                      </> :
+                    ref.label}
                   </Link>);
 
               })}
@@ -162,15 +177,15 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
               'hover:bg-surface hover:text-ink'}`
               }>
 
-              {email}
+              {accountLabel(email)}
             </Link>
-            {/* 이메일을 줄인 폭에서도 내 정보로 갈 수 있게 한다 */}
+            {/* 이메일을 줄인 폭에서도 내 정보로 갈 수 있게 한다. 640px 보다 좁아도 숨기지 않는다 */}
             <Link
               to="/account"
               aria-current={pathname.startsWith('/account') ? 'page' : undefined}
-              aria-label={`내 정보 (${email ?? ''})`}
-              title={email ?? undefined}
-              className={`hidden shrink-0 rounded-full p-2 transition-colors duration-150 ease-snap sm:inline-flex lg:hidden ${
+              aria-label={`내 정보 (${accountLabel(email)})`}
+              title={accountLabel(email)}
+              className={`inline-flex shrink-0 rounded-full p-2 transition-colors duration-150 ease-snap lg:hidden ${
               pathname.startsWith('/account') ?
               'bg-accent text-white' :
               'hover:bg-surface hover:text-ink'}`
@@ -178,16 +193,18 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
 
               <UserIcon className="h-4 w-4" aria-hidden="true" />
             </Link>
-            <button
-              type="button"
+            {/* 랜딩 머리말의 로그인 버튼과 같은 자리(맨 오른쪽)·같은 모양이다 */}
+            <Button
+              variant="secondary"
+              size="sm"
+              className="shrink-0 max-sm:px-3"
               onClick={() => {
                 signOut();
                 navigate('/');
-              }}
-              className="shrink-0 rounded-full border border-accent-line px-3 py-1.5 text-caption font-bold text-ink transition-colors duration-150 ease-snap hover:border-ink">
+              }}>
               
               로그아웃
-            </button>
+            </Button>
           </div>
         </div>
       </header>
@@ -197,7 +214,7 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
       {crumb &&
       <nav
         aria-label="현재 위치"
-        className="mx-auto w-full max-w-page px-6 pt-8 text-caption text-muted">
+        className="mx-auto w-full max-w-page px-6 pt-8 text-caption text-muted print:hidden">
 
           <ol className="flex items-center gap-2">
             <li>
@@ -205,9 +222,13 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
                 홈
               </Link>
             </li>
-            <li aria-hidden="true">›</li>
+            {/*
+              구분 기호를 aria-hidden 으로 숨기지 않는다. 접근성 보고서(2026-10-22)가
+              「경로 영역의 기호(>) 정보 인식 불가」로 지적했다 — 단계 사이를 가르는 정보다
+            */}
+            <li>›</li>
             <li>{crumb[0]}</li>
-            <li aria-hidden="true">›</li>
+            <li>›</li>
             <li className="text-ink2">{crumb[1]}</li>
           </ol>
         </nav>
@@ -217,7 +238,7 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
         {children}
       </main>
 
-      <footer className="mt-10 bg-surface">
+      <footer className="mt-10 bg-surface print:hidden">
         <div className="mx-auto flex max-w-page flex-col gap-1 px-6 py-8 text-caption text-muted sm:flex-row sm:items-center sm:justify-between">
           <p>
             카드내역 원본은 서버에 저장하지 않습니다. 카드번호·계좌번호는 브라우저
@@ -225,6 +246,14 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
           </p>
           <p className="tabular-nums">잠정 집계 · 당해연도 수입 확정 후 확정</p>
         </div>
+        <nav aria-label="도움말과 약관" className="mx-auto max-w-page px-6 pb-8 text-caption text-muted">
+          <ul className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <li><Link to="/faq" className="hover:text-ink hover:underline underline-offset-4">자주 묻는 질문</Link></li>
+            <li><Link to="/terms" className="hover:text-ink hover:underline underline-offset-4">이용약관</Link></li>
+            <li><Link to="/privacy" className="font-bold hover:text-ink hover:underline underline-offset-4">개인정보처리방침</Link></li>
+            <li><BugReportButton /></li>
+          </ul>
+        </nav>
       </footer>
     </div>);
 

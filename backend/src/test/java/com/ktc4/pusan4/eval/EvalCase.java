@@ -72,12 +72,15 @@ record EvalCase(
         if (!categories.isEmpty() && !categories.contains(category)) {
             throw p.error("merchant_category '" + category + "'가 rules/categories.yaml 밖이다");
         }
+        String merchant = p.text(tx, "가맹점");
         TransactionInput transaction = new TransactionInput(
             UUID.nameUUIDFromBytes(id.getBytes(StandardCharsets.UTF_8)),
             LocalDate.parse(p.text(tx, "일자")),
-            p.text(tx, "가맹점"),
+            merchant,
+            merchant,
             category,
-            p.node(tx, "금액").longValue()
+            p.node(tx, "금액").longValue(),
+            tx.path("합산").asBoolean(false)
         );
 
         List<UserFact> facts = new ArrayList<>();

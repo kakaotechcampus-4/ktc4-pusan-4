@@ -83,19 +83,48 @@ export interface Page<T> {
 
 export interface User {
   id: string;
-  email: string;
+  /** 카카오 계정이면 null 이다. 같은 이메일이어도 이메일 계정과 카카오 계정은 따로다 (api.md 1.1, #176) */
+  email: string | null;
   createdAt: string;
   /**
-   * 관리자 판별. api.md 에는 아직 없다 — 관리자 판별 방식은 10/26 에 정한다(backend_api_plan.md).
-   * 없으면 일반 사용자로 본다
+   * 관리자 판별(api.md 3.15). 가입하면 USER 이고, 관리자는 운영에서 DB 로 지정한다.
+   * 이 필드가 없던 옛 서버에 대비해 없으면 일반 사용자로 본다
    */
   role?: 'USER' | 'ADMIN';
 }
 
-/** 로그인 요청. 인증 계약은 아직 api.md 에 없다(#139) */
+/** 로그인 요청 (api.md 1.1) */
 export interface LoginRequest {
   email: string;
   password: string;
+}
+
+/** 가입 인증 코드 요청 (#193) */
+export interface EmailVerificationRequest {
+  email: string;
+}
+
+/** 메일로 받은 6자리 코드 확인 (#193) */
+export interface EmailVerificationConfirmRequest {
+  email: string;
+  code: string;
+}
+
+/** 가입에 쓸 토큰. 30분 동안 그 이메일의 가입에만 쓸 수 있다 */
+export interface EmailVerificationConfirmed {
+  verificationToken: string;
+}
+
+/** 이메일 가입 (#193). password 는 8자 이상, UTF-8 72바이트 이하 */
+export interface SignupRequest {
+  email: string;
+  password: string;
+  verificationToken: string;
+}
+
+/** 카카오가 콜백 주소로 넘긴 인가 코드 (#176). 한 번만 쓸 수 있다 */
+export interface KakaoLoginRequest {
+  code: string;
 }
 
 // ── 3.2 사업자 Context ──────────────────────────────
@@ -107,8 +136,8 @@ export interface BusinessContext {
   businessOpenDate: string;
   bookkeepingDuty: BookkeepingDuty;
   hasEmployee: boolean;
-  /** 자택 작업공간 면적 비율(%). 0이면 해당 없음 */
-  homeOfficeRatio: number;
+  /** 자택 작업 공간 면적 비율(%). 0이면 자택에서 일하지 않음, null 이면 미입력 (api.md 3.2) */
+  homeOfficeRatio: number | null;
 }
 
 export interface BusinessContextRef {
@@ -117,10 +146,8 @@ export interface BusinessContextRef {
 }
 
 /** 저장된 Context 한 버전 (contexts/current·list 응답) */
-export interface StoredBusinessContext extends Omit<BusinessContext, 'homeOfficeRatio'>, BusinessContextRef {
+export interface StoredBusinessContext extends BusinessContext, BusinessContextRef {
   userId: string;
-  /** 미입력이면 null */
-  homeOfficeRatio: number | null;
   createdAt: string;
 }
 
@@ -327,6 +354,17 @@ export interface Judgment {
   citations: Citation[];
 }
 
+/**
+ * GET /judgments/export 한 줄 (#214). 세무사에게 넘길 CSV 의 데이터다. 파일 변환은 FE 가 한다.
+ * allowedAmount 는 인정 금액(finalAmount)이다. 그해 한도를 넘은 접대비는 null 이다(#226)
+ */
+export interface JudgmentExportRow {
+  judgment: Judgment;
+  allowedAmount: number | null;
+  /** 이 거래에 답한 질문 문구와 답. 없으면 빈 배열 */
+  answers: { question: string; answer: string }[];
+}
+
 export interface VerdictSummary {
   count: number;
   finalAmount: number;
@@ -334,11 +372,27 @@ export interface VerdictSummary {
 
 export type SummaryScopeType = 'BATCH' | 'YEAR' | 'RUN';
 
+/**
+ * 과세연도별 한도 (#226, api.md 3.7). 그 batch 만이 아니라 그해 사용자 전체 기준이고,
+ * 직전연도 수입금액으로 계산한 잠정치다
+ */
+export interface LimitYear {
+  /** 판정 attributes.limit_bucket 과 같은 값(접대비) */
+  bucket: string;
+  taxYear: number;
+  /** 그해 이 묶음 판정 금액의 합(한도 전) */
+  totalAmount: number;
+  /** 한도를 넘어 필요경비에 넣지 않는 금액. 넘지 않았으면 0 */
+  excessAmount: number;
+}
+
 export interface JudgmentSummary {
   scope: { type: SummaryScopeType; id: string };
   totalCount: number;
   byVerdict: Record<Verdict, VerdictSummary>;
   byAccount: { account: string; count: number; finalAmount: number }[];
+  /** 범위에 접대비 판정이 있는 과세연도마다 하나. runId 범위는 빈 배열 */
+  limits: LimitYear[];
 }
 
 /**
@@ -459,7 +513,7 @@ export interface BulkAnswerResult {
 }
 
 // ── 관리자: 규칙 후보 (M1) ──────────────────────────
-// api.md 에 아직 없다. rule_candidate 테이블(V3)과 AI 파이프라인(ai/pipeline/candidates.py)이 쓰는 값을 따른다
+// api.md 3.15
 
 /** DB 의 대기·검토중·승인·기각·보류 */
 export type RuleCandidateStatus = 'PENDING' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED' | 'ON_HOLD';
@@ -491,8 +545,7 @@ export interface RuleCandidate {
 }
 
 // ── 비서 Really (docs/agent-secretary.md 9·10장) ────
-// 중계·진행 상황·지난번 답·세무대리인 질문 API 는 아직 백엔드 일정에 없다.
-// 모양은 비서 도구 코드(ai/assistant/tools.py, ai/eval/assistant_fake.py)를 따른다 — 실제 모양이 있는 곳이 여기뿐이다
+// 중계·진행 상황·지난번 답은 #185, 세무대리인 질문 API 는 #214 로 서버에 들어왔다(api.md)
 
 export interface AssistantMessage {
   role: 'user' | 'assistant';
@@ -533,15 +586,21 @@ export interface AssistantChatResponse {
   traceId: string | null;
 }
 
+/** 다음 할 일. 아래 순서로 처음 맞는 것 하나다. 마지막 실행이 FAILED 면 CONFIRM 이다 (api.md GET /progress) */
+export type NextStep = 'CLASSIFY' | 'INTERVIEW' | 'CONFIRM' | 'QUESTIONS' | 'RESULTS';
+
 /** GET /progress?batchId. 비서 도구 get_status 가 읽는 필드 */
 export interface Progress {
-  batch: { label: string; transactionCount: number } | null;
+  /** label 은 「국민 · 2026-09」, 여러 달이면 「국민 · 2026-01~2026-03」 */
+  batch: { id: string; label: string; transactionCount: number };
   /** 수입·이름·이메일은 담지 않는다 */
   context: { version: number; bookkeeping: BookkeepingDuty; hasEmployee: boolean } | null;
   classification: { pendingCount: number; pendingAmount: number };
-  run: { status: RunStatus } | null;
+  /** 이 업로드의 최근 판정 실행. 실행한 적 없으면 null */
+  run: { id: string; status: Coded<RunStatus> } | null;
   questions: { pendingCount: number; pendingAmount: number; fillableFromPrevious: number };
-  next: { step: string; route: string; label: string } | null;
+  /** route 와 label 은 서버 값을 그대로 쓴다 */
+  next: { step: NextStep; route: string; label: string };
 }
 
 /**
@@ -551,11 +610,15 @@ export interface Progress {
 export interface QuestionSuggestion {
   groupKey: string;
   factType: string;
+  /** 규칙 카드 질문 코드 */
+  code?: string;
   tier: 'A' | 'B' | 'C';
   value?: string | null;
+  /** 「9월 업로드(국민)」. 연도는 없고, 여러 달이면 「7~9월 업로드(국민)」 */
   sourceLabel?: string;
   conflict?: boolean;
-  history?: { value: string; sourceLabel: string }[];
+  /** 충돌했거나 가장 최근 답이 일괄 응답(bulk)이면 값 대신 이것을 준다 */
+  history?: { value: string; sourceLabel: string; bulk?: boolean }[];
   historyCounts?: Record<string, number>;
   reason?: string;
 }

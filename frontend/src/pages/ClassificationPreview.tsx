@@ -330,7 +330,10 @@ export function ClassificationPreview() {
                       );
                     }}>
 
-                        <option value="">다른 카테고리…</option>
+                        {/* 모델 후보가 없으면(빈 배열) 버튼이 없으니 「다른」이라고 하지 않는다 */}
+                        <option value="">
+                          {group.suggestedCategories.length > 0 ? '다른 카테고리…' : '카테고리 고르기…'}
+                        </option>
                         {MERCHANT_CATEGORIES.map((category) =>
                     <option key={category} value={category}>
                             {category}

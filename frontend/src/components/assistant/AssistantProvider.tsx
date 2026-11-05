@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { api, invalidateAll } from '../../api';
+import { api, ApiRequestError, invalidateAll } from '../../api';
 import type { AssistantProposal } from '../../types/domain';
 import { useSession } from '../../contexts/SessionContext';
 import { AssistantContext } from './context';
@@ -20,7 +20,7 @@ const TAX_YEAR = 2026;
 export function AssistantProvider({ children }: {children: React.ReactNode;}) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const { batchId } = useSession();
+  const { batchId, setBatchId } = useSession();
   const [open, setOpen] = useState(false);
   const [entries, setEntries] = useState<ChatEntry[]>([]);
   const [pending, setPending] = useState(false);
@@ -28,6 +28,8 @@ export function AssistantProvider({ children }: {children: React.ReactNode;}) {
   const [draft, setDraft] = useState('');
   const [subject, setSubject] = useState<string | null>(null);
   const [nudge, setNudge] = useState<Nudge | null>(null);
+  /** [적용]한 뒤 잠깐 띄우는 알림. 패널을 접어도 무엇이 바뀌었는지 보인다 */
+  const [toast, setToast] = useState<string | null>(null);
   const sessionId = useRef(crypto.randomUUID());
   const nudged = useRef(new Set<string>());
   // 보낼 때의 대화. 상태를 읽으려고 send 를 매번 새로 만들지 않는다
@@ -62,10 +64,13 @@ export function AssistantProvider({ children }: {children: React.ReactNode;}) {
       setEntries((prev) => prev.filter((entry) => entry.id !== mine.id));
       setDraft(message);
       setError(chatErrorText(caught));
+      // 세션이 가리키는 업로드·거래가 지워졌으면 매번 404 다. 빼고 다시 보낼 수 있게 한다
+      if (caught instanceof ApiRequestError && caught.code === 'BATCH_NOT_FOUND') setBatchId(null);
+      if (caught instanceof ApiRequestError && caught.code === 'TRANSACTION_NOT_FOUND') setSubject(null);
     } finally {
       setPending(false);
     }
-  }, [pending, pathname, batchId, subject]);
+  }, [pending, pathname, batchId, subject, setBatchId]);
 
   // 비서의 답을 기다리는 동안에는 받지 않는다. 그사이 넣은 문답이 먼저 붙어 질문과 답이 엇갈린다
   const showHelp = useCallback((topicId: string) => {
@@ -94,23 +99,27 @@ export function AssistantProvider({ children }: {children: React.ReactNode;}) {
     setPending(true);
     try {
       const { next } = await api.progress.get(batchId);
-      answer(
-        next ?
-        {
-          content: `다음 할 일은 「${next.label}」입니다.`,
-          proposals: toEntries([
-          { kind: 'navigation', route: next.route, card: `${routeName(next.route) ?? next.label} 화면으로 이동` }]
-          )
-        } :
-        { content: '지금 할 일이 남아 있지 않습니다.', proposals: [] }
-      );
-    } catch {
+      answer({
+        content: `다음 할 일은 「${next.label}」입니다.`,
+        proposals: toEntries([
+        { kind: 'navigation', route: next.route, card: `${routeName(next.route) ?? next.label} 화면으로 이동` }]
+        )
+      });
+    } catch (caught) {
       const flow = HELP_TOPICS.find((topic) => topic.id === 'flow');
+      if (caught instanceof ApiRequestError && caught.code === 'BATCH_NOT_FOUND') {
+        setBatchId(null);
+        answer({
+          content: '보던 업로드를 찾을 수 없습니다. 업로드 이력에서 볼 업로드를 골라 주세요.',
+          proposals: toEntries([{ kind: 'navigation', route: '/uploads', card: '업로드 이력 화면으로 이동' }])
+        });
+        return;
+      }
       answer({ content: `진행 상황을 불러오지 못했습니다. ${flow?.text ?? ''}`, proposals: [] });
     } finally {
       setPending(false);
     }
-  }, [pending, batchId]);
+  }, [pending, batchId, setBatchId]);
 
   const updateProposal = (id: string, index: number, patch: Partial<ProposalEntry>) =>
   setEntries((prev) =>
@@ -131,6 +140,7 @@ export function AssistantProvider({ children }: {children: React.ReactNode;}) {
     try {
       const result = await applyProposal(api, target.proposal, navigate, target.key);
       updateProposal(id, index, { state: 'done', result });
+      setToast(result);
     } catch (caught) {
       updateProposal(id, index, { state: 'failed', result: applyErrorText(caught) });
     }
@@ -147,6 +157,12 @@ export function AssistantProvider({ children }: {children: React.ReactNode;}) {
   }, []);
 
   const dismissNudge = useCallback(() => setNudge(null), []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(null), 3500);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
   // 알림이 가리키는 화면에 오면 알림은 할 일을 다 했다. 그 화면이 같은 내용을 지금 값으로 보여 준다
   // (질문 화면의 「지난번 답 한 번에 적용」). 메뉴로 왔거나 거기서 다 적용해도 알림이 남지 않게 한다
@@ -170,9 +186,10 @@ export function AssistantProvider({ children }: {children: React.ReactNode;}) {
       setSubject,
       nudge,
       showNudge,
-      dismissNudge
+      dismissNudge,
+      toast
     }),
-    [open, entries, pending, error, draft, send, showHelp, showNext, apply, nudge, showNudge, dismissNudge]
+    [open, entries, pending, error, draft, send, showHelp, showNext, apply, nudge, showNudge, dismissNudge, toast]
   );
 
   return <AssistantContext.Provider value={value}>{children}</AssistantContext.Provider>;

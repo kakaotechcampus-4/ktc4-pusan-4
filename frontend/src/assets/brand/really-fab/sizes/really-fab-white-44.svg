@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="44" height="44" role="img" aria-label="Really">
+<title>Really</title>
+<defs>
+  <clipPath id="rf-white-ci"><circle cx="100" cy="100" r="100"/></clipPath>
+  <radialGradient id="rf-white-hd" cx="35%" cy="25%" r="85%"><stop offset="0" stop-color="#FFD3E4"/><stop offset="0.55" stop-color="#FFA6CA"/><stop offset="1" stop-color="#F27CB0"/></radialGradient>
+  <radialGradient id="rf-white-bl" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="#FF9CC8"/><stop offset="1" stop-color="#F0609E"/></radialGradient>
+  <radialGradient id="rf-white-sn" cx="40%" cy="30%" r="80%"><stop offset="0" stop-color="#FFC4DC"/><stop offset="1" stop-color="#FF8FBD"/></radialGradient>
+</defs>
+<g clip-path="url(#rf-white-ci)">
+  <circle cx="100" cy="100" r="100" fill="#FFFFFF"/>
+  <path d="M44 52 l-8 -10 M30 66 l-12 -3" stroke="#2F5BFF" stroke-width="6" stroke-linecap="round"/>
+  <g transform="translate(124 146) rotate(-20)">
+    <!-- ears -->
+    <path d="M-78 -26 C-96 -66 -76 -90 -36 -70 Z" fill="#FF9CC4"/>
+    <path d="M-70 -34 C-82 -60 -70 -76 -44 -66 Z" fill="#FF7FB3"/>
+    <path d="M70 -36 C84 -78 60 -96 22 -74 Z" fill="#FF9CC4"/>
+    <path d="M62 -42 C70 -70 56 -80 30 -70 Z" fill="#FF7FB3"/>
+    <!-- antenna -->
+    <path d="M-6 -70 C-8 -90 -6 -102 4 -112" fill="none" stroke="#F27BAE" stroke-width="8" stroke-linecap="round"/>
+    <ellipse cx="-6" cy="-71" rx="9" ry="3.5" fill="#F27BAE"/>
+    <circle cx="10" cy="-124" r="17" fill="url(#rf-white-bl)"/>
+    <ellipse cx="4" cy="-130" rx="5" ry="3.5" fill="#FFFFFF" opacity="0.45"/>
+    
+    <!-- head -->
+    <ellipse cx="0" cy="0" rx="84" ry="76" fill="url(#rf-white-hd)"/>
+    <!-- eyes look up-left -->
+    <ellipse cx="-44" cy="-16" rx="7" ry="10.5" fill="#2A36C4"/>
+    <ellipse cx="14" cy="-22" rx="7" ry="10.5" fill="#2A36C4"/>
+    <circle cx="-46" cy="-20" r="2.4" fill="#FFFFFF"/>
+    <circle cx="12" cy="-26" r="2.4" fill="#FFFFFF"/>
+    <!-- blush -->
+    <ellipse cx="-62" cy="12" rx="12" ry="7" fill="#FF5C9A" opacity="0.35"/>
+    <ellipse cx="34" cy="6" rx="12" ry="7" fill="#FF5C9A" opacity="0.35"/>
+    <!-- snout -->
+    <ellipse cx="-18" cy="8" rx="27" ry="20" fill="url(#rf-white-sn)"/>
+    <ellipse cx="-27" cy="9" rx="4.5" ry="8.5" fill="#D9518C"/>
+    <ellipse cx="-9" cy="9" rx="4.5" ry="8.5" fill="#D9518C"/>
+    
+  </g>
+</g>
+</svg>

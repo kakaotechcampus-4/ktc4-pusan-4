@@ -27,7 +27,7 @@ public record JudgmentResponse(
         + "verdict 는 항상 NEEDS_REVIEW 이고, 되묻기 대기와 달리 답할 질문이 없다 (docs/rule-card-fields.md)")
     boolean outOfScope,
     @Schema(description = "계정과목", example = "소모품비") String account,
-    @Schema(description = "안분·상각 적용 후 인정 금액. G6 한도는 연간 집계라 넣지 않는다(요약과 내보내기의 allowedAmount 는 반영)")
+    @Schema(description = "안분·상각 적용 후 인정 금액. G6 한도는 연간 집계라 넣지 않는다(year 요약과 limits 가 반영)")
     Long finalAmount,
     @Schema(description = "룰로 확정하지 못한 fallback 결과인지") Boolean isInference,
     UnmatchedReason unmatchedReason,
