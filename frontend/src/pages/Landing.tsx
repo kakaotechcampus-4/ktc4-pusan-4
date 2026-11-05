@@ -42,11 +42,12 @@ function wantsIntro() {
 const SHELL = 'mx-auto w-full max-w-page px-6 lg:px-gutter';
 
 /** 검정 동그라미에 흰 화살표. 레퍼런스가 모든 「바로가기」에 쓰는 표시 */
-function ArrowDot({ size = 'md' }: {size?: 'sm' | 'md';}) {
+function ArrowDot({ size = 'md', invert = false }: {size?: 'sm' | 'md';invert?: boolean;}) {
   return (
     <span
       aria-hidden="true"
-      className={`inline-flex shrink-0 items-center justify-center rounded-full bg-ink text-white ${
+      className={`inline-flex shrink-0 items-center justify-center rounded-full ${
+      invert ? 'bg-canvas text-ink' : 'bg-ink text-white'} ${
       size === 'sm' ? 'h-5 w-5' : 'h-8 w-8'}`
       }>
 
@@ -148,16 +149,20 @@ export function Landing() {
             <div className="relative">
               <HeroBanner autoplay={!intro} />
 
-              {/* 왼쪽 아래 모서리를 바탕색으로 베어 내고 그 자리에 링크를 둔다 */}
-              <div className="absolute bottom-0 left-0 flex h-[72px] items-center rounded-tr-[20px] bg-canvas pr-7 pt-2">
-                <Link
-                  to={startTo}
-                  className="flex items-center gap-3 text-ir-lead font-normal tracking-ir-xs text-ink">
+              {/*
+                왼쪽 아래 모서리를 베어 낸 자리가 그대로 버튼이다.
+                전에는 그 자리를 바탕색(흰색)으로 채우고 글자만 뒀는데, 페이지 바탕과 같은 색이라
+                판이 패인 것으로 읽히고 누를 것으로 안 보였다. 흰 자리에 알약을 또 넣으면
+                판·흰 상자·알약 세 겹이 된다 — 베어 낸 자리를 통째로 칠한다 (#254 리뷰).
+                왼쪽 아래는 판과 같은 20px 으로 깎는다. 각지면 판의 둥근 모서리를 덮어 혼자 튄다
+              */}
+              <Link
+                to={startTo}
+                className="absolute bottom-0 left-0 flex h-[76px] items-center gap-3 rounded-bl-[20px] rounded-tr-[20px] bg-ink pl-7 pr-6 text-ir-lead font-normal tracking-ir-xs text-white transition-colors duration-150 ease-snap hover:bg-ink2">
 
-                  {signedIn ? '카드내역 올리기' : '무료로 판정해보기'}
-                  <ArrowDot />
-                </Link>
-              </div>
+                {signedIn ? '카드내역 올리기' : '무료로 판정해보기'}
+                <ArrowDot invert />
+              </Link>
             </div>
 
             {/*
