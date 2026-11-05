@@ -6,25 +6,11 @@ import { DisclaimerBar } from './DisclaimerBar';
 import { Button } from './ui';
 import { BugReportButton } from './BugReport';
 import { Logo } from './Logo';
+import { STEPS, STEP_ALIAS, under } from './steps';
 
 import { useSession } from '../contexts/SessionContext';
 import { accountLabel } from '../utils/account';
 
-/**
- * 진행 단계. 순서는 PM 확정 흐름을 따른다:
- * 업로드 → 분류 결과 미리보기 → 문진 → 판정 → 결과 (→ 되묻기 → 재판정)
- * 문진은 판정 전 필수지만 첫 화면에 두지 않는다 (이탈 방지).
- */
-const STEPS = [
-{ path: '/upload', label: '카드내역' },
-{ path: '/preview', label: '분류 확인' },
-{ path: '/interview', label: '사업자 문진' },
-// 판정 진행은 실행 id 가 주소에 있어야 한다(/run/:runId). 단계를 누르면 판정 전 확인으로 간다
-{ path: '/run', to: '/confirm', label: '판정' },
-{ path: '/results', label: '결과' }];
-
-/** /upload 가 /uploads 에도 걸리지 않게 경로 조각 단위로 맞춘다 */
-const under = (pathname: string, prefix: string) => pathname === prefix || pathname.startsWith(`${prefix}/`);
 
 /** 빵부스러기에 쓸 이름. [무리, 화면] */
 const CRUMB: Record<string, [string, string]> = {
@@ -32,7 +18,8 @@ const CRUMB: Record<string, [string, string]> = {
   '/preview': ['카드내역', '가맹점 분류 확인'],
   '/uploads': ['자료', '업로드 이력'],
   '/transactions': ['자료', '거래 목록'],
-  '/interview': ['판정', '사업자 문진'],
+  // 판정 흐름이 아니라 계정 설정이다. 고치는 길도 내 정보에 있다
+  '/interview': ['내 정보', '사업자 문진'],
   '/confirm': ['판정', '판정 확인'],
   '/run': ['판정', '판정 진행'],
   '/results': ['판정', '판정 결과'],
@@ -53,22 +40,20 @@ const REFS: NavRef[] = [
 /** 관리자에게만 보인다 (M1) */
 const ADMIN_REF: NavRef = { path: '/admin', label: '관리자' };
 
-/** 단계 표시에 포함되지 않지만 특정 단계에 속하는 화면 */
-const STEP_ALIAS: Record<string, number> = {
-  '/confirm': 3,
-  '/questions': 4,
-  '/summary': 4,
-  '/judgments': 4
-};
 
 
 interface AppShellProps {
   children: React.ReactNode;
   /** 판정 진행 화면처럼 흐름 표시가 방해되는 경우 숨긴다 */
   showSteps?: boolean;
+  /**
+   * 세무대리 오인 방지 고지(DisclaimerBar). 기본은 켠다.
+   * 판정을 보여주지 않는 화면(내 정보)에서만 내린다 — 거기엔 오인할 판정 내용이 없다 (#242 리뷰)
+   */
+  disclaimer?: boolean;
 }
 
-export function AppShell({ children, showSteps = true }: AppShellProps) {
+export function AppShell({ children, showSteps = true, disclaimer = true }: AppShellProps) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { email, isAdmin, signOut } = useSession();
@@ -122,7 +107,12 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
                         aria-hidden="true" /> :
 
 
-                      <span className="tabular-nums text-caption text-muted">
+                      <span
+                        className={`tabular-nums text-caption ${
+                        /* 고른 단계는 바탕이 파래진다. 숫자를 muted 로 박아 두면 대비 1.05 라 칸이 빈 것처럼 보인다 */
+                        active ? 'text-white' : 'text-muted'}`
+                        }>
+
                             {index + 1}
                           </span>
                       }
@@ -209,7 +199,7 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
         </div>
       </header>
 
-      <DisclaimerBar />
+      {disclaimer && <DisclaimerBar />}
 
       {crumb &&
       <nav

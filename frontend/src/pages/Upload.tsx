@@ -8,6 +8,7 @@ import {
   UploadCloudIcon } from
 'lucide-react';
 import { AppShell } from '../components/AppShell';
+import { StepEyebrow } from '../components/StepEyebrow';
 import { Badge, Button, Table, cn, type Column } from '../components/ui';
 import { useSession } from '../contexts/SessionContext';
 import { api, ApiRequestError, isMock } from '../api';
@@ -128,7 +129,7 @@ function sendErrorView(error: ApiRequestError): SendErrorView {
 }
 
 /**
- * 1단계 · 카드내역.
+ * 카드내역 올리기. 몇 단계인지는 STEPS 가 정한다(components/steps.tsx)
  * 파일은 이 브라우저 안에서 읽고(src/parser), 판정에 필요한 항목만 POST /upload-batches 로 보낸다.
  */
 export function Upload() {
@@ -227,7 +228,7 @@ export function Upload() {
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0">
           <header>
-            <p className="text-small font-bold text-accent">1단계 · 카드내역</p>
+            <StepEyebrow>카드내역</StepEyebrow>
             <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
               카드내역 올리기
             </h1>

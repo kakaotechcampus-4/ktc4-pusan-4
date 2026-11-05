@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { PlayIcon, ShieldCheckIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
+import { StepEyebrow } from '../components/StepEyebrow';
 import { useSession } from '../contexts/SessionContext';
 import { api, ApiRequestError, useApi } from '../api';
 import { formatNumber, formatPeriod } from '../utils/format';
@@ -78,7 +79,7 @@ export function Confirm() {
     <AppShell>
       <div className="mx-auto max-w-3xl">
         <header>
-          <p className="text-small font-bold text-accent">4단계 · 판정 전 확인</p>
+          <StepEyebrow>판정 전 확인</StepEyebrow>
           <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
             이 입력으로 판정합니다
           </h1>
