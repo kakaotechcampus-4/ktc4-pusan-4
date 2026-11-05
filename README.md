@@ -118,8 +118,8 @@
 ## 아키텍처
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./docs/img/readme/architecture-dark.png" />
-  <img src="./docs/img/readme/architecture.png" alt="PreeT 시스템 아키텍처" />
+  <source media="(prefers-color-scheme: dark)" srcset="./docs/img/readme/architecture-dark.gif" />
+  <img src="./docs/img/readme/architecture.gif" alt="PreeT 시스템 아키텍처" />
 </picture>
 
 > **판정 흐름**
