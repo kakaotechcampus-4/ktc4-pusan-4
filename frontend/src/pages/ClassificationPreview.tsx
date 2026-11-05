@@ -264,8 +264,16 @@ export function ClassificationPreview() {
                     '카드사에 찍힌 표기 그대로입니다. 이것만으로는 업종을 읽지 못했습니다'}
                   </p>
 
-                  {/* 어떤 결제였는지 떠올릴 수 있도록 건별로 보여준다 */}
-                  <ul className="mt-4 divide-y divide-line2 rounded-xl border border-line2 bg-canvas">
+                  {/*
+                    건별 목록은 접어 둔다. 그룹 카드가 여러 장 쌓이는데 카드마다 거래가 네 줄씩
+                    붙어 있어 「어떤 지출인가요?」까지 내려가기도 전에 화면이 찬다 (#242 리뷰).
+                    고르는 일은 늘 보이고, 떠올릴 거리만 열어서 본다
+                  */}
+                  <details className="mt-4">
+                    <summary className="cursor-pointer text-caption font-bold text-ink2 hover:text-ink">
+                      건별 보기 ({formatNumber(group.count)}건)
+                    </summary>
+                  <ul className="mt-2 divide-y divide-line2 rounded-xl border border-line2 bg-canvas">
                     {rows.slice(0, 4).map((row) =>
                 <li
                   key={row.transactionId}
@@ -291,6 +299,7 @@ export function ClassificationPreview() {
                       </li>
                 }
                   </ul>
+                  </details>
 
                   <p className="mt-5 text-body font-bold text-ink">
                     이 {formatNumber(group.count)}건은 어떤 지출인가요?

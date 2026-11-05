@@ -303,6 +303,10 @@ export function Results() {
       }
       </div>
       <div className="flex flex-wrap items-center gap-2">
+        {/* 판정이 끝난 뒤 나가는 길. 빵부스러기의 「홈」만으로는 눈에 띄지 않는다 (#242 리뷰) */}
+        <Button to="/" variant="ghost" size="sm">
+          홈으로
+        </Button>
         {/* 확인할 질문이 없을 때는 아래 안내가 사라지므로, 답을 바꾸러 가는 길을 여기 남긴다 */}
         {!(unresolved && unresolved.count > 0) && answeredGroups > 0 &&
       <Button to="/questions" variant="ghost" size="sm">

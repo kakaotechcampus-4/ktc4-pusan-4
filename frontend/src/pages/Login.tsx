@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LockIcon, MessageCircleIcon } from 'lucide-react';
+import { MessageCircleIcon } from 'lucide-react';
 import { useSession } from '../contexts/SessionContext';
 import { ApiRequestError, isMock, mockPassword } from '../api';
 import { AUTH_INPUT, AUTH_LABEL, AUTH_PRIMARY, AUTH_SECONDARY, AuthLayout } from '../components/AuthLayout';
@@ -169,12 +169,6 @@ export function Login() {
           목업 비밀번호는 {mockPassword} 입니다. admin@ 으로 시작하는 이메일은 관리자로 들어갑니다.
         </p>
       }
-
-      <p className="mt-6 flex items-start gap-2 text-[12px] leading-6 text-muted">
-        <LockIcon className="mt-1 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-        로그인은 판정 이력 보관에만 사용합니다. 카드내역 원본은 계정에 저장되지
-        않으며, 로그에 소득 금액과 이름을 남기지 않습니다.
-      </p>
     </AuthLayout>);
 
 }
