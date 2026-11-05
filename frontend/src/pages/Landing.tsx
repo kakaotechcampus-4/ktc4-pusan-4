@@ -167,7 +167,7 @@ export function Landing() {
             */}
             <div className="flex flex-col gap-2">
               <div className="rounded-2xl bg-surface2 p-5 text-white">
-                <p className="text-caption text-white">검수를 마친 규칙 카드</p>
+                <p className="text-caption text-white">조문을 읽고 만든 규칙 카드</p>
                 <p className="mt-2 whitespace-nowrap text-ir-num font-bold tracking-ir-sm tabular-nums">
                   {RULE_CARD_COUNT}
                   <span className="ml-0.5 text-body font-normal">장</span>
