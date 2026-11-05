@@ -1,0 +1,50 @@
+{
+  "agent": {
+    "metrics_collection_interval": 60,
+    "run_as_user": "cwagent"
+  },
+  "metrics": {
+    "namespace": "CWAgent",
+    "append_dimensions": {
+      "InstanceId": "${aws:InstanceId}"
+    },
+    "metrics_collected": {
+      "mem": {
+        "measurement": ["mem_used_percent"]
+      },
+      "disk": {
+        "measurement": ["used_percent"],
+        "resources": ["/"],
+        "drop_device": true
+      }
+    }
+  },
+  "logs": {
+    "metrics_collected": {
+      "prometheus": {
+        "cluster_name": "ktc4",
+        "log_group_name": "/ktc4/prometheus",
+        "prometheus_config_path": "/opt/aws/amazon-cloudwatch-agent/etc/prometheus.yaml",
+        "emf_processor": {
+          "metric_declaration_dedup": true,
+          "metric_namespace": "ktc4/backend",
+          "metric_unit": {
+            "jvm_memory_used_bytes": "Bytes"
+          },
+          "metric_declaration": [
+            {
+              "source_labels": ["job"],
+              "label_matcher": "^ktc4-backend$",
+              "dimensions": [["job"]],
+              "metric_selectors": [
+                "^hikaricp_connections_pending$",
+                "^jvm_memory_used_bytes$",
+                "^executor_queued_tasks$"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }
+}

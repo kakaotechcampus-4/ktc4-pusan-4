@@ -24,6 +24,50 @@
 
 ---
 
+# CloudWatch Agent (B2)
+
+- 브랜치: feature/monitoring-agent (feature/monitoring-stack 위)
+- 주요파일: deploy/cloudwatch-agent/config.json, deploy/cloudwatch-agent/prometheus.yaml, deploy/cloudwatch-agent/install.sh
+
+## 한 일
+
+- Agent 가 메모리(`mem_used_percent`)·루트 디스크(`disk_used_percent`)와 백엔드 Prometheus 지표 3개를 CloudWatch 로 보내게 설정했다. 설치·갱신은 `install.sh` 한 번.
+- Agent 가 Prometheus 값을 쓰는 로그 그룹 `/ktc4/prometheus`(보존 3일)를 모니터링 스택에 더했다.
+
+## 왜 이렇게 했나
+
+- 긁은 시계열은 EMF 로그로 전부 나가 로그 요금이 붙는다. `metric_relabel_configs` 로 3개(힙만, judgmentRunExecutor 만)만 남긴다.
+- 앱 지표 차원은 `job` 하나만 둔다. `uri`·`id` 같은 라벨을 차원에 넣으면 조합마다 커스텀 지표가 늘어난다.
+
+## 남은 것 · 아는 문제
+
+- 지표 이름은 계획 문서의 예상값이다. A2 PR 본문의 실제 출력과 다르면 relabel 규칙과 `metric_selectors` 를 고친다.
+- 디스크 지표에서 `fstype` 차원은 Agent 설정으로 뺄 수 없다. 시계열은 하나라 비용은 같다. B3 알람은 설치 뒤 `list-metrics` 로 본 실제 값을 쓴다.
+- 운영 EC2 설치와 Agent 메모리 측정은 아직.
+
+---
+
+# 메트릭 필터·알람·대시보드 (B3)
+
+- 브랜치: feature/monitoring-alarms (feature/monitoring-agent 위)
+- 주요파일: deploy/monitoring/template.yaml, docs/deployment.md
+
+## 한 일
+
+- `/ktc4/backend` 에 메트릭 필터 2개(5xx, 기동), 알람 4개(5xx, 재시작, 메모리, 디스크), 대시보드 `ktc4-backend` 를 스택에 더했다. 커스텀 지표는 계획대로 7개.
+
+## 왜 이렇게 했나
+
+- 5xx·재시작은 일이 생긴 순간만 의미가 있어 복구(OK) 알림을 뺐다. 배포할 때마다 기동·복구 두 번 울리는 걸 막는다.
+- 디스크 `fstype` 차원은 Agent 에서 뺄 수 없어 스택 파라미터(`RootFsType`, 기본 ext4)로 받는다.
+
+## 남은 것 · 아는 문제
+
+- A1 로그 예시가 아직 없어 필터는 계약(`status` 숫자 필드, 기동 문구) 기준이다. A1 머지 뒤 `test-metric-filter` 로 확인하고 다르면 고친다.
+- 알람별 `set-alarm-state` Discord 도착 확인은 배포 뒤.
+
+---
+
 # B1 배포 수정: Lambda zip 을 직접 만든다
 
 - 첫 배포에서 `AlarmToDiscordFunction` 이 "Could not unzip uploaded file" 로 실패했다. 템플릿 `Code` 에 `.py` 를 두면 AWS CLI v2(2.39.3)의 `cloudformation package` 가 zip 으로 묶지 않고 올린다.

@@ -16,6 +16,12 @@ Parameters:
     Type: Number
     Default: 14
     AllowedValues: [7, 14, 30]
+  RootFsType:
+    Type: String
+    Default: ext4
+    Description: >-
+      루트 디스크 지표의 fstype 차원 값. Agent 설치 뒤
+      aws cloudwatch list-metrics --namespace CWAgent --metric-name disk_used_percent 로 확인한다.
 
 Resources:
   # A3 의 compose awslogs 드라이버가 이 그룹에 쓴다. awslogs-create-group 은 false 다.
@@ -27,6 +33,14 @@ Resources:
     Properties:
       LogGroupName: /ktc4/backend
       RetentionInDays: !Ref BackendLogRetentionDays
+
+  # CloudWatch Agent(B2)가 긁은 Prometheus 값을 EMF 로그로 여기에 쓰고, CloudWatch 가 지표로 뽑는다.
+  # 지표로 뽑은 뒤에는 쓸 일이 없어 짧게 둔다.
+  PrometheusLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ktc4/prometheus
+      RetentionInDays: 3
 
   # Lambda 가 처음 실행될 때 자동으로 만드는 그룹은 보존 기간이 무기한이라 미리 만든다.
   AlarmToDiscordLogGroup:
@@ -127,9 +141,151 @@ Resources:
       AlarmActions: [!GetAtt AlarmToDiscordFunction.Arn]
       OKActions: [!GetAtt AlarmToDiscordFunction.Arn]
 
+  # ---- B3: 로그 메트릭 필터 ----
+  # 필드 이름은 docs/monitoring_plan.md 의 계약(요청 로그 status, 기동 문구)을 따른다.
+  # A1 의 실제 JSON 로그 한 줄로 aws logs test-metric-filter 를 돌려 확인한다.
+  Http5xxMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref BackendLogGroup
+      FilterName: http-5xx
+      FilterPattern: "{ $.status >= 500 }"
+      MetricTransformations:
+        - MetricNamespace: ktc4/backend
+          MetricName: http_5xx_count
+          MetricValue: "1"
+          Unit: Count
+
+  RestartMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref BackendLogGroup
+      FilterName: backend-started
+      FilterPattern: '"Started BackendApplication"'
+      MetricTransformations:
+        - MetricNamespace: ktc4/backend
+          MetricName: backend_start_count
+          MetricValue: "1"
+          Unit: Count
+
+  # ---- B3: 알람 ----
+  # 건수 알람 두 개는 일이 생긴 순간만 알린다. 복구(OK) 알림은 보내지 않는다.
+  # 건이 없으면 지표가 비므로 TreatMissingData 를 notBreaching 으로 둔다.
+  Http5xxAlarm:
+    Type: AWS::CloudWatch::Alarm
+    DependsOn: AlarmInvokePermission
+    Properties:
+      AlarmName: ktc4-backend-http-5xx
+      AlarmDescription: 백엔드 5xx 응답 발생 (5분에 1건 이상). Logs Insights 에서 status >= 500 으로 찾는다.
+      Namespace: ktc4/backend
+      MetricName: http_5xx_count
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!GetAtt AlarmToDiscordFunction.Arn]
+
+  RestartAlarm:
+    Type: AWS::CloudWatch::Alarm
+    DependsOn: AlarmInvokePermission
+    Properties:
+      AlarmName: ktc4-backend-restarted
+      AlarmDescription: 백엔드가 (다시) 기동했다. 배포 때도 울린다. 배포가 아니면 재시작 원인을 본다.
+      Namespace: ktc4/backend
+      MetricName: backend_start_count
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!GetAtt AlarmToDiscordFunction.Arn]
+
+  MemoryHighAlarm:
+    Type: AWS::CloudWatch::Alarm
+    DependsOn: AlarmInvokePermission
+    Properties:
+      AlarmName: ktc4-ec2-memory-high
+      AlarmDescription: EC2 메모리 사용률 90% 이상 5분
+      Namespace: CWAgent
+      MetricName: mem_used_percent
+      Dimensions:
+        - Name: InstanceId
+          Value: !Ref InstanceId
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 90
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: missing
+      AlarmActions: [!GetAtt AlarmToDiscordFunction.Arn]
+      OKActions: [!GetAtt AlarmToDiscordFunction.Arn]
+
+  DiskHighAlarm:
+    Type: AWS::CloudWatch::Alarm
+    DependsOn: AlarmInvokePermission
+    Properties:
+      AlarmName: ktc4-ec2-disk-high
+      AlarmDescription: EC2 루트 디스크 사용률 80% 이상
+      Namespace: CWAgent
+      MetricName: disk_used_percent
+      Dimensions:
+        - Name: InstanceId
+          Value: !Ref InstanceId
+        - Name: path
+          Value: /
+        - Name: fstype
+          Value: !Ref RootFsType
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 80
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: missing
+      AlarmActions: [!GetAtt AlarmToDiscordFunction.Arn]
+      OKActions: [!GetAtt AlarmToDiscordFunction.Arn]
+
+  # ---- B3: 대시보드 ----
+  Dashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: ktc4-backend
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {"type": "metric", "x": 0, "y": 0, "width": 8, "height": 6, "properties": {
+              "title": "CPU (%)", "region": "${AWS::Region}", "stat": "Average", "period": 300,
+              "metrics": [["AWS/EC2", "CPUUtilization", "InstanceId", "${InstanceId}"]],
+              "yAxis": {"left": {"min": 0, "max": 100}}}},
+            {"type": "metric", "x": 8, "y": 0, "width": 8, "height": 6, "properties": {
+              "title": "메모리 (%)", "region": "${AWS::Region}", "stat": "Average", "period": 300,
+              "metrics": [["CWAgent", "mem_used_percent", "InstanceId", "${InstanceId}"]],
+              "yAxis": {"left": {"min": 0, "max": 100}}}},
+            {"type": "metric", "x": 16, "y": 0, "width": 8, "height": 6, "properties": {
+              "title": "루트 디스크 (%)", "region": "${AWS::Region}", "stat": "Maximum", "period": 300,
+              "metrics": [["CWAgent", "disk_used_percent", "InstanceId", "${InstanceId}", "path", "/", "fstype", "${RootFsType}"]],
+              "yAxis": {"left": {"min": 0, "max": 100}}}},
+            {"type": "metric", "x": 0, "y": 6, "width": 8, "height": 6, "properties": {
+              "title": "5xx · 기동 (건)", "region": "${AWS::Region}", "stat": "Sum", "period": 300,
+              "metrics": [
+                ["ktc4/backend", "http_5xx_count", {"label": "5xx"}],
+                ["ktc4/backend", "backend_start_count", {"label": "기동"}]]}},
+            {"type": "metric", "x": 8, "y": 6, "width": 8, "height": 6, "properties": {
+              "title": "JVM 힙 사용량 (bytes)", "region": "${AWS::Region}", "stat": "Sum", "period": 60,
+              "metrics": [["ktc4/backend", "jvm_memory_used_bytes", "job", "ktc4-backend"]]}},
+            {"type": "metric", "x": 16, "y": 6, "width": 8, "height": 6, "properties": {
+              "title": "대기 (Hikari 커넥션 · 판정 실행 풀)", "region": "${AWS::Region}", "stat": "Maximum", "period": 60,
+              "metrics": [
+                ["ktc4/backend", "hikaricp_connections_pending", "job", "ktc4-backend", {"label": "Hikari 대기"}],
+                ["ktc4/backend", "executor_queued_tasks", "job", "ktc4-backend", {"label": "판정 풀 대기열"}]]}}
+          ]
+        }
+
 Outputs:
   BackendLogGroupName:
     Value: !Ref BackendLogGroup
   AlarmToDiscordFunctionArn:
-    Description: B3 에서 더하는 알람의 AlarmActions 에 쓴다
+    Description: 알람의 AlarmActions 에 쓴다
     Value: !GetAtt AlarmToDiscordFunction.Arn
