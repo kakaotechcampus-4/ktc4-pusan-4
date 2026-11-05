@@ -100,3 +100,6 @@ data/
 ai/eval/.queries.json
 ai/eval/.drafts.json
 ai/eval/.plans.json
+
+# 배포가 쓰는 블루그린 활성 색(deploy/deploy.sh). 서버에만 있다
+deploy/caddy/upstream.caddy
