@@ -133,7 +133,10 @@ curl -I "https://<도메인>/"
 
 `docker compose ps`에서 PostgreSQL·Redis·백엔드·AI가 healthy이고 웹 컨테이너가 running이어야 한다. 브라우저에서 `/`, `/upload`를 새로고침해 SPA 라우팅을 확인한다. 백엔드 `/actuator/health`와 AI `/health/db`는 컨테이너 내부 검사로 확인하며 외부에 공개하지 않는다. `docker stats`와 `df -h`로 4GB 메모리·50GB 디스크 사용량을 확인한다.
 
-배포 때 실행되는 `deploy.sh`는 직전 배포의 파일이다. SSM이 스크립트를 띄운 뒤 스크립트가 새 커밋을 checkout해도, bash는 이미 연 옛 파일을 끝까지 실행한다. 그래서 `deploy.sh` 자체의 변경은 그 다음 배포부터 적용된다. 새 커밋의 `compose.yaml`은 같은 배포에 적용되므로, 처음 배포에서 꼭 돌아야 하는 단계는 스크립트가 아니라 Compose 정의에 둔다(`web-files`가 그 예다).
+SSM이 띄우는 `deploy.sh`는 직전 배포의 파일이다. 스크립트가 새 커밋을 checkout해도 bash는 이미 연 옛 파일을 끝까지 실행한다. 그래서 `deploy.sh`는 checkout까지만 하고, 대상 커밋의 `deploy.sh`를 다시 실행해 나머지를 맡긴다(배포 잠금은 이어받는다). `deploy.sh`를 고친 커밋도 자기 배포부터 새 스크립트로 돈다.
+
+- 예외는 이 재실행이 들어간 커밋을 처음 배포할 때다. 그때는 재실행이 없는 옛 스크립트가 끝까지 돈다. 그래서 화면 파일 반영(`web-files`)은 스크립트가 아니라 Compose 정의에 두었다.
+- `--rollback`으로 재실행이 없는 옛 커밋으로 돌아가면 그 커밋의 스크립트가 잠금을 다시 잡고 처음부터 돈다.
 
 Compose는 기존 백엔드를 내린 뒤 새 백엔드를 띄우고, 새 백엔드가 부팅하면서 Flyway를 실행한다. 마이그레이션이 실패하면 그 시점부터 서비스가 멈추므로 5절의 롤백 명령으로 이전 SHA를 다시 배포한다. 마이그레이션 작성 규칙은 `db/README.md`를 따른다.
 
