@@ -66,23 +66,17 @@ bash ./backend/gradlew -p backend bootRun --args='--spring.profiles.active=local
 2. `/actuator/health`가 `UP`을 반환하는지
 3. Flyway가 `flyway_schema_history` 테이블을 생성하는지
 
-`integrationTest`와 `check`를 실행하기 전에는 Docker가 실행 중이어야 합니다. CI는 `test` 다음 `integrationTest`를 실행하며, 특정 클래스를 지정하지 않으므로 이후 추가되는 `*IntegrationTest`도 자동으로 포함합니다. 현재는 도메인 단위 테스트가 없어 `test`가 `NO-SOURCE`로 완료됩니다.
+`integrationTest`와 `check`를 실행하기 전에는 Docker가 실행 중이어야 합니다. CI는 `test` 다음 `integrationTest`를 실행하며, 특정 클래스를 지정하지 않으므로 이후 추가되는 `*IntegrationTest`도 자동으로 포함합니다. 클래스명이 `*IntegrationTest`가 아닌 단위 테스트(`AccessTokensTest`, `HolidaySyncTest` 등)는 Docker 없이 `test`에서 실행됩니다.
 
-## 목 응답
+## 인증과 요청 사용자
 
-서비스 레이어가 구현되기 전의 API는 기능별 `*MockData` Bean이 만든 고정 응답을 반환합니다. 입력과 id에 상관없이 같은 값이고, 상태를 저장하지 않습니다. 이런 API에는 `@MockResponse`가 붙어 있고 스웨거 설명이 `[목 응답]`으로 시작합니다. 지금은 남은 `*MockData` Bean이 없습니다.
-
-서비스를 구현하면 엔드포인트 단위로 다음을 바꿉니다.
-
-1. 컨트롤러가 주입받는 `*MockData`를 서비스로 바꾸고 호출부를 서비스 호출로 바꿉니다.
-2. 해당 메서드의 `@MockResponse`를 지웁니다.
-3. `*MockData`의 메서드가 더 이상 쓰이지 않으면 지웁니다. 모든 API가 바뀌면 `MockFixtures`, `MockResponse`까지 지웁니다.
+모든 API 는 서비스로 답합니다. 목 응답(`*MockData`, `@MockResponse`, `MockFixtures`)은 모두 지웠습니다.
 
 ### 요청한 사용자 (`CurrentUser`)
 
 서비스는 userId를 요청 본문이나 경로에서 받지 않습니다. 컨트롤러 메서드에 `CurrentUser` 인자를 두면 `CurrentUserArgumentResolver`가 채우고, 서비스에는 `currentUser.id()`를 넘깁니다(`UserController.me` 참고). 스웨거에는 노출되지 않습니다.
 
-`CurrentUserProvider` 구현체는 `auth.BearerCurrentUserProvider`이고, `Authorization: Bearer {accessToken}`의 사용자를 돌려줍니다. `/api/v1/auth/**`를 뺀 모든 API는 `CurrentUserWebConfig`의 인터셉터가 이를 확인해, 토큰이 없으면 `CurrentUser` 인자가 없는 API(목 응답 등)도 401 `UNAUTHORIZED`입니다. 계약은 `docs/api.md` 1.1에 있습니다.
+`CurrentUserProvider` 구현체는 `auth.BearerCurrentUserProvider`이고, `Authorization: Bearer {accessToken}`의 사용자를 돌려줍니다. `/api/v1/auth/**`를 뺀 모든 API는 `CurrentUserWebConfig`의 인터셉터가 이를 확인해, 토큰이 없으면 `CurrentUser` 인자가 없는 API(법령 조회 등)도 401 `UNAUTHORIZED`입니다. 계약은 `docs/api.md` 1.1에 있습니다.
 
 ### 인증 (`auth`)
 
@@ -137,5 +131,7 @@ PMD는 `backend/config/pmd/ruleset.xml`의 고복잡도·오류 가능성 규칙
 ## 코드 구성
 
 기능 코드는 `com.ktc4.pusan4.<feature>` 아래에 모으고, 기능 내부에서 controller, service, repository, entity, dto로 나눕니다. 둘 이상의 기능에서 실제로 공유되기 전에는 공통 계층을 만들지 않습니다.
+
+조회는 기본적으로 리포지토리의 `@Query`(JPQL)로 씁니다. 여러 쿼리가 같은 조건을 쓰거나 조건이 비어서 올 수 있으면 QueryDSL로 씁니다. 리포지토리에 `XxxRepositoryCustom` 인터페이스와 `XxxRepositoryCustomImpl` 구현을 붙이면 호출하는 쪽은 바뀌지 않습니다. 예를 들어 "지금 판정 대상인 거래" 조건은 `TransactionConditions`가 `TransactionDetail.effectiveStatus`에서 뽑아내고, 그 조건을 쓰는 조회는 모두 이 클래스를 가져다 씁니다. Q클래스는 빌드할 때 `build/generated`에 생성되므로 커밋하지 않습니다.
 
 DB 스키마는 Flyway만 변경합니다. 마이그레이션은 `src/main/resources/db/migration`에 `V1__create_member.sql` 형식으로 추가하며, 이미 적용된 파일은 수정하지 않고 새 버전의 파일을 추가합니다. Hibernate는 스키마를 생성하지 않고 애플리케이션 시작 시 매핑을 검증합니다.

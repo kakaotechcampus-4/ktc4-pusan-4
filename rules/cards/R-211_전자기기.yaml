@@ -10,9 +10,9 @@
 # 근거는 답마다 다르다: 가능 선택지는 §27① 을 선택지에 싣고, 카드 citations 에는 불가 근거만 둔다
 # (선택지 citations 가 카드 것을 대신한다, PR #68). 카드에 둘 다 두면 개인 답에도 §27① 이 붙는다.
 #
-# '업무·개인 혼재'는 verdict 를 두지 않는다. 비율을 묻지 않고 세무사 판단으로 둔다(#65, CONTEXT.md G3).
+# '업무·개인 혼용'은 verdict 를 두지 않는다. 비율을 묻지 않고 세무사 판단으로 둔다(#65, CONTEXT.md G3).
 id: R-211
-version: 3
+version: 4
 gate: G2
 priority: 500
 effective_period: { start: 2024-01-01, end: null }
@@ -30,5 +30,5 @@ question:
   options:
     - { value: 업무용, verdict: 가능, citations: [{ id: 소득세법-27-1, verified: true }], account: 소모품비 }
     - { value: 개인, verdict: 불가 }
-    - { value: 업무·개인 혼재 }
+    - { value: 업무·개인 혼용 }
 review: { by: 미검수, date: 2026-09-15 }

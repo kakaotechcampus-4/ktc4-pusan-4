@@ -34,6 +34,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -95,6 +96,23 @@ class QuestionAnswerIntegrationTest {
         batchId = insertBatch();
         context = insertContext();
         runId = insertRun(context);
+    }
+
+    @Test
+    void aggregated_transit_row_on_saturday_is_asked_like_a_weekday_trip() {
+        // given: 한 달치 지하철을 묶은 카드사 합산 행. 날짜는 묶음 기준일인 1/31(토)이다
+        UUID transit = insertTransaction("여비교통", "지하철 40건", 55_000L, "2026-01-31");
+        jdbcTemplate.update("update transaction set is_aggregated = true where id = ?", transit);
+
+        // when
+        judge(transit);
+
+        // then: 주말 여비교통(R-314, 불가)이 아니라 평일 여비교통(R-208)으로 업무 목적을 묻는다(#192)
+        assertThat(jdbcTemplate.queryForMap("""
+            select verdict, rule_card_id from judgment where transaction_id = ? order by revision desc limit 1
+            """, transit))
+            .containsEntry("verdict", "NEEDS_REVIEW")
+            .containsEntry("rule_card_id", "R-208");
     }
 
     @Test
@@ -311,6 +329,81 @@ class QuestionAnswerIntegrationTest {
             .containsEntry("judgment_id", jdbcTemplate.queryForObject(
                 "select id from judgment where transaction_id = ? order by revision desc limit 1", UUID.class, cafe))
             .containsEntry("allowed_amount", 6_500L);
+    }
+
+    @Test
+    void answer_unrelated_to_entertainment_does_not_settle_the_limit() throws Exception {
+        // given: 업무미팅 접대비 한 건. 한도 항목 값을 집계가 내지 않을 값으로 바꿔 둔다
+        // 바꾼 값이 남으므로, 같은 사용자를 쓰는 다른 테스트와 겹치지 않는 해(평일)에 둔다
+        UUID meeting = insertTransaction("카페", "스타벅스", 6_500L, "2033-03-02");
+        UUID telecom = insertTransaction("통신", "KT");
+        List.of(meeting, telecom).forEach(this::judge);
+        answer(List.of(pendingQuestion(meeting, "용도")), "업무미팅").andExpect(status().isOk());
+        jdbcTemplate.update("""
+            update limit_bucket_entry set allowed_amount = 3000
+            where judgment_id in (select id from judgment where transaction_id = ?)
+            """, meeting);
+
+        // when: 어느 판정도 접대비가 아닌 거래의 답
+        answer(List.of(pendingQuestion(telecom, "전용여부")), "전용").andExpect(status().isOk());
+
+        // then: 집계를 건너뛰어 한도 항목이 그대로다 (#218)
+        assertThat(jdbcTemplate.queryForList("""
+            select allowed_amount from limit_bucket_entry
+            where judgment_id in (select id from judgment where transaction_id = ?)
+            """, Long.class, meeting))
+            .containsExactly(3_000L);
+    }
+
+    @Test
+    void correcting_an_entertainment_answer_settles_the_limit_again() throws Exception {
+        // given
+        UUID meeting = insertTransaction("카페", "스타벅스");
+        judge(meeting);
+        UUID question = pendingQuestion(meeting, "용도");
+        answer(List.of(question), "업무미팅").andExpect(status().isOk());
+
+        // when: 새 판정은 접대비가 아니지만, 이전 판정이 접대비였다
+        answer(List.of(question), "개인").andExpect(status().isOk());
+
+        // then: 이전 판정의 한도 항목이 빠진다
+        assertThat(jdbcTemplate.queryForObject("""
+            select count(*) from limit_bucket_entry
+            where judgment_id in (select id from judgment where transaction_id = ?)
+            """, Integer.class, meeting)).isZero();
+    }
+
+    @Test
+    void current_judgment_follows_rejudge_override_and_release() throws Exception {
+        // given: 자동 판정 하나
+        UUID cafe = insertTransaction("카페", "스타벅스");
+        judge(cafe);
+        UUID automatic = latestJudgment(cafe);
+        assertThat(currentJudgment(cafe)).isEqualTo(automatic);
+
+        // when: 사용자가 불가로 수정한 뒤 다시 판정한다
+        mockMvc.perform(post("/api/v1/judgments/{id}/override", automatic)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"toVerdict": "UNAVAILABLE"}
+                    """))
+            .andExpect(status().isOk());
+        UUID overridden = latestJudgment(cafe);
+        judge(cafe);
+        UUID rejudged = latestJudgment(cafe);
+
+        // then: 활성 수정이 있는 동안은 새 자동 판정이 생겨도 수정 revision 이 현재다 (api.md 3.8)
+        assertThat(rejudged).isNotEqualTo(overridden);
+        assertThat(currentJudgment(cafe)).isEqualTo(overridden);
+
+        // when: 수정을 해제한다
+        UUID overrideId = jdbcTemplate.queryForObject(
+            "select id from judgment_override where transaction_id = ? and active", UUID.class, cafe);
+        mockMvc.perform(delete("/api/v1/judgment-overrides/{id}", overrideId)).andExpect(status().isNoContent());
+
+        // then: override 가 아닌 최신 revision 으로 돌아가고, 저장된 현재 판정이 모든 거래에서 정의(§5)와 같다
+        assertThat(currentJudgment(cafe)).isEqualTo(rejudged);
+        assertThat(CurrentJudgments.mismatches(jdbcTemplate)).isZero();
     }
 
     @Test
@@ -608,6 +701,16 @@ class QuestionAnswerIntegrationTest {
 
     private void judge(UUID transactionId) {
         executor.judge(transactionId, context, new JudgmentOrigin(JudgmentOriginType.RUN, runId));
+    }
+
+    private UUID latestJudgment(UUID transactionId) {
+        return jdbcTemplate.queryForObject(
+            "select id from judgment where transaction_id = ? order by revision desc limit 1", UUID.class, transactionId);
+    }
+
+    private UUID currentJudgment(UUID transactionId) {
+        return jdbcTemplate.queryForObject(
+            "select current_judgment_id from transaction where id = ?", UUID.class, transactionId);
     }
 
     private UUID pendingQuestion(UUID transactionId, String factType) {

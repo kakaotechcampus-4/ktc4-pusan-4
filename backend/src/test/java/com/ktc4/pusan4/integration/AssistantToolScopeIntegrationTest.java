@@ -33,7 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 합계만 주는 API(요약, 진행 상황)도 잡도록 남의 결제금액을 흔하지 않은 값으로 두고, 건수도 함께 찾는다.
  * 남의 거래는 한 건이고 고정 사용자는 이 클래스에서 거래가 없으니, 남의 것이 섞이면 건수가 1이 된다.
  * 같은 호출을 주인 토큰으로 하면 그 표지가 보이는지도 본다. 보이지 않으면 위 검사는 아무것도 증명하지 못한다.
- * /classification-reviews 는 아직 목 응답이고(#156), /statutes 는 사용자 데이터가 아니라 뺐다.
+ * /statutes 는 사용자 데이터가 아니라 뺐다. /classification-reviews 는 목에서 서비스로 바뀐 뒤(#156) 아직 이 검사에 넣지 않았다.
  */
 @SpringBootTest
 @AutoConfigureMockMvc

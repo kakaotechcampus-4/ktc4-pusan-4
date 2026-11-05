@@ -8,7 +8,6 @@ import java.util.UUID;
  */
 public final class TestUser {
 
-    /** 목 응답(MockFixtures.USER_ID)과 같은 값이라, 아직 목인 API 의 userId 와도 맞는다. */
     public static final UUID ID = UUID.fromString("0199c8f2-0000-7000-8000-000000000001");
     public static final String EMAIL = "demo@example.com";
 

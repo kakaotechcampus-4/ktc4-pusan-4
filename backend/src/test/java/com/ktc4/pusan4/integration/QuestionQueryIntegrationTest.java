@@ -162,6 +162,23 @@ class QuestionQueryIntegrationTest {
     }
 
     @Test
+    void questions_of_unclassified_transactions_are_left_out() throws Exception {
+        // given: 대기 질문이 걸린 거래 둘 중 하나가 분류 확인을 기다린다
+        UUID kept = insertTransaction(batchId, "2025-10-08", 6_500L);
+        UUID keptQuestion = insertQuestion(insertJudgment(kept, "NEEDS_REVIEW"), "merchant:스타벅스", "용도",
+            "PENDING", null, "2025-10-09T10:00:00+09:00");
+        UUID unclassified = insertTransaction(batchId, "2025-10-09", 3_000L);
+        insertQuestion(insertJudgment(unclassified, "NEEDS_REVIEW"), "merchant:스타벅스", "용도",
+            "PENDING", null, "2025-10-09T10:01:00+09:00");
+        jdbcTemplate.update("update transaction set classification_status = 'NEEDS_REVIEW' where id = ?", unclassified);
+
+        // when / then
+        mockMvc.perform(get("/api/v1/questions").param("batchId", batchId.toString()))
+            .andExpect(jsonPath("$.items[*].id", contains(keptQuestion.toString())))
+            .andExpect(jsonPath("$.unresolved.count").value(1));
+    }
+
+    @Test
     void list_never_returns_another_users_questions() throws Exception {
         // given: 다른 사용자의 거래에 걸린 대기 질문
         UUID otherBatchId = insertBatch(insertUser());

@@ -24,6 +24,7 @@ import com.ktc4.pusan4.judgment.domain.RuleCandidateStatus;
 import com.ktc4.pusan4.judgment.domain.StatuteVersion;
 import com.ktc4.pusan4.judgment.domain.Verdict;
 import com.ktc4.pusan4.judgment.persistence.BulkAnswerResult;
+import com.ktc4.pusan4.judgment.persistence.BusinessContextRevisionService;
 import com.ktc4.pusan4.judgment.persistence.JudgmentOverrideService;
 import com.ktc4.pusan4.judgment.persistence.JudgmentQueryService;
 import com.ktc4.pusan4.judgment.persistence.JudgmentRunService;
@@ -102,8 +103,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * 서비스 레이어가 붙기 전까지 컨트롤러는 고정된 목 응답을 반환한다.
- * 목 응답이 api.md 의 상태 코드를 지키는지 확인한다. 값은 보지 않는다 — 서비스로 바꿔도 깨지지 않아야 한다.
+ * 컨트롤러가 api.md 의 상태 코드를 지키는지 DB 없이 확인한다. 서비스는 대역으로 바꾸고 값은 보지 않는다.
  */
 @WebMvcTest
 @Import({ApiExceptionHandler.class, UuidV7Generator.class, TestAuthentication.class})
@@ -123,6 +123,9 @@ class ApiResponseContractTest {
 
     @MockitoBean
     private BusinessContextService contextService;
+
+    @MockitoBean
+    private BusinessContextRevisionService contextRevisionService;
 
     @MockitoBean
     private JudgmentRunService runService;
@@ -199,7 +202,7 @@ class ApiResponseContractTest {
         BusinessContext context = new BusinessContext(UUID.fromString(ID),
             TestUser.ID, 1, "940909", 82_000_000L, LocalDate.parse("2024-03-15"),
             BookkeepingDuty.간편장부, false, 20, OffsetDateTime.parse("2026-09-01T10:05:00+09:00"));
-        given(contextService.create(any(), any())).willReturn(context);
+        given(contextRevisionService.create(any(), any())).willReturn(context);
         given(contextService.current(any())).willReturn(context);
         given(contextService.history(any())).willReturn(List.of(context));
 
@@ -512,7 +515,25 @@ class ApiResponseContractTest {
         mockMvc.perform(get("/api/v1/no-such-resource"))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.code").value("NOT_FOUND"))
-            .andExpect(jsonPath("$.traceId").isNotEmpty());
+            .andExpect(jsonPath("$.traceId").isNotEmpty())
+            .andExpect(jsonPath("$.runId").doesNotExist());
+    }
+
+    @Test
+    void active_run_conflict_names_the_active_run() throws Exception {
+        // given
+        given(runService.create(any(), any(), any())).willThrow(new ApiException(
+            org.springframework.http.HttpStatus.CONFLICT, "RUN_ALREADY_ACTIVE", "이 업로드는 이미 판정 중입니다.", ID));
+
+        // when / then: api.md 1.3·3.6 — 409 RUN_ALREADY_ACTIVE 는 진행 중인 run 의 id 를 함께 준다
+        mockMvc.perform(request(HttpMethod.POST, "/api/v1/judgment-runs")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"batchId": "%s", "contextId": "%s"}
+                    """.formatted(ID, ID)))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("RUN_ALREADY_ACTIVE"))
+            .andExpect(jsonPath("$.runId").value(ID));
     }
 
     static Stream<String> invalidSummaryScopes() {

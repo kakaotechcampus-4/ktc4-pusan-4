@@ -18,8 +18,6 @@ import com.ktc4.pusan4.transaction.domain.ClassificationReviewGroup;
 import com.ktc4.pusan4.transaction.domain.ClassificationReviewItem;
 import com.ktc4.pusan4.transaction.domain.ClassificationReviewResult;
 import com.ktc4.pusan4.transaction.persistence.ClassificationReviewRepository.ReviewRow;
-import com.ktc4.pusan4.user.domain.BusinessContext;
-import com.ktc4.pusan4.user.persistence.BusinessContextService;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
@@ -64,7 +62,6 @@ public class ClassificationReviewService {
     private final TransactionRecordRepository transactionRepository;
     private final MerchantDictionaryRepository dictionaryRepository;
     private final MerchantCategoryVocabulary vocabulary;
-    private final BusinessContextService contextService;
     private final JudgmentExecutor executor;
     private final LimitSettlementService limitSettlement;
     private final Clock clock;
@@ -76,7 +73,6 @@ public class ClassificationReviewService {
         TransactionRecordRepository transactionRepository,
         MerchantDictionaryRepository dictionaryRepository,
         MerchantCategoryVocabulary vocabulary,
-        BusinessContextService contextService,
         JudgmentExecutor executor,
         LimitSettlementService limitSettlement,
         Clock clock
@@ -87,7 +83,6 @@ public class ClassificationReviewService {
         this.transactionRepository = transactionRepository;
         this.dictionaryRepository = dictionaryRepository;
         this.vocabulary = vocabulary;
-        this.contextService = contextService;
         this.executor = executor;
         this.limitSettlement = limitSettlement;
         this.clock = clock;
@@ -96,7 +91,7 @@ public class ClassificationReviewService {
     /**
      * 분류 확인 요청을 한 카테고리로 해결한다 (api.md 3.5). 거래 분류를 확정하고, 답을 개인 사전에 남긴다.
      * batch 에 완료된 판정 실행이 있으면 그 run 의 문진 버전으로, 해결한 거래 중 판정 대상만 다시 판정하고
-     * 접대비 한도를 다시 집계한다.
+     * 접대비 한도를 다시 집계한다(접대비와 닿지 않으면 건너뜀).
      * 남의 요청은 없는 요청과 똑같이 404 다. 한 건이라도 실패하면 아무것도 바꾸지 않는다.
      */
     @Transactional
@@ -138,9 +133,6 @@ public class ClassificationReviewService {
         merchantNorms.forEach(merchantNorm -> dictionaryRepository.savePersonal(userId, merchantNorm, category, now));
 
         int judged = rejudge(userId, batchIds.iterator().next(), transactions);
-        if (judged > 0) {
-            limitSettlement.settleProvisional(userId);
-        }
         return new ClassificationAnswer(ids.size(), category, judged);
     }
 
@@ -153,22 +145,25 @@ public class ClassificationReviewService {
                 "분류 확인 항목을 찾을 수 없습니다."));
     }
 
-    /** 판정 대상(effectiveStatus = JUDGEABLE)만 다시 판정한다. origin 은 거래마다 그 거래의 분류 확인 요청이다. */
+    /**
+     * 판정 대상(effectiveStatus = JUDGEABLE)만 다시 판정하고 한도를 다시 집계한다. origin 은 거래마다 그 거래의 분류 확인 요청이다.
+     * 질문 응답과 같은 재판정을 써서, batch UserFact 를 거래마다 다시 읽지 않고 접대비와 닿지 않으면 집계를 건너뛴다(#218).
+     */
     private int rejudge(UUID userId, UUID batchId, Map<UUID, TransactionRecordEntity> transactions) {
         Optional<Integer> contextVersion = reviewRepository.findLatestCompletedRunContextVersion(batchId);
         if (contextVersion.isEmpty()) {
             return 0;
         }
-        BusinessContext context = contextService.version(userId, contextVersion.get());
-        int judged = 0;
-        for (Map.Entry<UUID, TransactionRecordEntity> entry : transactions.entrySet()) {
-            if (entry.getValue().toDetail().effectiveStatus() == SourceStatus.JUDGEABLE) {
-                executor.judge(entry.getValue().id(), context,
-                    new JudgmentOrigin(JudgmentOriginType.CLASSIFICATION_REVIEW, entry.getKey()));
-                judged++;
+        Map<UUID, JudgmentOrigin> origins = new LinkedHashMap<>();
+        transactions.forEach((reviewId, transaction) -> {
+            if (transaction.toDetail().effectiveStatus() == SourceStatus.JUDGEABLE) {
+                origins.put(transaction.id(), new JudgmentOrigin(JudgmentOriginType.CLASSIFICATION_REVIEW, reviewId));
             }
+        });
+        if (!origins.isEmpty()) {
+            executor.rejudge(userId, origins, contextVersion.get());
         }
-        return judged;
+        return origins.size();
     }
 
     /** 정렬: createdAt ASC, id ASC. */

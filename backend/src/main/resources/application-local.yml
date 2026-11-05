@@ -27,6 +27,12 @@ app:
     workers: 4
     queue-capacity: 150
 
+# 로컬은 사람이 읽는 텍스트 로그. 운영 JSON 설정(application.yml)을 비운다.
+logging:
+  structured:
+    format:
+      console: ""
+
 springdoc:
   api-docs:
     enabled: true

@@ -39,6 +39,8 @@ public class JudgmentRunController {
         description = "같은 Batch 에 여러 번 실행할 수 있고, 다시 판정하면 새 revision 을 만든다")
     @ApiResponse(responseCode = "404", description = "BATCH_NOT_FOUND, CONTEXT_NOT_FOUND(문진 전)",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode = "409", description = "RUN_ALREADY_ACTIVE — 같은 업로드에 진행 중인 run 이 있다. 본문 runId 가 그 run",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @PostMapping
     @ResponseStatus(HttpStatus.ACCEPTED)
     public JudgmentRunCreatedResponse create(

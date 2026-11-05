@@ -92,11 +92,19 @@ app:
     email-verification:
       delivery: ${APP_AUTH_EMAIL_DELIVERY:smtp}
 
+# 운영 로그는 한 줄에 JSON 하나다(logstash 형식). CloudWatch 메트릭 필터가 { $.status >= 500 } 처럼 필드로 걸고,
+# 스택 트레이스가 stack_trace 필드에 들어가 여러 이벤트로 쪼개지지 않는다. 로컬은 application-local.yml 에서 텍스트로 되돌린다.
+logging:
+  structured:
+    format:
+      console: logstash
+
 management:
   endpoints:
     web:
       exposure:
-        include: health
+        # prometheus 는 호스트의 CloudWatch Agent 만 부른다. Caddy 는 /api/v1/* 만 넘기고, compose 는 8080 을 127.0.0.1 에만 연다.
+        include: health,prometheus
   # Redis 는 리프레시 토큰만 맡는다. Redis 가 내려가도 백엔드 전체를 unhealthy 로 만들어 배포를 멈추지 않게 health 에서 뺀다.
   health:
     redis:
