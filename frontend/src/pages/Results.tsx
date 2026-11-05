@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRightIcon, CircleHelpIcon, DownloadIcon, SearchXIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
+import { StepEyebrow } from '../components/StepEyebrow';
 import { JudgmentDetailPanel } from '../components/results/JudgmentDetailPanel';
 import { VerdictBadge } from '../components/VerdictBadge';
 import {
@@ -286,7 +287,7 @@ export function Results() {
   const header =
   <header className="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <p className="text-small font-bold text-accent">4단계 · 결과</p>
+        <StepEyebrow>결과</StepEyebrow>
         <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">판정 결과</h1>
         {summary &&
       <p className="mt-2 text-body tabular-nums text-muted">

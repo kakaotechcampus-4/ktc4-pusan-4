@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRightIcon, CheckIcon, SparklesIcon, UploadIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
+import { StepEyebrow } from '../components/StepEyebrow';
 import { api, ApiRequestError, useApi } from '../api';
 import { useSession } from '../contexts/SessionContext';
 import { Badge, Button, Card, Empty, Select } from '../components/ui';
@@ -9,7 +10,7 @@ import { MERCHANT_CATEGORIES } from '../types/domain';
 import { formatFullDate, formatNumber, formatWon } from '../utils/format';
 
 /**
- * 2단계 · 분류 확인.
+ * 가맹점 분류 확인. 몇 단계인지는 STEPS 가 정한다(components/steps.tsx)
  * 서버가 가맹점을 분류하지 못한 거래를 사용자가 카테고리로 확정한다.
  * 미분류로 남은 거래는 룰엔진에 전달되지 않으므로(api.md 3.3) 판정에서 빠진다는 것을 화면에서 말한다.
  */
@@ -105,7 +106,7 @@ export function ClassificationPreview() {
     <AppShell>
       <div className="mx-auto max-w-3xl">
         <header>
-          <p className="text-small font-bold text-accent">2단계 · 분류 확인</p>
+          <StepEyebrow>분류 확인</StepEyebrow>
           <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
             {loadError ?
             '분류 결과를 불러오지 못했습니다' :

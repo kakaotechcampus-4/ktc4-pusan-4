@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRightIcon, CopyCheckIcon, CopyIcon, PrinterIcon, SearchXIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
+import { StepEyebrow } from '../components/StepEyebrow';
 import { Button, Empty, Table, type Column } from '../components/ui';
 import { useSession } from '../contexts/SessionContext';
 import { api, useApi } from '../api';
@@ -136,7 +137,7 @@ export function Summary() {
   const header =
   <header className="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <p className="text-small font-bold text-accent">4단계 · 요약</p>
+        <StepEyebrow>요약</StepEyebrow>
         <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
           {period ? `${period} 요약` : '판정 요약'}
         </h1>

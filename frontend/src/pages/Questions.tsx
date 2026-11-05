@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowRightIcon, CheckIcon, LayersIcon, SearchXIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
+import { StepEyebrow } from '../components/StepEyebrow';
 import { Badge, Button, ChoiceGroup, Empty, Pagination } from '../components/ui';
 import { useSession } from '../contexts/SessionContext';
 import { api, ApiRequestError, useApi } from '../api';
@@ -204,7 +205,7 @@ export function Questions() {
   const header =
   <header className="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <p className="text-small font-bold text-accent">4단계 · 질문</p>
+        <StepEyebrow>질문</StepEyebrow>
         <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
           확인이 필요한 것만 물어봅니다
         </h1>

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowRightIcon, InfoIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
+import { StepEyebrow } from '../components/StepEyebrow';
 import { DEFAULT_CONTEXT, useSession } from '../contexts/SessionContext';
 import { api, ApiRequestError } from '../api';
 import type { BookkeepingDuty, BusinessContext, StoredBusinessContext } from '../types/domain';
@@ -181,7 +182,7 @@ export function Interview() {
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
         <form onSubmit={(event) => void submit(event)}>
           <header>
-            <p className="text-[13px] font-bold text-accent">설정 · 사업자 문진</p>
+            <StepEyebrow prefix="설정">사업자 문진</StepEyebrow>
             <h1 className="mt-1.5 text-[28px] font-bold tracking-tight text-ink">
               사업자 문진
             </h1>

@@ -6,26 +6,11 @@ import { DisclaimerBar } from './DisclaimerBar';
 import { Button } from './ui';
 import { BugReportButton } from './BugReport';
 import { Logo } from './Logo';
+import { STEPS, STEP_ALIAS, under } from './steps';
 
 import { useSession } from '../contexts/SessionContext';
 import { accountLabel } from '../utils/account';
 
-/**
- * 진행 단계: 업로드 → 분류 결과 미리보기 → 판정 → 결과 (→ 되묻기 → 재판정)
- *
- * 사업자 문진은 여기 넣지 않는다. 한 번 하면 다시 하지 않는 설정이지 판정마다 밟는
- * 단계가 아니다 — 띠에 끼워 두면 카드내역을 올릴 때마다 또 해야 하는 것처럼 보인다
- * (#242 리뷰). 문진을 막는 일은 띠가 아니라 Confirm.tsx 가 한다. 고치는 길은 내 정보에 있다
- */
-const STEPS = [
-{ path: '/upload', label: '카드내역' },
-{ path: '/preview', label: '분류 확인' },
-// 판정 진행은 실행 id 가 주소에 있어야 한다(/run/:runId). 단계를 누르면 판정 전 확인으로 간다
-{ path: '/run', to: '/confirm', label: '판정' },
-{ path: '/results', label: '결과' }];
-
-/** /upload 가 /uploads 에도 걸리지 않게 경로 조각 단위로 맞춘다 */
-const under = (pathname: string, prefix: string) => pathname === prefix || pathname.startsWith(`${prefix}/`);
 
 /** 빵부스러기에 쓸 이름. [무리, 화면] */
 const CRUMB: Record<string, [string, string]> = {
@@ -55,13 +40,6 @@ const REFS: NavRef[] = [
 /** 관리자에게만 보인다 (M1) */
 const ADMIN_REF: NavRef = { path: '/admin', label: '관리자' };
 
-/** 단계 표시에 포함되지 않지만 특정 단계에 속하는 화면 */
-const STEP_ALIAS: Record<string, number> = {
-  '/confirm': 2,
-  '/questions': 3,
-  '/summary': 3,
-  '/judgments': 3
-};
 
 
 interface AppShellProps {

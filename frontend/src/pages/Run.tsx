@@ -8,6 +8,7 @@ import {
   RadioIcon } from
 'lucide-react';
 import { AppShell } from '../components/AppShell';
+import { StepEyebrow } from '../components/StepEyebrow';
 import { useAssistant } from '../components/assistant/context';
 import { api, ApiRequestError, isMock } from '../api';
 import { useSession } from '../contexts/SessionContext';
@@ -219,7 +220,7 @@ function RunProgress() {
       <div className="mx-auto max-w-3xl">
         <header className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-small font-bold text-accent">3단계 · 판정</p>
+            <StepEyebrow>판정</StepEyebrow>
             <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
               {loadError && !run ?
               '판정 상태를 확인할 수 없습니다' :
