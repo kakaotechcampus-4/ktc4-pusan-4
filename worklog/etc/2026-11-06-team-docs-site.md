@@ -1,0 +1,30 @@
+# 팀 온보딩 문서 사이트 초안 (데모)
+
+- 브랜치: feature/team-docs-site (develop 76210a6 위)
+- 커밋: 52ae309 (1개)
+- 주요파일: docs/site/index.html
+
+## 한 일
+
+팀 규칙·설계·실행 방법을 한곳에서 보는 정적 문서 사이트 초안을 `docs/site/index.html` 한 파일로 추가했다.
+빌드 없이 브라우저로 열면 된다.
+
+- 개요: 프로젝트 개요, 핵심 설계 원칙, 팀 리소스(역할별 팀원)
+- 협업 가이드: 그라운드 룰, 브랜치 전략, 커밋 컨벤션, PR · 리뷰 규칙, 협업 자동화
+- 개발 가이드: 아키텍처(6관문), 기술 스택 · 구조, 로컬 실행
+
+본문의 저장소 경로(`docs/…`, `.github/…` 등)는 develop 브랜치 GitHub 링크로 자동 연결된다.
+오른쪽 아래 홈 버튼은 `frontend/src/assets/brand/really-fab/really-fab-blue.svg` 를 HTML 안에 넣어 썼다.
+
+## 왜 이렇게 했나
+
+내용은 `CONTEXT.md`, `CONTRIBUTING.md`, PR 템플릿, `docs/architecture.md`, `docs/deployment.md`,
+워크플로·룰셋 설정에서 옮겼다. 소통·회의·리뷰 시간 규칙과 수요일 16:00 정리 단계는 PM 이 정한 팀 규칙이다.
+작업 현황 숫자는 노션 보드 캡처 대신 GitHub PR 목록(`gh pr list --state all`, 2026-11-06)으로 계산했다.
+
+## 남은 것 · 아는 문제
+
+- 데모 초안이다. 배포(GitHub Pages / Vercel)는 하지 않았다.
+- 작업 현황·지표 숫자는 2026-11-06 값을 손으로 넣었다. 자동 갱신되지 않는다.
+- 내용이 HTML 문자열로 들어 있어 수정이 불편하다. 마크다운 분리 여부는 미정이다.
+- `CONTEXT.md` 의 배포 구성은 RDS 로 적혀 있지만 실제는 EC2 안 PostgreSQL 컨테이너다. 문서 사이트는 실제 기준으로 적었다.
