@@ -51,9 +51,8 @@ compose=(docker compose --env-file "$config" -f "$repo/deploy/compose.yaml")
 "${compose[@]}" pull
 "${compose[@]}" up -d --wait --remove-orphans
 
-# Caddy keeps running across deploys. Publish this commit's web files once the new backend is
-# healthy, then apply any Caddyfile change in place.
-"${compose[@]}" run --rm web-files
+# Caddy keeps running across deploys; `up` has already published this commit's web files
+# (web-files). Apply any Caddyfile change in place.
 "${compose[@]}" exec -T web caddy reload --config /etc/caddy/Caddyfile
 
 # Flyway must initialize the empty application schema before these SQL files run.

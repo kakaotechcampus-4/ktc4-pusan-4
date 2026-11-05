@@ -144,17 +144,21 @@ services:
       - caddy-data:/data
       - caddy-config:/config
     depends_on:
-      backend:
-        condition: service_healthy
+      web-files:
+        condition: service_completed_successfully
     mem_limit: 256m
     logging: *rotated-logging
 
-  # 커밋의 화면 파일을 web-dist 볼륨에 옮기고 끝난다(deploy/web-publish.sh). up 으로는 뜨지 않고 deploy.sh 가 run 으로 부른다.
+  # 커밋의 화면 파일을 web-dist 볼륨에 옮기고 끝난다(deploy/web-publish.sh). 새 화면이 옛 API 를 부르지 않게 새 backend 가 healthy 가 된 뒤 돈다.
+  # deploy.sh 가 아니라 up 안에 두는 이유: 배포 때 도는 deploy.sh 는 직전 배포의 것이라(docs/deployment.md 4절), 이 단계를 스크립트에 넣으면
+  # 처음 배포할 때 옛 스크립트가 빈 볼륨으로 Caddy 만 띄운다.
   web-files:
     image: ${ECR_REPOSITORY}:web-${IMAGE_TAG}
-    profiles: [publish]
     volumes:
       - web-dist:/srv
+    depends_on:
+      backend:
+        condition: service_healthy
 
 volumes:
   postgres-data:

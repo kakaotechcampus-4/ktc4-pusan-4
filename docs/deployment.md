@@ -62,8 +62,7 @@ sequenceDiagram
     SH->>SH: release SHA 확인 · checkout
     SH->>C: pull · up -d --wait
     Note over C: 이미지가 바뀐 backend · ai 를 내리고 새로 띄운다.<br/>새 backend 가 부팅하며 Flyway 를 돌린다.<br/>이 사이 API 와 비서는 멈춘다.
-    SH->>C: run --rm web-files
-    C-->>W: web-dist 에 새 화면 파일 추가 (HTML 은 마지막)
+    C-->>W: 새 backend 가 healthy 가 되면 web-files 가<br/>web-dist 에 새 화면 파일 추가 (HTML 은 마지막)
     SH->>W: caddy reload (Caddyfile 변경 반영)
     SH->>C: db/schema.sql · db/rag.sql 적용
     GH->>W: 공개 HTTPS 확인
@@ -121,7 +120,7 @@ sudo aws ecr get-login-password --region ap-northeast-2 >/dev/null
 
 웹 컨테이너(Caddy)는 배포해도 다시 뜨지 않는다.
 
-- `web-<SHA>` 이미지는 화면 파일만 담는다. 새 백엔드가 healthy가 되면 `deploy.sh`가 이 이미지를 `web-files`로 한 번 돌려 `web-dist` 볼륨에 파일을 옮긴다(`deploy/web-publish.sh`).
+- `web-<SHA>` 이미지는 화면 파일만 담는다. Compose `up`이 새 백엔드가 healthy가 된 뒤 이 이미지를 일회성 서비스 `web-files`로 돌려 `web-dist` 볼륨에 파일을 옮긴다(`deploy/web-publish.sh`). 끝난 `web-files` 컨테이너는 `Exited (0)`으로 남는다.
 - 옛 파일은 지우지 않는다. 이미 화면을 연 브라우저가 옛 해시 청크(`/assets/*`)를 이어서 받는다. 배포당 수 MB라 따로 정리하지 않는다.
 - Caddy는 서버 repo의 `deploy/caddy/`를 그대로 읽고, `deploy.sh`가 매번 `caddy reload`로 Caddyfile 변경을 연결을 끊지 않고 반영한다. 설정이 틀리면 reload가 실패해 배포가 실패하고, Caddy는 옛 설정으로 계속 낸다.
 - Caddy 버전(`deploy/compose.yaml`의 `web` 이미지)이나 `web` 서비스 정의를 바꾼 배포에서만 웹 컨테이너가 다시 떠 몇 초 끊긴다.
@@ -133,6 +132,8 @@ curl -I "https://<도메인>/"
 ```
 
 `docker compose ps`에서 PostgreSQL·Redis·백엔드·AI가 healthy이고 웹 컨테이너가 running이어야 한다. 브라우저에서 `/`, `/upload`를 새로고침해 SPA 라우팅을 확인한다. 백엔드 `/actuator/health`와 AI `/health/db`는 컨테이너 내부 검사로 확인하며 외부에 공개하지 않는다. `docker stats`와 `df -h`로 4GB 메모리·50GB 디스크 사용량을 확인한다.
+
+배포 때 실행되는 `deploy.sh`는 직전 배포의 파일이다. SSM이 스크립트를 띄운 뒤 스크립트가 새 커밋을 checkout해도, bash는 이미 연 옛 파일을 끝까지 실행한다. 그래서 `deploy.sh` 자체의 변경은 그 다음 배포부터 적용된다. 새 커밋의 `compose.yaml`은 같은 배포에 적용되므로, 처음 배포에서 꼭 돌아야 하는 단계는 스크립트가 아니라 Compose 정의에 둔다(`web-files`가 그 예다).
 
 Compose는 기존 백엔드를 내린 뒤 새 백엔드를 띄우고, 새 백엔드가 부팅하면서 Flyway를 실행한다. 마이그레이션이 실패하면 그 시점부터 서비스가 멈추므로 5절의 롤백 명령으로 이전 SHA를 다시 배포한다. 마이그레이션 작성 규칙은 `db/README.md`를 따른다.
 
