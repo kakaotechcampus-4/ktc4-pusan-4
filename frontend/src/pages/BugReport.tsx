@@ -18,6 +18,7 @@ export function BugReport() {
 
       <main className="mx-auto w-full max-w-page px-6 pb-28 pt-16 lg:px-gutter">
         <SectionHeading
+          as="h1"
           eyebrow="버그 신고"
           title="잘못 나온 것을 알려주세요"
           description="판정이 이상하거나 화면이 깨졌다면 알려주시면 고칩니다." />

@@ -88,6 +88,15 @@ export function App() {
   return (
     <SessionProvider>
       <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
+    </SessionProvider>);
+
+}
+
+/** 라우터 안쪽 전부. 빌드 때 프리렌더(entry-server.tsx)가 StaticRouter 로 감싸 같은 화면을 그린다 */
+export function AppRoutes() {
+  return (
         <AssistantRoot>
           <ErrorBoundary>
           <React.Suspense fallback={<PageLoading />}>
@@ -119,8 +128,6 @@ export function App() {
             <Assistant />
           </div>
           </ErrorBoundary>
-        </AssistantRoot>
-      </BrowserRouter>
-    </SessionProvider>);
+        </AssistantRoot>);
 
 }
