@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon, PauseIcon, PlayIcon } from 'lucide-react';
 import { OrbitStage } from './OrbitStage';
+import { InterviewCard, UploadRows, VerdictCard } from './flowFigure';
 import { FLOW_STEPS, NOT_DOING } from '../mock/marketing';
 
 /**
@@ -116,88 +117,41 @@ function RingBackdrop({ variant }: {variant: 'flow' | 'bound';}) {
         <circle cx="50" cy="50" r="19" fill="none" stroke="#FFFFFF" strokeOpacity="0.1" strokeWidth="0.4" />
         }
 
-        {nodes.map((node) => {
-          const rad = node.angle * Math.PI / 180;
-          return (
-            <circle
-              key={node.angle}
-              cx={50 + node.r * Math.cos(rad)}
-              cy={50 + node.r * Math.sin(rad)}
-              r="1.7"
-              fill={node.fill}
-              fillOpacity="0.85" />);
+        {/*
+          점이 테를 따라 천천히 돈다 (#247 리뷰). 1번 장면(OrbitStage)이 쓰는 orbit(52초)과
+          같은 속도라 두 장면이 따로 놀지 않는다. 그룹째 돌리므로 점 사이 간격은 그대로다.
+          motion-safe 라 「동작 줄이기」를 켠 사람에게는 멈춰 있다
+        */}
+        <g
+          className="motion-safe:animate-orbit"
+          style={{ transformBox: 'view-box', transformOrigin: '50% 50%' }}>
 
-        })}
+          {nodes.map((node) => {
+            const rad = node.angle * Math.PI / 180;
+            return (
+              <circle
+                key={node.angle}
+                cx={50 + node.r * Math.cos(rad)}
+                cy={50 + node.r * Math.sin(rad)}
+                r="1.7"
+                fill={node.fill}
+                fillOpacity="0.85" />);
+
+          })}
+        </g>
       </svg>
     </div>);
 
 }
 
 /** 칸 높이를 셋이 같게 맞춘다. 글 쓰는 칸은 svg 가 아니라 이쪽을 쓴다 */
-function HtmlCell({ children }: {children: React.ReactNode;}) {
-  return (
-    <div className="flex h-[104px] items-center lg:h-[124px]">{children}</div>);
-
-}
-
-/**
- * 판정 흐름. 칸마다 그 단계를 그린다 —
- * 올린 거래 목록 / 문진에 답한 카드 / 실제로 나오는 판정 카드 한 장
- */
+/** 판정 흐름. 칸마다 그 단계를 그린다 — 조각은 랜딩의 01·02·03 카드와 같이 쓴다 */
 function FlowFigure() {
   return (
     <FigureGrid>
-      {/* 1. 카드내역 올리기 — 올라온 거래 줄들 */}
-      <FigureCell>
-        {[
-        { y: 16, width: 150, opacity: 0.55 },
-        { y: 42, width: 112, opacity: 0.4 },
-        { y: 68, width: 166, opacity: 0.4 },
-        { y: 94, width: 92, opacity: 0.25 }].
-        map((row) =>
-        <rect
-          key={row.y}
-          x="0"
-          y={row.y}
-          width={row.width}
-          height="12"
-          rx="6"
-          fill="#FFFFFF"
-          fillOpacity={row.opacity} />
-
-        )}
-      </FigureCell>
-
-      {/*
-        2. 사업자 문진 — 고른 답 하나만 또렷하다.
-        전에는 그 줄만 노랬는데, 판이 밝은 파랑이 되면서 핑크(대비 1.60)로는 바꿀 수 없고
-        노랑은 팔레트에 없는 색이 된다. 흐리기로만 가른다
-      */}
-      <FigureCell>
-        <rect x="0" y="8" width="178" height="104" rx="16" fill="#FFFFFF" fillOpacity="0.07" stroke="#FFFFFF" strokeOpacity="0.28" strokeWidth="2" />
-        <rect x="22" y="32" width="88" height="10" rx="5" fill="#FFFFFF" fillOpacity="0.45" />
-        <rect x="22" y="56" width="134" height="10" rx="5" fill="#FFFFFF" fillOpacity="0.3" />
-        <rect x="22" y="80" width="58" height="10" rx="5" fill="#FFFFFF" />
-      </FigureCell>
-
-      {/*
-        3. 건별 판정과 근거 — 막대 대신 결과 화면에 실제로 나오는 카드를 그대로 줄여 놓는다 (#238 리뷰).
-        배지 기호·색은 utils/verdict.ts 의 VERDICT_META(AVAILABLE = ✓ / ok)와 같다
-      */}
-      <HtmlCell>
-        <div className="w-full max-w-[232px] rounded-xl bg-surface p-3.5">
-          <div className="flex items-start justify-between gap-2">
-            <p className="text-small font-bold leading-5 text-ink">AWS</p>
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-ok-line bg-ok-bg px-2 py-0.5 text-caption font-bold text-ok">
-              ✓ 가능
-            </span>
-          </div>
-          <p className="mt-0.5 text-body font-bold tabular-nums text-ink">128,000원</p>
-          <p className="mt-2.5 border-t border-line pt-2 text-caption text-muted">
-            소득세법 제27조 ①
-          </p>
-        </div>
-      </HtmlCell>
+      <UploadRows />
+      <InterviewCard />
+      <VerdictCard />
     </FigureGrid>);
 
 }
