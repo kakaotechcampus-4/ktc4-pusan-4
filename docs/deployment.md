@@ -8,7 +8,7 @@
 
 ### 서버 구성
 
-EC2 한 대에서 Compose 프로젝트 `ktc4`가 컨테이너 다섯 개를 띄운다. 밖으로 열린 포트는 Caddy의 80·443뿐이다.
+EC2 한 대에서 Compose 프로젝트 `ktc4`를 돌린다. 평소에는 Caddy, PostgreSQL, Redis와 받는 색의 backend·ai 쌍이 떠 있고, 다른 색 쌍은 멈춰 있다. 밖으로 열린 포트는 Caddy의 80·443뿐이다. 아래 그림은 blue가 받는 때다.
 
 ```mermaid
 flowchart LR
@@ -16,33 +16,44 @@ flowchart LR
 
     subgraph ec2["EC2 t3.medium · deploy/compose.yaml"]
         web["web<br/>Caddy 2.11.8<br/>배포해도 다시 뜨지 않음"]
-        backend["backend :8080<br/>Spring Boot · Flyway"]
-        ai["ai :8000<br/>FastAPI"]
+        subgraph blue["blue 쌍 · 받는 중"]
+            bb["backend-blue<br/>Spring Boot · Flyway"]
+            ab["ai-blue<br/>FastAPI"]
+        end
+        subgraph green["green 쌍 · 멈춤"]
+            bg["backend-green"]
+            ag["ai-green"]
+        end
         pg[("postgres :5432")]
         redis[("redis :6379")]
         dist[("web-dist 볼륨<br/>화면 파일")]
         timers["systemd 타이머<br/>백업 · 코퍼스 · 규칙 후보"]
+        job["ai-job<br/>배치용 일회성"]
         cwa["CloudWatch Agent"]
 
-        web -->|"/api/v1/*"| backend
+        web -->|"/api/v1/*<br/>upstream.caddy 의 색"| bb
+        web -.->|"다음 배포 뒤"| bg
         web -.->|"그 밖의 주소"| dist
-        backend -->|"비서 · 분류"| ai
-        ai -->|"비서 도구 /api/v1"| backend
-        backend --> pg
-        backend --> redis
-        ai --> pg
+        bb -->|"비서 · 분류"| ab
+        ab -->|"비서 도구 /api/v1"| bb
+        bg <--> ag
+        bb --> pg
+        bb --> redis
+        ab --> pg
         timers -.->|"pg_dump"| pg
-        timers -.->|"compose run ai"| ai
-        cwa -.->|"127.0.0.1:8080/actuator/prometheus"| backend
+        timers -.->|"compose run"| job
+        job --> pg
+        cwa -.->|"127.0.0.1:8080 · 8081<br/>/actuator/prometheus"| bb
     end
 
-    backend -.->|"awslogs"| logs[("CloudWatch Logs")]
+    bb -.->|"awslogs"| logs[("CloudWatch Logs")]
     timers -.->|"백업"| s3[("S3")]
 ```
 
 - 화살표는 호출 방향이다. 점선은 요청 경로 밖의 읽기·배치·수집이다.
+- 같은 색끼리만 서로 부른다. green 쌍도 blue와 같은 DB·Redis·로그 그룹을 쓴다. 전환은 4절.
 - 영속 볼륨은 `postgres-data`, `redis-data`, `caddy-data`(인증서·접근 기록), `caddy-config`, `web-dist`다. 재배포해도 남는다.
-- 타이머는 5·6·11절이다. 코퍼스와 규칙 후보 배치는 상시 `ai` 컨테이너가 아니라 같은 이미지로 띄운 일회용 컨테이너에서 돈다.
+- 타이머는 5·6·11절이다. 코퍼스와 규칙 후보 배치는 상시 ai가 아니라 같은 이미지로 띄운 일회용 `ai-job`에서 돈다.
 
 ### 배포 순서
 
@@ -59,12 +70,14 @@ sequenceDiagram
     GH->>GH: backend · ai · web 검증
     GH->>ECR: backend / ai / web-<SHA> 이미지 push<br/>(postgres 는 바뀔 때만)
     GH->>SH: SSM 으로 deploy.sh <SHA>
-    SH->>SH: release SHA 확인 · checkout
-    SH->>C: pull · up -d --wait
-    Note over C: 이미지가 바뀐 backend · ai 를 내리고 새로 띄운다.<br/>새 backend 가 부팅하며 Flyway 를 돌린다.<br/>이 사이 API 와 비서는 멈춘다.
-    C-->>W: 새 backend 가 healthy 가 되면 web-files 가<br/>web-dist 에 새 화면 파일 추가 (HTML 은 마지막)
-    SH->>W: caddy reload (Caddyfile 변경 반영)
+    SH->>SH: release SHA 확인 · checkout<br/>대상 커밋의 deploy.sh 로 다시 실행
+    SH->>C: 쉬는 색(예: green)의 backend · ai 를 새 이미지로 up --wait
+    Note over C: 새 backend 가 부팅하며 Flyway 를 돌린다.<br/>그동안 blue 쌍이 계속 받는다.
     SH->>C: db/schema.sql · db/rag.sql 적용
+    SH->>W: upstream.caddy 를 green 으로 바꾸고 caddy reload
+    Note over W: 이때부터 /api/v1 은 green 으로 간다.<br/>연결은 끊기지 않는다.
+    SH->>C: run --rm web-files<br/>(새 화면 파일 추가, HTML 은 마지막)
+    SH->>C: blue 쌍 stop<br/>(돌던 요청과 판정 run 을 마저 끝내고 멈춤)
     GH->>W: 공개 HTTPS 확인
 ```
 
@@ -116,31 +129,41 @@ sudo aws ecr get-login-password --region ap-northeast-2 >/dev/null
 
 ## 4. 배포와 확인
 
-`release` push가 발생하면 `.github/workflows/aws-release.yml`이 백엔드·AI·프런트 검증을 실행하고, GitHub 러너에서 이미지를 빌드해 ECR에 올린다. SSM이 EC2의 `deploy/deploy.sh`에 커밋 SHA를 전달한다. 스크립트는 원격 `release`의 현재 SHA와 일치하는지 확인하고 이미지 pull, Compose 기동, 화면 파일 반영, Flyway 완료 후 `db/schema.sql`과 `db/rag.sql`을 차례로 적용한다. DB 초기화 단계에서는 확장만 설치한다. `postgres-data`와 Caddy 인증서 볼륨은 재배포해도 유지된다.
+`release` push가 발생하면 `.github/workflows/aws-release.yml`이 백엔드·AI·프런트 검증을 실행하고, GitHub 러너에서 이미지를 빌드해 ECR에 올린다. SSM이 EC2의 `deploy/deploy.sh`에 커밋 SHA를 전달한다. 스크립트는 원격 `release`의 현재 SHA와 일치하는지 확인하고, 쉬는 색의 backend·ai를 새 이미지로 띄워 Flyway가 끝나면 `db/schema.sql`과 `db/rag.sql`을 적용한 뒤, Caddy를 새 색으로 돌리고 화면 파일을 반영하고 옛 쌍을 멈춘다(아래 「블루그린 전환」). DB 초기화 단계에서는 확장만 설치한다. `postgres-data`와 Caddy 인증서 볼륨은 재배포해도 유지된다.
 
 웹 컨테이너(Caddy)는 배포해도 다시 뜨지 않는다.
 
-- `web-<SHA>` 이미지는 화면 파일만 담는다. Compose `up`이 새 백엔드가 healthy가 된 뒤 이 이미지를 일회성 서비스 `web-files`로 돌려 `web-dist` 볼륨에 파일을 옮긴다(`deploy/web-publish.sh`). 끝난 `web-files` 컨테이너는 `Exited (0)`으로 남는다.
+- `web-<SHA>` 이미지는 화면 파일만 담는다. `deploy.sh`가 `/api/v1`을 새 색으로 돌린 뒤 이 이미지를 일회성 서비스 `web-files`로 돌려 `web-dist` 볼륨에 파일을 옮긴다(`deploy/web-publish.sh`).
 - 옛 파일은 지우지 않는다. 이미 화면을 연 브라우저가 옛 해시 청크(`/assets/*`)를 이어서 받는다. 배포당 수 MB라 따로 정리하지 않는다.
 - Caddy는 서버 repo의 `deploy/caddy/`를 그대로 읽고, `deploy.sh`가 매번 `caddy reload`로 Caddyfile 변경을 연결을 끊지 않고 반영한다. 설정이 틀리면 reload가 실패해 배포가 실패하고, Caddy는 옛 설정으로 계속 낸다.
 - Caddy 버전(`deploy/compose.yaml`의 `web` 이미지)이나 `web` 서비스 정의를 바꾼 배포에서만 웹 컨테이너가 다시 떠 몇 초 끊긴다.
 
 ```bash
 sudo cat /opt/ktc4/current-sha
-sudo docker ps --filter name=ktc4
+sudo cat /opt/ktc4/repo/deploy/caddy/upstream.caddy   # 받는 색
+sudo docker ps -a --filter name=ktc4
 curl -I "https://<도메인>/"
 ```
 
-`docker compose ps`에서 PostgreSQL·Redis·백엔드·AI가 healthy이고 웹 컨테이너가 running이어야 한다. 브라우저에서 `/`, `/upload`를 새로고침해 SPA 라우팅을 확인한다. 백엔드 `/actuator/health`와 AI `/health/db`는 컨테이너 내부 검사로 확인하며 외부에 공개하지 않는다. `docker stats`와 `df -h`로 4GB 메모리·50GB 디스크 사용량을 확인한다.
+PostgreSQL·Redis와 `upstream.caddy`의 색인 backend·ai가 healthy이고 웹 컨테이너가 running이어야 한다. 다른 색 쌍은 `Exited`가 정상이다. 브라우저에서 `/`, `/upload`를 새로고침해 SPA 라우팅을 확인한다. 백엔드 `/actuator/health`와 AI `/health/db`는 컨테이너 내부 검사로 확인하며 외부에 공개하지 않는다. `docker stats`와 `df -h`로 4GB 메모리·50GB 디스크 사용량을 확인한다.
 
 SSM이 띄우는 `deploy.sh`는 직전 배포의 파일이다. 스크립트가 새 커밋을 checkout해도 bash는 이미 연 옛 파일을 끝까지 실행한다. 그래서 `deploy.sh`는 checkout까지만 하고, 대상 커밋의 `deploy.sh`를 다시 실행해 나머지를 맡긴다(배포 잠금은 이어받는다). `deploy.sh`를 고친 커밋도 자기 배포부터 새 스크립트로 돈다.
 
 - 예외는 이 재실행이 들어간 커밋을 처음 배포할 때다. 그때는 재실행이 없는 옛 스크립트가 끝까지 돈다. 그래서 화면 파일 반영(`web-files`)은 스크립트가 아니라 Compose 정의에 두었다.
 - `--rollback`으로 재실행이 없는 옛 커밋으로 돌아가면 그 커밋의 스크립트가 잠금을 다시 잡고 처음부터 돈다.
 
-Compose는 기존 백엔드를 내린 뒤 새 백엔드를 띄우고, 새 백엔드가 부팅하면서 Flyway를 실행한다. 마이그레이션이 실패하면 그 시점부터 서비스가 멈추므로 5절의 롤백 명령으로 이전 SHA를 다시 배포한다. 마이그레이션 작성 규칙은 `db/README.md`를 따른다.
+### 블루그린 전환
 
-기존 백엔드는 내려가기 전에 새 요청을 받지 않고, 돌던 판정 run과 대기열의 run을 최대 60초(`app.judgment-run.await-termination`)까지 마저 처리한다. 그래서 판정이 도는 중에 배포하면 백엔드가 멈춰 있는 시간이 그만큼 길어진다. Compose의 `stop_grace_period`(100초)가 이보다 짧으면 그 전에 강제로 꺼진다. 60초 안에 못 끝낸 run은 새 백엔드의 멈춘 run 정리가 5분 뒤 `RUN_INTERRUPTED`로 끝내고, 사용자가 다시 실행한다.
+백엔드와 AI는 `blue`·`green` 두 쌍이다(`deploy/compose.yaml`). 같은 색끼리만 서로 부른다(`ASSISTANT_SERVER_URL`·`CLASSIFY_SERVER_URL`·`BACKEND_BASE_URL`). 전환하는 동안에도 옛 버전과 새 버전이 서로 부르지 않는다.
+
+- 받는 색은 `deploy/caddy/upstream.caddy` 한 줄(`reverse_proxy backend-blue:8080`)이다. `deploy.sh`가 쓰고 Caddyfile이 import한다. git에 없는 서버 파일이다(`.gitignore`).
+- 배포는 쉬는 색만 새 이미지로 띄운다. 새 backend가 부팅하며 Flyway를 돌리는 동안 옛 색이 계속 받는다. 새 쌍이 healthy가 되면 `upstream.caddy`를 바꾸고 `caddy reload`로 `/api/v1`을 넘긴다. reload는 연결을 끊지 않는다.
+- 넘긴 뒤 옛 쌍을 `stop`한다. 옛 백엔드는 새 요청을 받지 않고, 돌던 판정 run과 대기열의 run을 최대 60초(`app.judgment-run.await-termination`)까지 마저 처리한다. 트래픽이 이미 넘어가 사용자에게는 보이지 않는다. `stop_grace_period`는 백엔드 100초, AI 40초(비서 한 턴 상한 30초보다 길게)다. 60초 안에 못 끝낸 run은 새 백엔드의 멈춘 run 정리가 5분 뒤 `RUN_INTERRUPTED`로 끝내고, 사용자가 다시 실행한다.
+- 멈춘 쌍은 지우지 않는다. 다음 배포가 그 색을 새 이미지로 다시 만든다. 넘기기 전에 실패한 배포가 남긴 컨테이너도 다음 배포의 `stop`이 정리한다.
+- 두 쌍이 같이 뜨는 동안 메모리를 더 쓴다. 2026-11-05 운영 실측으로 backend 약 600MB, ai 약 100MB이고, 그때 서버 여유는 약 2.2GB였다.
+- 블루그린 이전의 한 쌍(`backend`·`ai`)이 남아 있으면 green부터 띄우고, 넘긴 뒤 그 컨테이너를 멈추고 지운다. 그 backend가 blue와 같은 호스트 포트 8080을 쓰기 때문이다.
+
+**마이그레이션은 직전 릴리스와 같이 돌아야 한다.** 새 색의 Flyway가 돈 뒤에도 옛 색이 같은 DB로 요청을 받는다. 컬럼·테이블 삭제나 이름 변경은 두 배포로 나눈다(`db/README.md`). 마이그레이션이 실패하면 새 색이 healthy가 되지 않아 배포가 실패하고, 옛 색이 계속 받는다.
 
 ### PostgreSQL이 다시 시작되는 변경
 
@@ -171,6 +194,8 @@ sudo systemctl status ktc4-backup.service
 첫 백업은 S3의 `postgres/` 경로에서 존재와 크기를 확인한다. 별도 임시 DB를 만들어 백업 파일을 `pg_restore`로 복원하고 `pg_tables`를 조회해 복원 가능성을 확인한 뒤 임시 DB를 삭제한다. 운영 DB를 복원 대상으로 사용하지 않는다.
 
 이전 애플리케이션 이미지로 되돌릴 때는 SSM 터미널에서 아래 명령을 사용한다. 대상 SHA의 ECR 이미지가 남아 있어야 하며, Flyway가 적용한 스키마는 되돌리지 않는다. 스키마 변경 배포는 이전 애플리케이션과 호환되도록 나눠서 진행한다.
+
+롤백도 대상 커밋의 `deploy.sh`로 돈다. 블루그린 커밋으로 되돌리면 쉬는 색에 옛 이미지를 띄워 넘기므로 끊기지 않는다. 블루그린 이전 커밋으로 되돌리면 그 커밋의 스크립트가 한 쌍 구조로 띄워 예전처럼 API가 20초 안팎 끊긴다.
 
 ```bash
 sudo bash /opt/ktc4/repo/deploy/deploy.sh <이전-40자리-SHA> --rollback
@@ -211,7 +236,7 @@ sudo -i
 repo=/opt/ktc4/repo; sha=$(cat /opt/ktc4/current-sha)
 set -a; source /etc/ktc4/production.env; set +a
 export IMAGE_TAG=$sha POSTGRES_TAG=$(git -C "$repo" rev-parse "$sha:docker/postgres" | cut -c1-12)
-docker compose --env-file /etc/ktc4/production.env -f "$repo/deploy/compose.yaml" run --rm --no-deps -T ai \
+docker compose --env-file /etc/ktc4/production.env -f "$repo/deploy/compose.yaml" run --rm --no-deps -T ai-job \
   python -m pipeline.law_sync --target law --law 001565 --law 003956 --history-since 2024-01-01 --dry-run
 # 행 수를 보고 --dry-run 을 빼서 다시 돌린다
 ```
@@ -253,9 +278,9 @@ docker compose --env-file /etc/ktc4/production.env -f "$repo/deploy/compose.yaml
 
 ## 10. 비서 중계
 
-백엔드 `POST /api/v1/assistant/chat`이 AI 서버(`http://ai:8000/assistant/chat`)로 대화를 넘긴다(api.md 3.14). AI 서버는 compose 내부망에만 있고 포트를 열지 않는다(agent-secretary.md C-8).
+백엔드 `POST /api/v1/assistant/chat`이 같은 색의 AI 서버(`http://ai-blue:8000/assistant/chat` 등)로 대화를 넘긴다(api.md 3.14). AI 서버는 compose 내부망에만 있고 포트를 열지 않는다(agent-secretary.md C-8).
 
-- 주소는 `ASSISTANT_SERVER_URL`이다. `deploy/compose.yaml`이 `http://ai:8000`으로 넣고, 로컬 기본값은 `http://localhost:8000`이다.
+- 주소는 `ASSISTANT_SERVER_URL`이다. `deploy/compose.yaml`이 색마다 `http://ai-blue:8000`·`http://ai-green:8000`으로 넣고, 로컬 기본값은 `http://localhost:8000`이다.
 - 읽기 타임아웃은 40초로, AI 서버의 한 턴 상한(30초)보다 길다. AI 서버가 응답하지 않거나 오류를 내면 503 `ASSISTANT_UNAVAILABLE`, AI 서버 전체 한도(8턴)에 걸리면 429 `ASSISTANT_RATE_LIMITED`다.
 - 사용자별 한도(동시 1, 분당 10, 하루 100)는 Redis에 센다(8장).
 
@@ -362,7 +387,7 @@ sudo docker compose --env-file /etc/ktc4/production.env -f /opt/ktc4/repo/deploy
 
 ## 14. 로그
 
-백엔드 로그는 Docker `awslogs` 드라이버로 CloudWatch Logs `/ktc4/backend`(서울 리전)에 간다. 로그 스트림은 컨테이너마다 하나라 배포하면 새 스트림이 생긴다. 나머지 컨테이너(PostgreSQL·Redis·AI·웹)는 서버 디스크의 `json-file`에 컨테이너마다 10MB × 5개까지만 남긴다.
+백엔드 로그는 Docker `awslogs` 드라이버로 CloudWatch Logs `/ktc4/backend`(서울 리전)에 간다. 로그 스트림은 컨테이너마다 하나라 배포하면 새 스트림이 생긴다. 두 색이 같은 그룹에 쓴다. 나머지 컨테이너(PostgreSQL·Redis·AI·웹)는 서버 디스크의 `json-file`에 컨테이너마다 10MB × 5개까지만 남긴다.
 
 - **로그 그룹이 먼저 있어야 한다.** 그룹은 15절의 모니터링 스택이 보존 기간 14일로 만든다. 보존 기간이 무기한인 그룹이 생기지 않게 compose 는 그룹을 만들지 않으므로(`awslogs-create-group: "false"`), 그룹이 없으면 백엔드 컨테이너가 뜨지 않고 배포가 실패한다. 이 설정이 든 커밋을 처음 `release`에 올리기 전에 확인한다.
 
@@ -376,7 +401,7 @@ sudo docker compose --env-file /etc/ktc4/production.env -f /opt/ktc4/repo/deploy
 - 서버에서 `docker logs`는 그대로 된다(Docker 의 dual logging). 서버에 남는 것은 최근 일부뿐이고 전체는 CloudWatch 에서 본다.
 
   ```bash
-  sudo docker logs --tail 100 ktc4-backend-1
+  sudo docker logs --tail 100 ktc4-backend-blue-1   # 받는 색은 upstream.caddy (4절)
   ```
 
 ### 형식
@@ -481,7 +506,7 @@ sudo tail -n 50 /opt/aws/amazon-cloudwatch-agent/logs/amazon-cloudwatch-agent.lo
 | `disk_used_percent` (`/`만) | `CWAgent` | `InstanceId`, `path`, `fstype` |
 | `hikaricp_connections_pending`, `jvm_memory_used_bytes`(heap), `executor_queued_tasks`(judgmentRunExecutor) | `ktc4/backend` | `job=ktc4-backend` |
 
-- 앱 지표는 백엔드가 `127.0.0.1:8080/actuator/prometheus`를 연 뒤(A2)부터 나온다. 그 전에는 Agent 로그에 연결 실패가 찍히는 게 정상이다.
+- 앱 지표는 백엔드의 `/actuator/prometheus`에서 긁는다. blue는 `127.0.0.1:8080`, green은 `127.0.0.1:8081`이다. 멈춘 색은 Agent 로그에 연결 실패가 찍히는 게 정상이다. 두 색의 값은 같은 차원(`job=ktc4-backend`)으로 들어간다.
 - 긁은 값 중 위 3개만 남기고 버린다(`prometheus.yaml`의 `metric_relabel_configs`). 늘리려면 이 규칙과 `config.json`의 `metric_selectors`를 같이 고친다. 지표 하나가 차원 조합마다 따로 과금된다.
 - 설치 뒤 확인: `aws cloudwatch list-metrics --region ap-northeast-2 --namespace CWAgent`와 `--namespace ktc4/backend`.
 

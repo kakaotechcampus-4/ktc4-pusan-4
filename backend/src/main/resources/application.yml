@@ -59,7 +59,7 @@ app:
     workers: 2
     queue-capacity: 50
     await-termination: 60s
-  # 비서 AI 서버 (api.md 3.14, docs/agent-secretary.md 9장). 내부망에만 있다. 운영은 http://ai:8000 (deploy/compose.yaml).
+  # 비서 AI 서버 (api.md 3.14, docs/agent-secretary.md 9장). 내부망에만 있다. 운영은 같은 색의 ai(http://ai-blue:8000 등, deploy/compose.yaml).
   # read-timeout 은 AI 서버의 한 턴 상한(30초)보다 길게 둔다.
   assistant:
     base-url: ${ASSISTANT_SERVER_URL:http://localhost:8000}
