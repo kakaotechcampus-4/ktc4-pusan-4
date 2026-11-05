@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useSession } from '../contexts/SessionContext';
 import { Button, Container } from './ui';
+import { Logo } from './Logo';
 import { BugReportButton } from './BugReport';
 
 /**
@@ -17,18 +18,9 @@ export function MarketingHeader() {
   const { status, signOut } = useSession();
 
   return (
-    <header className="sticky top-0 z-30 bg-canvas/95 backdrop-blur">
+    <header className="sticky top-0 z-30 border-b border-line bg-canvas/95 shadow-header backdrop-blur">
       <Container className="flex h-[72px] items-center gap-6 lg:gap-10">
-        <Link to="/" className="flex shrink-0 items-center gap-2.5 whitespace-nowrap" aria-label="PreeT 홈">
-          <span aria-hidden="true" className="flex gap-[3px]">
-            <span className="block h-5 w-[5px] rounded-sm bg-ink" />
-            <span className="block h-5 w-[5px] rounded-sm bg-ink" />
-            <span className="block h-5 w-[5px] rounded-sm bg-highlight" />
-          </span>
-          <span className="text-h4 font-bold tracking-tight text-ink">
-            PreeT
-          </span>
-        </Link>
+        <Logo />
 
         {/* 좁은 폭에서는 접는다. 같은 두 링크를 푸터에 두었다 */}
         <nav aria-label="주요 메뉴" className="hidden sm:block">

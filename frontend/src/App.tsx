@@ -75,17 +75,11 @@ function AssistantRoot({ children }: {children: React.ReactNode;}) {
   return <AssistantProvider key={userId ?? ''}>{children}</AssistantProvider>;
 }
 
-/** 로그인 뒤 화면을 감싼다. 비서 버튼·패널은 여기서만 그린다. 화면마다 AppShell 을 그리는 것은 그대로다 */
+/** 로그인 뒤 화면을 감싼다. 화면마다 AppShell 을 그리는 것은 그대로다 */
 function SignedIn() {
   return (
     <RequireAuth>
-      <>
-        <Outlet />
-        {/* 요약을 PDF 로 인쇄할 때 떠 있는 비서 버튼·패널이 찍히지 않게 한다 */}
-        <div className="print:hidden">
-          <Assistant />
-        </div>
-      </>
+      <Outlet />
     </RequireAuth>);
 
 }
@@ -124,6 +118,15 @@ export function AppRoutes() {
             <Route path="*" element={<NotFound />} />
           </Routes>
           </React.Suspense>
+          {/*
+            비서 버튼은 라우트 바깥에 둔다. 로그인 뒤 레이아웃 안에 두면 로고로 메인에
+            돌아왔을 때 버튼이 사라진다 — 다른 화면에는 있다가 메인에서만 없어진다.
+            어디서 보일지는 Assistant 가 정한다.
+            요약을 PDF 로 인쇄할 때 떠 있는 버튼·패널이 찍히지 않게 한다
+          */}
+          <div className="print:hidden">
+            <Assistant />
+          </div>
           </ErrorBoundary>
         </AssistantRoot>);
 
