@@ -59,7 +59,8 @@ export function Account() {
   const uploadCount = uploadsQ.data?.page.totalElements;
 
   return (
-    <AppShell>
+    // 고지 막대를 내린다. 여기엔 세무대리로 오인할 판정 내용이 없다 (#242 리뷰)
+    <AppShell disclaimer={false}>
       <div className="mx-auto max-w-2xl">
         <SectionHeading
           eyebrow="설정"
@@ -123,11 +124,6 @@ export function Account() {
 
           <p className="px-5 py-4 text-small text-muted">
               아직 문진을 하지 않았습니다. 판정을 시작하기 전에 마치면 됩니다.
-            </p>
-          }
-          {context &&
-          <p className="border-t border-line2 px-5 py-3 text-caption leading-5 text-muted">
-              고치면 새 버전으로 저장됩니다. 이미 낸 판정은 그때 문진 버전을 그대로 기록해 둡니다.
             </p>
           }
         </section>

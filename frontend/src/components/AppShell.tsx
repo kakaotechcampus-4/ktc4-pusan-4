@@ -66,9 +66,14 @@ interface AppShellProps {
   children: React.ReactNode;
   /** 판정 진행 화면처럼 흐름 표시가 방해되는 경우 숨긴다 */
   showSteps?: boolean;
+  /**
+   * 세무대리 오인 방지 고지(DisclaimerBar). 기본은 켠다.
+   * 판정을 보여주지 않는 화면(내 정보)에서만 내린다 — 거기엔 오인할 판정 내용이 없다 (#242 리뷰)
+   */
+  disclaimer?: boolean;
 }
 
-export function AppShell({ children, showSteps = true }: AppShellProps) {
+export function AppShell({ children, showSteps = true, disclaimer = true }: AppShellProps) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { email, isAdmin, signOut } = useSession();
@@ -122,7 +127,12 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
                         aria-hidden="true" /> :
 
 
-                      <span className="tabular-nums text-caption text-muted">
+                      <span
+                        className={`tabular-nums text-caption ${
+                        /* 고른 단계는 바탕이 파래진다. 숫자를 muted 로 박아 두면 대비 1.05 라 칸이 빈 것처럼 보인다 */
+                        active ? 'text-white' : 'text-muted'}`
+                        }>
+
                             {index + 1}
                           </span>
                       }
@@ -209,7 +219,7 @@ export function AppShell({ children, showSteps = true }: AppShellProps) {
         </div>
       </header>
 
-      <DisclaimerBar />
+      {disclaimer && <DisclaimerBar />}
 
       {crumb &&
       <nav
