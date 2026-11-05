@@ -217,6 +217,6 @@ public class TransactionRecordEntity extends AssignedIdEntity<UUID> {
     }
 
     TransactionInput toInput() {
-        return new TransactionInput(id, approvedAt, merchantRaw, merchantNorm, merchantCategory, amount);
+        return new TransactionInput(id, approvedAt, merchantRaw, merchantNorm, merchantCategory, amount, aggregated);
     }
 }

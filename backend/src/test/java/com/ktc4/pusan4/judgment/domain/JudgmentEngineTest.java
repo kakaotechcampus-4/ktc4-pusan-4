@@ -947,6 +947,24 @@ class JudgmentEngineTest {
         assertThat(wednesday.attributes()).doesNotContainKey("matched");
     }
 
+    // 카드사 합산 행(`지하철 40건`)의 날짜는 묶음 기준일(월말)이라, 그날이 토요일이어도 주말 지출이 아니다(#192).
+    @Test
+    void holiday_match_skips_aggregated_rows() {
+        RuleCard weekend = new RuleCard(
+            "R-061", 1, Gate.G5, 500,
+            new RuleMatch(List.of(), List.of(), List.of(), null, null, List.of(), true),
+            null, null, List.of(), Map.of("matched", true), List.of()
+        );
+        RuleSet rules = new RuleSet(List.of(g2Available(), weekend));
+        UserContext context = new UserContext("940909", false, null);
+        TransactionInput monthEnd = new TransactionInput(
+            UUID.randomUUID(), LocalDate.of(2026, 1, 31), "지하철 40건", "지하철 40건", "여비교통", 55_000, true);
+
+        Judgment aggregated = JudgmentEngine.judge(monthEnd, context, List.of(), rules);
+
+        assertThat(aggregated.attributes()).doesNotContainKey("matched");
+    }
+
     // 2025-10-09(목) 한글날: 평일이지만 공휴일로 넘기면 휴일 카드가 붙는다.
     @Test
     void holiday_match_includes_given_weekday_public_holidays() {

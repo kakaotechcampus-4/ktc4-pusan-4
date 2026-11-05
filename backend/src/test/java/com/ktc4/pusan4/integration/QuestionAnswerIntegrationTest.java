@@ -98,6 +98,23 @@ class QuestionAnswerIntegrationTest {
     }
 
     @Test
+    void aggregated_transit_row_on_saturday_is_asked_like_a_weekday_trip() {
+        // given: 한 달치 지하철을 묶은 카드사 합산 행. 날짜는 묶음 기준일인 1/31(토)이다
+        UUID transit = insertTransaction("여비교통", "지하철 40건", 55_000L, "2026-01-31");
+        jdbcTemplate.update("update transaction set is_aggregated = true where id = ?", transit);
+
+        // when
+        judge(transit);
+
+        // then: 주말 여비교통(R-314, 불가)이 아니라 평일 여비교통(R-208)으로 업무 목적을 묻는다(#192)
+        assertThat(jdbcTemplate.queryForMap("""
+            select verdict, rule_card_id from judgment where transaction_id = ? order by revision desc limit 1
+            """, transit))
+            .containsEntry("verdict", "NEEDS_REVIEW")
+            .containsEntry("rule_card_id", "R-208");
+    }
+
+    @Test
     void first_answer_answers_siblings_and_rejudges_judged_transactions_of_the_merchant() throws Exception {
         // given: 같은 통신사 거래 둘(가맹점 단위 질문), 같은 가맹점의 카페 거래, 아직 판정하지 않은 통신 거래
         UUID first = insertTransaction("통신", "KT");
