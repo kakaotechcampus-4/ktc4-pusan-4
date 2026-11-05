@@ -36,3 +36,22 @@
 - 실제 ECR pull·SSM 배포와, Linux 에서 디렉터리 bind mount 가 `git checkout` 결과를 바로 보는지는 운영 배포 뒤 확인한다(`StartedAt` 이 다음 배포에서 그대로인지 포함).
 - `frontend/` 주석 5곳(vite.config.ts, seo.ts, Privacy.tsx, prerender.mjs, http.ts)과 `frontend/README.md` 가 아직 `deploy/Caddyfile` 을 가리킨다. FE 담당에게 넘긴다.
 - 다음 단계는 backend·ai 블루그린(PR 2)이다. develop 의 backend 가 `127.0.0.1:8080` 을 호스트에 열고 있어(CloudWatch Agent 수집) 두 벌을 같이 띄울 때 포트가 겹친다. PR 2 에서 다룬다.
+
+## 20:17 가짜 EC2 로 배포를 재현해 첫 배포 404 를 고쳤다
+
+- `docker:29-dind` 로 가짜 EC2(메모리 3.8GB 제한)를 띄웠다. 로컬 레지스트리, 가짜 `aws`, bare 저장소의 `release` 를 두고 `deploy.sh` 를 그대로 돌렸다. 로컬에는 CloudWatch 가 없어 backend 로그 드라이버만 json-file 로 바꾼 커밋을 얹었다.
+- 0.2초마다 `/` 와 `/api/v1/users/me` 를 부르며 끊김을 쟀다.
+
+| 배포 | 화면 끊김 | API 끊김 | Caddy 재시작 |
+| --- | --- | --- | --- |
+| develop 구조 재배포 | 18.1초 | 20.6초 | 예 |
+| 이 PR 첫 커밋 그대로 첫 배포 | 배포 뒤 계속 404 | 22.0초 | 예 |
+| 고친 뒤 첫 배포 | 18.0초 | 20.4초 | 예(한 번) |
+| 고친 뒤 재배포 | 0 | 12.7초 | 아니오 |
+| 고친 뒤 Caddyfile 변경 배포 | 0 | 13.0초 | 아니오(새 헤더 반영) |
+
+- 원인: SSM 이 띄우는 `deploy.sh` 는 직전 배포의 파일이다. 스크립트가 새 커밋을 checkout 해도 bash 는 이미 연 옛 파일을 끝까지 돈다. 그래서 `run --rm web-files` 를 스크립트에 넣으면 첫 배포에서는 돌지 않고, 새 compose 의 빈 `web-dist` 로 Caddy 만 다시 뜬다.
+- 고침: `web-files` 를 profile 없는 일회성 서비스로 두고 `backend` healthy 뒤에 돌게 했다. `web` 은 `web-files` 완료 뒤에 뜬다. `deploy.sh` 에는 `caddy reload` 만 남겼다. 이 규칙을 `deployment.md` 4절에 적었다.
+- Linux(가짜 EC2)에서 `git checkout` 으로 바뀐 Caddyfile 이 디렉터리 마운트로 바로 보이고 reload 로 반영되는 것도 확인했다.
+- 운영 compose 는 v5.5.1, 로컬은 v5.7.0 이다. 판정 run 이 도는 중의 배포는 재지 않았다.
+- 다음 PR(블루그린)도 첫 배포는 이 PR 의 `deploy.sh` 로 돈다. 설계할 때 감안한다.
