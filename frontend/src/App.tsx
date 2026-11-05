@@ -14,6 +14,7 @@ import { Terms } from './pages/public/Terms';
 import { Privacy } from './pages/public/Privacy';
 import { NotFound } from './pages/public/NotFound';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { ScrollToTop } from './components/ScrollToTop';
 import { KAKAO_CALLBACK_PATH } from './auth/kakao';
 import { Loader2Icon } from 'lucide-react';
 
@@ -98,6 +99,8 @@ export function App() {
 export function AppRoutes() {
   return (
         <AssistantRoot>
+          {/* 화면이 바뀌면 맨 위로. 라우터는 스크롤을 건드리지 않는다 */}
+          <ScrollToTop />
           <ErrorBoundary>
           <React.Suspense fallback={<PageLoading />}>
           <Routes>
