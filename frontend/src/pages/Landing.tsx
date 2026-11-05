@@ -171,12 +171,12 @@ export function Landing() {
             */}
             <div className="flex flex-col gap-2">
               <div className="rounded-2xl bg-surface2 p-5 text-white">
-                <p className="text-caption text-white/60">검수를 마친 규칙 카드</p>
+                <p className="text-caption text-white">검수를 마친 규칙 카드</p>
                 <p className="mt-2 whitespace-nowrap text-ir-num font-bold tracking-ir-sm tabular-nums">
                   {RULE_CARD_COUNT}
                   <span className="ml-0.5 text-body font-normal">장</span>
                 </p>
-                <p className="mt-2 text-caption leading-5 text-white/60 [word-break:keep-all]">
+                <p className="mt-2 text-caption leading-5 text-white [word-break:keep-all]">
                   판정마다 어느 카드가 걸렸는지 함께 보여줍니다
                 </p>
               </div>

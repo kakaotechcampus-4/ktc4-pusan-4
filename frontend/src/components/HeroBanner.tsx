@@ -168,12 +168,16 @@ function FlowFigure() {
         )}
       </FigureCell>
 
-      {/* 2. 사업자 문진 — 고른 답이 하나 노랗게 차 있다 */}
+      {/*
+        2. 사업자 문진 — 고른 답 하나만 또렷하다.
+        전에는 그 줄만 노랬는데, 판이 밝은 파랑이 되면서 핑크(대비 1.60)로는 바꿀 수 없고
+        노랑은 팔레트에 없는 색이 된다. 흐리기로만 가른다
+      */}
       <FigureCell>
         <rect x="0" y="8" width="178" height="104" rx="16" fill="#FFFFFF" fillOpacity="0.07" stroke="#FFFFFF" strokeOpacity="0.28" strokeWidth="2" />
-        <rect x="22" y="32" width="88" height="10" rx="5" fill="#FFFFFF" />
-        <rect x="22" y="56" width="134" height="10" rx="5" fill="#FFFFFF" fillOpacity="0.4" />
-        <rect x="22" y="80" width="58" height="10" rx="5" fill="#FFE600" />
+        <rect x="22" y="32" width="88" height="10" rx="5" fill="#FFFFFF" fillOpacity="0.45" />
+        <rect x="22" y="56" width="134" height="10" rx="5" fill="#FFFFFF" fillOpacity="0.3" />
+        <rect x="22" y="80" width="58" height="10" rx="5" fill="#FFFFFF" />
       </FigureCell>
 
       {/*
@@ -277,7 +281,8 @@ function TextSlide({
   return (
     <div className="absolute inset-0 flex flex-col px-8 pt-12 sm:px-16 sm:pt-16">
       <RingBackdrop variant={backdrop} />
-      <p className="relative text-body text-highlight">{eyebrow}</p>
+      {/* 밝은 파랑 판 위에서 핑크는 대비 1.60 이라 안 읽힌다. eyebrow 는 흰색으로 둔다 */}
+      <p className="relative text-body text-white">{eyebrow}</p>
       <strong className="mt-5 block whitespace-pre-line relative text-h2 font-normal leading-tight tracking-ir text-white [word-break:keep-all] lg:text-ir-display">
         {title}
       </strong>
@@ -393,7 +398,7 @@ export function HeroBanner({ autoplay = true }: {autoplay?: boolean;}) {
           <OrbitStage />
           {/* 글은 궤도 위에 올린다 */}
           <div className="relative z-10 px-8 pt-12 sm:px-16 sm:pt-16">
-            <p className="text-body text-highlight">
+            <p className="text-body text-white">
               1인 IT 개발 사업자를 위한 경비 판정
             </p>
             {/* 페이지의 h1. 프리렌더가 공개 페이지마다 h1 이 하나인지 본다(scripts/prerender.mjs) */}
@@ -430,7 +435,11 @@ export function HeroBanner({ autoplay = true }: {autoplay?: boolean;}) {
         오른쪽 아래 현재/전체. 왼쪽 아래는 「바로가기」가 베어 낸 자리라,
         좁은 화면에서는 그 띠(72px)를 피해 위로 올린다
       */}
-      <div className="absolute bottom-24 right-6 z-20 flex items-center gap-1 rounded-full bg-white/10 px-2 py-1 text-small text-white/80 sm:bottom-8 sm:right-8">
+      {/*
+        띠를 흰색이 아니라 검정으로 깐다. 흰 띠(bg-white/10)는 판보다 밝아져서
+        13px 흰 글자가 대비 4.08 로 떨어진다 — 검정 10% 면 5.76 이다
+      */}
+      <div className="absolute bottom-24 right-6 z-20 flex items-center gap-1 rounded-full bg-black/10 px-2 py-1 text-small text-white sm:bottom-8 sm:right-8">
         {/* 저절로 넘어가는 동안 읽으면 4초마다 끼어든다. 멈췄을 때만 읽는다 */}
         <span className="pl-1.5 pr-1 tabular-nums" aria-live={playing ? 'off' : 'polite'}>
           {page + 1} / {SLIDE_COUNT}

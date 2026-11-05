@@ -33,8 +33,8 @@ type Spot = {angle: number; radius: number; size: number; Icon: () => React.Reac
 const Card = () =>
 <svg viewBox="0 0 64 64" className="h-full w-full" aria-hidden="true">
     <rect x="6" y="14" width="52" height="36" rx="7" fill="#FFFFFF" />
-    <rect x="6" y="23" width="52" height="7" fill="#16181D" />
-    <rect x="13" y="38" width="16" height="4" rx="2" fill="#FFE600" />
+    <rect x="6" y="23" width="52" height="7" fill="#191F28" />
+    <rect x="13" y="38" width="16" height="4" rx="2" fill="#FF5C9A" />
   </svg>;
 
 
@@ -45,7 +45,7 @@ const Receipt = () =>
     fill="#FFFFFF"
     />
 
-    <rect x="21" y="20" width="22" height="3.4" rx="1.7" fill="#16181D" />
+    <rect x="21" y="20" width="22" height="3.4" rx="1.7" fill="#191F28" />
     <rect x="21" y="29" width="22" height="3.4" rx="1.7" fill="#DCE1E8" />
     <rect x="21" y="38" width="13" height="3.4" rx="1.7" fill="#DCE1E8" />
   </svg>;
@@ -55,7 +55,7 @@ const Store = () =>
 <svg viewBox="0 0 64 64" className="h-full w-full" aria-hidden="true">
     <rect x="12" y="27" width="40" height="26" rx="4" fill="#FFFFFF" />
     <path d="M10 14h44l-4 13H14z" fill="#FF5A5A" />
-    <rect x="28" y="37" width="8" height="16" rx="2" fill="#16181D" />
+    <rect x="28" y="37" width="8" height="16" rx="2" fill="#191F28" />
   </svg>;
 
 
@@ -63,18 +63,18 @@ const Bubble = () =>
 <svg viewBox="0 0 64 64" className="h-full w-full" aria-hidden="true">
     <path
     d="M32 13c12.7 0 23 7.6 23 17s-10.3 17-23 17a30 30 0 0 1-5.6-.5l-10.6 5.3 3-8.6C12.4 40 9 35 9 30c0-9.4 10.3-17 23-17z"
-    fill="#FFE600" />
+    fill="#FF5C9A" />
 
-    <circle cx="23" cy="30" r="3" fill="#122E55" />
-    <circle cx="32" cy="30" r="3" fill="#122E55" />
-    <circle cx="41" cy="30" r="3" fill="#122E55" />
+    <circle cx="23" cy="30" r="3" fill="#2C6AE8" />
+    <circle cx="32" cy="30" r="3" fill="#2C6AE8" />
+    <circle cx="41" cy="30" r="3" fill="#2C6AE8" />
   </svg>;
 
 
 const Statute = () =>
 <svg viewBox="0 0 64 64" className="h-full w-full" aria-hidden="true">
     <rect x="12" y="8" width="40" height="48" rx="5" fill="#FFFFFF" />
-    <rect x="20" y="19" width="24" height="3.4" rx="1.7" fill="#16181D" />
+    <rect x="20" y="19" width="24" height="3.4" rx="1.7" fill="#191F28" />
     <rect x="20" y="28" width="24" height="3.4" rx="1.7" fill="#DCE1E8" />
     <rect x="20" y="37" width="16" height="3.4" rx="1.7" fill="#DCE1E8" />
     <circle cx="44" cy="46" r="6" fill="#FF5A5A" />

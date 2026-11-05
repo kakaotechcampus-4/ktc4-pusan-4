@@ -95,6 +95,14 @@ public class TransactionRecordEntity extends AssignedIdEntity<UUID> {
     @Column(name = "source_card")
     private String sourceCard;
 
+    // 현재 판정(api.md §5). 조회 조건에만 쓰고 TransactionRecordRepository.pointCurrentJudgment 로만 바꾼다.
+    // 엔티티가 이 열을 쓰게 두면, 같은 트랜잭션에서 분류 확정 같은 다른 필드 변경이 flush 될 때 엔티티에 남은
+    // 이전 값으로 되돌린다.
+    // 같은 이유로 pointCurrentJudgment 뒤에도 이미 읽어 둔 엔티티에는 이전 값이 남는다. 이 필드 값을 읽지 말고,
+    // 현재 판정이 필요하면 TransactionRecordRepository.findCurrentJudgmentId 로 DB 에서 읽는다.
+    @Column(name = "current_judgment_id", insertable = false, updatable = false)
+    private UUID currentJudgmentId;
+
     // 응답에 바로 쓰려고 코드가 채운다(DB 기본값 now() 는 SQL 로 넣는 테스트 픽스처용으로 남는다).
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
@@ -203,11 +211,10 @@ public class TransactionRecordEntity extends AssignedIdEntity<UUID> {
         return merchantRaw;
     }
 
-    /** 지금 판정 대상인가. 조건은 TransactionRecordRepository.findRunTargetIds 와 같다(api.md 2.3, 3.6). */
+    /** 지금 판정 대상인가. 쿼리 쪽은 TransactionConditions.judgmentTarget 이다(api.md 2.3, 3.6). */
     boolean judgeable() {
-        return "CLASSIFIED".equals(classificationStatus)
-            && (("JUDGEABLE".equals(sourceStatus) && !"EXCLUDED".equals(userInclusion))
-                || ("EXCLUDED".equals(sourceStatus) && "INCLUDED".equals(userInclusion)));
+        return ClassificationStatus.CLASSIFIED.name().equals(classificationStatus)
+            && toDetail().effectiveStatus() == SourceStatus.JUDGEABLE;
     }
 
     JudgedTransaction toJudged() {
@@ -217,6 +224,6 @@ public class TransactionRecordEntity extends AssignedIdEntity<UUID> {
     }
 
     TransactionInput toInput() {
-        return new TransactionInput(id, approvedAt, merchantRaw, merchantNorm, merchantCategory, amount);
+        return new TransactionInput(id, approvedAt, merchantRaw, merchantNorm, merchantCategory, amount, aggregated);
     }
 }

@@ -2,6 +2,7 @@ package com.ktc4.pusan4.judgment.persistence;
 
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
@@ -11,52 +12,15 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface TransactionRecordRepository extends Repository<TransactionRecordEntity, UUID> {
+/** 판정 대상 조건을 쓰는 조회(findRunTargetIds 등)는 {@link TransactionRecordRepositoryCustom} 에 있다. */
+public interface TransactionRecordRepository
+    extends Repository<TransactionRecordEntity, UUID>, TransactionRecordRepositoryCustom {
 
     TransactionRecordEntity save(TransactionRecordEntity transaction);
 
     Optional<TransactionRecordEntity> findById(UUID transactionId);
 
     List<TransactionRecordEntity> findByIdIn(Collection<UUID> transactionIds);
-
-    // run 대상: effectiveStatus = JUDGEABLE 이고 classificationStatus = CLASSIFIED (api.md 3.6).
-    // effectiveStatus 는 저장하지 않고 sourceStatus·userInclusion 으로 계산한다(api.md 2.3).
-    // 판정대상은 사용자가 제외하지 않은 JUDGEABLE, 또는 사용자가 포함한 EXCLUDED 다. CANCELED_OFFSET 은 늘 빠진다.
-    @Query("""
-        select transaction.id
-        from TransactionRecordEntity transaction
-        where transaction.batchId = :batchId
-          and transaction.classificationStatus = 'CLASSIFIED'
-          and (
-            (transaction.sourceStatus = 'JUDGEABLE' and transaction.userInclusion <> 'EXCLUDED')
-            or (transaction.sourceStatus = 'EXCLUDED' and transaction.userInclusion = 'INCLUDED')
-          )
-        order by transaction.approvedAt, transaction.id
-        """)
-    List<UUID> findRunTargetIds(@Param("batchId") UUID batchId);
-
-    // 가맹점 단위 답(api.md 3.10)이 바꾸는 거래 중 다시 판정할 거래. 지금 판정 대상이면서(findRunTargetIds 와 같은 조건)
-    // 판정한 적이 있는 거래만 고른다. 분류 전·제외·아직 run 이 돌지 않은 거래에 run 밖 판정을 만들지 않는다.
-    @Query("""
-        select transaction.id
-        from TransactionRecordEntity transaction
-        where transaction.batchId = :batchId
-          and transaction.merchantNorm = :merchantNorm
-          and transaction.classificationStatus = 'CLASSIFIED'
-          and (
-            (transaction.sourceStatus = 'JUDGEABLE' and transaction.userInclusion <> 'EXCLUDED')
-            or (transaction.sourceStatus = 'EXCLUDED' and transaction.userInclusion = 'INCLUDED')
-          )
-          and exists (
-            select judgment.id
-            from JudgmentEntity judgment
-            where judgment.transactionId = transaction.id
-          )
-        """)
-    List<UUID> findJudgedTargetIdsByMerchant(
-        @Param("batchId") UUID batchId,
-        @Param("merchantNorm") String merchantNorm
-    );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
@@ -67,6 +31,26 @@ public interface TransactionRecordRepository extends Repository<TransactionRecor
     Optional<TransactionRecordEntity> findByIdForUpdate(
         @Param("transactionId") UUID transactionId
     );
+
+    @Query("select transaction.currentJudgmentId from TransactionRecordEntity transaction where transaction.id = :transactionId")
+    Optional<UUID> findCurrentJudgmentId(@Param("transactionId") UUID transactionId);
+
+    // 현재 판정(api.md §5)을 바꾼다. 부르는 쪽이 거래 락을 잡은 뒤에 부른다. 엔티티 필드는 읽기 전용이라
+    // (TransactionRecordEntity.currentJudgmentId) 여기서만 쓴다. 먼저 flush 해 새 판정 행이 들어간 뒤에 가리킨다.
+    @Modifying(flushAutomatically = true)
+    @Query(value = "update transaction set current_judgment_id = :judgmentId where id = :transactionId", nativeQuery = true)
+    void pointCurrentJudgment(@Param("transactionId") UUID transactionId, @Param("judgmentId") UUID judgmentId);
+
+    // 자동 판정 저장용. 활성 override 가 있으면 현재 판정은 그 override revision 그대로다(api.md 3.8).
+    // 확인과 갱신을 한 문장으로 해 판정마다 왕복을 하나만 더한다(run 은 거래마다 판정을 저장한다).
+    @Modifying(flushAutomatically = true)
+    @Query(value = """
+        update transaction set current_judgment_id = :judgmentId
+        where id = :transactionId
+          and not exists (select 1 from judgment_override o where o.transaction_id = :transactionId and o.active)
+        """, nativeQuery = true)
+    void pointCurrentJudgmentUnlessOverridden(
+        @Param("transactionId") UUID transactionId, @Param("judgmentId") UUID judgmentId);
 
     /** 업로드 중복 건너뛰기용. 이 사용자가 이미 가진 naturalKey 만 돌려준다(api.md 3.3, UNIQUE(user_id, natural_key)). */
     @Query("""

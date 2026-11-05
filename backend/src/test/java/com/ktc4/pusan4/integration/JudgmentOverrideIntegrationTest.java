@@ -1,7 +1,7 @@
 package com.ktc4.pusan4.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ktc4.pusan4.shared.api.MockFixtures;
+import com.ktc4.pusan4.auth.TestUser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,7 +40,7 @@ class JudgmentOverrideIntegrationTest {
     @ServiceConnection
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17-alpine");
 
-    private static final UUID USER_ID = MockFixtures.USER_ID;
+    private static final UUID USER_ID = TestUser.ID;
 
     @Autowired
     private MockMvc mockMvc;
@@ -349,6 +349,7 @@ class JudgmentOverrideIntegrationTest {
                 rules_commit_sha, user_context_version, tax_year, verdict, is_inference, %s
             ) values (?, ?, ?, 'R-300', 1, '["R-300"]', 'fixture', 1, 2025, ?, false, ?)
             """.formatted(originColumn), id, transactionId, revision, verdict, originId);
+        CurrentJudgments.refresh(jdbcTemplate);
         return id;
     }
 

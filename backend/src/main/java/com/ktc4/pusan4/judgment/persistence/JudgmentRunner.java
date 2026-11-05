@@ -2,6 +2,7 @@ package com.ktc4.pusan4.judgment.persistence;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.core.task.TaskRejectedException;
@@ -23,6 +24,7 @@ import java.util.concurrent.TimeUnit;
 class JudgmentRunner {
 
     private static final Logger log = LoggerFactory.getLogger(JudgmentRunner.class);
+    private static final String RUN_ID = "runId";
 
     private final JudgmentRunService runService;
     private final TaskExecutor executor;
@@ -51,7 +53,19 @@ class JudgmentRunner {
         runService.interruptStale();
     }
 
+    /**
+     * 이 run 의 로그에 runId 를 MDC 로 붙인다. 워커 스레드는 다음 run 에 재사용되므로 끝나면 지운다.
+     */
     void run(UUID runId) {
+        MDC.put(RUN_ID, runId.toString());
+        try {
+            judgeAll(runId);
+        } finally {
+            MDC.remove(RUN_ID);
+        }
+    }
+
+    private void judgeAll(UUID runId) {
         Optional<JudgmentRunService.RunStart> started;
         try {
             started = runService.start(runId);

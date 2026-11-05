@@ -237,6 +237,7 @@ class TransactionIntegrationTest {
                 tax_year, verdict, is_inference, %s
             ) values (?, ?, ?, 'fixture', 1, 2026, ?, false, ?)
             """.formatted(originColumn), judgmentId, transactionId, revision, verdict, originId);
+        CurrentJudgments.refresh(jdbcTemplate);
         return judgmentId;
     }
 

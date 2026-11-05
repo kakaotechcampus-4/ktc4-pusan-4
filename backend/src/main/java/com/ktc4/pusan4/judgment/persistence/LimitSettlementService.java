@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,7 +49,7 @@ public class LimitSettlementService {
 
     /**
      * 현재 판정이나 판정 대상이 바뀌는 곳에서 부른다: run 완료, 재판정(질문 응답·분류 응답), override 와 그 해제,
-     * 거래 제외/포함, batch 삭제.
+     * 거래 제외/포함, batch 삭제, 문진 수정(수입금액이 바뀌므로).
      * 수입금액은 최신 문진의 직전연도 수입금액이다(연중 잠정치, CONTEXT.md §4 잠정/확정).
      */
     @Transactional
@@ -79,6 +80,17 @@ public class LimitSettlementService {
         long annualLimit = EntertainmentLimit.annual(contextService.current(userId).prevYearRevenue());
         years.forEach(year -> limitService.replaceProvisional(userId, year, EntertainmentLimit.BUCKET,
             AnnualLimitAllocator.allocate(annualLimit, byYear.getOrDefault(year, List.of()))));
+    }
+
+    /**
+     * 재판정 뒤의 집계. 재판정은 그 거래들의 현재 판정만 바꾸므로, 그 거래들의 어느 판정도(이전 revision 포함)
+     * 접대비가 아니면 집계 대상이 그대로라 건너뛴다(#218).
+     */
+    @Transactional
+    public void settleAfterRejudge(UUID userId, Collection<UUID> rejudgedTransactionIds) {
+        if (judgmentRepository.existsLimitTagged(rejudgedTransactionIds, EntertainmentLimit.BUCKET)) {
+            settleProvisional(userId);
+        }
     }
 
     /**

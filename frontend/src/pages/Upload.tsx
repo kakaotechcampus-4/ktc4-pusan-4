@@ -565,9 +565,10 @@ function PreviewCard({
           <h3 className="text-body font-bold text-ink">
             보낼 거래 중 처음 {formatNumber(head.length)}건
           </h3>
+          {/* caption 은 표가 무엇인지 적는다. 「처음 N건」은 보고 있는 범위지 표의 내용이 아니다 (접근성 보고서 2026-10-22) */}
           <Table
           className="mt-3"
-          caption={`보낼 거래 중 처음 ${head.length}건`}
+          caption="서버로 보낼 카드내역"
           columns={rowColumns}
           rows={head}
           rowKey={(r) => String(rows.indexOf(r))} />
