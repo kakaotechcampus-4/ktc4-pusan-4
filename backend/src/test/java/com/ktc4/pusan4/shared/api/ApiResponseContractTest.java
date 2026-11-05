@@ -54,7 +54,7 @@ import com.ktc4.pusan4.transaction.domain.UploadResult;
 import com.ktc4.pusan4.transaction.persistence.ClassificationReviewService;
 import com.ktc4.pusan4.transaction.persistence.TransactionService;
 import com.ktc4.pusan4.transaction.persistence.UploadBatchService;
-import com.ktc4.pusan4.transaction.persistence.UploadService;
+import com.ktc4.pusan4.transaction.persistence.UploadFacade;
 import com.ktc4.pusan4.user.domain.AppUser;
 import com.ktc4.pusan4.user.domain.BookkeepingDuty;
 import com.ktc4.pusan4.user.domain.BusinessContext;
@@ -102,8 +102,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * 서비스 레이어가 붙기 전까지 컨트롤러는 고정된 목 응답을 반환한다.
- * 목 응답이 api.md 의 상태 코드를 지키는지 확인한다. 값은 보지 않는다 — 서비스로 바꿔도 깨지지 않아야 한다.
+ * 컨트롤러가 api.md 의 상태 코드를 지키는지 DB 없이 확인한다. 서비스는 대역으로 바꾸고 값은 보지 않는다.
  */
 @WebMvcTest
 @Import({ApiExceptionHandler.class, UuidV7Generator.class, TestAuthentication.class})
@@ -155,7 +154,7 @@ class ApiResponseContractTest {
     private StatuteService statuteService;
 
     @MockitoBean
-    private UploadService uploadService;
+    private UploadFacade uploadFacade;
 
     @MockitoBean
     private UploadBatchService batchService;
@@ -183,7 +182,8 @@ class ApiResponseContractTest {
     void stubServices() {
         ClassificationReviewItem review = new ClassificationReviewItem(UUID.fromString(ID), UUID.fromString(ID),
             UUID.fromString(ID), ClassificationReviewStatus.PENDING, OffsetDateTime.parse("2026-09-18T01:10:00+09:00"),
-            null, LocalDate.parse("2026-01-03"), "XYZ PAYMENTS", "XYZ PAYMENTS", "미분류", 47_000L, 0);
+            null, LocalDate.parse("2026-01-03"), "XYZ PAYMENTS", "XYZ PAYMENTS", "미분류", 47_000L, 0,
+            List.of("해외SaaS"));
         given(reviewService.list(any(), any(), any(), anyInt(), anyInt())).willReturn(new ClassificationReviewResult<>(
             new PageImpl<>(List.of(review), PageRequest.of(0, 20), 1), 1, 47_000L));
         given(reviewService.groups(any(), any(), any(), anyInt(), anyInt())).willReturn(new ClassificationReviewResult<>(
@@ -250,7 +250,7 @@ class ApiResponseContractTest {
         given(statuteService.get(anyLong())).willReturn(new StatuteVersion(1523, "소득세법시행령-67-4",
             "소득세법 시행령 제67조 제4항", "시행령", LocalDate.parse("2026-01-01"), null, "https://www.law.go.kr/", "..."));
 
-        given(uploadService.upload(any(), any(), any())).willReturn(new UploadResult(UUID.fromString(ID), 1, 0, 0,
+        given(uploadFacade.upload(any(), any(), any())).willReturn(new UploadResult(UUID.fromString(ID), 1, 0, 0,
             OffsetDateTime.parse("2026-09-18T01:10:00+09:00")));
 
         UploadBatchSummary batch = new UploadBatchSummary(UUID.fromString(ID), SourceType.승인내역, CardIssuer.국민,

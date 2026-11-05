@@ -20,7 +20,7 @@ import { formatFullDate, formatNumber, formatPeriod, toKst } from '../utils/form
  * 배치를 지우면 거래·판정·질문·사용자 수정까지 함께 사라진다(api.md 3.3). 지우기 전에 그걸 말한다.
  */
 export function Uploads() {
-  const { batchId, setBatchId, setRunId } = useSession();
+  const { batchId, setBatchId } = useSession();
   const [page, setPage] = useState(0);
   const [target, setTarget] = useState<UploadBatch | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -40,10 +40,7 @@ export function Uploads() {
     setError(null);
     try {
       await api.uploads.remove(target.id);
-      if (batchId === target.id) {
-        setBatchId(null);
-        setRunId(null);
-      }
+      if (batchId === target.id) setBatchId(null);
       setTarget(null);
       listQ.reload();
     } catch (caught) {

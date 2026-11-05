@@ -23,16 +23,16 @@
 | 이름 | 값 | 용도 |
 |---|---|---|
 | `canvas` | #FFFFFF | 페이지 바탕 |
-| `surface` | #F3F5F7 | 패널, 카드 |
-| `surface2` | #122E55 | 첫 화면 큰 판과 그 옆 숫자 카드. 위에 올리는 글자·그림은 흰색 |
+| `surface` | #F2F4F6 | 패널, 카드 |
+| `surface2` | #2C6AE8 | 첫 화면 큰 판과 그 옆 숫자 카드. 위에 올리는 글자·그림은 흰색 |
 | `sheet` | #FFFFFF | 패널 위에서 흰 바탕이 필요할 때, 표 |
-| `line` / `line2` | #E8ECF0 / #F3F5F7 | 테두리·행 괘선 / 약한 구분선 |
-| `rule` | #16181D | 표 머리 위 굵은 괘선 |
-| `ink` / `ink2` / `muted` | #16181D / #30363F / #67707E | 제목·강조 / 본문 / 보조 |
-| `accent` | #16181D | 주된 동작, 지금 자리 알약 |
-| `accent-hover` / `accent-soft` / `accent-line` | #30363F / #F3F5F7 | primary hover / 연한 채움 / 테두리 버튼·패널 안 구분선 (#DCE1E8) |
-| `link` | #1B64DA | 문장 속 링크 |
-| `highlight` | #FFE600 | 한 화면에 한 번만 쓰는 강조 |
+| `line` / `line2` | #E5E8EB / #EDEFF2 | 테두리·행 괘선 / 약한 구분선. `line2` 는 `surface` 패널 위에서도 보여야 해서 `surface` 보다 진하다 |
+| `rule` | #191F28 | 표 머리 위 굵은 괘선 |
+| `ink` / `ink2` / `muted` | #191F28 / #4E5968 / #6B7684 | 제목·강조 / 본문 / 보조 |
+| `accent` | #2C6AE8 | 주된 동작, 지금 자리 알약 |
+| `accent-hover` / `accent-soft` / `accent-line` | #1C5FD4 / #E4EDFB | primary hover / 연한 채움(고른 선택지·진행 중 단계, `surface` 위에서도 구별) / 테두리 버튼·패널 안 구분선 (#DCE3EB) |
+| `link` | #2C6AE8 | 문장 속 링크 |
+| `highlight` | #FF5C9A | 한 화면에 한 번만 쓰는 강조 |
 | `ok` / `ok-bg` / `ok-line` / `ok-bar` | #00703D / #E8F6F0 / #B2E3CE / #12B76A | 가능 |
 | `warn` / `warn-bg` / `warn-line` / `warn-bar` | #8A5A10 / #FDF3E3 / #EFD7A4 / #F7A51B | 확인 필요 |
 | `deny` / `deny-bg` / `deny-line` / `deny-bar` | #C5283D / #FDEDEF / #F7CDD4 / #FF5A5A | 불가 |
@@ -46,7 +46,7 @@
   - "성공했습니다" 토스트에 `ok` 를 쓰지 않는다. 잘 된 것은 색으로 말하지 않는다.
 - `bg + line + text` 세트 규칙은 **박스**에 적용된다. 한 줄 문구나 버튼처럼 박스가 아닌 곳은 글자색(또는 버튼 배경)만 쓴다.
 - **글자색과 채움색을 섞지 않는다.** `ok·warn·deny` 는 글자용이라 대비(4.5:1) 때문에 어둡다. 막대·점처럼 글자가 안 올라가는 채움에는 `ok-bar·warn-bar·deny-bar` 를 쓴다. 글자색을 막대에 쓰면 `warn` 이 갈색 막대가 된다.
-- 색을 바꾸면 **대비를 다시 잰다.** 글자색은 자기 `-bg` 위에서 4.5:1 이상이어야 한다. 현재 값은 ok 5.63 · warn 5.22 · deny 4.83 · muted 5.39(패널 위)다.
+- 색을 바꾸면 **대비를 다시 잰다.** 글자색은 자기 `-bg` 위에서 4.5:1 이상이어야 한다. 현재 값은 ok 5.63 · warn 5.22 · deny 4.83 · muted 5.39(흰 바탕)·4.53(가장 어두운 바탕인 `accent-soft` 위)다.
 
 ### 타이포
 
@@ -85,6 +85,8 @@
 - 섹션 세로 여백: 랜딩 `pt-28`, 구분 띠(숫자) `py-16`.
 - 라운드: 패널·카드 `rounded-2xl`(24px), 큰 판 `rounded-[20px]`, 중간 `rounded-xl`(16px)·`rounded-lg`(12px), **버튼·알약은 `rounded-full`**.
 - **그림자를 쓰지 않는다.** `shadow-card`·`shadow-panel` 은 `none` 이다. 겹침은 바탕색과 괘선으로만 가른다.
+  - 예외는 머리띠 하나다. `shadow-header` 를 `border-b border-line` 과 같이 쓴다. 머리띠는 바탕과 같은 흰색이라
+    괘선만으로는 스크롤한 내용이 밑으로 지나가는 것이 안 보인다. 다른 곳에는 쓰지 않는다.
 - **패널에 테두리를 두르지 않는다.** 흰 바탕 위 `surface` 회색으로만 가른다. 테두리가 필요한 것은 표의 행 괘선과 `secondary` 버튼뿐이다.
 - 표는 패널에 넣지 않는다. 머리 위 굵은 괘선(`border-t-2 border-rule`) 하나, 행 사이 얇은 괘선, 숫자는 오른쪽 정렬.
 - 전환: `transition-colors duration-150 ease-snap`. 등장 애니메이션은 `animate-rise` 하나.

@@ -1328,6 +1328,8 @@ createdAt ASC, id ASC
 
 지금 판정 대상(effectiveStatus = JUDGEABLE)인 거래의 Review만 반환하고 집계한다. 사용자가 거래를 제외하면 그 Review는 목록과 미해소 집계에서 빠지고, 다시 포함하면 돌아온다. Review 자체는 지우지 않는다. 업로드 배치의 `classificationPendingCount`와 같은 기준이다.
 
+`suggestedCategories`는 분류 모델이 고른 후보 카테고리다. 최대 3개이고 가맹점 카테고리(2.12) 안의 값만 담으며 `기타`·`PG_미상`은 넣지 않는다. 모델이 꺼져 있거나 실패·시간 초과했거나 답을 거절하면 빈 배열이다. 후보는 거래마다 남으므로 포함(3.4)으로 나중에 생긴 Review도 같은 후보를 받는다. 모델 답으로 분류를 확정하지는 않는다. 모델이 확실하다고 답해도 Review가 생기고 사용자가 고른다(`docs/backend_api_plan.md` B10).
+
 ### grouped=false (기본)
 
 Review 개별 항목을 반환한다. `unresolved` 집계는 grouped 여부와 무관하게 항상 최상위에 포함한다(아래 "미해소 집계" 참고).
@@ -1348,7 +1350,7 @@ Review 개별 항목을 반환한다. `unresolved` 집계는 grouped 여부와 �
       "suggestedCategories": [
         "해외SaaS",
         "온라인쇼핑",
-        "기타"
+        "국내SW"
       ],
       "createdAt": "2026-09-18T01:10:00+09:00",
       "resolvedAt": null
@@ -1364,7 +1366,7 @@ Review 개별 항목을 반환한다. `unresolved` 집계는 grouped 여부와 �
 
 ### grouped=true
 
-동일 `merchantNorm` 또는 분류 키를 갖는 Review를 한 카드로 묶어 표시할 수 있다.
+동일 `merchantNorm` 또는 분류 키를 갖는 Review를 한 카드로 묶어 표시할 수 있다. 그룹의 `suggestedCategories`는 `transactions`의 첫 Review 후보다.
 
 ```
 {
@@ -1383,7 +1385,7 @@ Review 개별 항목을 반환한다. `unresolved` 집계는 grouped 여부와 �
       "suggestedCategories": [
         "해외SaaS",
         "온라인쇼핑",
-        "기타"
+        "국내SW"
       ],
       "transactions": [
         {
@@ -1853,17 +1855,35 @@ GET /api/v1/judgments/summary?runId=R1
       "count": 42,
       "finalAmount": 1820000
     }
+  ],
+
+  "limits": [
+    {
+      "bucket": "접대비",
+      "taxYear": 2026,
+      "totalAmount": 13006500,
+      "excessAmount": 916500
+    }
   ]
 }
 ```
 
 `byVerdict`는 세 verdict를 늘 담는다. 판정이 없는 verdict는 `count`·`finalAmount`가 0이다. `finalAmount`가 아직 없는 Judgment(금액 계산 전)는 0으로 더한다.
 
-현재 결과인 `batchId`, `year` 집계는 한도 항목(`limit_bucket_entry`)이 있는 Judgment(접대비)를 `finalAmount` 대신 한도 인정액으로 더한다. 한도를 넘는 금액은 필요경비에 들어가지 않기 때문이다(소득세법 §35 3항). `byVerdict.AVAILABLE`과 `byAccount`에 같이 적용되어, 둘의 차이로 계산하는 값은 그대로 맞는다.
+접대비 한도(소득세법 §35 3항)는 사용자의 한 해 전체 지출로 정해지고, 어느 거래가 초과분인지는 법이 정하지 않는다. 그래서 거래별·batch별로 한도를 나누지 않고 연 단위로만 다룬다(#15, `CONTEXT.md` G6 "건별로 계산하지 않는다").
 
-- 한도는 사용자의 한 해 전체 기준이다. `year` 합계는 배분 순서와 관계없이 맞지만, `batchId` 하나에 돌아가는 몫은 배분 순서(승인일 오름차순, #15 확정 전 잠정)에 따라 달라진다.
-- 거래별 `finalAmount`는 그대로라, 판정 목록의 `finalAmount` 합과 요약이 접대비 한도 초과분만큼 다를 수 있다.
-- 과거 Run인 `runId` 집계는 `finalAmount` 합 그대로다. 한도 항목은 다시 집계할 때마다 지금 상태로 갈아 끼워져, 그 Run 시점의 인정액이 남아 있지 않다.
+- `year` 집계만 한도 항목(`limit_bucket_entry`)이 있는 Judgment(접대비)를 `finalAmount` 대신 한도 인정액으로 더한다. 한도를 넘는 금액은 필요경비에 들어가지 않기 때문이다. 이 합계는 배분 순서와 관계없이 맞는다. `byVerdict.AVAILABLE`과 `byAccount`에 같이 적용되어, 둘의 차이로 계산하는 값은 그대로 맞는다.
+- `batchId` 집계는 `finalAmount` 합이다. batch 하나에 돌아가는 접대비 몫은 배분 순서 없이 정할 수 없다. 그해 한도를 넘었으면 `limits`의 `excessAmount`만큼 필요경비에서 빠진다.
+- 과거 Run인 `runId` 집계도 `finalAmount` 합 그대로다. 한도 항목은 다시 집계할 때마다 지금 상태로 갈아 끼워져, 그 Run 시점의 인정액이 남아 있지 않다. `limits`는 빈 배열이다.
+
+`limits`는 범위(`batchId`, `year`)에 접대비 Judgment가 있는 과세연도마다 하나씩, 과세연도 순으로 둔다. 값은 그 batch만이 아니라 그해 사용자 전체 기준이다. 직전연도 수입금액으로 계산한 잠정치다(`CONTEXT.md` §4 잠정/확정).
+
+| 필드 | 설명 |
+| --- | --- |
+| bucket | 한도 묶음. 판정 `attributes.limit_bucket`과 같은 값(`접대비`) |
+| taxYear | 과세연도 |
+| totalAmount | 그해 이 묶음 Judgment 금액의 합(한도 전) |
+| excessAmount | 한도를 넘어 필요경비에 넣지 않는 금액. 넘지 않았으면 0 |
 
 `byAccount`는 `AVAILABLE`이면서 `account`가 있는 Judgment만 모은다. 정렬은 `finalAmount DESC`이고, 같으면 `account` 이름순이다.
 
@@ -1889,6 +1909,9 @@ Query: `batchId` 또는 `year` 중 정확히 하나. 0개거나 2개면 `400 INV
         { "question": "이 가맹점에서 사용한 비용은 주로 어떤 목적으로 지출하셨나요?", "answer": "업무미팅" }
       ]
     }
+  ],
+  "limits": [
+    { "bucket": "접대비", "taxYear": 2026, "totalAmount": 12800, "excessAmount": 0 }
   ]
 }
 ```
@@ -1896,8 +1919,9 @@ Query: `batchId` 또는 `year` 중 정확히 하나. 0개거나 2개면 `400 INV
 | 필드 | 설명 |
 | --- | --- |
 | judgment | 거래의 현재 Judgment. `GET /judgments/{judgmentId}` 응답과 같은 모양이다 |
-| allowedAmount | 한도까지 반영한 인정 금액. 한도 항목이 있는 Judgment(접대비)는 한도 인정액, 아니면 `finalAmount`다. 위 summary 와 같은 기준이다 |
+| allowedAmount | 인정 금액(`finalAmount`). 한도 항목이 있는 Judgment(접대비)는 그해 한도를 넘었으면 `null`이다. 넘은 해의 거래별 인정액은 배분 순서로만 정해져 내보내지 않는다(#15) |
 | answers | 이 거래에 답한 질문 문구와 답. 같은 사실(`factType`)은 하나만 둔다. 답한 것이 없으면 빈 배열 |
+| limits | 위 summary 의 `limits`와 같다. 넘은 해의 접대비 초과액은 여기서 연 단위로 준다 |
 
 - 2026-10-05 에 정한 CSV 칸(상품 이름, 판정 결과, 근거 조문, 사용 목적, 사용 날짜)은 `transaction.merchantRaw`, `verdict.label`, `citations[].statuteId`, `answers`, `transaction.approvedAt` 에서 채운다.
 - 확인 필요(혼용처럼 세무사 판단이 필요한 답)는 `allowedAmount` 가 0이고, 사용자가 무엇이라고 답했는지는 `answers` 로 넘어간다.
@@ -1976,7 +2000,7 @@ Query: `batchId` 또는 `year` 중 정확히 하나. 0개거나 2개면 `400 INV
 | origin | 이 revision이 생성된 직접 원인 |
 | outOfScope | 룰엔진 판정 범위 밖(핸드오프)인지. `verdict = NEEDS_REVIEW`일 때만 `true`일 수 있고 그 외 verdict에서는 항상 `false` |
 | account | 계정과목 |
-| finalAmount | 안분, 상각 적용 후 인정 금액. `AVAILABLE`이 아니면 0. G6 한도는 연간 집계라 반영하지 않는다(요약은 반영한다, 3.7 summary) |
+| finalAmount | 안분, 상각 적용 후 인정 금액. `AVAILABLE`이 아니면 0. G6 한도는 연간 집계라 반영하지 않는다(`year` 요약과 `limits`가 반영한다, 3.7 summary) |
 | isInference | 룰로 확정하지 못해 fallback 결과인지 |
 | unmatchedReason | 매칭 실패 원인 |
 | attributes | 판정 과정에서 생성된 속성 |
@@ -2672,7 +2696,7 @@ Question을 삭제하지 않고 상태를 남겨 판정 이력을 보존한다.
 | `RESULTS` | `/results` | 그 밖 |
 
 실행 중(`QUEUED`·`RUNNING`)이어도 판정된 거래의 질문과 결과는 볼 수 있어 `QUESTIONS`·`RESULTS`로 간다. 실행 중인지는 `run.status`로 안다.
-판정 실행 화면(`/run`)은 실행 id 없이 들어오면 판정을 새로 시작하므로 `route`로 주지 않는다. 비서의 이동 카드와 화면의 이동 버튼이 이 값을 그대로 쓴다.
+판정 실행 화면은 실행 id 를 주소에 실어야 열리므로(`/run/{runId}`, #187) `route`로 주지 않는다. 비서의 이동 카드와 화면의 이동 버튼이 이 값을 그대로 쓴다.
 
 없거나 다른 사용자의 Batch 면 `404 BATCH_NOT_FOUND`.
 

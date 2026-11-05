@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRightIcon, TriangleAlertIcon } from 'lucide-react';
-import type { Judgment, JudgmentOriginType, Verdict } from '../../types/domain';
+import type { Judgment, JudgmentOriginType, LimitYear, Verdict } from '../../types/domain';
 import { api, ApiRequestError, useApi } from '../../api';
 import { Badge, Button, ChoiceGroup, Input } from '../ui';
 import { VerdictBadge } from '../VerdictBadge';
@@ -77,16 +77,22 @@ value === true ? '예' : value === false ? '아니오' : String(value);
 interface JudgmentDetailPanelProps {
   /** 거래의 현재 판정. 거래 요약(judgment.transaction)도 여기서 읽는다 */
   judgment: Judgment;
+  /** 한도를 넘은 해의 접대비면 그해 한도(#226). 거래별 인정액 대신 한도 대상임을 보인다 */
+  exceededLimit?: LimitYear;
   /** 사용자가 행을 고를 때마다 늘어난다. 바뀌면 제목으로 초점을 옮긴다(같은 행을 다시 골라도) */
   focusKey?: number;
   /** 수정·해제로 현재 판정이 바뀌었을 때 */
   onChanged: () => void;
+  /** 이 거래를 판정 대상에서 뺐을 때. 가맹점 이름을 넘긴다 */
+  onExcluded?: (merchant: string) => void;
 }
 
 export function JudgmentDetailPanel({
   judgment,
+  exceededLimit,
   focusKey = 0,
-  onChanged
+  onChanged,
+  onExcluded
 }: JudgmentDetailPanelProps) {
   const transaction = judgment.transaction;
   const [target, setTarget] = useState<Target | null>(null);
@@ -223,12 +229,27 @@ export function JudgmentDetailPanel({
     setError(null);
     try {
       await api.judgments.removeOverride(judgment.origin.id);
-      setDone('수정을 되돌렸습니다. 규칙 엔진의 판정을 다시 씁니다.');
+      // 되돌리면 직접 바꾸기 전의 현재 판정으로 돌아간다. 그 판정은 답변 반영이나 분류 확인 반영일 수도 있다
+      setDone('수정을 되돌렸습니다. 직접 바꾸기 전의 판정을 다시 씁니다.');
       editHeading.current?.focus();
       onChanged();
     } catch (caught) {
       setError(errorMessage(caught, '수정을 되돌리지 못했습니다. 잠시 후 다시 시도해 주세요.'));
     } finally {
+      setBusy(false);
+    }
+  };
+
+  /** 회의의 「결제 내역 삭제」. 거래를 지우지 않고 판정 대상에서 뺀다(3.4). 거래 화면에서 다시 넣을 수 있다 */
+  const exclude = async () => {
+    if (busy || !onExcluded) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.transactions.exclude(judgment.transactionId);
+      onExcluded(transaction.merchantNorm);
+    } catch (caught) {
+      setError(errorMessage(caught, '판정 대상에서 빼지 못했습니다. 잠시 후 다시 시도해 주세요.'));
       setBusy(false);
     }
   };
@@ -278,15 +299,26 @@ export function JudgmentDetailPanel({
           <dt className="text-caption text-muted">
             {asset ? `${transaction.approvedAt.slice(0, 4)}년에 넣을 수 있는 금액` : '필요경비 산입액'}
           </dt>
+          {exceededLimit ?
+          <dd className="mt-1">
+              <span className="block text-h4 font-bold text-warn">연간 한도 대상</span>
+              <span className="mt-1 block text-caption text-muted">
+                {exceededLimit.taxYear}년 접대비가 한도를 {formatWon(exceededLimit.excessAmount)} 넘어, 거래별 인정액은
+                정하지 않습니다.
+              </span>
+            </dd> :
+
           <dd
             className={`mt-1 text-h3 font-bold tabular-nums tracking-ir-sm ${
             judgment.finalAmount ? 'text-ok' : 'text-muted'}`
             }>
 
-            {judgment.finalAmount !== null ?
+              {/* 서버는 가능이 아니면 0 을 준다(#184). 「0원」은 확인 필요를 금액이 정해진 것처럼 보이게 해 비워 둔다 */}
+              {judgment.verdict.code === 'AVAILABLE' && judgment.finalAmount !== null ?
             `${formatWon(judgment.finalAmount)}${asset ? '까지' : ''}` :
             '—'}
-          </dd>
+            </dd>
+          }
         </div>
       </dl>
 
@@ -485,6 +517,19 @@ export function JudgmentDetailPanel({
           </p>
         }
       </section>
+
+      {onExcluded &&
+      <section className="border-b border-line px-5 py-4">
+          <h3 className="text-body font-bold text-ink">판정할 필요가 없는 거래라면</h3>
+          <p className="mt-1.5 text-caption text-muted">
+            판정 대상에서 빼면 결과와 합계에서 사라집니다. 경비가 아니라는 뜻이면 위에서 불가로 바꿔 주세요.
+            거래는 지우지 않아서 거래 화면에서 다시 넣을 수 있습니다.
+          </p>
+          <Button variant="secondary" size="sm" className="mt-3" disabled={busy} onClick={() => void exclude()}>
+            판정 대상에서 빼기
+          </Button>
+        </section>
+      }
 
       <section className="px-5 py-4">
         <h3 className="text-body font-bold text-ink">판정 이력</h3>

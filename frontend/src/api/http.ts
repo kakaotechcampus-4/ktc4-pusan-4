@@ -28,15 +28,21 @@ interface Options {
 }
 
 /**
- * 인증 (#139 가정). 액세스 토큰은 메모리에만 두고 Authorization 헤더로 보낸다.
+ * 인증 (api.md 1.1). 액세스 토큰은 메모리에만 두고 Authorization 헤더로 보낸다.
  * 리프레시 토큰은 서버가 httpOnly 쿠키로 둔다 — 같은 오리진이라 fetch 가 그대로 실어 보낸다.
- * 경로와 응답 모양(`{accessToken}`)은 api.md 에 적히면 맞춘다.
  */
 let accessToken: string | null = null;
 const lostListeners = new Set<() => void>();
 
-/** 로그인·재발급은 만료된 토큰을 싣지 않는다. 서버가 헤더의 토큰부터 검사하면 거기서 401 이 난다 */
-const NO_BEARER = new Set(['/auth/login', '/auth/refresh']);
+/** 로그인·가입·재발급은 만료된 토큰을 싣지 않는다. 서버가 헤더의 토큰부터 검사하면 거기서 401 이 난다 */
+const NO_BEARER = new Set([
+'/auth/login',
+'/auth/refresh',
+'/auth/signup',
+'/auth/kakao',
+'/auth/email-verification',
+'/auth/email-verification/confirm']
+);
 /** 이 경로의 401 은 재발급으로 풀리지 않는다 */
 const isAuthPath = (path: string) => path.startsWith('/auth/');
 
@@ -54,6 +60,17 @@ const lose = () => {
   lostListeners.forEach((listener) => listener());
 };
 
+/**
+ * 다른 탭과도 재발급 줄을 세운다 (#195). 탭마다 같은 쿠키로 동시에 보내면 서버가 이미 쓴 리프레시 토큰으로 보고
+ * 로그인을 끊는다. 앞 탭의 응답이 쿠키를 바꾼 뒤에 다음 탭이 새 쿠키로 보낸다.
+ * Web Locks 가 없는 브라우저는 탭 안에서만 묶는다
+ */
+const refreshRequest = () => request<{ accessToken: string }>('POST', '/auth/refresh');
+const serializedRefresh = async (): Promise<{ accessToken: string }> =>
+typeof navigator !== 'undefined' && navigator.locks ?
+await navigator.locks.request('auth-refresh', refreshRequest) :
+refreshRequest();
+
 let refreshing: Promise<void> | null = null;
 /**
  * 동시에 401 을 받은 요청들이 재발급을 한 번만 하도록 진행 중인 재발급을 나눠 쓴다.
@@ -62,7 +79,7 @@ let refreshing: Promise<void> | null = null;
 const refresh = () => {
   if (!refreshing) {
     const startedAt = generation;
-    refreshing = request<{ accessToken: string }>('POST', '/auth/refresh').
+    refreshing = serializedRefresh().
     then((result) => {
       if (generation === startedAt) accessToken = result.accessToken;
     }).
@@ -139,7 +156,12 @@ retried = false)
   }
 
   if (!response.ok) {
-    const error = (data ?? {}) as { code?: string; message?: string; traceId?: string };
+    const error = (data ?? {}) as {
+      code?: string;
+      message?: string;
+      traceId?: string;
+      runId?: string;
+    };
     // 초 단위만 읽는다. 날짜 형식이면 버린다
     const retryAfter = Number(response.headers.get('Retry-After'));
     throw new ApiRequestError(
@@ -147,7 +169,9 @@ retried = false)
       error.code ?? 'UNKNOWN',
       error.message ?? `요청을 처리하지 못했습니다. (${response.status})`,
       error.traceId ?? '',
-      response.headers.has('Retry-After') && Number.isFinite(retryAfter) ? retryAfter : undefined
+      response.headers.has('Retry-After') && Number.isFinite(retryAfter) ? retryAfter : undefined,
+      // 409 RUN_ALREADY_ACTIVE 에만 붙는다 (#228). 문자열이 아니면 없는 것으로 둔다
+      typeof error.runId === 'string' ? error.runId : undefined
     );
   }
   return data as T;
@@ -164,18 +188,25 @@ const page = (query?: { page?: number; size?: number }): Query => ({
   size: query?.size
 });
 
+/** 로그인·가입·카카오 로그인. 응답은 모두 `{accessToken}` + 리프레시 쿠키다 (api.md 1.1) */
+const enter = async (path: string, body: unknown) => {
+  // 다른 계정으로 로그인하다 실패해도 앞 사람의 토큰이 남지 않게 먼저 버린다
+  accessToken = null;
+  generation += 1;
+  await settled();
+  const startedAt = generation;
+  const result = await post<{ accessToken: string }>(path, body);
+  // 그사이 로그아웃했거나 다시 로그인했으면 이 토큰은 쓰지 않는다
+  if (generation === startedAt) accessToken = result.accessToken;
+};
+
 export const httpApi: Api = {
   auth: {
-    login: async (body) => {
-      // 다른 계정으로 로그인하다 실패해도 앞 사람의 토큰이 남지 않게 먼저 버린다
-      accessToken = null;
-      generation += 1;
-      await settled();
-      const startedAt = generation;
-      const result = await post<{ accessToken: string }>('/auth/login', body);
-      // 그사이 로그아웃했거나 다시 로그인했으면 이 토큰은 쓰지 않는다
-      if (generation === startedAt) accessToken = result.accessToken;
-    },
+    login: (body) => enter('/auth/login', body),
+    requestEmailVerification: (body) => post<void>('/auth/email-verification', body),
+    confirmEmailVerification: (body) => post('/auth/email-verification/confirm', body),
+    signup: (body) => enter('/auth/signup', body),
+    kakao: (body) => enter('/auth/kakao', body),
     // 아직 로그인 전이라 잃을 것이 없다. 어떤 이유로든 못 이어 가면 로그인 화면이다
     restore: () => {
       const startedAt = generation;
@@ -284,6 +315,7 @@ export const httpApi: Api = {
       latestOnly: query?.latestOnly
     }),
     get: (judgmentId) => get(`/judgments/${judgmentId}`),
+    export: (scope) => get('/judgments/export', { batchId: scope.batchId, year: scope.year }),
     override: (judgmentId, body, idempotencyKey) =>
     post(`/judgments/${judgmentId}/override`, body, idempotencyKey),
     removeOverride: (overrideId) => del(`/judgment-overrides/${overrideId}`)
@@ -314,7 +346,7 @@ export const httpApi: Api = {
     suggestions: (batchId) => get('/questions/suggestions', { batchId })
   },
 
-  // 아래 경로는 명세 10장의 이름을 따른 가정이다. 백엔드가 정하면 맞춘다
+  // 경로는 api.md 와 같다
   assistant: {
     chat: (body) => post('/assistant/chat', body)
   },
@@ -324,7 +356,7 @@ export const httpApi: Api = {
   },
 
   handoffNotes: {
-    // 저장 API 가 아직 없는 서버(404)는 저장한 질문이 없는 것과 같다. 다른 실패는 요약이 「빠진 항목」으로 알린다
+    // #214 전 서버에는 저장 API 가 없었다(404). 그때는 저장한 질문이 없는 것과 같다. 다른 실패는 요약이 「빠진 항목」으로 알린다
     list: () =>
     get<Awaited<ReturnType<Api['handoffNotes']['list']>>>('/handoff-notes').catch((caught: unknown) => {
       if (caught instanceof ApiRequestError && caught.status === 404) return [];

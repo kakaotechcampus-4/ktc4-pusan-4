@@ -14,6 +14,15 @@ const CENTER_LINES = [
 
 const SWAP_MS = 3200;
 
+/*
+ * 첫 모션 조각. 순서는 제목(Landing) → 테 → 그림 → 가운데 문구다.
+ * scale 을 쓰는 것은 겉면에만 둔다 — -translate-x-1/2 가 걸린 요소에 두면 transform 이
+ * 덮여서 동그라미가 반 칸 밀린다
+ */
+const DRAW = 'animate-draw [animation-delay:250ms] motion-reduce:animate-none';
+const SPREAD = 'animate-spread [animation-delay:500ms] motion-reduce:animate-none';
+const CENTER_RISE = 'animate-rise [animation-delay:800ms] motion-reduce:animate-none';
+
 /** 궤도 위 자리. angle 은 12시부터 시계방향, radius 는 판 절반 대비 % */
 type Spot = {angle: number; radius: number; size: number; Icon: () => React.ReactElement;};
 
@@ -24,8 +33,8 @@ type Spot = {angle: number; radius: number; size: number; Icon: () => React.Reac
 const Card = () =>
 <svg viewBox="0 0 64 64" className="h-full w-full" aria-hidden="true">
     <rect x="6" y="14" width="52" height="36" rx="7" fill="#FFFFFF" />
-    <rect x="6" y="23" width="52" height="7" fill="#16181D" />
-    <rect x="13" y="38" width="16" height="4" rx="2" fill="#FFE600" />
+    <rect x="6" y="23" width="52" height="7" fill="#191F28" />
+    <rect x="13" y="38" width="16" height="4" rx="2" fill="#FF5C9A" />
   </svg>;
 
 
@@ -36,7 +45,7 @@ const Receipt = () =>
     fill="#FFFFFF"
     />
 
-    <rect x="21" y="20" width="22" height="3.4" rx="1.7" fill="#16181D" />
+    <rect x="21" y="20" width="22" height="3.4" rx="1.7" fill="#191F28" />
     <rect x="21" y="29" width="22" height="3.4" rx="1.7" fill="#DCE1E8" />
     <rect x="21" y="38" width="13" height="3.4" rx="1.7" fill="#DCE1E8" />
   </svg>;
@@ -46,7 +55,7 @@ const Store = () =>
 <svg viewBox="0 0 64 64" className="h-full w-full" aria-hidden="true">
     <rect x="12" y="27" width="40" height="26" rx="4" fill="#FFFFFF" />
     <path d="M10 14h44l-4 13H14z" fill="#FF5A5A" />
-    <rect x="28" y="37" width="8" height="16" rx="2" fill="#16181D" />
+    <rect x="28" y="37" width="8" height="16" rx="2" fill="#191F28" />
   </svg>;
 
 
@@ -54,18 +63,18 @@ const Bubble = () =>
 <svg viewBox="0 0 64 64" className="h-full w-full" aria-hidden="true">
     <path
     d="M32 13c12.7 0 23 7.6 23 17s-10.3 17-23 17a30 30 0 0 1-5.6-.5l-10.6 5.3 3-8.6C12.4 40 9 35 9 30c0-9.4 10.3-17 23-17z"
-    fill="#FFE600" />
+    fill="#FF5C9A" />
 
-    <circle cx="23" cy="30" r="3" fill="#122E55" />
-    <circle cx="32" cy="30" r="3" fill="#122E55" />
-    <circle cx="41" cy="30" r="3" fill="#122E55" />
+    <circle cx="23" cy="30" r="3" fill="#2C6AE8" />
+    <circle cx="32" cy="30" r="3" fill="#2C6AE8" />
+    <circle cx="41" cy="30" r="3" fill="#2C6AE8" />
   </svg>;
 
 
 const Statute = () =>
 <svg viewBox="0 0 64 64" className="h-full w-full" aria-hidden="true">
     <rect x="12" y="8" width="40" height="48" rx="5" fill="#FFFFFF" />
-    <rect x="20" y="19" width="24" height="3.4" rx="1.7" fill="#16181D" />
+    <rect x="20" y="19" width="24" height="3.4" rx="1.7" fill="#191F28" />
     <rect x="20" y="28" width="24" height="3.4" rx="1.7" fill="#DCE1E8" />
     <rect x="20" y="37" width="16" height="3.4" rx="1.7" fill="#DCE1E8" />
     <circle cx="44" cy="46" r="6" fill="#FF5A5A" />
@@ -123,7 +132,12 @@ function Ring({
 
 }
 
-export function OrbitStage() {
+/**
+ * intro: 첫 모션 중인가. 인트로 화면에서만 켠다 — 메인 배너에서는 돌기만 한다
+ * full: 전체화면인가. 좁은 화면에서도 그림을 다 띄운다 — 440px 패널에서는 테만 남기지만
+ *       844px 짜리 인트로에서 테만 두면 거의 빈 화면이 된다
+ */
+export function OrbitStage({ intro = false, full = false }: {intro?: boolean; full?: boolean;}) {
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
@@ -140,29 +154,49 @@ export function OrbitStage() {
 
   return (
     <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
-      {/* 좁은 화면에서는 테만 남긴다 */}
-      <span className="absolute left-[72%] top-[62%] aspect-square w-[90%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20 lg:hidden" />
-      <span className="absolute left-[72%] top-[62%] aspect-square w-[58%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20 lg:hidden" />
+      {/* 좁은 화면에서는 테만 남긴다 — 전체화면은 아래 판을 그대로 쓴다 */}
+      <div
+        className={`absolute inset-0 ${full ? 'hidden' : 'lg:hidden'} ${
+        intro ? DRAW : ''}`
+        }>
+        <span className="absolute left-[72%] top-[62%] aspect-square w-[90%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20" />
+        <span className="absolute left-[72%] top-[62%] aspect-square w-[58%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20" />
+      </div>
       {/*
         궤도는 정사각 판 안에서만 돈다. 가로·세로 %를 따로 쓰면 원이 아니라
         타원이 되어 그림이 좌우 끝으로 밀린다. 중심을 오른쪽으로 비켜 두어
         왼쪽 위 제목과 겹치지 않게 한다
       */}
-      <div className="absolute left-[66%] top-1/2 hidden aspect-square h-[94%] -translate-x-1/2 -translate-y-1/2 lg:block">
-        <span className="absolute left-1/2 top-1/2 aspect-square w-[104%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20" />
-        <span className="absolute left-1/2 top-1/2 aspect-square w-[72%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20" />
+      <div
+        className={`absolute left-1/2 top-1/2 aspect-square w-[88%] -translate-x-1/2 -translate-y-1/2 lg:left-[66%] lg:h-[94%] lg:w-auto ${
+        full ? 'block' : 'hidden'} lg:block`
+        }>
+        <div className={`absolute inset-0 ${intro ? DRAW : ''}`}>
+          <span className="absolute left-1/2 top-1/2 aspect-square w-[104%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20" />
+          <span className="absolute left-1/2 top-1/2 aspect-square w-[72%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20" />
+        </div>
 
-        <Ring spots={OUTER} spin="animate-orbit" counter="animate-orbit-back" />
-        <Ring
-          spots={INNER}
-          spin="animate-orbit-slow"
-          counter="animate-orbit-slow-back" />
+        {/* 회전은 Ring 이 하고 퍼지는 것은 이 겉면이 한다. 한 요소에 두면 둘 중 하나가 덮인다 */}
+        <div className={`absolute inset-0 ${intro ? SPREAD : ''}`}>
+          <Ring spots={OUTER} spin="animate-orbit" counter="animate-orbit-back" />
+          <Ring
+            spots={INNER}
+            spin="animate-orbit-slow"
+            counter="animate-orbit-slow-back" />
 
+        </div>
       </div>
 
       {/* 가운데 바뀌는 문구 — 궤도 중심에 맞춘다 */}
-      <div className="absolute inset-y-0 left-[66%] hidden w-[70%] -translate-x-1/2 items-center justify-center px-8 lg:flex">
-        <p className="relative text-center text-h3 font-bold tracking-ir-sm text-white lg:text-ir-panel">
+      <div
+        className={`absolute inset-y-0 left-1/2 w-[80%] -translate-x-1/2 items-center justify-center px-8 lg:left-[66%] lg:w-[70%] ${
+        full ? 'flex' : 'hidden'} lg:flex`
+        }>
+        <p
+          className={`relative text-center text-h3 font-bold tracking-ir-sm text-white lg:text-ir-panel ${
+          intro ? CENTER_RISE : ''}`
+          }>
+
           {CENTER_LINES.map((line, i) =>
           <span
             key={line}

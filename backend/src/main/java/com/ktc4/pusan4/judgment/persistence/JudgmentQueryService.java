@@ -5,11 +5,12 @@ import com.ktc4.pusan4.judgment.domain.JudgmentExportRow.Answer;
 import com.ktc4.pusan4.judgment.domain.JudgmentRevision;
 import com.ktc4.pusan4.judgment.domain.JudgmentRevision.CitedStatute;
 import com.ktc4.pusan4.judgment.domain.JudgmentSummary;
+import com.ktc4.pusan4.judgment.domain.LimitYearTotal;
 import com.ktc4.pusan4.judgment.domain.Question;
 import com.ktc4.pusan4.judgment.domain.QuestionStatus;
 import com.ktc4.pusan4.judgment.limit.EntertainmentLimit;
 import com.ktc4.pusan4.judgment.persistence.JudgmentCitationRepository.CitationRow;
-import com.ktc4.pusan4.judgment.persistence.LimitBucketEntryRepository.AllowedAmount;
+import com.ktc4.pusan4.judgment.persistence.LimitBucketEntryRepository.EntryAmount;
 import com.ktc4.pusan4.shared.api.ApiException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -23,6 +24,8 @@ import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -69,13 +72,15 @@ public class JudgmentQueryService {
     /**
      * batchId·year·runId 중 하나로 집계한다. 대상은 같은 조건의 목록과 같다
      * (batchId·year 는 현재 판정, runId 는 그 Run 이 만든 판정).
-     * 현재 결과의 접대비 판정은 finalAmount 대신 한도 인정액으로 더한다(소득세법 §35③ 초과분 불산입).
-     * 과거 Run 은 finalAmount 그대로다. 한도 항목은 지금 상태만 남아 그 Run 시점의 인정액이 아니다.
+     * year 요약만 접대비 판정을 finalAmount 대신 한도 인정액으로 더한다(소득세법 §35③ 초과분 불산입).
+     * 한도는 연간 총액이라, 배치 하나에 돌아가는 몫은 배분 순서 없이 정할 수 없다(#15). 그래서 batchId 요약은
+     * finalAmount 합이고, 초과액은 {@link #limits} 로 따로 준다.
+     * 과거 Run 도 finalAmount 그대로다. 한도 항목은 지금 상태만 남아 그 Run 시점의 인정액이 아니다.
      */
     @Transactional(readOnly = true)
     public JudgmentSummary summary(UUID userId, UUID batchId, Integer year, UUID runId) {
         JudgmentListQuery query = new JudgmentListQuery(null, batchId, year, null, true, runId);
-        Map<UUID, Long> limitAllowed = runId != null ? Map.of() : limitAllowedAmounts(userId);
+        Map<UUID, Long> limitAllowed = year == null ? Map.of() : limitAllowedAmounts(userId);
         return JudgmentSummary.of(find(userId, query, Pageable.unpaged()).stream()
             .map(judgment -> judgment.toSummaryRow(limitAllowed.get(judgment.id())))
             .toList());
@@ -83,24 +88,67 @@ public class JudgmentQueryService {
 
     /**
      * 세무사에게 넘길 내보내기 (api.md 3.7 export). batchId·year 중 하나의 현재 판정 전부와, 거래마다 답한 질문이다.
-     * 인정 금액은 요약과 같은 기준이다(접대비는 한도 인정액). 파일(CSV) 변환은 FE 가 한다.
+     * 인정 금액은 finalAmount 다. 접대비 판정은 그해 한도를 넘었으면 비운다. 넘은 해의 거래별 인정액은
+     * 배분 순서로만 정해지고 법이 정하지 않아서다(#15). 그해 초과액은 {@link #limits} 가 준다.
+     * 파일(CSV) 변환은 FE 가 한다.
      */
     @Transactional(readOnly = true)
     public List<JudgmentExportRow> export(UUID userId, UUID batchId, Integer year) {
         JudgmentListQuery query = new JudgmentListQuery(null, batchId, year, null, true, null);
         List<JudgmentRevision> judgments = toDomain(find(userId, query, Pageable.unpaged()).getContent());
-        Map<UUID, Long> limitAllowed = limitAllowedAmounts(userId);
+        List<EntryAmount> entries = entryRepository.findEntryAmounts(userId, EntertainmentLimit.BUCKET);
+        Map<UUID, EntryAmount> entryByJudgment = entries.stream()
+            .collect(Collectors.toMap(EntryAmount::judgmentId, Function.identity()));
+        Set<Integer> exceededYears = yearTotals(entries).stream()
+            .filter(LimitYearTotal::exceeded)
+            .map(LimitYearTotal::taxYear)
+            .collect(Collectors.toSet());
         Map<UUID, List<Answer>> answers = answersByTransaction(questionQueryService.find(userId, batchId, null));
         return judgments.stream()
             .map(judgment -> new JudgmentExportRow(judgment,
-                limitAllowed.getOrDefault(judgment.id(), judgment.finalAmount()),
+                allowedAmount(judgment, entryByJudgment.get(judgment.id()), exceededYears),
                 answers.getOrDefault(judgment.transactionId(), List.of())))
             .toList();
     }
 
+    private static Long allowedAmount(JudgmentRevision judgment, EntryAmount entry, Set<Integer> exceededYears) {
+        if (entry == null) {
+            return judgment.finalAmount();
+        }
+        return exceededYears.contains(entry.taxYear()) ? null : entry.allowedAmount();
+    }
+
+    /**
+     * batchId·year 범위에 접대비 판정이 있는 과세연도마다 한도 합계와 초과액 (api.md 3.7 limits). 과세연도 순이다.
+     * 한도는 사용자의 한 해 전체 기준이라, batchId 범위여도 그해의 다른 batch 까지 합친 값이다. runId 범위는 없다.
+     */
+    @Transactional(readOnly = true)
+    public List<LimitYearTotal> limits(UUID userId, UUID batchId, Integer year) {
+        if (batchId == null && year == null) {
+            return List.of();
+        }
+        Set<Integer> years = year != null
+            ? Set.of(year)
+            : Set.copyOf(entryRepository.findTaxYearsOfBatch(userId, EntertainmentLimit.BUCKET, batchId));
+        return yearTotals(entryRepository.findEntryAmounts(userId, EntertainmentLimit.BUCKET)).stream()
+            .filter(total -> years.contains(total.taxYear()))
+            .toList();
+    }
+
+    /** 항목을 과세연도별로 더한다. 과세연도 순이다. */
+    private static List<LimitYearTotal> yearTotals(List<EntryAmount> entries) {
+        Map<Integer, List<EntryAmount>> byYear = entries.stream()
+            .collect(Collectors.groupingBy(EntryAmount::taxYear, TreeMap::new, Collectors.toList()));
+        return byYear.entrySet().stream()
+            .map(year -> new LimitYearTotal(EntertainmentLimit.BUCKET, year.getKey(),
+                year.getValue().stream().mapToLong(EntryAmount::taggedAmount).sum(),
+                year.getValue().stream().mapToLong(entry -> entry.taggedAmount() - entry.allowedAmount()).sum()))
+            .toList();
+    }
+
     private Map<UUID, Long> limitAllowedAmounts(UUID userId) {
-        return entryRepository.findAllowedAmounts(userId, EntertainmentLimit.BUCKET).stream()
-            .collect(Collectors.toMap(AllowedAmount::judgmentId, AllowedAmount::allowedAmount));
+        return entryRepository.findEntryAmounts(userId, EntertainmentLimit.BUCKET).stream()
+            .collect(Collectors.toMap(EntryAmount::judgmentId, EntryAmount::allowedAmount));
     }
 
     /**

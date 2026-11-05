@@ -2,7 +2,7 @@
 
 카테캠 팀 계정의 Ubuntu 24.04 EC2 한 대에 `deploy/compose.yaml`을 실행한다. 배포 코드는 별도 worktree의 `feat/aws-deploy`에서 작성해 `develop`으로 머지한다. 첫 `release`는 이 설정이 포함된 `develop` 커밋에서 만들고, 이후 `develop → release` PR의 push가 자동 배포를 시작한다. 기존 `develop → main` 멘토 리뷰 흐름은 유지한다.
 
-현재 프런트엔드는 목업 데이터로 동작하며 주요 백엔드 API는 501을 반환한다. 이 배포의 완료 기준은 전체 스택의 정상 기동이다. 실제 카드 데이터로 시험하기 전에는 인증과 API 연동을 완료해야 한다.
+프런트엔드는 백엔드 API를 HTTP로 호출하고, 백엔드는 목 응답 없이 실제 서비스로 답한다. 로그인은 9절, 배포 뒤 확인은 각 절의 헬스체크를 따른다.
 
 ## 1. AWS와 DNS 준비
 
@@ -24,6 +24,7 @@ Repository **Settings → Secrets and variables → Actions → Variables**에 �
 | `ECR_REPOSITORY` | `123456789012.dkr.ecr.ap-northeast-2.amazonaws.com/ktc4-pusan-4` 형태의 전체 URI |
 | `EC2_INSTANCE_ID` | 제공된 EC2의 `i-...` ID |
 | `DOMAIN` | DuckDNS에서 발급한 호스트 이름 |
+| `KAKAO_REST_API_KEY` | 카카오 앱의 REST API 키. web 이미지를 빌드할 때 `VITE_KAKAO_REST_API_KEY`로 넘긴다. 브라우저 인가 주소에 실리는 공개 값이다. web 이미지를 `VITE_API=http`로 빌드해야 쓰인다. 그때 비우면 화면에서 카카오 버튼을 숨긴다. 지금 web 이미지는 목업 빌드라 키와 상관없이 목업 카카오 로그인 버튼이 보인다 |
 
 워크플로는 `id-token: write`와 `contents: read`로 OIDC 임시 자격증명을 얻는다. AWS 액세스 키나 SSH 개인키를 GitHub Secrets에 넣지 않는다. `release` 브랜치는 PR 검토를 요구하도록 보호한다. `AWS release`의 `backend`, `ai`, `web` 검증이 통과한 커밋만 승격한다. PR에서는 이 세 검증이 배포와 같은 Dockerfile로 이미지까지 빌드한다(push는 하지 않는다). 레포 구조가 바뀌어 Dockerfile이 깨지면 배포가 아니라 그 PR에서 실패한다. `release`로 가는 PR은 이 레포의 `develop`에서만 연다. `Release source`의 `release-source` 체크가 다른 브랜치나 fork에서 온 PR을 실패시키며, 이 체크도 `release` ruleset의 필수 체크로 등록한다. 이 체크는 `pull_request_target`으로 기본 브랜치(`develop`)에 있는 워크플로 파일을 실행하므로, PR 안에서 파일을 고쳐 통과시킬 수 없다. GitHub은 2025-12-08부터 `pull_request_target`을 base가 아닌 기본 브랜치의 파일로 실행한다([변경 공지](https://github.blog/changelog/2025-11-07-actions-pull_request_target-and-environment-branch-protections-changes/)).
 
@@ -235,11 +236,59 @@ sudo docker compose --env-file /etc/ktc4/production.env -f /opt/ktc4/repo/deploy
 - 이메일이 없는 카카오 계정은 `where id = '<사용자 id>'`로 지정한다. id 는 그 계정으로 `GET /api/v1/users/me`를 불러 확인한다.
 - 관리자를 해제할 때는 `role = 'USER'`로 되돌린다. 바뀐 role 은 다음 요청부터 바로 반영된다.
 
-## 13. 로그
+## 13. 웹과 검색 노출
 
-트랙 A(A3)가 채운다. 백엔드 로그는 CloudWatch Logs `/ktc4/backend`로 간다. 이 그룹은 14절의 모니터링 스택이 만든다.
+웹 컨테이너의 Caddy(`deploy/Caddyfile`)가 화면 파일을 낸다.
 
-## 14. 모니터링
+- 공개 페이지(`/`, `/faq`, `/terms`, `/privacy`)는 빌드 때 미리 그린 HTML(`index.html`, `faq.html` …)이 나간다. 크롤러와 카카오톡 미리보기가 자바스크립트 없이 본문·제목을 읽는다. 목록은 `frontend/src/seo.ts`다.
+- 그 밖의 주소(로그인 뒤 화면, 로그인 화면, 없는 주소)는 본문 없는 `app.html`이 나가고 화면은 브라우저가 그린다. `app.html`은 `noindex`라 검색에 잡히지 않는다.
+- `/robots.txt`, `/sitemap.xml`, `/llms.txt`는 빌드가 만든다. 검색엔진과 AI 크롤러(학습·검색·열람)를 모두 허용한다.
+- 화면 파일은 zstd·gzip으로 압축하고, `/assets/*`는 1년 동안 캐시한다(파일명에 내용 해시가 붙는다). API 응답은 손대지 않는다.
+- 모든 https 응답에 HSTS(`Strict-Transport-Security: max-age=31536000`)를 붙인다. 한 번 들어온 브라우저는 1년 동안 http 주소도 https로 바꿔 접속한다. 그 기간에는 인증서가 깨져도 http로 우회할 수 없으므로, Caddy 인증서 갱신이 실패하지 않는지 본다.
+
+배포 뒤 확인:
+
+```bash
+curl -s https://<도메인>/ | grep -c '<h1'                      # 1
+curl -s https://<도메인>/no-such-page | grep -c noindex         # 1
+curl -s https://<도메인>/robots.txt                             # User-agent: * …
+curl -s -o /dev/null -w '%{content_type}\n' https://<도메인>/llms.txt   # text/plain
+curl -sI https://<도메인>/ | grep -i strict-transport           # max-age=31536000
+```
+
+카카오톡 미리보기는 카카오가 캐시한다. 제목·설명·이미지를 바꿨으면 [카카오 공유 디버거](https://developers.kakao.com/tool/debugger/sharing)에서 주소의 캐시를 지운다.
+
+### 검색 도구 등록
+
+검색 도구는 소유 확인 값이 남아 있는 동안만 사이트를 관리하게 해 준다. 아래 값을 지우거나 덮어쓰면 확인이 풀린다.
+
+- 구글 서치콘솔: 도메인 속성. DuckDNS의 TXT 레코드에 `google-site-verification=…` 값을 넣었다. DuckDNS는 도메인마다 TXT를 하나만 두므로, 다른 용도로 TXT를 갱신하면 이 값이 사라진다.
+- Bing 웹마스터 도구: 서치콘솔에서 가져와 등록했다. 서치콘솔 확인이 풀리면 같이 풀린다.
+- 네이버 서치어드바이저: `frontend/index.html`의 `naver-site-verification` 메타 태그. 프리렌더가 이 파일을 틀로 쓰므로 공개 페이지마다 들어간다.
+- 사이트맵은 세 곳 모두 `https://<도메인>/sitemap.xml`로 제출한다.
+
+### 접근 기록
+
+검색엔진·AI 크롤러가 언제 얼마나 읽어 가는지 세려고 남긴다.
+
+- `caddy-data` 볼륨의 `/data/access.log`에 JSON 한 줄씩 쌓는다. 10MB를 넘으면 gzip으로 압축한 파일로 굴리고 5개까지만 둔다.
+- IP는 앞 두 자리만 남긴다(IPv4 /16, IPv6 /32). 쿠키·인증 헤더는 Caddy가 지운다. `/api/v1/*` 요청은 남기지 않는다.
+- 남기는 항목을 바꾸면 개인정보처리방침(`frontend/src/pages/public/Privacy.tsx`)의 「접속 기록」도 같이 고친다.
+
+크롤러별 방문 수:
+
+```bash
+sudo docker compose --env-file /etc/ktc4/production.env -f /opt/ktc4/repo/deploy/compose.yaml exec -T web \
+  sh -c 'cat /data/access.log; zcat /data/access-*.log.gz 2>/dev/null' \
+  | grep -oiE 'GPTBot|OAI-SearchBot|ChatGPT-User|ClaudeBot|Claude-SearchBot|Claude-User|PerplexityBot|Perplexity-User|CCBot|Googlebot|bingbot|Yeti' \
+  | sort | uniq -c
+```
+
+## 14. 로그
+
+트랙 A(A3)가 채운다. 백엔드 로그는 CloudWatch Logs `/ktc4/backend`로 간다. 이 그룹은 15절의 모니터링 스택이 만든다.
+
+## 15. 모니터링
 
 알람·Lambda·로그 그룹은 CloudFormation 스택 `ktc4-monitoring`(`deploy/monitoring/template.yaml`) 하나로 관리한다. 콘솔에서 손으로 고치지 말고 템플릿을 고쳐 다시 배포한다. 계획과 이유는 `docs/monitoring_plan.md`에 있다.
 

@@ -47,6 +47,8 @@ export interface AssistantValue {
   /** once 를 주면 같은 값으로는 한 번만 띄운다 (판정 실행 하나에 한 번) */
   showNudge: (nudge: Nudge, once?: string) => void;
   dismissNudge: () => void;
+  /** [적용]한 결과 문장. 몇 초 뒤 사라진다 */
+  toast: string | null;
 }
 
 export const AssistantContext = createContext<AssistantValue | null>(null);

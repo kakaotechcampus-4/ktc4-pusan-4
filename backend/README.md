@@ -66,23 +66,17 @@ bash ./backend/gradlew -p backend bootRun --args='--spring.profiles.active=local
 2. `/actuator/health`가 `UP`을 반환하는지
 3. Flyway가 `flyway_schema_history` 테이블을 생성하는지
 
-`integrationTest`와 `check`를 실행하기 전에는 Docker가 실행 중이어야 합니다. CI는 `test` 다음 `integrationTest`를 실행하며, 특정 클래스를 지정하지 않으므로 이후 추가되는 `*IntegrationTest`도 자동으로 포함합니다. 현재는 도메인 단위 테스트가 없어 `test`가 `NO-SOURCE`로 완료됩니다.
+`integrationTest`와 `check`를 실행하기 전에는 Docker가 실행 중이어야 합니다. CI는 `test` 다음 `integrationTest`를 실행하며, 특정 클래스를 지정하지 않으므로 이후 추가되는 `*IntegrationTest`도 자동으로 포함합니다. 클래스명이 `*IntegrationTest`가 아닌 단위 테스트(`AccessTokensTest`, `HolidaySyncTest` 등)는 Docker 없이 `test`에서 실행됩니다.
 
-## 목 응답
+## 인증과 요청 사용자
 
-서비스 레이어가 구현되기 전의 API는 기능별 `*MockData` Bean이 만든 고정 응답을 반환합니다. 입력과 id에 상관없이 같은 값이고, 상태를 저장하지 않습니다. 이런 API에는 `@MockResponse`가 붙어 있고 스웨거 설명이 `[목 응답]`으로 시작합니다. 지금은 남은 `*MockData` Bean이 없습니다.
-
-서비스를 구현하면 엔드포인트 단위로 다음을 바꿉니다.
-
-1. 컨트롤러가 주입받는 `*MockData`를 서비스로 바꾸고 호출부를 서비스 호출로 바꿉니다.
-2. 해당 메서드의 `@MockResponse`를 지웁니다.
-3. `*MockData`의 메서드가 더 이상 쓰이지 않으면 지웁니다. 모든 API가 바뀌면 `MockFixtures`, `MockResponse`까지 지웁니다.
+모든 API 는 서비스로 답합니다. 목 응답(`*MockData`, `@MockResponse`, `MockFixtures`)은 모두 지웠습니다.
 
 ### 요청한 사용자 (`CurrentUser`)
 
 서비스는 userId를 요청 본문이나 경로에서 받지 않습니다. 컨트롤러 메서드에 `CurrentUser` 인자를 두면 `CurrentUserArgumentResolver`가 채우고, 서비스에는 `currentUser.id()`를 넘깁니다(`UserController.me` 참고). 스웨거에는 노출되지 않습니다.
 
-`CurrentUserProvider` 구현체는 `auth.BearerCurrentUserProvider`이고, `Authorization: Bearer {accessToken}`의 사용자를 돌려줍니다. `/api/v1/auth/**`를 뺀 모든 API는 `CurrentUserWebConfig`의 인터셉터가 이를 확인해, 토큰이 없으면 `CurrentUser` 인자가 없는 API(목 응답 등)도 401 `UNAUTHORIZED`입니다. 계약은 `docs/api.md` 1.1에 있습니다.
+`CurrentUserProvider` 구현체는 `auth.BearerCurrentUserProvider`이고, `Authorization: Bearer {accessToken}`의 사용자를 돌려줍니다. `/api/v1/auth/**`를 뺀 모든 API는 `CurrentUserWebConfig`의 인터셉터가 이를 확인해, 토큰이 없으면 `CurrentUser` 인자가 없는 API(법령 조회 등)도 401 `UNAUTHORIZED`입니다. 계약은 `docs/api.md` 1.1에 있습니다.
 
 ### 인증 (`auth`)
 

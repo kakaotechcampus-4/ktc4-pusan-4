@@ -1,20 +1,40 @@
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRightIcon } from 'lucide-react';
 import { useSession } from '../contexts/SessionContext';
 import { MarketingHeader } from '../components/MarketingHeader';
 import { MarketingFooter } from '../components/MarketingFooter';
-import { OrbitStage } from '../components/OrbitStage';
+import { HeroBanner } from '../components/HeroBanner';
+import { IntroOverlay } from '../components/IntroOverlay';
 import { ExampleCarousel } from '../components/ExampleCarousel';
 import {
   FLOW_STEPS,
-  HERO_SUMMARY,
   NOT_DOING,
+  RULE_CARD_COUNT,
   STATS,
-  SYSTEM_FEATURES } from
+  SYSTEM_FEATURES,
+  VERDICTS } from
 '../mock/marketing';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { PAGES } from '../seo';
 
-const won = (value: number) => value.toLocaleString('ko-KR');
+/**
+ * 인트로를 봤다는 표시. 처음 한 번만 띄운다 — 로고로 다녀와도 다시 뜨지 않는다.
+ * index.html 의 덮개 스크립트도 이 키를 읽는다. 바꾸면 거기도 바꾼다
+ */
+const INTRO_SEEN = 'preet.intro.seen';
+
+/** 움직임을 줄이라는 설정이면 아예 띄우지 않는다. 빌드 때 미리 그리는 HTML(entry-server.tsx)에는 넣지 않는다 */
+function wantsIntro() {
+  if (typeof window === 'undefined') return false;
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return false;
+  try {
+    return window.localStorage.getItem(INTRO_SEEN) === null;
+  } catch {
+    // 저장소를 막아 둔 브라우저. 띄우기는 하되 표시를 못 남겨 올 때마다 뜬다
+    return true;
+  }
+}
 
 /** 본문 폭과 좌우 여백. 레퍼런스는 1440 폭에서 좌우 62px 를 띄운다 */
 const SHELL = 'mx-auto w-full max-w-page px-6 lg:px-gutter';
@@ -97,7 +117,23 @@ const BOARDS = [
 
 export function Landing() {
   const { status } = useSession();
-  const [ok, ask] = HERO_SUMMARY.distribution;
+  useDocumentTitle(PAGES.home.title);
+
+  const [intro, setIntro] = useState(wantsIntro);
+
+  // index.html 이 미리 깔아 둔 판을 걷는다. 인트로가 뜨면 그 아래로 가려져 이어져 보이고, 안 뜨면 본문이 드러난다
+  useEffect(() => {
+    document.documentElement.classList.remove('intro-cover');
+  }, []);
+
+  const closeIntro = useCallback(() => {
+    setIntro(false);
+    try {
+      window.localStorage.setItem(INTRO_SEEN, '1');
+    } catch {
+      // 못 남기면 다음에 또 뜬다. 막을 방법이 없고 막을 일도 아니다
+    }
+  }, []);
 
   /* 로그인 뒤에는 메인으로 오므로, CTA 가 로그인 폼으로 되돌아가면 막힌다 */
   const signedIn = status === 'signedIn';
@@ -105,6 +141,8 @@ export function Landing() {
 
   return (
     <div className="min-h-full bg-canvas">
+      {intro && <IntroOverlay onDone={closeIntro} />}
+
       <MarketingHeader />
 
       <main>
@@ -112,21 +150,7 @@ export function Landing() {
         <section className={`${SHELL} pt-10`}>
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_206px]">
             <div className="relative">
-              <div className="relative min-h-[440px] overflow-hidden rounded-[20px] bg-surface2 lg:min-h-[621px]">
-                <OrbitStage />
-
-                {/* 글은 궤도 위에 올린다 */}
-                <div className="relative z-10 px-8 pt-12 sm:px-16 sm:pt-16">
-                  <p className="text-body text-highlight">
-                    1인 IT 개발 사업자를 위한 경비 판정
-                  </p>
-                  <strong className="mt-5 block text-h2 font-normal leading-tight tracking-ir text-white [word-break:keep-all] lg:text-ir-display">
-                    이 카드값이 경비인지,
-                    <br />
-                    조문까지 붙여 답합니다
-                  </strong>
-                </div>
-              </div>
+              <HeroBanner autoplay={!intro} />
 
               {/* 왼쪽 아래 모서리를 바탕색으로 베어 내고 그 자리에 링크를 둔다 */}
               <div className="absolute bottom-0 left-0 flex h-[72px] items-center rounded-tr-[20px] bg-canvas pr-7 pt-2">
@@ -140,50 +164,50 @@ export function Landing() {
               </div>
             </div>
 
-            {/* 첫 장은 검정에 큰 숫자, 아래로 회색 (레퍼런스 wrap_banner) */}
+            {/*
+              첫 장은 남색에 큰 숫자, 아래로 회색 (레퍼런스 wrap_banner).
+              로그인 전에는 보여 줄 실제 판정 결과가 없다. 지어낸 금액·건수 대신
+              세어서 확인되는 것(규칙 카드 수)과 제품이 하는 일만 둔다
+            */}
             <div className="flex flex-col gap-2">
               <div className="rounded-2xl bg-surface2 p-5 text-white">
-                <p className="text-caption text-white/60">이번 달 인정 경비</p>
+                <p className="text-caption text-white">검수를 마친 규칙 카드</p>
                 <p className="mt-2 whitespace-nowrap text-ir-num font-bold tracking-ir-sm tabular-nums">
-                  {won(HERO_SUMMARY.availableAmount)}
-                  <span className="ml-0.5 text-body font-normal">원</span>
+                  {RULE_CARD_COUNT}
+                  <span className="ml-0.5 text-body font-normal">장</span>
                 </p>
-                <p className="mt-2 text-caption text-white/60 tabular-nums">
-                  {HERO_SUMMARY.total}건 중 {ok.count}건 가능
+                <p className="mt-2 text-caption leading-5 text-white [word-break:keep-all]">
+                  판정마다 어느 카드가 걸렸는지 함께 보여줍니다
                 </p>
               </div>
 
               <div className="rounded-2xl bg-surface p-5">
-                <p className="text-caption text-muted">판정 분포</p>
-                <ul className="mt-4 space-y-3">
-                  {HERO_SUMMARY.distribution.map((item) =>
+                <p className="text-caption text-muted">판정 세 갈래</p>
+                <ul className="mt-4 space-y-3.5">
+                  {VERDICTS.map((item) =>
                   <li key={item.label}>
-                      <div className="flex items-baseline justify-between text-small">
-                        <span className="text-ink2">{item.label}</span>
-                        <span className="font-bold tabular-nums text-ink">
-                          {item.count}건
-                        </span>
-                      </div>
-                      <div className="mt-1.5 h-1 w-full rounded-full bg-accent-line">
-                        <div
-                        className={`h-1 rounded-full ${item.bar}`}
-                        style={{
-                          width: `${Math.round(item.count / HERO_SUMMARY.total * 100)}%`
-                        }} />
+                      <div className="flex items-center gap-1.5 text-small">
+                        <span
+                        className={`h-1.5 w-1.5 shrink-0 rounded-full ${item.bar}`}
+                        aria-hidden="true" />
 
+                        <span className="font-bold text-ink">{item.label}</span>
                       </div>
+                      <p className="mt-1 text-caption leading-5 text-ink2 [word-break:keep-all]">
+                        {item.body}
+                      </p>
                     </li>
                   )}
                 </ul>
               </div>
 
               <div className="flex-1 rounded-2xl bg-surface p-5">
-                <p className="text-caption text-muted">지금 할 일</p>
+                <p className="text-caption text-muted">되돌릴 수 없는 동작</p>
                 <p className="mt-2 text-h4 font-bold tracking-ir-sm text-ink">
-                  확인 필요 {ask.count}건
+                  없습니다
                 </p>
                 <p className="mt-2 text-small leading-6 text-ink2 [word-break:keep-all]">
-                  같은 사유끼리 묶어 두었습니다. 답하면 그 자리에서 다시
+                  신고·제출·발송을 만들지 않습니다. 답을 고치면 그 자리에서 다시
                   판정합니다.
                 </p>
               </div>
@@ -256,7 +280,7 @@ export function Landing() {
 
         {/* 숫자 줄 — 위아래 괘선만 */}
         <section id="evidence" className="mt-28 border-y border-line">
-          <dl className={`${SHELL} grid grid-cols-2 gap-10 py-16 md:grid-cols-4`}>
+          <dl className={`${SHELL} grid grid-cols-2 gap-10 py-16 md:grid-cols-3`}>
             {STATS.map((stat) =>
             <div key={stat.label}>
                 <dt className="sr-only">{stat.label}</dt>

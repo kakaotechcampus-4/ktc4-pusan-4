@@ -5,6 +5,9 @@ import type {
   BulkAnswerResult,
   BusinessContext,
   BusinessContextRef,
+  EmailVerificationConfirmRequest,
+  EmailVerificationConfirmed,
+  EmailVerificationRequest,
   ClassificationResponseRequest,
   ClassificationResponseResult,
   ClassificationReview,
@@ -16,8 +19,11 @@ import type {
   Judgment,
   JudgmentRun,
   JudgmentRunCreated,
+  JudgmentExportRow,
   JudgmentRunFailure,
   JudgmentSummary,
+  KakaoLoginRequest,
+  LimitYear,
   LoginRequest,
   OverrideRequest,
   Page,
@@ -33,6 +39,7 @@ import type {
   ReviewStatus,
   RuleCandidate,
   RuleCandidateStatus,
+  SignupRequest,
   Statute,
   StoredBusinessContext,
   Transaction,
@@ -74,6 +81,11 @@ export interface JudgmentQuery extends PageQuery {
   latestOnly?: boolean;
 }
 
+/** batchId · year 중 정확히 하나. 0개거나 2개면 400 INVALID_EXPORT_SCOPE */
+export type ExportScope =
+{batchId: string;year?: never;} |
+{year: number;batchId?: never;};
+
 /** batchId · year · runId 중 정확히 하나. 0개거나 2개 이상이면 400 INVALID_SUMMARY_SCOPE */
 export type SummaryScope =
 {batchId: string;year?: never;runId?: never;} |
@@ -97,12 +109,20 @@ export interface RuleCandidateQuery extends PageQuery {
 
 export interface Api {
   /**
-   * 인증. 계약이 아직 api.md 에 없어 #139 에 적은 대로 가정한다 — 액세스 토큰은 Authorization 헤더(메모리),
-   * 리프레시 토큰은 httpOnly 쿠키. 토큰은 이 층 안에만 있고 화면은 보지 않는다
+   * 인증 (api.md 1.1). 액세스 토큰은 Authorization 헤더(메모리), 리프레시 토큰은 httpOnly 쿠키.
+   * 토큰은 이 층 안에만 있고 화면은 보지 않는다
    */
   auth: {
     /** 성공하면 이후 요청에 토큰이 붙는다. 이메일·비밀번호가 틀리면 401 */
     login(body: LoginRequest): Promise<void>;
+    /** 가입 인증 코드를 메일로 보낸다 (#193). 코드는 5분 동안 쓸 수 있고, 다시 받기는 60초에 한 번이다 */
+    requestEmailVerification(body: EmailVerificationRequest): Promise<void>;
+    /** 코드를 확인하고 가입에 쓸 토큰을 받는다 */
+    confirmEmailVerification(body: EmailVerificationConfirmRequest): Promise<EmailVerificationConfirmed>;
+    /** 가입하고 바로 로그인한다. 성공하면 login 과 같다 */
+    signup(body: SignupRequest): Promise<void>;
+    /** 카카오 인가 코드로 로그인한다 (#176). 처음 온 회원이면 서버가 계정을 만든다 */
+    kakao(body: KakaoLoginRequest): Promise<void>;
     /** 새로고침 뒤 리프레시 쿠키로 로그인을 이어 간다. 이어 갈 수 없으면 false */
     restore(): Promise<boolean>;
     /** 이 브라우저의 토큰은 부르는 즉시 지운다. 서버 응답은 기다리지 않아도 된다 */
@@ -163,6 +183,11 @@ export interface Api {
     list(query?: JudgmentQuery): Promise<Page<Judgment>>;
     get(judgmentId: string): Promise<Judgment>;
     /**
+     * 세무사에게 넘길 내보내기(#214). 현재 판정 전부를 페이지 없이 준다. 다른 사용자의 batchId 면 빈 목록.
+     * limits 는 summary 의 limits 와 같다(#226)
+     */
+    export(scope: ExportScope): Promise<{items: JudgmentExportRow[];limits: LimitYear[];}>;
+    /**
      * 3.8 사용자 수정. 새 revision 을 만들고 이전 판정은 보존한다.
      * 현재 판정이 아니거나 판정 대상이 아닌 거래면 409 (#62). idempotencyKey 는 같은 내용을 다시 보낼 때만 재사용한다
      */
@@ -180,12 +205,13 @@ export interface Api {
     respond(body: QuestionResponseRequest): Promise<QuestionResponseResult>;
     /** 남은 꼬리 질문을 factType 단위로 한 번에 닫는다 */
     bulkAnswer(body: BulkAnswerRequest): Promise<BulkAnswerResult>;
-    /** 다른 업로드에서 같은 질문에 한 답 (명세 3.1). 아직 백엔드 일정에 없다 */
+    /** 다른 업로드에서 같은 질문에 한 답 (명세 3.1, api.md GET /questions/suggestions) */
     suggestions(batchId: string): Promise<{items: QuestionSuggestion[];}>;
   };
   /**
-   * 비서 Really (docs/agent-secretary.md 9·10장). 중계·진행 상황·세무대리인 질문 API 는 아직 백엔드 일정에 없다.
-   * 오류는 중계가 1.3 형식으로 바꿔 준다. 429 는 Retry-After(ApiRequestError.retryAfter)
+   * 비서 Really (docs/agent-secretary.md 9·10장). 중계는 api.md POST /assistant/chat.
+   * 검증 실패는 400, 맥락의 업로드·거래가 없거나 남의 것이면 404 BATCH_NOT_FOUND·TRANSACTION_NOT_FOUND,
+   * 한도는 429 ASSISTANT_RATE_LIMITED + Retry-After(ApiRequestError.retryAfter), AI 서버 장애는 503
    */
   assistant: {
     chat(body: AssistantChatRequest): Promise<AssistantChatResponse>;
@@ -197,7 +223,7 @@ export interface Api {
     list(): Promise<HandoffNote[]>;
     create(body: HandoffNoteRequest): Promise<HandoffNote>;
   };
-  /** 관리자 (M1). 계약이 아직 없다 — 경로·모양은 가정이다 */
+  /** 관리자 (M1, api.md 3.15) */
   admin: {
     ruleCandidates: {
       list(query?: RuleCandidateQuery): Promise<Page<RuleCandidate>>;
@@ -215,7 +241,9 @@ export class ApiRequestError extends Error {
   message: string,
   public readonly traceId = '',
   /** 429 의 Retry-After(초). 없으면 undefined */
-  public readonly retryAfter?: number)
+  public readonly retryAfter?: number,
+  /** 409 RUN_ALREADY_ACTIVE 의 진행 중인 판정 실행 id (#228). 그 밖에는 undefined */
+  public readonly runId?: string)
   {
     super(message);
     this.name = 'ApiRequestError';
