@@ -283,3 +283,90 @@ sudo docker compose --env-file /etc/ktc4/production.env -f /opt/ktc4/repo/deploy
   | grep -oiE 'GPTBot|OAI-SearchBot|ChatGPT-User|ClaudeBot|Claude-SearchBot|Claude-User|PerplexityBot|Perplexity-User|CCBot|Googlebot|bingbot|Yeti' \
   | sort | uniq -c
 ```
+
+## 14. 로그
+
+트랙 A(A3)가 채운다. 백엔드 로그는 CloudWatch Logs `/ktc4/backend`로 간다. 이 그룹은 15절의 모니터링 스택이 만든다.
+
+## 15. 모니터링
+
+알람·Lambda·로그 그룹은 CloudFormation 스택 `ktc4-monitoring`(`deploy/monitoring/template.yaml`) 하나로 관리한다. 콘솔에서 손으로 고치지 말고 템플릿을 고쳐 다시 배포한다. 계획과 이유는 `docs/monitoring_plan.md`에 있다.
+
+| 리소스 | 이름 |
+| --- | --- |
+| 백엔드 로그 그룹 | `/ktc4/backend` (보존 14일, 스택을 지워도 남는다) |
+| 알림 Lambda | `ktc4-alarm-to-discord` (알람 → Discord 장애 알림 스레드) |
+| 알람 | `ktc4-ec2-cpu-high`, `ktc4-ec2-status-check-failed`, `ktc4-ec2-memory-high`, `ktc4-ec2-disk-high`, `ktc4-backend-http-5xx`, `ktc4-backend-restarted` |
+| 대시보드 | `ktc4-backend` |
+| Agent 로그 그룹 | `/ktc4/prometheus` (보존 3일, Agent 가 긁은 앱 지표를 EMF 로그로 쓰는 곳) |
+
+### 스택 배포
+
+SSO로 로그인한 터미널에서 실행한다. 리전은 스크립트가 `ap-northeast-2`로 고정한다.
+
+```bash
+aws sso login --profile ktc-team
+export AWS_PROFILE=ktc-team
+export ARTIFACT_BUCKET=<Lambda zip을 올릴 S3 버킷>   # 5절의 백업 버킷을 써도 된다. monitoring/ 접두사에 올린다.
+export EC2_INSTANCE_ID=i-...
+read -rs ALARM_DISCORD_WEBHOOK && export ALARM_DISCORD_WEBHOOK   # 장애 알림 스레드 웹훅(?thread_id= 포함)
+deploy/monitoring/deploy.sh
+```
+
+- 장애 알림 웹훅은 PR 알림·코퍼스 동기화와 다른 스레드다. `TEAM_DISCORD_WEBHOOK` 끝에 `?thread_id=<장애 알림 스레드 ID>`를 붙인다.
+- 웹훅은 `NoEcho` 파라미터라 스택 화면에는 보이지 않지만, Lambda 환경 변수에는 평문으로 남는다.
+- 템플릿을 고친 뒤에도 같은 명령으로 다시 배포한다. 바뀐 게 없으면 아무것도 하지 않는다.
+
+### 알림 확인
+
+배포 직후와 알람을 더한 뒤에 알람 상태를 손으로 바꿔 Discord에 오는지 본다. 다음 평가 주기(최대 5분)에 실제 상태로 돌아오며 복구 알림이 한 번 더 온다.
+
+```bash
+aws cloudwatch set-alarm-state --region ap-northeast-2 \
+  --alarm-name ktc4-ec2-cpu-high --state-value ALARM --state-reason "알림 경로 시험"
+```
+
+Discord에 오지 않으면 Lambda 로그(`/aws/lambda/ktc4-alarm-to-discord`)를 본다. 403이면 웹훅 URL, 로그 자체가 없으면 Lambda 호출 권한(`AlarmInvokePermission`)을 확인한다.
+
+### CloudWatch Agent
+
+EC2에 CloudWatch Agent를 설치해 메모리·디스크와 백엔드 앱 지표 3개를 보낸다. 설정은 `deploy/cloudwatch-agent/`에 있고, 스택을 먼저 배포한 뒤(로그 그룹 `/ktc4/prometheus`) 설치한다. 설정을 바꾼 뒤에도 같은 명령을 다시 돌린다.
+
+```bash
+cd /opt/ktc4/repo && sudo git pull
+sudo bash /opt/ktc4/repo/deploy/cloudwatch-agent/install.sh
+systemctl status amazon-cloudwatch-agent --no-pager   # Memory: 줄로 Agent 사용량을 본다
+sudo tail -n 50 /opt/aws/amazon-cloudwatch-agent/logs/amazon-cloudwatch-agent.log
+```
+
+| 지표 | 네임스페이스 | 차원 |
+| --- | --- | --- |
+| `mem_used_percent` | `CWAgent` | `InstanceId` |
+| `disk_used_percent` (`/`만) | `CWAgent` | `InstanceId`, `path`, `fstype` |
+| `hikaricp_connections_pending`, `jvm_memory_used_bytes`(heap), `executor_queued_tasks`(judgmentRunExecutor) | `ktc4/backend` | `job=ktc4-backend` |
+
+- 앱 지표는 백엔드가 `127.0.0.1:8080/actuator/prometheus`를 연 뒤(A2)부터 나온다. 그 전에는 Agent 로그에 연결 실패가 찍히는 게 정상이다.
+- 긁은 값 중 위 3개만 남기고 버린다(`prometheus.yaml`의 `metric_relabel_configs`). 늘리려면 이 규칙과 `config.json`의 `metric_selectors`를 같이 고친다. 지표 하나가 차원 조합마다 따로 과금된다.
+- 설치 뒤 확인: `aws cloudwatch list-metrics --region ap-northeast-2 --namespace CWAgent`와 `--namespace ktc4/backend`.
+
+### 알람 기준
+
+| 알람 | 조건 | 복구 알림 |
+| --- | --- | --- |
+| `ktc4-backend-http-5xx` | 요청 로그 `status >= 500`, 5분에 1건 이상 | 없음 |
+| `ktc4-backend-restarted` | 로그 `Started BackendApplication` 1건 이상. 배포 때도 울린다. | 없음 |
+| `ktc4-ec2-cpu-high` | CPU 80% 이상, 5분 단위 2번 연속 | 있음 |
+| `ktc4-ec2-status-check-failed` | 상태 검사 실패 | 있음 |
+| `ktc4-ec2-memory-high` | 메모리 90% 이상 5분 | 있음 |
+| `ktc4-ec2-disk-high` | 루트 디스크 80% 이상 | 있음 |
+
+- 건수 알람(5xx, 기동)은 건이 없으면 지표가 비어 `OK`로 돌아간다. 복구 알림은 소음이라 보내지 않는다.
+- 5xx 필터는 `status`가 숫자 필드일 때만 걸린다. 백엔드 로그 형식을 바꾸면 실제 로그 한 줄로 필터를 다시 시험한다.
+
+```bash
+aws logs test-metric-filter --region ap-northeast-2 \
+  --filter-pattern '{ $.status >= 500 }' \
+  --log-event-messages '<A1 PR 본문의 500 요청 로그 한 줄>'
+```
+
+- 디스크 알람의 `fstype` 차원은 스택 파라미터 `RootFsType`(기본 `ext4`)다. Agent 설치 뒤 `list-metrics`로 본 값과 다르면 `deploy.sh`를 고쳐 `RootFsType=<값>`을 넘긴다.
