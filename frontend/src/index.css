@@ -15,7 +15,7 @@ body,
 }
 body {
   background-color: #ffffff;
-  color: #30363F;
+  color: #4E5968;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -24,8 +24,9 @@ body {
   outline-offset: 2px;
   border-radius: 4px;
 }
+/* 팔레트에서 노랑을 뺐다. 핑크는 선택 바탕으로 쓰면 ink2 대비 2.46 · muted 1.59 라 글자가 묻힌다 */
 ::selection {
-  background: #ffe600;
+  background: #E4EDFB;
 }
 
 /* 요약을 PDF 로 저장할 때(Summary.tsx 「PDF로 저장」). 비서 패널이 준 오른쪽 여백과 배경색을 빼고 본문만 찍는다 */

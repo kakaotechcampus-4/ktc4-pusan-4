@@ -1,7 +1,11 @@
 import React, { useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ChevronDownIcon, SendIcon, XIcon } from 'lucide-react';
-// 비서 얼굴. 봇 아이콘 대신 브랜드 Really 를 쓴다 (assets/brand/really-fab)
+/*
+ * 버튼 한 장이다. SVG 가 파란 원판에 돼지까지 그려 둔 완성된 얼굴이라,
+ * 알약 안에 넣으면 원판 위에 원판이 겹친다 (#242 리뷰). 브랜드 문서가 정한 모양도
+ * 투명 버튼 + 원형 SVG 이고 크기는 44·56·72 중 56 이 기본이다
+ */
 import really from '../../assets/brand/really-fab/really-fab-blue.svg';
 import { Badge, Button, Input, cn } from '../ui';
 import { useSession } from '../../contexts/SessionContext';
@@ -17,12 +21,11 @@ function SignInLauncher() {
     <div className="fixed bottom-5 right-5 z-40">
       <button
         type="button"
+        aria-label="로그인하고 비서에게 묻기"
         onClick={() => navigate('/login', { state: { from: '/' } })}
-        className="flex items-center gap-2 rounded-full bg-ink px-4 py-3 text-body font-bold text-white shadow-panel transition-transform duration-150 ease-snap hover:-translate-y-0.5">
+        className="block h-14 w-14 rounded-full transition-transform duration-150 ease-snap hover:-translate-y-0.5 focus-visible:rounded-full">
 
-        <img src={really} alt="" className="h-6 w-6 rounded-full" />
-        Really
-        <span className="sr-only">로그인하고 비서에게 묻기</span>
+        <img src={really} alt="" className="block h-14 w-14 rounded-full" />
       </button>
     </div>);
 
@@ -129,18 +132,22 @@ export function Assistant() {
           }
           </div>
         }
+        {/* 펴면 돼지 대신 접는 화살표를 둔다. 글자가 없으니 버튼에 접는 길도 보여야 한다 */}
         <button
           ref={button}
           type="button"
           aria-expanded={open}
+          aria-label={open ? '비서 접기' : '비서에게 묻기'}
           onClick={() => setOpen(!open)}
-          className="flex items-center gap-2 rounded-full bg-ink px-4 py-3 text-body font-bold text-white shadow-panel transition-transform duration-150 ease-snap hover:-translate-y-0.5">
+          className={cn(
+            // 전역 :focus-visible 이 border-radius 4px 를 얹는다. 원형 버튼에 모난 테가 그려져 되돌린다
+            'h-14 w-14 rounded-full transition-transform duration-150 ease-snap hover:-translate-y-0.5 focus-visible:rounded-full',
+            open ? 'flex items-center justify-center bg-ink text-white' : 'block'
+          )}>
 
           {open ?
-          <ChevronDownIcon className="h-5 w-5" aria-hidden="true" /> :
-          <img src={really} alt="" className="h-6 w-6 rounded-full" />}
-          Really
-          <span className="sr-only">{open ? '비서 접기' : '비서에게 묻기'}</span>
+          <ChevronDownIcon className="h-6 w-6" aria-hidden="true" /> :
+          <img src={really} alt="" className="block h-14 w-14 rounded-full" />}
         </button>
       </div>
     </>);
