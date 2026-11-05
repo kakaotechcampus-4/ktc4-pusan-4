@@ -47,6 +47,27 @@
 
 ---
 
+# 메트릭 필터·알람·대시보드 (B3)
+
+- 브랜치: feature/monitoring-alarms (feature/monitoring-agent 위)
+- 주요파일: deploy/monitoring/template.yaml, docs/deployment.md
+
+## 한 일
+
+- `/ktc4/backend` 에 메트릭 필터 2개(5xx, 기동), 알람 4개(5xx, 재시작, 메모리, 디스크), 대시보드 `ktc4-backend` 를 스택에 더했다. 커스텀 지표는 계획대로 7개.
+
+## 왜 이렇게 했나
+
+- 5xx·재시작은 일이 생긴 순간만 의미가 있어 복구(OK) 알림을 뺐다. 배포할 때마다 기동·복구 두 번 울리는 걸 막는다.
+- 디스크 `fstype` 차원은 Agent 에서 뺄 수 없어 스택 파라미터(`RootFsType`, 기본 ext4)로 받는다.
+
+## 남은 것 · 아는 문제
+
+- A1 로그 예시가 아직 없어 필터는 계약(`status` 숫자 필드, 기동 문구) 기준이다. A1 머지 뒤 `test-metric-filter` 로 확인하고 다르면 고친다.
+- 알람별 `set-alarm-state` Discord 도착 확인은 배포 뒤.
+
+---
+
 # B1 배포 수정: Lambda zip 을 직접 만든다
 
 - 첫 배포에서 `AlarmToDiscordFunction` 이 "Could not unzip uploaded file" 로 실패했다. 템플릿 `Code` 에 `.py` 를 두면 AWS CLI v2(2.39.3)의 `cloudformation package` 가 zip 으로 묶지 않고 올린다.
