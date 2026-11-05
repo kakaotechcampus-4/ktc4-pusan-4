@@ -286,7 +286,7 @@ export function Results() {
   const header =
   <header className="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <p className="text-small font-bold text-accent">5단계 · 결과</p>
+        <p className="text-small font-bold text-accent">4단계 · 결과</p>
         <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">판정 결과</h1>
         {summary &&
       <p className="mt-2 text-body tabular-nums text-muted">

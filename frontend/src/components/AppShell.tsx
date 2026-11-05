@@ -11,14 +11,15 @@ import { useSession } from '../contexts/SessionContext';
 import { accountLabel } from '../utils/account';
 
 /**
- * 진행 단계. 순서는 PM 확정 흐름을 따른다:
- * 업로드 → 분류 결과 미리보기 → 문진 → 판정 → 결과 (→ 되묻기 → 재판정)
- * 문진은 판정 전 필수지만 첫 화면에 두지 않는다 (이탈 방지).
+ * 진행 단계: 업로드 → 분류 결과 미리보기 → 판정 → 결과 (→ 되묻기 → 재판정)
+ *
+ * 사업자 문진은 여기 넣지 않는다. 한 번 하면 다시 하지 않는 설정이지 판정마다 밟는
+ * 단계가 아니다 — 띠에 끼워 두면 카드내역을 올릴 때마다 또 해야 하는 것처럼 보인다
+ * (#242 리뷰). 문진을 막는 일은 띠가 아니라 Confirm.tsx 가 한다. 고치는 길은 내 정보에 있다
  */
 const STEPS = [
 { path: '/upload', label: '카드내역' },
 { path: '/preview', label: '분류 확인' },
-{ path: '/interview', label: '사업자 문진' },
 // 판정 진행은 실행 id 가 주소에 있어야 한다(/run/:runId). 단계를 누르면 판정 전 확인으로 간다
 { path: '/run', to: '/confirm', label: '판정' },
 { path: '/results', label: '결과' }];
@@ -32,7 +33,8 @@ const CRUMB: Record<string, [string, string]> = {
   '/preview': ['카드내역', '가맹점 분류 확인'],
   '/uploads': ['자료', '업로드 이력'],
   '/transactions': ['자료', '거래 목록'],
-  '/interview': ['판정', '사업자 문진'],
+  // 판정 흐름이 아니라 계정 설정이다. 고치는 길도 내 정보에 있다
+  '/interview': ['내 정보', '사업자 문진'],
   '/confirm': ['판정', '판정 확인'],
   '/run': ['판정', '판정 진행'],
   '/results': ['판정', '판정 결과'],
@@ -55,10 +57,10 @@ const ADMIN_REF: NavRef = { path: '/admin', label: '관리자' };
 
 /** 단계 표시에 포함되지 않지만 특정 단계에 속하는 화면 */
 const STEP_ALIAS: Record<string, number> = {
-  '/confirm': 3,
-  '/questions': 4,
-  '/summary': 4,
-  '/judgments': 4
+  '/confirm': 2,
+  '/questions': 3,
+  '/summary': 3,
+  '/judgments': 3
 };
 
 

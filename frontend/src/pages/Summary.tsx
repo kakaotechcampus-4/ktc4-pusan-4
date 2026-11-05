@@ -136,7 +136,7 @@ export function Summary() {
   const header =
   <header className="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <p className="text-small font-bold text-accent">5단계 · 요약</p>
+        <p className="text-small font-bold text-accent">4단계 · 요약</p>
         <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
           {period ? `${period} 요약` : '판정 요약'}
         </h1>

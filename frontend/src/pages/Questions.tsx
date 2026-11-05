@@ -204,7 +204,7 @@ export function Questions() {
   const header =
   <header className="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <p className="text-small font-bold text-accent">5단계 · 질문</p>
+        <p className="text-small font-bold text-accent">4단계 · 질문</p>
         <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
           확인이 필요한 것만 물어봅니다
         </h1>

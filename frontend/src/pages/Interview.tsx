@@ -64,6 +64,15 @@ const dutyFor = (revenue: number): BookkeepingDuty => revenue >= DOUBLE_ENTRY_FR
 /** 오늘(한국 시각) 날짜. 개업일은 오늘을 넘길 수 없다 */
 const todayKst = () => new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
 
+/*
+ * 칸 하나가 틀렸을 때의 모양. 3번 개업일과 6번 면적 비율이 서로 달랐다 (#242 리뷰) —
+ * 개업일은 빨간 글자만 띄우고 테두리는 그대로였고, 비율은 aria-invalid 만 걸어 둬서
+ * 아무것도 안 보였다. 테두리와 글자를 묶어 두 칸이 같은 식으로 알리게 한다
+ */
+const fieldClass =
+'rounded-xl border border-line px-3.5 py-2.5 text-[14px] tabular-nums text-ink aria-[invalid=true]:border-deny';
+const fieldErrorClass = 'mt-2 text-small text-deny';
+
 const cardClass = 'rounded-2xl border border-line bg-surface p-5';
 const labelClass = 'text-[14px] font-bold text-ink';
 const hintClass = 'mt-1 text-[13px] leading-6 text-muted';
@@ -167,11 +176,12 @@ export function Interview() {
   };
 
   return (
-    <AppShell>
+    // 진행 단계에 없는 화면이다. 띠를 띄우면 어느 칸도 켜지지 않아 고장난 것처럼 보인다
+    <AppShell showSteps={false}>
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
         <form onSubmit={(event) => void submit(event)}>
           <header>
-            <p className="text-[13px] font-bold text-accent">3단계 · 사업자 문진</p>
+            <p className="text-[13px] font-bold text-accent">설정 · 사업자 문진</p>
             <h1 className="mt-1.5 text-[28px] font-bold tracking-tight text-ink">
               사업자 문진
             </h1>
@@ -246,9 +256,9 @@ export function Interview() {
                 onChange={(event) =>
                 update('businessOpenDate', event.target.value)
                 }
-                className="mt-3 rounded-xl border border-line px-3.5 py-2.5 text-[14px] tabular-nums text-ink" />
+                className={`mt-3 ${fieldClass}`} />
               {futureOpen &&
-              <p role="alert" className="mt-2 text-small text-deny">개업일은 오늘이나 그 전이어야 합니다.</p>
+              <p role="alert" className={fieldErrorClass}>개업일은 오늘이나 그 전이어야 합니다.</p>
               }
               
             </section>
@@ -326,10 +336,13 @@ export function Interview() {
                       edited.current = true;
                       setRatioText(event.target.value.replace(/\D/g, '').slice(0, 3));
                     }}
-                    className="w-24 rounded-xl border border-line px-3.5 py-2.5 text-[14px] tabular-nums text-ink" />
+                    className={`w-24 ${fieldClass}`} />
                   
                     <span className="text-[14px] font-bold text-ink">%</span>
                   </div>
+                  {ratioText !== '' && !ratioValid &&
+                <p role="alert" className={fieldErrorClass}>1 과 100 사이의 숫자를 적어 주세요.</p>
+                }
                   <p className="mt-2 text-[12px] leading-5 text-muted">
                     미리 채워 두지 않습니다. 대략이라도 실제 면적으로 적어 주세요. 예: 방 네 칸 중 한 칸을 작업실로 쓰면 25%.
                   </p>

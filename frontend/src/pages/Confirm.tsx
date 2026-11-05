@@ -78,7 +78,7 @@ export function Confirm() {
     <AppShell>
       <div className="mx-auto max-w-3xl">
         <header>
-          <p className="text-small font-bold text-accent">4단계 · 판정 전 확인</p>
+          <p className="text-small font-bold text-accent">3단계 · 판정 전 확인</p>
           <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
             이 입력으로 판정합니다
           </h1>
