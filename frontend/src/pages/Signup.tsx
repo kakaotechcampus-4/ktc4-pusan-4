@@ -4,10 +4,15 @@ import { CheckIcon } from 'lucide-react';
 import { SignedUpError, useSession } from '../contexts/SessionContext';
 import { api, ApiRequestError, mockVerificationCode } from '../api';
 import { AUTH_INPUT, AUTH_LABEL, AUTH_PRIMARY, AUTH_SECONDARY, AuthLayout } from '../components/AuthLayout';
+import { Button, Modal } from '../components/ui';
+import { TERMS_EFFECTIVE, TermsBody } from './public/Terms';
+import { PRIVACY_EFFECTIVE, PrivacyBody } from './public/Privacy';
 
 /** 다시 받기 간격. 서버도 60초에 한 번만 보낸다 (#193) */
 const RESEND_SECONDS = 60;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** 약관·처리방침을 여는 「보기」 */
+const DOC_LINK = 'shrink-0 text-[12px] text-muted underline underline-offset-4 hover:text-ink';
 
 interface LocationState {
   from?: string;
@@ -66,6 +71,8 @@ export function Signup() {
   const [password, setPassword] = useState('');
   const [passwordAgain, setPasswordAgain] = useState('');
   const [agreeTerms, setAgreeTerms] = useState(false);
+  /** 띄워 둔 문서. null 이면 닫혀 있다 */
+  const [doc, setDoc] = useState<'terms' | 'privacy' | null>(null);
   const [agreePrivacy, setAgreePrivacy] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -369,25 +376,49 @@ export function Signup() {
               모두 동의합니다
             </label>
             <span aria-hidden="true" className="block h-px bg-line2" />
-            <label className="flex items-center gap-2 text-ink2">
-              <input type="checkbox" checked={agreeTerms} onChange={(event) => setAgreeTerms(event.target.checked)} />
-              <span className="flex-1">[필수] 이용약관 동의</span>
-              <Link to="/terms" target="_blank" className="text-[12px] text-muted underline underline-offset-4 hover:text-ink">
+            {/*
+              「보기」는 label 밖에 둔다. 안에 두면 누를 때 체크박스까지 같이 켜진다 —
+              읽어 보려다 동의한 것이 되면 안 된다 (#247 리뷰)
+            */}
+            <div className="flex items-center gap-2 text-ink2">
+              <label className="flex flex-1 items-center gap-2">
+                <input type="checkbox" checked={agreeTerms} onChange={(event) => setAgreeTerms(event.target.checked)} />
+                [필수] 이용약관 동의
+              </label>
+              <button type="button" onClick={() => setDoc('terms')} className={DOC_LINK}>
                 보기
-              </Link>
-            </label>
-            <label className="flex items-center gap-2 text-ink2">
-              <input
-              type="checkbox"
-              checked={agreePrivacy}
-              onChange={(event) => setAgreePrivacy(event.target.checked)} />
+              </button>
+            </div>
+            <div className="flex items-center gap-2 text-ink2">
+              <label className="flex flex-1 items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={agreePrivacy}
+                  onChange={(event) => setAgreePrivacy(event.target.checked)} />
 
-              <span className="flex-1">[필수] 개인정보 수집·이용 동의</span>
-              <Link to="/privacy" target="_blank" className="text-[12px] text-muted underline underline-offset-4 hover:text-ink">
+                [필수] 개인정보 수집·이용 동의
+              </label>
+              <button type="button" onClick={() => setDoc('privacy')} className={DOC_LINK}>
                 보기
-              </Link>
-            </label>
+              </button>
+            </div>
           </fieldset>
+
+          {/* 페이지로 보내지 않고 창으로 띄운다. 적던 메일·비밀번호를 잃지 않는다 (#247 리뷰) */}
+          <Modal
+            open={doc !== null}
+            onClose={() => setDoc(null)}
+            size="lg"
+            title={doc === 'privacy' ? '개인정보처리방침' : '이용약관'}
+            description={`시행일 ${doc === 'privacy' ? PRIVACY_EFFECTIVE : TERMS_EFFECTIVE}`}
+            footer={
+            <Button variant="secondary" size="sm" onClick={() => setDoc(null)}>
+                닫기
+              </Button>
+            }>
+
+            {doc === 'privacy' ? <PrivacyBody /> : <TermsBody onOpenPrivacy={() => setDoc('privacy')} />}
+          </Modal>
 
           {errorBox}
           <button type="submit" disabled={busy} className={`mt-5 ${AUTH_PRIMARY}`}>
