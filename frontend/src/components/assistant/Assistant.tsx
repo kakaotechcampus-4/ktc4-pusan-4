@@ -216,7 +216,9 @@ function Panel({
       role="dialog"
       aria-label="비서 Really"
       onKeyDown={onKeyDown}
-      className="fixed inset-0 z-40 flex flex-col bg-surface sm:inset-auto sm:bottom-20 sm:right-5 sm:h-[min(38rem,calc(100vh-8rem))] sm:w-[25rem] sm:rounded-2xl sm:border sm:border-line sm:shadow-panel">
+      /* 테두리를 line(흰 바탕 대비 1.19)에서 muted(4.62)로 올린다. 대화창 바탕이 흰 화면과
+         거의 같은 밝기라 어디서 끝나는지 보이지 않았다 (#242 리뷰) */
+      className="fixed inset-0 z-40 flex flex-col bg-surface sm:inset-auto sm:bottom-20 sm:right-5 sm:h-[min(38rem,calc(100vh-8rem))] sm:w-[25rem] sm:rounded-2xl sm:border sm:border-muted sm:shadow-panel">
 
       <header className="flex items-start gap-3 border-b border-line px-5 py-4">
         <div className="min-w-0 flex-1">

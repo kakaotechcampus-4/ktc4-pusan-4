@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRightIcon } from 'lucide-react';
 import { useSession } from '../contexts/SessionContext';
+import icon from '../assets/brand/icon/preet-icon.svg';
+import { InterviewCard, UploadRows, VerdictCard } from '../components/flowFigure';
 import { MarketingHeader } from '../components/MarketingHeader';
 import { MarketingFooter } from '../components/MarketingFooter';
 import { HeroBanner } from '../components/HeroBanner';
@@ -55,19 +57,13 @@ function ArrowDot({ size = 'md' }: {size?: 'sm' | 'md';}) {
 
 /**
  * 섹션 제목. 레퍼런스는 글자 앞에 48×48 그림을 두고 글자는 48px 굵기 400 이다.
- * 그림은 카카오 자산이라 가져오지 않고, 같은 자리에 우리 로고 막대를 둔다.
+ * 그림은 카카오 자산이라 가져오지 않는다. 같은 자리에 브랜드 앱 아이콘을 둔다 (#247 리뷰).
  */
 function IrHeading({ children }: {children: React.ReactNode;}) {
   return (
     <h2 className="flex items-center gap-4 text-h2 font-normal tracking-ir text-ink [word-break:keep-all] lg:text-ir-section">
-      <span
-        aria-hidden="true"
-        className="flex h-12 w-12 shrink-0 items-center justify-center gap-[3px] rounded-xl bg-surface">
-
-        <span className="block h-5 w-[5px] rounded-sm bg-ink" />
-        <span className="block h-5 w-[5px] rounded-sm bg-ink" />
-        <span className="block h-5 w-[5px] rounded-sm bg-highlight" />
-      </span>
+      {/* 브랜드 앱 아이콘. 둥근 사각형과 바탕을 SVG 가 이미 갖고 있어 타일을 따로 그리지 않는다 */}
+      <img src={icon} alt="" aria-hidden="true" className="block h-12 w-12 shrink-0" />
       {children}
     </h2>);
 
@@ -223,7 +219,7 @@ export function Landing() {
             {BOARDS.map((board) =>
             <div
               key={board.title}
-              className="flex min-h-[241px] flex-col rounded-2xl bg-surface px-8 py-8">
+              className="flex min-h-[241px] flex-col rounded-2xl bg-accent-soft px-8 py-8">
 
                 <strong className="text-h3 font-bold tracking-ir-sm text-ink lg:text-ir-panel">
                   {board.title}
@@ -238,13 +234,25 @@ export function Landing() {
           </div>
 
           <ul className="mt-4 grid gap-4 md:grid-cols-3">
-            {FLOW_STEPS.slice(0, 3).map((step) =>
+            {FLOW_STEPS.slice(0, 3).map((step, index) =>
             <li key={step.step}>
-                <div className="flex h-full min-h-[360px] flex-col rounded-2xl bg-surface px-8 py-8">
+                <div className="flex h-full min-h-[360px] flex-col rounded-2xl bg-accent-soft px-8 py-8">
                   <span className="inline-flex w-fit items-center rounded-full bg-canvas px-3.5 py-1.5 text-caption text-ink2">
                     {step.step}단계
                   </span>
-                  <strong className="mt-auto block text-h3 font-bold leading-tight tracking-ir-sm text-ink [word-break:keep-all] lg:text-ir-panel">
+                  {/*
+                    히어로 2번 장면과 같은 그림을 그 단계 칸에 하나씩 둔다 (#247 리뷰).
+                    같은 말을 위에서는 그림으로, 여기서는 글로만 하고 있었고 그 자리가 비어
+                    그림이 빠진 것처럼 보였다. 연파랑 판이라 색만 light 로 바꿔 쓴다
+                  */}
+                  <div className="mt-6 flex flex-1 items-center">
+                    {[
+                    <UploadRows key="upload" tone="light" />,
+                    <InterviewCard key="interview" tone="light" />,
+                    <VerdictCard key="verdict" tone="light" />][
+                    index]}
+                  </div>
+                  <strong className="block text-h3 font-bold leading-tight tracking-ir-sm text-ink [word-break:keep-all] lg:text-ir-panel">
                     {step.title}
                   </strong>
                   <p className="mt-5 text-body leading-6 text-ink2 [word-break:keep-all]">
@@ -303,7 +311,7 @@ export function Landing() {
             {SYSTEM_FEATURES.map((feature) =>
             <li
               key={feature.title}
-              className="flex min-h-[360px] flex-col rounded-2xl bg-surface px-8 py-8">
+              className="flex min-h-[360px] flex-col rounded-2xl bg-accent-soft px-8 py-8">
 
                 <strong className="block whitespace-pre-line text-h3 font-bold leading-tight tracking-ir-sm text-ink [word-break:keep-all] lg:text-ir-panel">
                   {feature.title}
@@ -312,7 +320,7 @@ export function Landing() {
                   {feature.body}
                 </p>
                 {feature.caption &&
-              <p className="mt-6 border-t border-accent-line pt-5 text-small text-muted">
+              <p className="mt-6 border-t border-accent-line pt-5 text-small text-ink2">
                     {feature.caption}
                   </p>
               }
