@@ -258,6 +258,15 @@ curl -sI https://<도메인>/ | grep -i strict-transport           # max-age=315
 
 카카오톡 미리보기는 카카오가 캐시한다. 제목·설명·이미지를 바꿨으면 [카카오 공유 디버거](https://developers.kakao.com/tool/debugger/sharing)에서 주소의 캐시를 지운다.
 
+### 검색 도구 등록
+
+검색 도구는 소유 확인 값이 남아 있는 동안만 사이트를 관리하게 해 준다. 아래 값을 지우거나 덮어쓰면 확인이 풀린다.
+
+- 구글 서치콘솔: 도메인 속성. DuckDNS의 TXT 레코드에 `google-site-verification=…` 값을 넣었다. DuckDNS는 도메인마다 TXT를 하나만 두므로, 다른 용도로 TXT를 갱신하면 이 값이 사라진다.
+- Bing 웹마스터 도구: 서치콘솔에서 가져와 등록했다. 서치콘솔 확인이 풀리면 같이 풀린다.
+- 네이버 서치어드바이저: `frontend/index.html`의 `naver-site-verification` 메타 태그. 프리렌더가 이 파일을 틀로 쓰므로 공개 페이지마다 들어간다.
+- 사이트맵은 세 곳 모두 `https://<도메인>/sitemap.xml`로 제출한다.
+
 ### 접근 기록
 
 검색엔진·AI 크롤러가 언제 얼마나 읽어 가는지 세려고 남긴다.
