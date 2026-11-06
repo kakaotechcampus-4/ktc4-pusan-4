@@ -1,13 +1,15 @@
 import React from 'react';
 import { cn } from './cn';
 
-type CardTone = 'surface' | 'canvas' | 'ink';
+type CardTone = 'canvas' | 'ink';
 type CardPadding = 'sm' | 'md' | 'lg' | 'none';
 
-/** 회색 패널이 기본이다. 테두리도 그림자도 쓰지 않고 바탕색으로만 가른다 */
+/**
+ * 흰 상자에 옅은 테두리가 기본이다. 회색으로 칠하지 않는다 — 회색은 hover·고른 상태의 색이다.
+ * 경계가 꼭 필요한 덩어리에만 쓰고, 나머지는 흰 바탕에 간격으로 가른다
+ */
 const TONE: Record<CardTone, string> = {
-  surface: 'bg-surface',
-  canvas: 'border border-line bg-sheet',
+  canvas: 'border border-line bg-canvas',
   ink: 'bg-ink text-white'
 };
 
@@ -26,7 +28,7 @@ interface CardProps extends React.HTMLAttributes<HTMLElement> {
 }
 
 export function Card({
-  tone = 'surface',
+  tone = 'canvas',
   padding = 'sm',
   as: Tag = 'div',
   className,
@@ -37,7 +39,7 @@ export function Card({
     <Tag
       className={cn('rounded-2xl', TONE[tone], PADDING[padding], className)}
       {...rest}>
-      
+
       {children}
     </Tag>);
 

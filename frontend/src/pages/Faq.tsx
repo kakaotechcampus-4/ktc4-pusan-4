@@ -18,11 +18,7 @@ export function Faq() {
       <MarketingHeader />
 
       <main className="mx-auto w-full max-w-page px-6 pb-28 pt-16 lg:px-gutter">
-        <SectionHeading
-          as="h1"
-          eyebrow="자주 묻는 질문"
-          title="먼저 묻는 것들"
-          description="판정을 누가 하는지, 내 파일이 어디까지 가는지, 결과를 어디까지 믿어도 되는지." />
+        <SectionHeading as="h1" eyebrow="자주 묻는 질문" title="먼저 묻는 것들" />
 
         <div className="mt-16 space-y-16">
           {FAQ_GROUPS.map((group) =>
@@ -59,15 +55,11 @@ export function Faq() {
           )}
         </div>
 
-        <div className="mt-20 rounded-2xl bg-surface px-8 py-12 sm:px-16">
+        <div className="mt-20 border-t border-line pt-12">
           <p className="text-h3 font-bold tracking-ir-sm text-ink [word-break:keep-all]">
             여기에 없는 것은 직접 돌려 보는 편이 빠릅니다
           </p>
-          <p className="mt-4 max-w-2xl text-body leading-6 text-ink2 [word-break:keep-all]">
-            카드내역 한 달치면 판정이 어떻게 나오는지 바로 보입니다. 결과가
-            마음에 들지 않으면 되묻기에 답해 다시 판정할 수 있습니다.
-          </p>
-          <Button to="/login" size="md" className="mt-8">
+          <Button to="/login" size="md" className="mt-6">
             판정해보기
           </Button>
         </div>

@@ -53,9 +53,10 @@ export function Table<T>({
 }: TableProps<T>) {
   if (!loading && rows.length === 0 && empty) return <>{empty}</>;
 
+  // 칸 안의 글자는 줄을 바꾸지 않는다(「제/외/하/기」). 긴 가맹점명은 그 칸이 truncate 로 말줄임한다
   const cellClass = (column: Column<T>) =>
   cn(
-    'px-4 py-4 text-body',
+    'whitespace-nowrap px-4 py-4 text-body',
     column.align === 'right' ? 'text-right tabular-nums' : 'text-left',
     column.width,
     column.hideBelow && HIDE[column.hideBelow]
@@ -110,11 +111,12 @@ export function Table<T>({
                 } :
                 undefined
                 }
+                // 고른 행은 accent-soft, hover 는 surface 다. 둘이 같은 회색이면 어느 행을 골랐는지 안 보인다 (C79)
                 className={cn(
                   'transition-colors duration-150',
                   onRowClick &&
-                  'cursor-pointer hover:bg-surface focus-visible:bg-surface focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
-                  selected && 'bg-surface'
+                  'cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
+                  selected ? 'bg-accent-soft' : onRowClick && 'hover:bg-surface focus-visible:bg-surface'
                 )}>
 
                 {columns.map((column, index) =>
@@ -153,7 +155,7 @@ export function Pagination({ page, onChange, note }: PaginationProps) {
           type="button"
           disabled={page.number === 0}
           onClick={() => onChange(page.number - 1)}
-          className="rounded-lg border border-line px-3 py-1.5 font-normal text-ink transition-colors duration-150 hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-40">
+          className="whitespace-nowrap rounded-lg border border-line px-3 py-1.5 font-normal text-ink transition-colors duration-150 hover:bg-surface disabled:cursor-not-allowed disabled:opacity-40">
 
           이전
         </button>
@@ -164,7 +166,7 @@ export function Pagination({ page, onChange, note }: PaginationProps) {
           type="button"
           disabled={!page.hasNext}
           onClick={() => onChange(page.number + 1)}
-          className="rounded-lg border border-line px-3 py-1.5 font-normal text-ink transition-colors duration-150 hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-40">
+          className="whitespace-nowrap rounded-lg border border-line px-3 py-1.5 font-normal text-ink transition-colors duration-150 hover:bg-surface disabled:cursor-not-allowed disabled:opacity-40">
 
           다음
         </button>

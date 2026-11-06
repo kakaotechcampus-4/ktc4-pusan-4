@@ -3,6 +3,8 @@ import type { Api } from '../../api';
 import type {
   AssistantMessage,
   AssistantProposal,
+  NextStep,
+  Progress,
   QuestionGroup,
   QuestionSuggestion } from
 '../../types/domain';
@@ -25,11 +27,11 @@ export const historyOf = (entries: {role: AssistantMessage['role'];content: stri
 trimHistory(entries.filter((entry) => !entry.local).map(({ role, content }) => ({ role, content })));
 
 /**
- * 비서가 이동을 제안할 수 있는 화면과 그 이름 (ai/assistant/tools.py ROUTES 와 같다).
+ * 비서가 이동을 제안할 수 있는 화면과 그 이름. 경로는 ai/assistant/tools.py ROUTES 와 같고, 이름은 화면 이름을 따른다.
  * 판정 실행(/run)은 판정 전 확인을 건너뛰므로 뺀다. 목록 밖의 경로는 따라가지 않는다
  */
 export const ASSISTANT_ROUTES: Record<string, string> = {
-  '/upload': '카드내역',
+  '/upload': '카드내역 올리기',
   '/preview': '분류 확인',
   '/interview': '사업자 문진',
   '/confirm': '판정 전 확인',
@@ -50,14 +52,34 @@ export const PROPOSAL_LABEL: Record<AssistantProposal['kind'], string> = {
   classification: '가맹점 분류',
   override: '판정 수정',
   navigation: '화면 이동',
-  handoff_note: '세무대리인 질문'
+  handoff_note: '세무사 질문'
 };
+
+/** 「다음에 할 일」에서 단계마다 하는 말. [다른 화면에 있을 때, 그 화면에 이미 있을 때] */
+const NEXT_TEXT: Record<NextStep, [away: string, here: string]> = {
+  CLASSIFY: ['분류가 필요한 가맹점이 남았습니다.', '이 화면에서 분류가 필요한 가맹점의 업종을 골라 주세요.'],
+  INTERVIEW: ['판정 전에 사업자 문진에 답해 주세요.', '이 화면의 사업자 문진에 답하면 판정을 시작할 수 있습니다.'],
+  CONFIRM: ['판정을 아직 시작하지 않았습니다.', '이 화면에서 판정을 시작할 수 있습니다.'],
+  QUESTIONS: ['답할 질문이 남았습니다.', '이 화면에 답할 질문이 남았습니다.'],
+  RESULTS: ['답할 질문이 없습니다. 결과를 확인해 주세요.', '답할 질문이 없습니다. 요약에서 세무사에게 넘길 내용을 볼 수 있습니다.']
+};
+
+/**
+ * 「다음에 할 일」의 답 (C106). 서버의 next 를 따르되 지금 그 화면에 있으면 그리로 보내지 않는다 —
+ * 결과 화면에서 결과 보기로 가라고 하면 할 일을 알려 주지 못한 것이다. 결과까지 다 봤으면 요약을 권한다.
+ * 질문이 남았으면 서버가 이미 질문을 먼저 준다(NextStep.java). route 가 null 이면 이동 카드를 붙이지 않는다
+ */
+export function nextAnswer(next: Progress['next'], pathname: string): {content: string;route: string | null;} {
+  const [away, here] = NEXT_TEXT[next.step] ?? [`다음 할 일은 ${next.label}입니다.`, '지금 화면에서 이어서 하면 됩니다.'];
+  if (next.route !== pathname) return { content: away, route: next.route };
+  return { content: here, route: next.step === 'RESULTS' ? '/summary' : null };
+}
 
 /** [적용]할 수 없는 카드면 그 까닭, 할 수 있으면 null */
 export const blockedReason = (proposal: AssistantProposal): string | null =>
 proposal.kind === 'override' && proposal.toVerdict === 'NEEDS_REVIEW' ?
 // 확인 필요로 되돌리면 질문 없는 확인 필요가 된다 (#62)
-'확인 필요로는 바꿀 수 없어 적용하지 않습니다. 결과 화면에서 가능·불가 중에 골라 주세요.' :
+'확인 필요로는 바꿀 수 없어 적용하지 않습니다. 결과 화면에서 가능이나 불가 중에 골라 주세요.' :
 proposal.kind === 'navigation' && routeName(proposal.route) === undefined ?
 '이동할 수 없는 화면입니다.' :
 null;
@@ -109,7 +131,7 @@ idempotencyKey: string)
       return '화면을 옮겼습니다.';
     case 'handoff_note':
       await api.handoffNotes.create({ text: proposal.text, transactionIds: proposal.transactionIds });
-      return '세무대리인 질문에 넣었습니다. 요약 화면의 넘길 문장에 들어갑니다.';
+      return '세무사 질문에 넣었습니다. 요약 화면의 넘길 문장에 들어갑니다.';
   }
 }
 
@@ -181,12 +203,12 @@ suggestion: QuestionSuggestion | undefined)
     return history.length > 0 ?
     {
       kind: 'history',
-      text: `지난 답이 서로 다릅니다: ${history.map((item) => `${item.sourceLabel} '${item.value}'`).join(' · ')}`
+      text: `지난 답이 서로 다릅니다: ${history.map((item) => `${item.sourceLabel} '${item.value}'`).join(', ')}`
     } :
     null;
   }
   const counts = Object.entries(suggestion.historyCounts ?? {}).filter(([value]) => allowed(value));
   return counts.length > 0 ?
-  { kind: 'history', text: `이 가맹점 지난 답: ${counts.map(([value, n]) => `${value} ${formatNumber(n)}`).join(' · ')}` } :
+  { kind: 'history', text: `이 가맹점 지난 답: ${counts.map(([value, n]) => `${value} ${formatNumber(n)}건`).join(', ')}` } :
   null;
 }
