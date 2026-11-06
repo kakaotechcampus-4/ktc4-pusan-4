@@ -239,10 +239,13 @@ function Panel({
       </header>
 
       <div role="log" aria-live="polite" className="flex-1 space-y-3 overflow-y-auto bg-canvas px-5 py-4">
+        {/* 열자마자 누가 답하는지 보이게 한다 (#259) */}
         {entries.length === 0 &&
-        <div className="space-y-3">
+        <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
+            <img src={really} alt="" className="h-20 w-20 rounded-full" />
+            <p className="text-body font-bold text-ink">무엇이든 물어보세요</p>
             <p className="text-small leading-6 text-ink2">
-              거래·판정·질문에 대해 물어보세요. 예: 「토요일 스타벅스는 미팅이었어」, 「3월에 카페 얼마 썼어?」
+              거래·판정·질문에 대해 답합니다. 예: 「토요일 스타벅스는 미팅이었어」, 「3월에 카페 얼마 썼어?」
             </p>
           </div>
         }
@@ -282,15 +285,25 @@ function Message({ entry }: {entry: ChatEntry;}) {
   const mine = entry.role === 'user';
   return (
     <div className={cn('flex flex-col gap-2', mine ? 'items-end' : 'items-start')}>
-      <p
-        className={cn(
-          'max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-small leading-6',
-          mine ? 'bg-ink text-white' : 'border border-line bg-surface text-ink2'
-        )}>
+      <div className={cn('flex w-full gap-2', mine ? 'justify-end' : 'justify-start')}>
+        {/*
+          누가 말하는지 눈으로도 보이게 얼굴을 붙인다 (#259). 글자로는 아래 sr-only 로만
+          있어서 스크린리더만 알 수 있었다. 헤더에는 넣지 않는다 — 바로 옆에 같은 얼굴의
+          버튼이 떠 있어 창을 열면 돼지가 둘이 된다
+        */}
+        {!mine &&
+        <img src={really} alt="" className="mt-0.5 h-8 w-8 shrink-0 rounded-full" />
+        }
+        <p
+          className={cn(
+            'max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-small leading-6',
+            mine ? 'bg-accent text-white' : 'border border-line bg-surface text-ink2'
+          )}>
 
-        <span className="sr-only">{mine ? '나: ' : 'Really: '}</span>
-        {entry.content}
-      </p>
+          <span className="sr-only">{mine ? '나: ' : 'Really: '}</span>
+          {entry.content}
+        </p>
+      </div>
       {entry.proposals.map((item, index) => {
         const blocked = blockedReason(item.proposal);
         // 적용한 카드는 한 줄로 접는다. 무엇을 했는지만 남긴다 (#143 리뷰)
