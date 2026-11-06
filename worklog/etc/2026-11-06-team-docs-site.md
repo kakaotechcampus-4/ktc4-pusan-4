@@ -109,3 +109,12 @@ PM 이 준 정보로 채웠다.
   이름과 GitHub 아이디는 프로필 이름(Hyunbin Jung, Chioh Lee, 재성)과 커밋 작성자 이름(Seongjin)으로 맞췄다. yuyeol3 · RainDrop3 는 프로필 이름이 없어 아이디와 `CONTEXT.md` 의 "AI 리드 Kang" 으로 맞췄다.
 - 노션 프로젝트 페이지 링크를 팀 리소스와 그라운드 룰(작업 관리 · 회의록)에 넣었다.
 - 그라운드 룰: 주말 PR 은 하루 안에 보고 답하기, 협업이 필요하면 카톡방에서 일정을 정해 수시 회의, 회의록은 노션에.
+
+## 11:38 백엔드 리뷰 반영 (9c0252a)
+
+memoryhong 리뷰 3건을 반영했다. 코드에서 각각 확인했다.
+
+1. 팀 리소스 백엔드 설명에 가맹점 분류를 더했다 (`backend/.../merchant/` 패키지).
+2. 기술 스택 Redis 설명: 리프레시 토큰 + 이메일 인증 상태(`EmailVerificationStore`) + 비서 호출 한도(`AssistantRateLimiter`).
+3. 로컬 실행: `docker compose up -d postgres redis`. Redis 가 없으면 로그인이 실패하고, health 는 Redis 를 보지 않아 UP 으로 나온다는 안내를 더했다.
+   원본 `backend/README.md` 는 #261 에서 같은 내용으로 고친다. #261 의 Redis 기본값(localhost · 16379)은 `application-local.yml`, 루트 `compose.yaml` 과 같다.
