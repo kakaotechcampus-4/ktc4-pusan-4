@@ -54,11 +54,17 @@ const BLOCKED_REASON: Record<BlockedCode, string> = {
 };
 
 const UNSENT_REASON: Record<UnsendableCode, string> = {
+  FOREIGN_ONLY: '원화 금액이 없는 해외 결제입니다',
   NO_DATE: '승인일이 없습니다',
   NO_AMOUNT: '금액이 없습니다',
+  ZERO_AMOUNT: '0원 결제입니다',
   BLANK_MERCHANT: '가맹점명이 없습니다',
   APPROVAL_TOO_LONG: '승인번호가 너무 깁니다'
 };
+
+/** 해외이용금액은 달러다(KB 파일 머리 「해외이용금액($)」) */
+const formatDollar = (amount: number) =>
+`${amount.toLocaleString('ko-KR', { maximumFractionDigits: 2 })}달러`;
 
 type SendState = 'idle' | 'sending' | ApiRequestError;
 
@@ -477,9 +483,22 @@ function PreviewCard({
   (n: string) =>
   `취소 ${n}건은 같은 가맹점 · 같은 금액 결제가 여러 건이라 짝을 정하지 못했습니다. 후보 결제에 확인 필요를 붙였습니다.`],
 
-  [stats.cancelsUnpaired, (n: string) => `취소 ${n}건은 원래 결제를 찾지 못했습니다. 조회 기간 밖에 있을 수 있습니다.`],
+  [
+  stats.cancelsUnpaired - stats.cancelsOutOfWindow,
+  (n: string) =>
+  `취소 ${n}건은 이 파일에서 원래 결제를 찾지 못했습니다. 앞서 올린 파일의 결제라면 거래 화면에서 판정 대상에서 빼 주세요.`],
+
+  [
+  stats.cancelsOutOfWindow,
+  (n: string) =>
+  `취소 ${n}건은 같은 가맹점, 같은 금액의 결제와 62일 넘게 떨어져 있어 짝짓지 않았습니다. 환불된 결제라면 거래 화면에서 판정 대상에서 빼 주세요.`],
+
   [stats.nonTransaction, (n: string) => `할인 · 포인트 사용 ${n}건은 카드사 정산 행이라 대상제외로 표시했습니다.`],
-  [stats.foreignOnlySkipped, (n: string) => `원화 금액이 없는 해외 결제 ${n}건은 읽지 않았습니다.`],
+  [
+  stats.foreignOnly,
+  (n: string) =>
+  `해외 결제 ${n}건은 원화 금액이 없어 판정에 넣지 못합니다. 원화로 바뀐 뒤 다시 내려받거나 세무사에게 따로 알려 주세요.`],
+
   [stats.aggregated, (n: string) => `교통비처럼 여러 결제를 묶은 합산 행 ${n}건을 표시했습니다.`],
   [
   stats.medicalMasked,
@@ -494,7 +513,15 @@ function PreviewCard({
   {
     header: '금액',
     align: 'right',
-    cell: (u) => <span className="whitespace-nowrap">{u.row.amount === null ? '—' : formatWon(u.row.amount)}</span>
+    cell: (u) =>
+    <span className="whitespace-nowrap">
+        {u.row.foreignAmount !== null ?
+      formatDollar(u.row.foreignAmount) :
+      u.row.amount === null ?
+      '—' :
+      formatWon(u.row.amount)}
+      </span>
+
   },
   { header: '이유', cell: (u) => <span className="whitespace-nowrap">{UNSENT_REASON[u.code]}</span> }];
 

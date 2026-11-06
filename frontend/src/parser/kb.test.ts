@@ -36,15 +36,15 @@ describe('readKb — 샘플 full', () => {
     });
   });
 
-  it('행 수와 건너뛴 행을 센다', async () => {
+  it('빈 줄만 건너뛰고 외화 전용 · 가맹점명 없는 행도 읽는다', async () => {
     const result = await readKb(await buildKbXls('full'));
-    expect(result.sourceRows).toBe(14);
-    expect(result.foreignOnlySkipped).toBe(1);
-    expect(result.records).toHaveLength(13);
+    expect(result.sourceRows).toBe(15);
+    expect(result.foreignOnly).toBe(1);
+    expect(result.records).toHaveLength(15);
     expect(result.declaredPeriod).toEqual({ start: '2026-01-01', end: '2026-03-31' });
     expect(result.records.map((r) => r.merchant)).toEqual([
-      '스타벅스코리아 서면점', '서면연세의원', '부산약국', '서면연세의원', '쿠팡', '쿠팡', '교보문고', '하이마트',
-      '지하철_모바일 50 건', 'GS25 서면점', '포인트사용', '다이소 서면점', '넷플릭스']);
+      '스타벅스코리아 서면점', '서면연세의원', '부산약국', '서면연세의원', '쿠팡', '쿠팡', 'AWS', '교보문고', '하이마트',
+      '지하철_모바일 50 건', 'GS25 서면점', '포인트사용', '다이소 서면점', '', '넷플릭스']);
   });
 
   it('행마다 값을 옮긴다', async () => {
@@ -62,7 +62,8 @@ describe('readKb — 샘플 full', () => {
       installment: 0,
       status: null,
       needsReview: false,
-      reviewReason: ''
+      reviewReason: '',
+      foreignAmount: null
     });
     expect(byApproval('10000002')).toMatchObject({ memo: '진료', amount: 15000, when: '2026-01-05' });
     expect(byApproval('10000003')).toMatchObject({ installment: 0, amount: 4500 });
@@ -73,8 +74,16 @@ describe('readKb — 샘플 full', () => {
     // 날짜가 숫자 셀(엑셀 일련번호)이면 읽지 않는다
     expect(byApproval('30000004')).toMatchObject({ when: null, amount: 3000 });
     expect(byApproval('30000005')).toMatchObject({ amount: -1000 });
-    // 국내 · 해외 금액이 모두 0 이면 금액이 없다
-    expect(byApproval('30000006')).toMatchObject({ amount: null });
+    // 외화만 있으면 원화 금액이 없고, 외화 금액은 반올림하지 않고 둔다
+    expect(byApproval('20000010')).toMatchObject({
+      amount: null,
+      foreignAmount: 12.5,
+      status: '대상제외',
+      reviewReason: '해외 결제 (원화 금액 없음)'
+    });
+    // 국내 · 해외 금액이 모두 0 이면 0원이다. 빈 칸과 가른다
+    expect(byApproval('30000006')).toMatchObject({ amount: 0, foreignAmount: null, status: null });
+    expect(byApproval('30000007')).toMatchObject({ merchant: '', amount: 5000, when: '2026-03-02' });
     expect(byApproval('30000008')).toMatchObject({ when: '2026-03-31', memo: 'GPT' });
   });
 });
@@ -86,7 +95,7 @@ describe('readKb — 샘플 변형', () => {
     expect(result.declaredPeriod).toBeNull();
     expect(result.headers).toEqual(full.headers);
     expect(result.records).toEqual(full.records);
-    expect(result.sourceRows).toBe(14);
+    expect(result.sourceRows).toBe(15);
   });
 
   it('billing 은 청구내역으로 판별된다', async () => {
@@ -175,14 +184,22 @@ describe('kbDeclaredPeriod', () => {
 describe('kbRecords', () => {
   const header: Cell[][] = [[], [], [], [], [], [], []];
 
-  it('가맹점명이 비면 세지 않고, 외화만 있으면 세고 건너뛴다', () => {
+  it('가맹점명도 승인일도 없는 줄만 건너뛰고, 외화 전용 행은 대상제외로 남긴다', () => {
     const result = kbRecords(gridOf([
       ...header,
+      ['', '', '', '', '  ', 1000],
       ['2026-01-03', '', '', '', '  ', 1000],
       ['2026-01-03', '', '', '', 'AWS', 0, 12.5],
-      ['2026-01-03', '', '', '', '다이소', 0, 0]]));
-    expect(result.sourceRows).toBe(2);
-    expect(result.foreignOnlySkipped).toBe(1);
-    expect(result.records.map((r) => [r.merchant, r.amount])).toEqual([['다이소', null]]);
+      ['2026-01-03', '', '', '', 'FIGMA', undefined, '15.00'],
+      ['2026-01-03', '', '', '', '다이소', 0, 0],
+      ['2026-01-03', '', '', '', '편의점']]));
+    expect(result.sourceRows).toBe(5);
+    expect(result.foreignOnly).toBe(2);
+    expect(result.records.map((r) => [r.merchant, r.amount, r.foreignAmount, r.status])).toEqual([
+      ['', 1000, null, null],
+      ['AWS', null, 12.5, '대상제외'],
+      ['FIGMA', null, 15, '대상제외'],
+      ['다이소', 0, null, null],
+      ['편의점', null, null, null]]);
   });
 });
