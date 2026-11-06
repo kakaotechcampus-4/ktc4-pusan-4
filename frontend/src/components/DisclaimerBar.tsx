@@ -1,17 +1,15 @@
-import { InfoIcon } from 'lucide-react';
+import { DISCLAIMER } from '../copy';
 
-/** 전 화면 상시 노출. 세무대리로 오인될 소지를 화면에서 차단한다. */
+/**
+ * 전 화면 상시 노출. 세무대리로 오인될 소지를 화면에서 차단한다.
+ * 문장은 copy.ts 한 곳에 둔다. 띠를 칠하지 않고 괘선으로만 가른다 (11/5 치오 방향)
+ */
 export function DisclaimerBar() {
   return (
-    <div className="border-b border-line2 bg-accent-soft">
-      <div className="mx-auto flex max-w-[1240px] items-center gap-2 px-6 py-2 text-[13px] leading-5 text-ink2">
-        <InfoIcon className="h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
-        <p>
-          이 서비스는 <strong className="font-bold">확인할 항목과 근거</strong>까지만
-          제시합니다. 세액을 확정하거나 신고를 대리하지 않으며, 최종 판단은 세무대리인의
-          확인이 필요합니다.
-        </p>
-      </div>
+    <div className="border-b border-line">
+      <p className="mx-auto max-w-page px-6 py-2 text-caption text-ink2 [word-break:keep-all]">
+        {DISCLAIMER}
+      </p>
     </div>);
 
 }
