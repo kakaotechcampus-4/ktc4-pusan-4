@@ -44,14 +44,15 @@ export function FilterBar<V extends string>({
             type="button"
             aria-pressed={active}
             onClick={() => onChange(option.value)}
+            // 고른 것은 accent(지금 고른 자리의 색)다. 건수는 흐리게 하지 않는다 — opacity-70 은 흰 바탕 3.45 였다
             className={cn(
-              'rounded-lg px-3 py-1.5 text-small font-bold transition-colors duration-150 ease-snap',
-              active ? 'bg-ink text-white' : 'text-ink2 hover:bg-canvas'
+              'whitespace-nowrap rounded-lg px-3 py-1.5 text-small font-bold transition-colors duration-150 ease-snap',
+              active ? 'bg-accent text-white' : 'text-ink2 hover:bg-surface'
             )}>
 
             {option.label}
             {option.count !== undefined &&
-            <span className="ml-1.5 tabular-nums opacity-70">
+            <span className="ml-1.5 font-normal tabular-nums">
                 {option.count.toLocaleString('ko-KR')}
               </span>
             }

@@ -112,7 +112,7 @@ export function Modal({
         tabIndex={-1}
         onClick={(event) => event.stopPropagation()}
         className={cn(
-          'relative flex w-full max-h-[calc(100vh-2rem)] flex-col rounded-2xl border border-line bg-surface p-6 shadow-panel outline-none motion-safe:animate-rise',
+          'relative flex w-full max-h-[calc(100vh-2rem)] flex-col rounded-2xl border border-line bg-canvas p-6 shadow-panel outline-none motion-safe:animate-rise',
           size === 'lg' ? 'max-w-2xl' : 'max-w-md'
         )}>
 
