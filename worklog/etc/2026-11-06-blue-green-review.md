@@ -35,3 +35,7 @@
 ## 남은 것 · 아는 문제
 
 - R1 배포에서 redis 가 다시 만들어졌다. 정의 변경은 없어 `pull` 로 받은 이미지가 바뀐 것으로 보이며 이 PR 과 무관하다. 확인은 하지 않았다.
+
+## 20:41 compose 주석의 「이름 없는 up」을 풀어 씀
+
+- `deploy/compose.yaml` 머리 주석을 「서비스 이름 없이 docker compose up 하면」으로 바꿨다. 「이름 없는 up」은 처음 보는 사람이 뜻을 알기 어렵다는 이야기가 나왔다. 문서(`deployment.md` 3절)는 이미 `docker compose up` 으로 적혀 있었다.
