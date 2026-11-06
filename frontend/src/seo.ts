@@ -16,7 +16,7 @@ export const TAGLINE = '개인 사업자를 위한 종합소득세 경비 판정
 
 export interface PublicPage {
   path: string;
-  /** dist 안에 쓸 파일. Caddy 가 /faq 를 faq.html 로 찾는다(deploy/Caddyfile) */
+  /** dist 안에 쓸 파일. Caddy 가 /faq 를 faq.html 로 찾는다(deploy/caddy/Caddyfile) */
   file: string;
   /** 「제목 · PreeT」 꼴로 붙는다. PreeT 로 시작하면 그대로 쓴다 */
   title: string;

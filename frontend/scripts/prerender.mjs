@@ -4,7 +4,7 @@
  * 크롤러·카카오톡 미리보기는 자바스크립트를 돌리지 않거나 덜 돌린다. 빈 #root 만 받으면 본문·제목을 못 본다.
  * 그래서 vite 가 만든 dist/index.html 을 틀로 삼아 페이지마다 본문과 head 를 채운 파일을 쓴다.
  *
- * - dist/<file>  공개 페이지. Caddy 가 /faq 를 faq.html 로 찾는다(deploy/Caddyfile)
+ * - dist/<file>  공개 페이지. Caddy 가 /faq 를 faq.html 로 찾는다(deploy/caddy/Caddyfile)
  * - dist/app.html  본문 없는 틀 + noindex. 로그인 뒤 화면·로그인 화면·없는 주소가 모두 이것을 받는다
  * - dist/robots.txt · sitemap.xml · llms.txt  크롤러와 AI 에게 주는 안내
  */
