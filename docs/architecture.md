@@ -267,3 +267,4 @@ flowchart TD
 - [`CONTEXT.md`](../CONTEXT.md): 설계 논의·결정·대안 전체 (단일 원본)
 - [`docs/schema_mapping.md`](./schema_mapping.md): 파서 출력과 transaction 스키마 대조, natural_key 검증
 - [`docs/limit-settlement.md`](./limit-settlement.md): 연간 한도 집계·배분·상태 전이
+- [`docs/deployment.md`](./deployment.md#구조): 운영 서버의 컨테이너 구성과 배포 순서 그림

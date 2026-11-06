@@ -8,28 +8,35 @@ if [[ ! $sha =~ ^[0-9a-f]{40}$ ]] || [[ -n $mode && $mode != --rollback ]]; then
     exit 2
 fi
 
-exec 9>/run/lock/ktc4-deploy.lock
-flock 9
-
 repo=/opt/ktc4/repo
 config=/etc/ktc4/production.env
 test -f "$config"
 test -d "$repo/.git"
 
-if [[ $mode == --rollback ]]; then
-    if ! git -C "$repo" cat-file -e "$sha^{commit}" 2>/dev/null; then
-        git -C "$repo" fetch --depth 1 origin "$sha"
-    fi
-else
-    git -C "$repo" fetch --depth 1 origin release
-    release_sha=$(git -C "$repo" rev-parse FETCH_HEAD)
-    if [[ $release_sha != "$sha" ]]; then
-        echo "Skipping stale release $sha; release is $release_sha" >&2
-        exit 1
-    fi
-fi
+# The copy of this file that SSM starts is the previous deploy's, and bash keeps running it even
+# after checkout replaces it. So once the target commit is checked out, hand over to that commit's
+# deploy.sh: a change to this file then applies to its own deploy. The new process inherits the
+# lock on fd 9 and starts from the deploy below.
+if [[ -z ${KTC4_DEPLOY_CHECKED_OUT:-} ]]; then
+    exec 9>/run/lock/ktc4-deploy.lock
+    flock 9
 
-git -C "$repo" checkout --force --detach "$sha"
+    if [[ $mode == --rollback ]]; then
+        if ! git -C "$repo" cat-file -e "$sha^{commit}" 2>/dev/null; then
+            git -C "$repo" fetch --depth 1 origin "$sha"
+        fi
+    else
+        git -C "$repo" fetch --depth 1 origin release
+        release_sha=$(git -C "$repo" rev-parse FETCH_HEAD)
+        if [[ $release_sha != "$sha" ]]; then
+            echo "Skipping stale release $sha; release is $release_sha" >&2
+            exit 1
+        fi
+    fi
+
+    git -C "$repo" checkout --force --detach "$sha"
+    KTC4_DEPLOY_CHECKED_OUT=1 exec bash "$repo/deploy/deploy.sh" "$@"
+fi
 
 set -a
 # shellcheck disable=SC1090
@@ -50,6 +57,10 @@ aws ecr get-login-password --region ap-northeast-2 \
 compose=(docker compose --env-file "$config" -f "$repo/deploy/compose.yaml")
 "${compose[@]}" pull
 "${compose[@]}" up -d --wait --remove-orphans
+
+# Caddy keeps running across deploys; `up` has already published this commit's web files
+# (web-files). Apply any Caddyfile change in place.
+"${compose[@]}" exec -T web caddy reload --config /etc/caddy/Caddyfile
 
 # Flyway must initialize the empty application schema before these SQL files run.
 "${compose[@]}" exec -T postgres \

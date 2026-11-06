@@ -260,6 +260,8 @@ export function HeroBanner({ autoplay = true }: {autoplay?: boolean;}) {
   const track = useRef<HTMLUListElement>(null);
   const [page, setPage] = useState(0);
   const wrap = useRef<Wrap | null>(null);
+  /** 마지막으로 잰 칸 너비. 창이 바뀌었을 때 「바뀌기 전 기준으로」 몇 번째였는지 세는 데 쓴다 */
+  const width = useRef(0);
   /** ⏸ 로 멈췄는지 */
   const [stopped, setStopped] = useState(false);
   /** 마우스가 올라가 있거나 키보드 포커스가 안에 있다. 읽거나 누르는 동안은 넘기지 않는다 */
@@ -302,6 +304,37 @@ export function HeroBanner({ autoplay = true }: {autoplay?: boolean;}) {
     el.scrollLeft = (direction === 1 ? SLIDE_COUNT - 2 : 1) * width;
     el.scrollTo({ left: (direction === 1 ? SLIDE_COUNT - 1 : 0) * width, behavior: 'smooth' });
   }, [unwrap]);
+
+  /**
+   * 칸 너비가 바뀌어도 `scrollLeft` 는 px 이라 그대로 남는다. 끝을 넘어 도는 중(order 로
+   * 옮겨 붙인 상태)에 바뀌면 되돌릴 기준이 어긋나, 장면 사이에 18px 걸쳐 멈추고 옮겨 붙인
+   * 장면이 제자리로 돌아오지 않는다. 바뀌기 전 너비로 몇 번째였는지 세고 새 너비에 맞춘다.
+   *
+   * `resize` 가 아니라 `ResizeObserver` 다. 폭은 창 크기 말고도 바뀌고(스크롤바가 생기거나
+   * 브라우저를 확대할 때) 그때는 `resize` 가 오지 않는다
+   */
+  useEffect(() => {
+    const el = track.current;
+    if (!el) return;
+    width.current = el.clientWidth;
+    const observer = new ResizeObserver(() => {
+      const was = width.current;
+      const now = el.clientWidth;
+      if (!now || now === was) return;
+      width.current = now;
+      const raw = was ? Math.round(el.scrollLeft / was) : 0;
+      // 도는 중이면 옮겨 붙인 만큼 되돌려 센 뒤 제자리로 돌린다
+      const at = wrap.current ? (raw + wrap.current.step + SLIDE_COUNT) % SLIDE_COUNT : raw;
+      if (wrap.current) {
+        wrap.current.slide.style.order = '';
+        wrap.current = null;
+      }
+      el.scrollLeft = at * now;
+      setPage(at);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // 움직임을 줄이라는 설정이면 멈춘 채로 시작한다. ▶ 로 켤 수는 있다.
   // 첫 렌더가 아니라 effect 에서 읽는다 — 빌드 때 미리 그리는 HTML 에는 window 가 없다

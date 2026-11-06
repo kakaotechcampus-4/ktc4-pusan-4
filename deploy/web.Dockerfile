@@ -12,6 +12,9 @@ ENV VITE_KAKAO_REST_API_KEY=$VITE_KAKAO_REST_API_KEY
 # api/index.ts 가 목업을 고른다 — 지금 배포 화면은 /api/v1 을 한 번도 부르지 않는다
 RUN VITE_API=http npm run build
 
-FROM caddy:2-alpine
-COPY deploy/Caddyfile /etc/caddy/Caddyfile
-COPY --from=build /src/dist /srv
+# 화면 파일만 담는다. 서버는 고정 버전 Caddy(compose.yaml web)가 맡고, deploy.sh 가 배포마다
+# 이 이미지로 web-dist 볼륨에 파일을 옮긴다. 그래서 화면이 바뀌어도 Caddy 는 다시 뜨지 않는다
+FROM busybox:1.37
+COPY --from=build /src/dist /dist
+COPY deploy/web-publish.sh /publish.sh
+CMD ["sh", "/publish.sh"]

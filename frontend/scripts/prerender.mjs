@@ -72,6 +72,21 @@ function check(path, body) {
 const pages = Object.values(PAGES);
 const urlOf = (page) => `${SITE_URL}${page.path}`;
 
+/**
+ * 검색 결과에 뜨는 사이트 이름. 구글은 WebSite 구조화 데이터의 name 을 제일 먼저 보고,
+ * 없으면 og:site_name → title → 도메인 순으로 내려간다. 지금은 이게 없어서 도메인까지 내려갔고,
+ * duckdns.org 가 공용 DDNS 라 「Duck DNS」가 나왔다 (og:site_name 은 이미 PreeT 였는데도).
+ * 구글 지침대로 홈에만 넣는다
+ */
+const WEBSITE_JSON_LD = `<script type="application/ld+json">${JSON.stringify({
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: 'PreeT',
+  url: `${SITE_URL}/`,
+  description: PAGES.home.description,
+  inLanguage: 'ko-KR'
+})}</script>`;
+
 await writeFile(
   join(dist, 'app.html'),
   fill({
@@ -91,7 +106,10 @@ for (const page of pages) {
       title: documentTitle(page.title),
       description: page.description,
       url: urlOf(page),
-      head: [`<link rel="canonical" href="${urlOf(page)}" />`],
+      head: [
+      `<link rel="canonical" href="${urlOf(page)}" />`,
+      ...(page === PAGES.home ? [WEBSITE_JSON_LD] : [])],
+
       body
     })
   );

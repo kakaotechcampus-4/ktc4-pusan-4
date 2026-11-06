@@ -6,10 +6,10 @@ Java 21, Spring Boot 3.5, JPA, PostgreSQL로 구성된 백엔드 애플리케이
 
 필요한 도구는 JDK 21과 Docker입니다. 시스템에 Gradle을 별도로 설치할 필요는 없습니다.
 
-저장소 루트에서 PostgreSQL을 실행합니다.
+저장소 루트에서 PostgreSQL과 Redis를 실행합니다. 로그인할 때 리프레시 토큰을 Redis에 저장하므로 Redis가 없으면 로그인이 실패합니다.
 
 ```shell
-docker compose up -d postgres
+docker compose up -d postgres redis
 ```
 
 Windows에서는 다음 명령으로 애플리케이션을 실행합니다.
@@ -24,7 +24,7 @@ macOS와 Linux에서는 다음 명령을 사용합니다.
 bash ./backend/gradlew -p backend bootRun --args='--spring.profiles.active=local'
 ```
 
-실행 후 `GET http://localhost:8080/actuator/health`에서 애플리케이션과 DB 연결 상태를 확인할 수 있습니다.
+실행 후 `GET http://localhost:8080/actuator/health`에서 애플리케이션과 DB 연결 상태를 확인할 수 있습니다. Redis는 health 검사에서 빠져 있어 Redis가 없어도 UP으로 나옵니다.
 
 `local` 프로필의 기본 연결값은 다음과 같습니다. 필요한 경우 같은 이름의 환경 변수로 변경합니다.
 
@@ -35,6 +35,8 @@ bash ./backend/gradlew -p backend bootRun --args='--spring.profiles.active=local
 | `DB_NAME` | `ktc4` |
 | `DB_USERNAME` | `ktc4` |
 | `DB_PASSWORD` | `ktc4-local` |
+| `REDIS_HOST` | `localhost` |
+| `REDIS_PORT` | `16379` |
 
 로컬 프로필을 사용하지 않는 환경에서는 Spring 표준 환경 변수인 `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`를 주입합니다.
 

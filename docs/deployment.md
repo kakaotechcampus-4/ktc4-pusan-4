@@ -4,6 +4,70 @@
 
 프런트엔드는 백엔드 API를 HTTP로 호출하고, 백엔드는 목 응답 없이 실제 서비스로 답한다. 로그인은 9절, 배포 뒤 확인은 각 절의 헬스체크를 따른다.
 
+## 구조
+
+### 서버 구성
+
+EC2 한 대에서 Compose 프로젝트 `ktc4`가 컨테이너 다섯 개를 띄운다. 밖으로 열린 포트는 Caddy의 80·443뿐이다.
+
+```mermaid
+flowchart LR
+    user(["브라우저"]) -->|"443 / 80"| web
+
+    subgraph ec2["EC2 t3.medium · deploy/compose.yaml"]
+        web["web<br/>Caddy 2.11.8<br/>배포해도 다시 뜨지 않음"]
+        backend["backend :8080<br/>Spring Boot · Flyway"]
+        ai["ai :8000<br/>FastAPI"]
+        pg[("postgres :5432")]
+        redis[("redis :6379")]
+        dist[("web-dist 볼륨<br/>화면 파일")]
+        timers["systemd 타이머<br/>백업 · 코퍼스 · 규칙 후보"]
+        cwa["CloudWatch Agent"]
+
+        web -->|"/api/v1/*"| backend
+        web -.->|"그 밖의 주소"| dist
+        backend -->|"비서 · 분류"| ai
+        ai -->|"비서 도구 /api/v1"| backend
+        backend --> pg
+        backend --> redis
+        ai --> pg
+        timers -.->|"pg_dump"| pg
+        timers -.->|"compose run ai"| ai
+        cwa -.->|"127.0.0.1:8080/actuator/prometheus"| backend
+    end
+
+    backend -.->|"awslogs"| logs[("CloudWatch Logs")]
+    timers -.->|"백업"| s3[("S3")]
+```
+
+- 화살표는 호출 방향이다. 점선은 요청 경로 밖의 읽기·배치·수집이다.
+- 영속 볼륨은 `postgres-data`, `redis-data`, `caddy-data`(인증서·접근 기록), `caddy-config`, `web-dist`다. 재배포해도 남는다.
+- 타이머는 5·6·11절이다. 코퍼스와 규칙 후보 배치는 상시 `ai` 컨테이너가 아니라 같은 이미지로 띄운 일회용 컨테이너에서 돈다.
+
+### 배포 순서
+
+`release` push 한 번이 아래 순서로 흐른다(4절).
+
+```mermaid
+sequenceDiagram
+    participant GH as GitHub Actions
+    participant ECR
+    participant SH as EC2 deploy.sh
+    participant C as Compose
+    participant W as web (Caddy)
+
+    GH->>GH: backend · ai · web 검증
+    GH->>ECR: backend / ai / web-<SHA> 이미지 push<br/>(postgres 는 바뀔 때만)
+    GH->>SH: SSM 으로 deploy.sh <SHA>
+    SH->>SH: release SHA 확인 · checkout
+    SH->>C: pull · up -d --wait
+    Note over C: 이미지가 바뀐 backend · ai 를 내리고 새로 띄운다.<br/>새 backend 가 부팅하며 Flyway 를 돌린다.<br/>이 사이 API 와 비서는 멈춘다.
+    C-->>W: 새 backend 가 healthy 가 되면 web-files 가<br/>web-dist 에 새 화면 파일 추가 (HTML 은 마지막)
+    SH->>W: caddy reload (Caddyfile 변경 반영)
+    SH->>C: db/schema.sql · db/rag.sql 적용
+    GH->>W: 공개 HTTPS 확인
+```
+
 ## 1. AWS와 DNS 준비
 
 1. 서울(`ap-northeast-2`)의 제공된 EC2에 Elastic IP를 할당·연결한다. DuckDNS에서 서브도메인을 발급하고 A 레코드를 그 EIP로 설정한다. 고정 EIP이므로 DuckDNS 토큰을 GitHub Actions에 등록하지 않는다.
@@ -52,7 +116,14 @@ sudo aws ecr get-login-password --region ap-northeast-2 >/dev/null
 
 ## 4. 배포와 확인
 
-`release` push가 발생하면 `.github/workflows/aws-release.yml`이 백엔드·AI·프런트 검증을 실행하고, GitHub 러너에서 이미지를 빌드해 ECR에 올린다. SSM이 EC2의 `deploy/deploy.sh`에 커밋 SHA를 전달한다. 스크립트는 원격 `release`의 현재 SHA와 일치하는지 확인하고 이미지 pull, Compose 기동, Flyway 완료 후 `db/schema.sql`과 `db/rag.sql`을 차례로 적용한다. DB 초기화 단계에서는 확장만 설치한다. `postgres-data`와 Caddy 인증서 볼륨은 재배포해도 유지된다.
+`release` push가 발생하면 `.github/workflows/aws-release.yml`이 백엔드·AI·프런트 검증을 실행하고, GitHub 러너에서 이미지를 빌드해 ECR에 올린다. SSM이 EC2의 `deploy/deploy.sh`에 커밋 SHA를 전달한다. 스크립트는 원격 `release`의 현재 SHA와 일치하는지 확인하고 이미지 pull, Compose 기동, 화면 파일 반영, Flyway 완료 후 `db/schema.sql`과 `db/rag.sql`을 차례로 적용한다. DB 초기화 단계에서는 확장만 설치한다. `postgres-data`와 Caddy 인증서 볼륨은 재배포해도 유지된다.
+
+웹 컨테이너(Caddy)는 배포해도 다시 뜨지 않는다.
+
+- `web-<SHA>` 이미지는 화면 파일만 담는다. Compose `up`이 새 백엔드가 healthy가 된 뒤 이 이미지를 일회성 서비스 `web-files`로 돌려 `web-dist` 볼륨에 파일을 옮긴다(`deploy/web-publish.sh`). 끝난 `web-files` 컨테이너는 `Exited (0)`으로 남는다.
+- 옛 파일은 지우지 않는다. 이미 화면을 연 브라우저가 옛 해시 청크(`/assets/*`)를 이어서 받는다. 배포당 수 MB라 따로 정리하지 않는다.
+- Caddy는 서버 repo의 `deploy/caddy/`를 그대로 읽고, `deploy.sh`가 매번 `caddy reload`로 Caddyfile 변경을 연결을 끊지 않고 반영한다. 설정이 틀리면 reload가 실패해 배포가 실패하고, Caddy는 옛 설정으로 계속 낸다.
+- Caddy 버전(`deploy/compose.yaml`의 `web` 이미지)이나 `web` 서비스 정의를 바꾼 배포에서만 웹 컨테이너가 다시 떠 몇 초 끊긴다.
 
 ```bash
 sudo cat /opt/ktc4/current-sha
@@ -61,6 +132,11 @@ curl -I "https://<도메인>/"
 ```
 
 `docker compose ps`에서 PostgreSQL·Redis·백엔드·AI가 healthy이고 웹 컨테이너가 running이어야 한다. 브라우저에서 `/`, `/upload`를 새로고침해 SPA 라우팅을 확인한다. 백엔드 `/actuator/health`와 AI `/health/db`는 컨테이너 내부 검사로 확인하며 외부에 공개하지 않는다. `docker stats`와 `df -h`로 4GB 메모리·50GB 디스크 사용량을 확인한다.
+
+SSM이 띄우는 `deploy.sh`는 직전 배포의 파일이다. 스크립트가 새 커밋을 checkout해도 bash는 이미 연 옛 파일을 끝까지 실행한다. 그래서 `deploy.sh`는 checkout까지만 하고, 대상 커밋의 `deploy.sh`를 다시 실행해 나머지를 맡긴다(배포 잠금은 이어받는다). `deploy.sh`를 고친 커밋도 자기 배포부터 새 스크립트로 돈다.
+
+- 예외는 이 재실행이 들어간 커밋을 처음 배포할 때다. 그때는 재실행이 없는 옛 스크립트가 끝까지 돈다. 그래서 화면 파일 반영(`web-files`)은 스크립트가 아니라 Compose 정의에 두었다.
+- `--rollback`으로 재실행이 없는 옛 커밋으로 돌아가면 그 커밋의 스크립트가 잠금을 다시 잡고 처음부터 돈다.
 
 Compose는 기존 백엔드를 내린 뒤 새 백엔드를 띄우고, 새 백엔드가 부팅하면서 Flyway를 실행한다. 마이그레이션이 실패하면 그 시점부터 서비스가 멈추므로 5절의 롤백 명령으로 이전 SHA를 다시 배포한다. 마이그레이션 작성 규칙은 `db/README.md`를 따른다.
 
@@ -238,7 +314,7 @@ sudo docker compose --env-file /etc/ktc4/production.env -f /opt/ktc4/repo/deploy
 
 ## 13. 웹과 검색 노출
 
-웹 컨테이너의 Caddy(`deploy/Caddyfile`)가 화면 파일을 낸다.
+웹 컨테이너의 Caddy(`deploy/caddy/Caddyfile`)가 `web-dist` 볼륨의 화면 파일을 낸다(4절).
 
 - 공개 페이지(`/`, `/faq`, `/terms`, `/privacy`)는 빌드 때 미리 그린 HTML(`index.html`, `faq.html` …)이 나간다. 크롤러와 카카오톡 미리보기가 자바스크립트 없이 본문·제목을 읽는다. 목록은 `frontend/src/seo.ts`다.
 - 그 밖의 주소(로그인 뒤 화면, 로그인 화면, 없는 주소)는 본문 없는 `app.html`이 나가고 화면은 브라우저가 그린다. `app.html`은 `noindex`라 검색에 잡히지 않는다.
