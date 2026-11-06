@@ -234,7 +234,7 @@ const DOCS = [
 ['03-Team', '3. 팀 리소스', `
 <p>6명이 함께 만듭니다. 이름을 누르면 GitHub 프로필로 갑니다.</p>
 <h2>Maintainers</h2>
-<div class="team"><div class="role"><b>PM</b><small>주간 develop → main PR, 머지</small><div class="ppl"><a class="person" href="https://github.com/IwanttobeaHokage" target="_blank"><img src="https://github.com/IwanttobeaHokage.png?size=80" alt=""><span><b>정현빈</b><small>@IwanttobeaHokage</small></span><em class="tag lead">PM</em></a></div></div><div class="role"><b>백엔드</b><small>판정 엔진 · 인증 · 배포 · 모니터링</small><div class="ppl"><a class="person" href="https://github.com/yuyeol3" target="_blank"><img src="https://github.com/yuyeol3.png?size=80" alt=""><span><b>최유렬</b><small>@yuyeol3</small></span><em class="tag lead">BE 리드</em></a><a class="person" href="https://github.com/memoryhong" target="_blank"><img src="https://github.com/memoryhong.png?size=80" alt=""><span><b>홍성진</b><small>@memoryhong</small></span><em class="tag">BE · 플래너</em></a></div></div><div class="role"><b>AI</b><small>법령 파이프라인 · RAG · 에이전트 비서 Really · 팀 자동화</small><div class="ppl"><a class="person" href="https://github.com/RainDrop3" target="_blank"><img src="https://github.com/RainDrop3.png?size=80" alt=""><span><b>강민규</b><small>@RainDrop3</small></span><em class="tag lead">AI 리드</em></a></div></div><div class="role"><b>프론트엔드</b><small>React · 화면 · 카드내역 파서</small><div class="ppl"><a class="person" href="https://github.com/cho104" target="_blank"><img src="https://github.com/cho104.png?size=80" alt=""><span><b>이치오</b><small>@cho104</small></span><em class="tag lead">FE 리드</em></a><a class="person" href="https://github.com/Jaeseong22" target="_blank"><img src="https://github.com/Jaeseong22.png?size=80" alt=""><span><b>이재성</b><small>@Jaeseong22</small></span><em class="tag">FE · 메이커</em></a></div></div></div>
+<div class="team"><div class="role"><b>PM</b><small>주간 develop → main PR, 머지</small><div class="ppl"><a class="person" href="https://github.com/IwanttobeaHokage" target="_blank"><img src="https://github.com/IwanttobeaHokage.png?size=80" alt=""><span><b>정현빈</b><small>@IwanttobeaHokage</small></span><em class="tag lead">PM</em></a></div></div><div class="role"><b>백엔드</b><small>판정 엔진 · 가맹점 분류 · 인증 · 배포 · 모니터링</small><div class="ppl"><a class="person" href="https://github.com/yuyeol3" target="_blank"><img src="https://github.com/yuyeol3.png?size=80" alt=""><span><b>최유렬</b><small>@yuyeol3</small></span><em class="tag lead">BE 리드</em></a><a class="person" href="https://github.com/memoryhong" target="_blank"><img src="https://github.com/memoryhong.png?size=80" alt=""><span><b>홍성진</b><small>@memoryhong</small></span><em class="tag">BE · 플래너</em></a></div></div><div class="role"><b>AI</b><small>법령 파이프라인 · RAG · 에이전트 비서 Really · 팀 자동화</small><div class="ppl"><a class="person" href="https://github.com/RainDrop3" target="_blank"><img src="https://github.com/RainDrop3.png?size=80" alt=""><span><b>강민규</b><small>@RainDrop3</small></span><em class="tag lead">AI 리드</em></a></div></div><div class="role"><b>프론트엔드</b><small>React · 화면 · 카드내역 파서</small><div class="ppl"><a class="person" href="https://github.com/cho104" target="_blank"><img src="https://github.com/cho104.png?size=80" alt=""><span><b>이치오</b><small>@cho104</small></span><em class="tag lead">FE 리드</em></a><a class="person" href="https://github.com/Jaeseong22" target="_blank"><img src="https://github.com/Jaeseong22.png?size=80" alt=""><span><b>이재성</b><small>@Jaeseong22</small></span><em class="tag">FE · 메이커</em></a></div></div></div>
 <h2>링크</h2>
 <ul>
   <li><a href="https://ktc4-pusan-4.duckdns.org/" target="_blank">PreeT 실제 서비스 ↗</a></li>
@@ -506,7 +506,7 @@ docs: 커밋 컨벤션 추가</code></pre>
 <tr><td>백엔드</td><td>Java 21 + Spring Boot 3.5 + JPA. 판정 엔진·금액 산정·집계·정규화</td></tr>
 <tr><td>AI 서버</td><td>Python 3.12 + FastAPI. 법령 동기화·RAG·규칙 후보 추출·분류</td></tr>
 <tr><td>DB</td><td>PostgreSQL 17 + pgvector + pg_bigm (컨테이너, <code>docker/postgres/</code>)</td></tr>
-<tr><td>캐시</td><td>Redis 7.4 — 리프레시 토큰 저장</td></tr>
+<tr><td>캐시</td><td>Redis 7.4 — 리프레시 토큰, 이메일 인증 상태, 비서 호출 한도 저장</td></tr>
 <tr><td>LLM / 임베딩</td><td>OpenAI API / text-embedding-3-small, 호출 추적은 Langfuse</td></tr>
 <tr><td>배포</td><td>AWS EC2 1대에서 docker compose 로 PostgreSQL·Redis·백엔드·AI·웹 실행. 이미지는 ECR, 배포 명령은 SSM, HTTPS 는 Caddy</td></tr>
 <tr><td>CI · 모니터링</td><td>GitHub Actions, CloudWatch</td></tr></table>
@@ -658,15 +658,15 @@ JudgmentRun            한 Batch 에 대한 일괄 판정 실행</code></pre>
 `],
 ['09-Local', '8. 로컬 실행', `
 <h2>백엔드</h2>
-<p>JDK 21과 Docker가 필요합니다.</p>
-<pre><code>docker compose up -d postgres
+<p>JDK 21과 Docker가 필요합니다. 로그인할 때 리프레시 토큰을 Redis에 저장하므로 PostgreSQL과 Redis를 함께 띄웁니다.</p>
+<pre><code>docker compose up -d postgres redis
 
 # Windows
 .\\backend\\gradlew.bat -p backend bootRun --args="--spring.profiles.active=local"
 
 # macOS / Linux
 bash ./backend/gradlew -p backend bootRun --args='--spring.profiles.active=local'</code></pre>
-<p>확인: <code>GET http://localhost:8080/actuator/health</code></p>
+<p>확인: <code>GET http://localhost:8080/actuator/health</code> — Redis는 health 검사에서 빠져 있어 Redis가 없어도 UP으로 나옵니다.</p>
 <h2>프론트엔드</h2>
 <pre><code>cd frontend
 npm install
