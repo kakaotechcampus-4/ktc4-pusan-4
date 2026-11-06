@@ -203,8 +203,8 @@ const DOCS = [
 3월 취득 → 10개월분: 3,500,000 ÷ 5 × 10/12 = 583,333원</code></pre>
 <h2>일정</h2>
 <table><tr><th>항목</th><th>내용</th></tr>
-<tr><td>기간</td><td>2026-09 ~ 2026-11 (11주)</td></tr>
-<tr><td>v1.0 배포</td><td>2026-11-06</td></tr></table>
+<tr><td>기간</td><td style="white-space:nowrap">2026-09 ~ 2026-11 (11주)</td></tr>
+<tr><td>v1.0 배포</td><td style="white-space:nowrap">2026-11-06</td></tr></table>
 `],
 ['02-Principles', '2. 핵심 설계 원칙', `
 <h3>원칙 1. 판정 경로에 LLM이 없다</h3>
@@ -431,6 +431,45 @@ docs: 커밋 컨벤션 추가</code></pre>
 <tr><td>확정된 규칙 카드</td><td>53장 (<code>rules/cards/</code>)</td></tr>
 <tr><td>판정 평가셋</td><td>60건</td></tr></table>
 `],
+['06c-Review', '5. 코드 리뷰 기록', `
+<p>매주 PM 이 <code>develop → main</code> PR 을 올리고 담당 멘토님(<a href="https://github.com/bbeomgeun" target="_blank">bbeomgeun</a>)이 리뷰합니다. 1~12주차 PR 7개 모두 멘토님의 수정 요청(Request changes)과 승인(Approve) 리뷰가 함께 남아 있습니다.</p>
+<h2>주차별 멘토 리뷰</h2>
+<table><tr><th style="width:15%">PR</th><th style="width:14%">올린 날</th><th>멘토님이 다룬 주제</th></tr>
+<tr><td><a href="https://github.com/kakaotechcampus-4/ktc4-pusan-4/pull/14" target="_blank">#14</a> 1주차</td><td style="white-space:nowrap">2026-09-09</td><td>natural_key(중복 방지 키) 재료 선정 · 판정 기준을 코드가 아니라 데이터로 두는 구조 · 불확정 상황의 안전 강등 · 요청부터 응답까지 플로우차트 요청</td></tr>
+<tr><td><a href="https://github.com/kakaotechcampus-4/ktc4-pusan-4/pull/36" target="_blank">#36</a> 2주차</td><td style="white-space:nowrap">2026-09-16</td><td>되묻기를 기다릴지 확정할지 정하는 기준 · out_of_scope 핸드오프가 화면에 없는 문제 · 한 사람이 쓴 평가셋 기대값을 CI 차단 기준으로 쓰는 문제</td></tr>
+<tr><td><a href="https://github.com/kakaotechcampus-4/ktc4-pusan-4/pull/50" target="_blank">#50</a> 3주차</td><td style="white-space:nowrap">2026-09-23</td><td>목 서버 대신 스프링에서 목 응답 내리기 · API 명세 · AI 실험은 기준치를 정하고 빠르게 시도해 통과 여부를 보는 방식</td></tr>
+<tr><td><a href="https://github.com/kakaotechcampus-4/ktc4-pusan-4/pull/71" target="_blank">#71</a> 4주차</td><td style="white-space:nowrap">2026-09-30</td><td>[PM] 체인점 가맹점 키 설계 · [BE] 목 응답 수준 · 배포 구조 · CD 구성 · [AI] 법령 동기화 폐기 로직과 API 오류 대비</td></tr>
+<tr><td><a href="https://github.com/kakaotechcampus-4/ktc4-pusan-4/pull/107" target="_blank">#107</a> 9주차</td><td style="white-space:nowrap">2026-10-07</td><td>[PM] 규칙 기반 분류 로직을 어디에 둘지 · [BE] 인증·인가 방식 · 공휴일 데이터 배치 적재와 동기화 · 소프트/하드 삭제 · [AI] 민감정보 관리 · 모델 선택 기준</td></tr>
+<tr><td><a href="https://github.com/kakaotechcampus-4/ktc4-pusan-4/pull/165" target="_blank">#165</a> 11주차</td><td style="white-space:nowrap">2026-10-21</td><td>[BE] 서버 재시작으로 중단된 백그라운드 작업 처리 · 재판정 중 일부 실패 시 롤백 여부 · 거래 목록 필터 · [AI] AI 비서</td></tr>
+<tr><td><a href="https://github.com/kakaotechcampus-4/ktc4-pusan-4/pull/189" target="_blank">#189</a> 12주차</td><td style="white-space:nowrap">2026-10-28</td><td>[BE] 판정 실행 시 DB CPU 측정 결과 판단 · 리프레시 토큰 재사용 감지와 여러 탭 동시 재발급 · 대기열 실패 시 FE 재처리 여부</td></tr>
+<tr><td><a href="https://github.com/kakaotechcampus-4/ktc4-pusan-4/pull/243" target="_blank">#243</a> 13주차</td><td style="white-space:nowrap">2026-11-04</td><td>리뷰 대기 중</td></tr></table>
+<p class="why"><span class="why-label">기준</span> 멘토님 리뷰 본문의 번호 붙은 질문 제목을 옮겼습니다. 자세한 답변은 각 PR 에서 봅니다.</p>
+<h2>리뷰가 문서와 코드로 이어진 예</h2>
+<ul>
+  <li>1주차 리뷰에서 요청부터 응답까지의 플로우차트를 요청받았고, 9월 11일 <code>docs/architecture.md</code> 에 흐름도가 추가됐습니다. 멘토님은 승인하며 배포 파이프라인 · ERD · API 명세 · 인프라 구조도 · 주요 비즈니스 플로우를 그림으로 남기라고 권했습니다.</li>
+  <li>3주차에 목 서버를 따로 두지 말고 스프링에서 목 응답을 내리라는 의견을 받고, 4주차 PR 에서 목 응답으로 교체한 것을 멘토님이 확인했습니다.</li>
+  <li>9주차 공휴일 데이터는 처음에 벌크로 넣고 임시 공휴일에 대비해 주기적으로 동기화하라는 의견을 받았습니다 (<code>HolidaySync</code>, <code>docs/deployment.md</code> 7절).</li>
+</ul>
+`],
+['06d-Docs', '6. 문서화 규칙', `
+<h2>어디에 무엇을 쓰나</h2>
+<table><tr><th style="width:30%">문서</th><th>쓰는 것</th></tr>
+<tr><td><code>CONTEXT.md</code></td><td>설계 결정과 이유, 버린 대안. 머리말에 날짜별로 바뀐 결정을 남깁니다</td></tr>
+<tr><td><code>docs/</code></td><td>기능 명세(API · 비서 · 규칙 카드 필드 등), 실험 · 평가 보고서, 배포 절차</td></tr>
+<tr><td><code>worklog/</code></td><td>push 마다 남기는 작업 기록</td></tr>
+<tr><td>PR 본문</td><td>PR 템플릿 4칸 (<a href="#06-PR">PR · 리뷰 규칙</a>)</td></tr>
+<tr><td>각 폴더 README</td><td>실행 방법 (<code>backend/README.md</code>, <code>frontend/README.md</code>, <code>db/README.md</code>, <code>eval/README.md</code>)</td></tr></table>
+<h2>단일 원본</h2>
+<p>같은 명세를 여러 문서에 나눠 쓰지 않고 한 곳을 원본으로 정합니다. 예: 규칙 카드 필드는 <code>docs/rule-card-fields.md</code>, 비서 명세는 <code>docs/agent-secretary.md</code>, 화면 규칙은 <code>frontend/DESIGN.md</code>.</p>
+<h2>worklog 쓰는 법</h2>
+<ul>
+  <li>경로: <code>worklog/&lt;fe|be|ai|etc&gt;/&lt;YYYY-MM-DD&gt;-&lt;영문-슬러그&gt;.md</code>. 여러 도메인에 걸치면 바뀐 파일이 가장 많은 쪽 하나.</li>
+  <li>같은 날 같은 도메인 문서가 있으면 새로 만들지 않고 끝에 <code>## HH:MM 한 줄 요약</code> 으로 이어 씁니다. 이미 쓴 줄은 고치지 않습니다.</li>
+  <li>틀: 제목 · 브랜치 · 커밋 · 주요파일 → 한 일 → 왜 이렇게 했나 → 남은 것 · 아는 문제.</li>
+  <li>커밋 메시지와 diff 에서 읽히는 것만 씁니다. 추측으로 채우지 않습니다.</li>
+</ul>
+<p class="why"><span class="why-label">파일</span> <code>.claude/skills/worklog/SKILL.md</code>, <code>.githooks/pre-push</code></p>
+`],
 ]],
 ['개발 가이드', [
 ['07-Architecture', '1. 아키텍처 · 6관문', `
@@ -462,6 +501,17 @@ docs: 커밋 컨벤션 추가</code></pre>
 <tr><td>배포</td><td>AWS EC2 1대에서 docker compose 로 PostgreSQL·Redis·백엔드·AI·웹 실행. 이미지는 ECR, 배포 명령은 SSM, HTTPS 는 Caddy</td></tr>
 <tr><td>CI · 모니터링</td><td>GitHub Actions, CloudWatch</td></tr></table>
 <p class="why"><span class="why-label">참고</span> <code>CONTEXT.md</code> 초기 계획은 RDS 였지만, 실제 배포는 EC2 안의 PostgreSQL 컨테이너입니다 (<code>docs/deployment.md</code>).</p>
+<h2>선정 근거</h2>
+<table><tr><th style="width:24%">도구</th><th>판단</th></tr>
+<tr><td>Langfuse</td><td>✅ LLM 호출 추적. 모델 호출이 4곳 이상이라 디버깅에서 크게 갈림</td></tr>
+<tr><td>Pydantic</td><td>✅ 구조화 출력 + 조문 실재성 검증</td></tr>
+<tr><td>LangGraph</td><td>조건부. 직접 짜서 도는 걸 확인한 뒤 판단</td></tr>
+<tr><td>LangChain</td><td>❌ 인덱스 하나 → 답변 패턴이라 4섹션 조건부 탐색과 안 맞음, 버전 불안정</td></tr>
+<tr><td>LlamaIndex</td><td>❌ 강점이 문서 파싱인데 소스가 법령 API 하나(구조화 XML)</td></tr>
+<tr><td>Airflow · Kafka · dbt · Spark</td><td>❌ 조문 수천~수만 건 규모에서 운영 비용이 더 큼</td></tr>
+<tr><td>별도 벡터 DB</td><td>❌ pgvector 로 충분. 컴포넌트 0개 추가, 원문 조인 가능</td></tr></table>
+<blockquote>추상화가 감춘 것 중에 내가 건드려야 할 게 있으면 그 추상화는 맞지 않는다.</blockquote>
+<p class="why"><span class="why-label">출처</span> <code>CONTEXT.md</code> 12절</p>
 <h2>디렉터리</h2>
 <table><tr><th>경로</th><th>내용</th></tr>
 <tr><td><code>backend/</code></td><td>Spring Boot 백엔드</td></tr>
@@ -477,7 +527,126 @@ docs: 커밋 컨벤션 추가</code></pre>
 <tr><td><code>docs/</code></td><td>설계·평가 문서</td></tr>
 <tr><td><code>CONTEXT.md</code></td><td>설계 결정과 이유 (먼저 읽기)</td></tr></table>
 `],
-['09-Local', '3. 로컬 실행', `
+['07b-API', '3. API', `
+<p>모든 API 는 <code>/api/v1</code> 아래에 있습니다. 전체 명세(요청 · 응답 · 에러 코드)의 원본은 <code>docs/api.md</code> 입니다.</p>
+<h2>리소스 구조</h2>
+<pre><code>UploadBatch            한 번 업로드한 카드내역 묶음
+  └─ Transaction       개별 거래
+       ├─ ClassificationReview   분류 실패 → 사용자 확인
+       └─ Judgment               거래 하나의 판정 (revision 으로 저장)
+            ├─ Question → UserFact → 재판정
+            └─ JudgmentOverride  → 새 revision
+JudgmentRun            한 Batch 에 대한 일괄 판정 실행</code></pre>
+<h2>공통 규칙</h2>
+<table><tr><th style="width:22%">항목</th><th>규칙</th></tr>
+<tr><td>인증</td><td><code>/auth/*</code> 를 뺀 모든 API 는 <code>Authorization: Bearer 액세스토큰</code>. 액세스 토큰 15분(JWT), 리프레시 토큰 14일(HttpOnly 쿠키, 서버 Redis 가 기억). 401 이면 프론트가 한 번 재발급 후 재요청</td></tr>
+<tr><td>에러</td><td><code>code</code> · <code>message</code> · <code>traceId</code>. 전용 코드가 없으면 상태별 공통 코드(VALIDATION_ERROR, UNAUTHORIZED, NOT_FOUND …)</td></tr>
+<tr><td>중복 업로드</td><td><code>POST /upload-batches</code> 는 <code>Idempotency-Key</code> 헤더 사용, 24시간 유효</td></tr>
+<tr><td>진행 확인</td><td>판정 실행은 SSE 대신 <code>GET /judgment-runs/&#123;runId&#125;</code> 폴링. 룰 엔진이 결정론적 로컬 연산이라 충분하다고 봄</td></tr></table>
+<h2>엔드포인트 (43개)</h2>
+<table><tr><th style="width:22%">묶음</th><th>엔드포인트</th></tr>
+<tr><td>인증</td><td>POST auth/email-verification · email-verification/confirm · signup · login · kakao · refresh · logout</td></tr>
+<tr><td>사용자</td><td>GET · DELETE users/me · POST · GET users/me/contexts · GET users/me/contexts/current</td></tr>
+<tr><td>업로드 · 거래</td><td>POST · GET upload-batches · GET · DELETE upload-batches/&#123;batchId&#125; · GET transactions · GET transactions/&#123;id&#125; · POST transactions/&#123;id&#125;/exclude · include</td></tr>
+<tr><td>분류 확인</td><td>GET classification-reviews · POST classification-responses</td></tr>
+<tr><td>판정</td><td>POST judgment-runs · GET judgment-runs/&#123;runId&#125; · failures · GET judgments · summary · export · GET judgments/&#123;id&#125; · POST judgments/&#123;id&#125;/override · DELETE judgment-overrides/&#123;id&#125;</td></tr>
+<tr><td>되묻기</td><td>GET questions · POST question-responses · POST questions/bulk-answer · GET questions/suggestions</td></tr>
+<tr><td>기타</td><td>GET statutes/&#123;statuteVersionId&#125; · GET progress · POST assistant/chat · GET · POST handoff-notes</td></tr>
+<tr><td>관리자</td><td>GET admin/rule-candidates · POST admin/rule-candidates/&#123;id&#125;/approve · reject</td></tr></table>
+`],
+['07c-DB', '4. DB 스키마', `
+<p>PostgreSQL 17 + pgvector + pg_bigm. 테이블 구조와 관계도(ERD)는 <code>CONTEXT.md</code> 8절, 적용 방법은 <code>db/README.md</code> 에 있습니다.</p>
+<h2>누가 만드나</h2>
+<table><tr><th style="width:30%">소유</th><th>무엇</th><th>어디</th></tr>
+<tr><td>백엔드 Flyway</td><td>판정 코어 테이블 (마이그레이션 21개)</td><td><code>backend/src/main/resources/db/migration/</code></td></tr>
+<tr><td>db 디렉터리</td><td><code>law_sync_log</code></td><td><code>db/schema.sql</code></td></tr>
+<tr><td>db 디렉터리</td><td><code>legal_chunk</code> (RAG 색인)</td><td><code>db/rag.sql</code></td></tr></table>
+<blockquote>순서가 있습니다. Flyway 가 먼저 돌고 그다음 <code>rag.sql</code>. <code>legal_chunk</code> 가 <code>statute_version</code> 을 참조해서 반대로 하면 실패합니다.</blockquote>
+<h2>테이블 (24개)</h2>
+<p>app_user · user_context · user_fact · upload_batch · transaction · idempotency_key · merchant_dict · merchant_model_decision · classification_review · judgment_run · judgment_run_item · judgment · judgment_citation · judgment_input_fact · judgment_override · question_queue · limit_bucket_entry · unmatched_log · rule_candidate · statute_version · public_holiday · handoff_note · handoff_note_transaction · legal_chunk (+ law_sync_log)</p>
+<h2>지킬 것</h2>
+<ul>
+  <li>조문은 UPDATE 로 덮어쓰지 않고 쌓습니다(append-only). 인용은 <code>statute_version_id</code>(버전 FK)로 남깁니다.</li>
+  <li><code>unmatched_log</code> 에 <code>user_id</code> 를 넣지 않습니다. 개인 지출 패턴이 드러납니다.</li>
+  <li>임베딩 컬럼은 1536차원입니다(text-embedding-3-small).</li>
+</ul>
+<p class="why"><span class="why-label">출처</span> <code>CONTEXT.md</code> 16절 "자주 하는 실수"</p>
+`],
+['07d-FE', '5. 프론트엔드', `
+<p>Vite + React 18 + TypeScript + Tailwind. 원본은 <code>frontend/README.md</code> 와 <code>frontend/DESIGN.md</code> 입니다.</p>
+<h2>폴더</h2>
+<table><tr><th style="width:28%">경로</th><th>내용</th></tr>
+<tr><td>src/api/</td><td>API 레이어. contract.ts(함수 시그니처), hooks.ts(useApi), mock/(목업 구현)</td></tr>
+<tr><td>src/components/ui/</td><td>공용 부품 (Button, Card, Badge, Field · Input · Select …)</td></tr>
+<tr><td>src/components/</td><td>도메인 부품 (VerdictBadge, StatuteCitation, OrbitStage …)</td></tr>
+<tr><td>src/pages/</td><td>라우트별 화면</td></tr>
+<tr><td>src/parser/</td><td>카드내역 파서. KB국민 · IBK기업 승인내역 .xls 를 브라우저에서 읽음</td></tr>
+<tr><td>src/types/</td><td>도메인 타입 (API 명세와 1:1)</td></tr></table>
+<h2>데이터 흐름</h2>
+<p>화면은 <code>api.*</code> 만 부릅니다. 기본은 인메모리 목업이고 <code>VITE_API=http</code> 이면 실제 서버를 부릅니다. 화면 코드는 그대로입니다.</p>
+<h2>디자인 규칙</h2>
+<ul>
+  <li>색 · 글자 크기 · 간격은 <code>tailwind.config.js</code> 토큰 이름으로만 씁니다. 임의 값(<code>text-[15px]</code>)은 쓰지 않습니다.</li>
+  <li>그림자를 쓰지 않습니다(머리띠 예외). 패널은 테두리 없이 회색 바탕으로 가릅니다.</li>
+  <li>강조색(핑크)은 한 화면에 한 번만. 주된 버튼은 검정 알약, 파랑은 문장 속 링크.</li>
+  <li>판정 결과는 색만으로 말하지 않고 기호(✓ ? ✕)를 붙입니다 → <code>VerdictBadge</code>.</li>
+  <li>움직임은 첫 화면 큰 판에서만. 세금 판정 화면은 차분하게 둡니다.</li>
+</ul>
+<h2>검색 노출</h2>
+<p><code>npm run build</code> 끝에 공개 페이지를 미리 그려(prerender) 크롤러와 카카오톡 미리보기가 본문 · 제목을 읽게 합니다. 공개 페이지를 더하면 <code>src/seo.ts</code> 의 <code>PAGES</code> 에 넣습니다.</p>
+`],
+['07e-Convention', '6. 코딩 컨벤션', `
+<p>커밋 메시지 규칙은 <a href="#05-Commit">커밋 컨벤션</a> 에 있습니다. 여기는 코드 규칙입니다.</p>
+<h2>백엔드 (Java · Spring)</h2>
+<ul>
+  <li>기능별 패키지 아래 <code>api</code>(컨트롤러 · 요청/응답) · <code>domain</code> · <code>persistence</code>(엔티티 · 리포지토리 · 서비스)로 나눕니다. 예: <code>handoff/api</code>, <code>handoff/domain</code>, <code>handoff/persistence</code>.</li>
+  <li>테스트 클래스 이름: 단위 <code>*Test</code>, DB · 스프링이 필요한 통합 <code>*IntegrationTest</code>. 이름으로 CI 실행 대상이 나뉩니다.</li>
+  <li>PMD(복잡도 · 빈 catch · 안 쓰는 변수/필드/메서드 등 8개 규칙)와 CPD(중복 코드)를 PR 마다 참고용 리포트로 냅니다. 실패해도 막지 않습니다.</li>
+</ul>
+<p class="why"><span class="why-label">파일</span> <code>backend/config/pmd/ruleset.xml</code>, <code>backend/README.md</code></p>
+<h2>AI 서버 (Python)</h2>
+<ul>
+  <li>패키지 관리는 uv, 검사는 <code>ruff check</code>(기본 규칙), 테스트는 pytest. AI CI 가 PR 마다 돌립니다.</li>
+</ul>
+<h2>프론트엔드 (TypeScript · React)</h2>
+<ul>
+  <li>ESLint: <code>eslint:recommended</code> + <code>@typescript-eslint/recommended</code> + <code>react-hooks/recommended</code>.</li>
+  <li>타입 검사 <code>npx tsc --noEmit</code>, 디자인 규칙은 <a href="#07d-FE">프론트엔드</a> 참고.</li>
+</ul>
+<h2>도메인 코드에서 자주 하는 실수</h2>
+<ol>
+  <li>파일 순회 순서에 의존 — 로딩 직후 <code>priority → id</code> 로 재정렬</li>
+  <li>first-match 로 구현 — best-match(priority → specificity → id)여야 함</li>
+  <li><code>eval()</code> 도입 — 규칙 카드가 코드가 됨</li>
+  <li>게이트를 정수 · 문자열로 다루기 — <code>Gate</code> enum 하나가 단일 출처</li>
+  <li>한도를 건별로 계산 — 같은 입력에 다른 답</li>
+  <li>평가셋 기대값을 규칙 카드에서 뽑기 — 자기가 자기를 채점</li>
+  <li>업종코드 앞자리 0 유실 — 문자열 강제</li>
+  <li>모델에게 금액 계산 시키기 — 산술은 코드가</li>
+  <li>분류 결과를 fixture 로 고정 안 하기 — CI 가 비결정적이 됨</li>
+  <li>속성 관문을 조기 종료로 구현 — <code>putAll</code> 이지 <code>return</code> 이 아님</li>
+</ol>
+<p class="why"><span class="why-label">출처</span> <code>CONTEXT.md</code> 16절 (20개 중 코드 쪽 10개). AI 코딩 에이전트용 지침은 <code>CLAUDE.md</code>.</p>
+`],
+['07f-Test', '7. 테스트', `
+<h2>백엔드</h2>
+<table><tr><th style="width:22%">종류</th><th>명령</th><th>내용</th></tr>
+<tr><td>단위</td><td><code>gradlew -p backend test</code></td><td>도메인 규칙 · 계산 · 검증 · 변환. Docker 불필요</td></tr>
+<tr><td>통합</td><td><code>gradlew -p backend integrationTest</code></td><td>PostgreSQL · JPA · Flyway · 트랜잭션. Testcontainers 가 테스트용 DB 를 띄우고 끝나면 지움</td></tr>
+<tr><td>전체</td><td><code>gradlew -p backend check</code></td><td>위 둘 다</td></tr></table>
+<h2>판정 평가셋 (회귀 검사)</h2>
+<ul>
+  <li><code>eval/cases/E-*.yaml</code> 한 건 = 거래 하나와 받아야 할 판정. 지금 60건.</li>
+  <li><strong>기대값은 규칙 카드가 아니라 조문에서 뽑습니다.</strong> 케이스마다 근거 조문 요지를 먼저 쓰고 기대값을 거기서 도출합니다.</li>
+  <li>백엔드 <code>test</code> 에 포함돼 CI 에서 돕니다. 리포트는 빌드 후 <code>build/reports/eval/eval-report.md</code> (백엔드 폴더 안)에 생깁니다.</li>
+</ul>
+<p class="why"><span class="why-label">파일</span> <code>eval/README.md</code></p>
+<h2>AI 서버 · 프론트엔드</h2>
+<table><tr><th style="width:22%">대상</th><th>명령</th></tr>
+<tr><td>AI 서버</td><td><code>uv run ruff check .</code> · <code>uv run pytest</code></td></tr>
+<tr><td>프론트엔드</td><td><code>npm test</code>(vitest) · <code>npm run lint</code> · <code>npx tsc --noEmit</code></td></tr></table>
+`],
+['09-Local', '8. 로컬 실행', `
 <h2>백엔드</h2>
 <p>JDK 21과 Docker가 필요합니다.</p>
 <pre><code>docker compose up -d postgres
@@ -499,6 +668,27 @@ npm run dev   # http://localhost:5173</code></pre>
 <tr><td>통합 (<code>*IntegrationTest</code>)</td><td><code>gradlew -p backend integrationTest</code></td><td>필요</td></tr>
 <tr><td>프론트</td><td><code>npm test</code></td><td>-</td></tr></table>
 `],
+['09b-Deploy', '9. 배포', `
+<p>원본은 <code>docs/deployment.md</code> 입니다. 여기는 흐름만 요약합니다.</p>
+<h2>구성</h2>
+<ul>
+  <li>카테캠 팀 계정의 Ubuntu 24.04 EC2 한 대에서 <code>deploy/compose.yaml</code> 로 PostgreSQL · Redis · 백엔드 · AI · 웹을 띄웁니다.</li>
+  <li>도메인은 DuckDNS(<a href="https://ktc4-pusan-4.duckdns.org/" target="_blank">ktc4-pusan-4.duckdns.org</a>), HTTPS 인증서는 Caddy 가 발급합니다.</li>
+  <li>보안그룹은 80 · 443 만 엽니다. 서버 접속은 SSH 대신 Session Manager 를 씁니다.</li>
+</ul>
+<h2>배포 흐름</h2>
+<pre><code>develop → release PR (승인 1명 + 백엔드·AI·웹 검사 통과)
+  → release push
+  → GitHub Actions: 검증 → 이미지 빌드 → ECR 업로드
+  → SSM 이 EC2 의 deploy/deploy.sh 에 커밋 SHA 전달
+  → 이미지 pull → compose 기동 → Flyway → db/schema.sql · db/rag.sql 적용</code></pre>
+<h2>운영</h2>
+<table><tr><th style="width:22%">항목</th><th>내용</th></tr>
+<tr><td>백업</td><td>매일 03:00 <code>pg_dump</code> 를 S3 로 보냄. 복원은 임시 DB 에서 확인</td></tr>
+<tr><td>되돌리기</td><td><code>deploy.sh &lt;이전 SHA&gt; --rollback</code>. Flyway 스키마는 되돌리지 않으므로 스키마 변경은 이전 앱과 호환되게 나눠 배포</td></tr>
+<tr><td>로그 · 알림</td><td>백엔드 로그는 CloudWatch Logs, 알람은 디스코드로 (<a href="#06b-Automation">협업 자동화</a>)</td></tr>
+<tr><td>주의</td><td>운영에서 <code>docker compose down -v</code> 금지 — DB 볼륨이 지워짐</td></tr></table>
+`],
 ]],
 ];
 
@@ -514,6 +704,14 @@ const DESC = {   // 홈 카드 한 줄 설명
   '05-Commit': 'type: subject 형식과 타입 목록',
   '06-PR': 'PR 본문 쓰는 법, 머지 규칙, 주간 리뷰 사이클',
   '06b-Automation': 'PR 알림 봇, 승인 필수 룰셋, worklog 자동 작성, CI·배포, 모니터링',
+  '06c-Review': '주차별 멘토 리뷰 PR 과 다룬 주제',
+  '06d-Docs': 'CONTEXT · docs · worklog · README 에 무엇을 쓰나',
+  '07b-API': '리소스 구조, 공통 규칙, 엔드포인트 43개',
+  '07c-DB': '테이블 소유 · 적용 순서 · 테이블 24개',
+  '07d-FE': '폴더 구조, 목업/실서버 전환, 디자인 규칙',
+  '07e-Convention': '백엔드 · AI · 프론트 코드 규칙과 자주 하는 실수',
+  '07f-Test': '단위 · 통합 테스트, 판정 평가셋, 린트',
+  '09b-Deploy': 'EC2 · compose 구성, release 배포 흐름, 백업 · 롤백',
   '07-Architecture': '입력 검증부터 집계까지, 6관문 판정 흐름',
   '08-Stack': '프론트 · 백엔드 · AI 서버 · DB 구성과 디렉터리',
   '09-Local': '백엔드·프론트 로컬 실행과 테스트 명령',
@@ -527,6 +725,14 @@ const RELATED = {   // 페이지 끝 "함께 보면 좋은 문서"
   '05-Commit': ['04-Branch', '06-PR'],
   '06-PR': ['06b-Automation', '04-Branch', '00-Ground-Rules'],
   '06b-Automation': ['06-PR', '00-Ground-Rules'],
+  '06c-Review': ['06-PR', '06b-Automation'],
+  '06d-Docs': ['00-Ground-Rules', '06-PR'],
+  '07b-API': ['07c-DB', '07-Architecture'],
+  '07c-DB': ['07b-API', '07-Architecture'],
+  '07d-FE': ['07b-API', '07e-Convention'],
+  '07e-Convention': ['05-Commit', '07f-Test'],
+  '07f-Test': ['07e-Convention', '09-Local'],
+  '09b-Deploy': ['06b-Automation', '08-Stack'],
   '07-Architecture': ['02-Principles', '08-Stack'],
   '08-Stack': ['09-Local', '07-Architecture'],
   '09-Local': ['08-Stack', '04-Branch'],
