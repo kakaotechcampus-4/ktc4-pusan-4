@@ -155,6 +155,19 @@ describe('인증 (#139 가정)', () => {
     expect(callsTo('/users/me').map(([, init]) => bearer(init))).toEqual(['Bearer old', 'Bearer new']);
   });
 
+  it('서버 오류 문구가 없거나 영어면 상태 번호 없이 일반 문구를 쓴다 (C65)', async () => {
+    const api = await fresh();
+    route({
+      '/upload-batches': () => [502],
+      '/users/me': () => [405, { code: 'METHOD_NOT_ALLOWED', message: "Method 'PUT' is not supported." }],
+      '/judgment-runs': () => [409, { code: 'CONFLICT', message: '이미 판정 중입니다.' }]
+    });
+    const generic = '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.';
+    await expect(api.uploads.list()).rejects.toMatchObject({ status: 502, code: 'UNKNOWN', message: generic });
+    await expect(api.users.me()).rejects.toMatchObject({ code: 'METHOD_NOT_ALLOWED', message: generic });
+    await expect(api.runs.create({ batchId: 'b1', contextId: 'c1' })).rejects.toMatchObject({ message: '이미 판정 중입니다.' });
+  });
+
   it('재발급도 401 이면 로그인이 풀렸다고 한 번만 알린다', async () => {
     const api = await fresh();
     const lost = vi.fn();

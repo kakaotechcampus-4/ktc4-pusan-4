@@ -2,7 +2,7 @@ import { ApiRequestError } from './contract';
 import type { Api } from './contract';
 
 /**
- * 실제 서버 구현. 배포에서 Caddy 가 `/api/v1/*` 를 백엔드로 넘기므로(deploy/Caddyfile)
+ * 실제 서버 구현. 배포에서 Caddy 가 `/api/v1/*` 를 백엔드로 넘기므로(deploy/caddy/Caddyfile)
  * 같은 오리진이고 CORS 가 없다. 개발 중에는 vite proxy 가 같은 경로를 넘긴다.
  */
 const BASE = '/api/v1';
@@ -123,7 +123,7 @@ retried = false)
     });
   } catch {
     // 네트워크가 끊겼거나 서버가 응답하지 않는다. 화면이 "데이터 없음"으로 읽지 않도록 상태 0 으로 구분한다
-    throw new ApiRequestError(0, 'NETWORK_ERROR', '서버에 연결하지 못했습니다.');
+    throw new ApiRequestError(0, 'NETWORK_ERROR', '서버에 연결하지 못했습니다. 인터넷 연결을 확인하고 다시 시도해 주세요.');
   }
 
   const text = await response.text();
@@ -167,7 +167,8 @@ retried = false)
     throw new ApiRequestError(
       response.status,
       error.code ?? 'UNKNOWN',
-      error.message ?? `요청을 처리하지 못했습니다. (${response.status})`,
+      // 본문이 없거나(프록시의 502·504) 한글이 없는 서버 기본 문구(Spring 의 영어)면 화면에 올리지 않는다 (C65)
+      error.message && /[가-힣]/.test(error.message) ? error.message : '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.',
       error.traceId ?? '',
       response.headers.has('Retry-After') && Number.isFinite(retryAfter) ? retryAfter : undefined,
       // 409 RUN_ALREADY_ACTIVE 에만 붙는다 (#228). 문자열이 아니면 없는 것으로 둔다
