@@ -89,7 +89,7 @@ describe('chatErrorText', () => {
 
   it('Retry-After 가 0 이면 「0초 뒤」로 적지 않는다', () => {
     expect(chatErrorText(new ApiRequestError(429, 'ASSISTANT_RATE_LIMITED', 'x', '', 0))).toBe(
-      '지금은 더 받을 수 없습니다. 잠시 뒤 다시 물어봐 주세요.'
+      '지금은 더 받을 수 없습니다. 잠시 후 다시 물어봐 주세요.'
     );
   });
 

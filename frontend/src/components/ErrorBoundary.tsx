@@ -43,8 +43,8 @@ function ErrorScreen() {
         <h1 className="mt-5 text-h3 font-bold text-ink">화면을 그리지 못했습니다</h1>
         <p className="mt-2 text-body leading-7 text-ink2">
           {isMock ?
-          '잠시 뒤 다시 시도해 주세요. 체험 화면은 새로고침하면 처음 상태로 돌아갑니다.' :
-          '잠시 뒤 다시 시도해 주세요. 올린 카드내역과 판정은 서버에 그대로 있습니다.'}
+          '잠시 후 다시 시도해 주세요. 체험 화면은 새로고침하면 처음 상태로 돌아갑니다.' :
+          '잠시 후 다시 시도해 주세요. 올린 카드내역과 판정은 서버에 그대로 있습니다.'}
         </p>
         <div className="mt-6 flex justify-center gap-2">
           <Button size="md" onClick={() => window.location.reload()}>

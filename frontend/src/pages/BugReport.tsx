@@ -20,7 +20,7 @@ export function BugReport() {
         <SectionHeading
           as="h1"
           eyebrow="버그 신고"
-          title="잘못 나온 것을 알려주세요"
+          title="잘못 나온 것을 알려 주세요"
           description="판정이 이상하거나 화면이 깨졌다면 알려주시면 고칩니다." />
 
         <div className="mt-12 max-w-2xl rounded-2xl border border-line bg-surface px-8 py-10">
@@ -38,7 +38,7 @@ export function BugReport() {
 
         <section className="mt-16 max-w-2xl">
           <h2 className="text-h3 font-bold tracking-ir-sm text-ink">
-            이렇게 적어주시면 좋습니다
+            이렇게 적어 주시면 좋습니다
           </h2>
           <dl className="mt-6 border-t border-line">
             {WHAT_TO_WRITE.map((item) =>

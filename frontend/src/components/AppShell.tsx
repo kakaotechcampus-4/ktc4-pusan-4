@@ -15,17 +15,17 @@ import { accountLabel } from '../utils/account';
 /** 빵부스러기에 쓸 이름. [무리, 화면] */
 const CRUMB: Record<string, [string, string]> = {
   '/upload': ['카드내역', '카드내역 올리기'],
-  '/preview': ['카드내역', '가맹점 분류 확인'],
+  '/preview': ['카드내역', '분류 확인'],
   '/uploads': ['자료', '업로드 이력'],
   '/transactions': ['자료', '거래 목록'],
   // 판정 흐름이 아니라 계정 설정이다. 고치는 길도 내 정보에 있다
-  '/interview': ['내 정보', '사업자 문진'],
-  '/confirm': ['판정', '판정 확인'],
+  '/interview': ['설정', '사업자 문진'],
+  '/confirm': ['판정', '판정 전 확인'],
   '/run': ['판정', '판정 진행'],
   '/results': ['판정', '판정 결과'],
-  '/questions': ['판정', '되묻기'],
-  '/summary': ['판정', '세무사 전달 요약'],
-  '/account': ['내 정보', '내 정보'],
+  '/questions': ['판정', '질문'],
+  '/summary': ['판정', '전달 요약'],
+  '/account': ['설정', '내 정보'],
   '/admin': ['관리자', '규칙 후보']
 };
 
@@ -234,14 +234,17 @@ export function AppShell({ children, showSteps = true, disclaimer = true }: AppS
             카드내역 원본은 서버에 저장하지 않습니다. 카드번호·계좌번호는 브라우저
             파싱 단계에서 폐기됩니다.
           </p>
+          {/* 합계를 보여주는 화면에서만 뜻이 있다. 업로드·문진에는 셀 것이 없다 */}
+          {(under(pathname, '/results') || under(pathname, '/summary')) &&
           <p className="tabular-nums">잠정 집계 · 당해연도 수입 확정 후 확정</p>
+          }
         </div>
         <nav aria-label="도움말과 약관" className="mx-auto max-w-page px-6 pb-8 text-caption text-muted">
           <ul className="flex flex-wrap items-center gap-x-5 gap-y-2">
             <li><Link to="/faq" className="hover:text-ink hover:underline underline-offset-4">자주 묻는 질문</Link></li>
+            <li><BugReportButton /></li>
             <li><Link to="/terms" className="hover:text-ink hover:underline underline-offset-4">이용약관</Link></li>
             <li><Link to="/privacy" className="font-bold hover:text-ink hover:underline underline-offset-4">개인정보처리방침</Link></li>
-            <li><BugReportButton /></li>
           </ul>
         </nav>
       </footer>

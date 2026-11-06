@@ -65,7 +65,7 @@ export function MarketingHeader() {
                 내 판정으로
               </Button>
               <Button to="/account" variant="secondary" size="sm">
-                마이페이지
+                내 정보
               </Button>
               <Button variant="secondary" size="sm" onClick={signOut}>
                 로그아웃

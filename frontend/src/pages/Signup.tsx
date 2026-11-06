@@ -362,6 +362,8 @@ export function Signup() {
             </div>
           </div>
 
+          {passwordError && errorBox}
+
           <fieldset className="mt-5 space-y-2 rounded-xl border border-line px-3.5 py-3 text-[13px]">
             <legend className="sr-only">약관 동의</legend>
             <label className="flex items-center gap-2 font-bold text-ink">
@@ -420,7 +422,7 @@ export function Signup() {
             {doc === 'privacy' ? <PrivacyBody /> : <TermsBody onOpenPrivacy={() => setDoc('privacy')} />}
           </Modal>
 
-          {errorBox}
+          {!passwordError && errorBox}
           <button type="submit" disabled={busy} className={`mt-5 ${AUTH_PRIMARY}`}>
             {busy ? '가입하는 중…' : '가입하기'}
           </button>

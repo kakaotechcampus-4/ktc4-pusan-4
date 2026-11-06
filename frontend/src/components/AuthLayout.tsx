@@ -61,7 +61,7 @@ export function AuthLayout({ title, children }: {title: string;children: React.R
 
 /** 로그인·가입 폼의 입력칸. 로그인 화면의 기존 모양 그대로다 */
 export const AUTH_INPUT =
-'mt-1.5 w-full rounded-xl border border-line px-3.5 py-2.5 text-[14px] text-ink placeholder:text-muted/70 disabled:bg-canvas disabled:text-muted';
+'mt-1.5 w-full rounded-xl border border-line px-3.5 py-2.5 text-[14px] text-ink placeholder:text-muted/70 aria-[invalid=true]:border-deny disabled:bg-canvas disabled:text-muted';
 export const AUTH_LABEL = 'block text-[13px] font-normal text-ink2';
 export const AUTH_PRIMARY =
 'w-full rounded-xl bg-accent px-4 py-3 text-[15px] font-bold text-white transition-colors duration-150 ease-snap hover:bg-accent-hover disabled:opacity-60';

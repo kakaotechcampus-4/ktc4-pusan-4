@@ -1572,7 +1572,7 @@ export const mockControls = {
   failNextAssistant(kind: 400 | 429 | 'daily' | 503) {
     store.failAssistant =
     kind === 429 ?
-    new ApiRequestError(429, 'ASSISTANT_RATE_LIMITED', '잠시 뒤 다시 물어봐 주세요.', '', 5) :
+    new ApiRequestError(429, 'ASSISTANT_RATE_LIMITED', '잠시 후 다시 물어봐 주세요.', '', 5) :
     kind === 'daily' ?
     new ApiRequestError(429, 'ASSISTANT_RATE_LIMITED', '오늘은 더 물어볼 수 없습니다.', '', 6 * 3600) :
     kind === 503 ?

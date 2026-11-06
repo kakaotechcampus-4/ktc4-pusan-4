@@ -345,7 +345,7 @@ function RunProgress() {
           <dl className="mt-3 grid gap-x-6 gap-y-2 text-small sm:grid-cols-2">
             <div className="flex justify-between gap-3">
               <dt className="text-muted">문진 버전</dt>
-              <dd className="tabular-nums text-ink2">v{run?.contextVersion ?? '—'}</dd>
+              <dd className="tabular-nums text-ink2">{run?.contextVersion ?? '—'}</dd>
             </div>
             <div className="flex justify-between gap-3">
               <dt className="text-muted">판정 대상</dt>
@@ -473,7 +473,7 @@ function RunProgress() {
             onClick={() => navigate('/results')}
             className="mt-4 inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-3 text-body-lg font-bold text-white transition-colors duration-150 ease-snap hover:bg-accent-hover">
             
-              결과 보기
+              판정 결과 보기
               <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
             </button>
           </motion.section>

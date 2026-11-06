@@ -13,7 +13,7 @@ import {
   type Column } from
 '../components/ui';
 import type { UploadBatch } from '../types/domain';
-import { formatFullDate, formatNumber, formatPeriod, toKst } from '../utils/format';
+import { formatFullDate, formatNumber, formatPeriod, issuerLabel, toKst } from '../utils/format';
 
 /**
  * 업로드 이력 (FR-24·25).
@@ -69,7 +69,7 @@ export function Uploads() {
     cell: (row) =>
     <span className="block min-w-0">
           <span className="block font-normal text-ink">
-            {row.cardIssuer}카드 · {row.sourceType}
+            {issuerLabel(row.cardIssuer)} · {row.sourceType}
           </span>
           <span className="block truncate text-small tabular-nums text-muted">
             {formatPeriod(row.periodStart, row.periodEnd)}
@@ -123,7 +123,7 @@ export function Uploads() {
     <Button
       variant="secondary"
       size="sm"
-      aria-label={`${row.cardIssuer}카드 ${formatPeriod(row.periodStart, row.periodEnd)} 보기`}
+      aria-label={`${issuerLabel(row.cardIssuer)} ${formatPeriod(row.periodStart, row.periodEnd)} 보기`}
       onClick={() => setBatchId(row.id)}>
 
           이 파일 보기
@@ -138,7 +138,7 @@ export function Uploads() {
     <Button
       variant="ghost"
       size="sm"
-      aria-label={`${row.cardIssuer}카드 ${formatPeriod(row.periodStart, row.periodEnd)} 업로드 삭제`}
+      aria-label={`${issuerLabel(row.cardIssuer)} ${formatPeriod(row.periodStart, row.periodEnd)} 업로드 삭제`}
       onClick={() => setTarget(row)}>
 
           삭제
@@ -184,7 +184,7 @@ export function Uploads() {
           <Empty
             icon={<InboxIcon className="h-5 w-5" />}
             title="아직 올린 파일이 없습니다"
-            description="국민·기업카드 이용내역을 올리면 여기에 쌓입니다."
+            description="KB국민카드·IBK기업은행 카드의 승인내역을 올리면 여기에 쌓입니다."
             action={
             <Button to="/upload" size="sm">
                   카드내역 올리기
@@ -239,7 +239,7 @@ export function Uploads() {
             <div className="flex justify-between gap-3">
               <dt className="text-muted">파일</dt>
               <dd className="text-ink">
-                {target.cardIssuer}카드 · {target.sourceType}
+                {issuerLabel(target.cardIssuer)} · {target.sourceType}
               </dd>
             </div>
             <div className="flex justify-between gap-3">

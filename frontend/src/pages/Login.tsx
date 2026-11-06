@@ -17,6 +17,8 @@ export function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  /** 틀린 칸. 서버가 돌려준 오류는 어느 칸인지 알 수 없어 null 이다 */
+  const [invalidField, setInvalidField] = useState<'email' | 'password' | null>(null);
   const [busy, setBusy] = useState(false);
 
   const from = (location.state as LocationState | null)?.from ?? '/';
@@ -26,6 +28,7 @@ export function Login() {
     if (busy) return;
     setBusy(true);
     setError(null);
+    setInvalidField(null);
     try {
       await signIn(nextEmail, nextPassword);
       navigate(from, { replace: true });
@@ -47,11 +50,13 @@ export function Login() {
     event.preventDefault();
     if (!email.includes('@')) {
       setError('이메일 형식을 확인해 주세요.');
+      setInvalidField('email');
       return;
     }
     // 길이 규칙은 가입할 때만 본다. 가입 전에 만든 계정의 비밀번호를 여기서 막지 않는다
     if (password === '') {
       setError('비밀번호를 입력해 주세요.');
+      setInvalidField('password');
       return;
     }
     void complete(email, password);
@@ -111,7 +116,7 @@ export function Login() {
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               placeholder="name@example.com"
-              aria-invalid={Boolean(error)}
+              aria-invalid={invalidField === 'email'}
               className={AUTH_INPUT} />
 
           </div>
@@ -125,7 +130,7 @@ export function Login() {
               autoComplete="current-password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              aria-invalid={Boolean(error)}
+              aria-invalid={invalidField === 'password'}
               className={AUTH_INPUT} />
 
           </div>

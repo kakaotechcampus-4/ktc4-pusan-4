@@ -179,7 +179,7 @@ export function Results() {
       const period = batch ? `${batch.periodStart}_${batch.periodEnd}` : batchId.slice(0, 8);
       download(`PreeT-판정결과-${period}.csv`, judgmentsCsv(items, limits));
     } catch {
-      setNotice('CSV 를 만들지 못했습니다. 잠시 후 다시 시도해 주세요.');
+      setNotice('CSV를 만들지 못했습니다. 잠시 후 다시 시도해 주세요.');
     } finally {
       setExporting(false);
     }
@@ -277,7 +277,7 @@ export function Results() {
       }
           {/* ②(넘김)는 목록에서도 ①·③과 다르게 보여야 한다 (rule-card-fields.md) */}
           {row.outOfScope && row.origin.type !== 'OVERRIDE' &&
-      <span className="text-caption text-muted">세무사에게 넘김</span>
+      <span className="text-caption text-muted">세무대리인에게 넘김</span>
       }
         </span>
 
@@ -293,7 +293,7 @@ export function Results() {
       <p className="mt-2 text-body tabular-nums text-muted">
             {batchQ.data &&
         `${formatPeriod(batchQ.data.periodStart, batchQ.data.periodEnd)} · `}
-            {formatNumber(summary.totalCount)}건 · 인정 경비{' '}
+            {formatNumber(summary.totalCount)}건 · 인정 금액{' '}
             <strong className="font-bold text-ink">
               {formatWon(summary.byVerdict.AVAILABLE.finalAmount)}
             </strong>

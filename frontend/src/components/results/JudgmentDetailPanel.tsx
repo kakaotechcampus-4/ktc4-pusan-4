@@ -26,13 +26,13 @@ type ReviewState = 'QUESTION' | 'HANDOFF' | 'FOLLOW_UP' | 'NO_RULE' | 'PRESUMED'
 
 const REVIEW_MESSAGE: Record<ReviewState, string> = {
   QUESTION: '답할 질문이 남아 있습니다. 답하면 바로 다시 판정합니다.',
-  HANDOFF: '판정하지 않고 세무사에게 넘겼습니다. 규칙으로 다루지 않는 지출입니다.',
+  HANDOFF: '판정하지 않고 세무대리인에게 넘겼습니다. 규칙으로 다루지 않는 지출입니다.',
   // rule-card-fields.md ③. 기간배분처럼 뒤에서 금액을 정할 답과, 혼용처럼 세무사 판단에 맡기는 답(#65)이
   // 함께 들어온다. 둘 다에 맞는 말로 쓴다
   FOLLOW_UP:
-  '답을 반영했지만 규칙만으로는 아직 확정하지 못했습니다. 안분 비율·기간처럼 뒤에서 정할 조건이 남았거나 세무사 판단이 필요한 답입니다.',
+  '답을 반영했지만 규칙만으로는 아직 확정하지 못했습니다. 안분 비율·기간처럼 뒤에서 정할 조건이 남았거나 세무대리인 판단이 필요한 답입니다.',
   NO_RULE: '판정할 규칙이 없습니다. 근거를 지어내지 않고 확인 필요로 두었습니다.',
-  PRESUMED: '추정으로 제외했어요. 업무였다면 질문에 답해 주세요. 답하면 다시 판정합니다.'
+  PRESUMED: '추정으로 보고 제외했습니다. 업무였다면 질문에 답해 주세요. 답하면 다시 판정합니다.'
 };
 
 /**
@@ -72,7 +72,7 @@ const errorMessage = (caught: unknown, fallback: string) =>
 caught instanceof ApiRequestError ? caught.message : fallback;
 
 const attributeValue = (value: unknown) =>
-value === true ? '예' : value === false ? '아니오' : String(value);
+value === true ? '예' : value === false ? '아니요' : String(value);
 
 interface JudgmentDetailPanelProps {
   /** 거래의 현재 판정. 거래 요약(judgment.transaction)도 여기서 읽는다 */
@@ -267,7 +267,7 @@ export function JudgmentDetailPanel({
             {judgment.verdict.label}
           </p>
           <span className="shrink-0 text-caption tabular-nums text-ink2">
-            {ORIGIN_LABEL[judgment.origin.type]} · rev.{judgment.revision}
+            {ORIGIN_LABEL[judgment.origin.type]} · {judgment.revision}차 판정
           </span>
         </div>
         {judgment.outOfScope &&
@@ -297,7 +297,7 @@ export function JudgmentDetailPanel({
         <div className="bg-sheet px-5 py-4">
           {/* 자산은 그해 넣을 수 있는 한도다. 「넣으세요」가 아니라 「까지 넣을 수 있습니다」 (CONTEXT.md G4) */}
           <dt className="text-caption text-muted">
-            {asset ? `${transaction.approvedAt.slice(0, 4)}년에 넣을 수 있는 금액` : '필요경비 산입액'}
+            {asset ? `${transaction.approvedAt.slice(0, 4)}년에 넣을 수 있는 금액` : '인정 금액'}
           </dt>
           {exceededLimit ?
           <dd className="mt-1">
@@ -418,7 +418,7 @@ export function JudgmentDetailPanel({
               <dt>규칙 카드</dt>
               <dd className="text-ink2">
                 {judgment.ruleCardId}
-                {judgment.ruleCardVersion !== null && ` v${judgment.ruleCardVersion}`}
+                {judgment.ruleCardVersion !== null && ` 버전 ${judgment.ruleCardVersion}`}
                 {judgment.appliedRuleIds.length > 1 &&
                 ` 외 ${judgment.appliedRuleIds.length - 1}장`}
               </dd>
@@ -433,7 +433,7 @@ export function JudgmentDetailPanel({
           {judgment.userContextVersion !== null &&
           <div className="flex justify-between gap-2">
               <dt>문진 버전</dt>
-              <dd className="text-ink2">v{judgment.userContextVersion}</dd>
+              <dd className="text-ink2">{judgment.userContextVersion}</dd>
             </div>
           }
           <div className="flex justify-between gap-2">
@@ -544,7 +544,7 @@ export function JudgmentDetailPanel({
         <ol className="mt-2.5 space-y-2">
             {(historyQ.data?.items ?? []).map((revision) =>
           <li key={revision.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-caption tabular-nums text-muted">
-                <span className="w-10 shrink-0">rev.{revision.revision}</span>
+                <span className="w-10 shrink-0">{revision.revision}차</span>
                 <VerdictBadge verdict={revision.verdict} />
                 <span className="text-ink2">{ORIGIN_LABEL[revision.origin.type]}</span>
                 <span>{formatDateTime(revision.computedAt)}</span>
