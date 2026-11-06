@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRightIcon, CircleHelpIcon, DownloadIcon, SearchXIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
+import { StepEyebrow } from '../components/StepEyebrow';
 import { JudgmentDetailPanel } from '../components/results/JudgmentDetailPanel';
 import { VerdictBadge } from '../components/VerdictBadge';
 import {
@@ -286,7 +287,7 @@ export function Results() {
   const header =
   <header className="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <p className="text-small font-bold text-accent">5단계 · 결과</p>
+        <StepEyebrow>결과</StepEyebrow>
         <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">판정 결과</h1>
         {summary &&
       <p className="mt-2 text-body tabular-nums text-muted">
@@ -303,6 +304,10 @@ export function Results() {
       }
       </div>
       <div className="flex flex-wrap items-center gap-2">
+        {/* 판정이 끝난 뒤 나가는 길. 빵부스러기의 「홈」만으로는 눈에 띄지 않는다 (#242 리뷰) */}
+        <Button to="/" variant="ghost" size="sm">
+          홈으로
+        </Button>
         {/* 확인할 질문이 없을 때는 아래 안내가 사라지므로, 답을 바꾸러 가는 길을 여기 남긴다 */}
         {!(unresolved && unresolved.count > 0) && answeredGroups > 0 &&
       <Button to="/questions" variant="ghost" size="sm">

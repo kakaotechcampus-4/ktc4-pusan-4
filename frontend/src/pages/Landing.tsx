@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRightIcon } from 'lucide-react';
 import { useSession } from '../contexts/SessionContext';
+import icon from '../assets/brand/icon/preet-icon.svg';
+import { InterviewCard, UploadRows, VerdictCard } from '../components/flowFigure';
 import { MarketingHeader } from '../components/MarketingHeader';
 import { MarketingFooter } from '../components/MarketingFooter';
 import { HeroBanner } from '../components/HeroBanner';
@@ -40,11 +42,12 @@ function wantsIntro() {
 const SHELL = 'mx-auto w-full max-w-page px-6 lg:px-gutter';
 
 /** 검정 동그라미에 흰 화살표. 레퍼런스가 모든 「바로가기」에 쓰는 표시 */
-function ArrowDot({ size = 'md' }: {size?: 'sm' | 'md';}) {
+function ArrowDot({ size = 'md', invert = false }: {size?: 'sm' | 'md';invert?: boolean;}) {
   return (
     <span
       aria-hidden="true"
-      className={`inline-flex shrink-0 items-center justify-center rounded-full bg-ink text-white ${
+      className={`inline-flex shrink-0 items-center justify-center rounded-full ${
+      invert ? 'bg-canvas text-ink' : 'bg-ink text-white'} ${
       size === 'sm' ? 'h-5 w-5' : 'h-8 w-8'}`
       }>
 
@@ -55,19 +58,13 @@ function ArrowDot({ size = 'md' }: {size?: 'sm' | 'md';}) {
 
 /**
  * 섹션 제목. 레퍼런스는 글자 앞에 48×48 그림을 두고 글자는 48px 굵기 400 이다.
- * 그림은 카카오 자산이라 가져오지 않고, 같은 자리에 우리 로고 막대를 둔다.
+ * 그림은 카카오 자산이라 가져오지 않는다. 같은 자리에 브랜드 앱 아이콘을 둔다 (#247 리뷰).
  */
 function IrHeading({ children }: {children: React.ReactNode;}) {
   return (
     <h2 className="flex items-center gap-4 text-h2 font-normal tracking-ir text-ink [word-break:keep-all] lg:text-ir-section">
-      <span
-        aria-hidden="true"
-        className="flex h-12 w-12 shrink-0 items-center justify-center gap-[3px] rounded-xl bg-surface">
-
-        <span className="block h-5 w-[5px] rounded-sm bg-ink" />
-        <span className="block h-5 w-[5px] rounded-sm bg-ink" />
-        <span className="block h-5 w-[5px] rounded-sm bg-highlight" />
-      </span>
+      {/* 브랜드 앱 아이콘. 둥근 사각형과 바탕을 SVG 가 이미 갖고 있어 타일을 따로 그리지 않는다 */}
+      <img src={icon} alt="" aria-hidden="true" className="block h-12 w-12 shrink-0" />
       {children}
     </h2>);
 
@@ -152,16 +149,20 @@ export function Landing() {
             <div className="relative">
               <HeroBanner autoplay={!intro} />
 
-              {/* 왼쪽 아래 모서리를 바탕색으로 베어 내고 그 자리에 링크를 둔다 */}
-              <div className="absolute bottom-0 left-0 flex h-[72px] items-center rounded-tr-[20px] bg-canvas pr-7 pt-2">
-                <Link
-                  to={startTo}
-                  className="flex items-center gap-3 text-ir-lead font-normal tracking-ir-xs text-ink">
+              {/*
+                왼쪽 아래 모서리를 베어 낸 자리가 그대로 버튼이다.
+                전에는 그 자리를 바탕색(흰색)으로 채우고 글자만 뒀는데, 페이지 바탕과 같은 색이라
+                판이 패인 것으로 읽히고 누를 것으로 안 보였다. 흰 자리에 알약을 또 넣으면
+                판·흰 상자·알약 세 겹이 된다 — 베어 낸 자리를 통째로 칠한다 (#254 리뷰).
+                왼쪽 아래는 판과 같은 20px 으로 깎는다. 각지면 판의 둥근 모서리를 덮어 혼자 튄다
+              */}
+              <Link
+                to={startTo}
+                className="absolute bottom-0 left-0 flex h-[76px] items-center gap-3 rounded-bl-[20px] rounded-tr-[20px] bg-ink pl-7 pr-6 text-ir-lead font-normal tracking-ir-xs text-white transition-colors duration-150 ease-snap hover:bg-ink2">
 
-                  {signedIn ? '카드내역 올리기' : '무료로 판정해보기'}
-                  <ArrowDot />
-                </Link>
-              </div>
+                {signedIn ? '카드내역 올리기' : '무료로 판정해보기'}
+                <ArrowDot invert />
+              </Link>
             </div>
 
             {/*
@@ -171,7 +172,7 @@ export function Landing() {
             */}
             <div className="flex flex-col gap-2">
               <div className="rounded-2xl bg-surface2 p-5 text-white">
-                <p className="text-caption text-white">검수를 마친 규칙 카드</p>
+                <p className="text-caption text-white">조문을 읽고 만든 규칙 카드</p>
                 <p className="mt-2 whitespace-nowrap text-ir-num font-bold tracking-ir-sm tabular-nums">
                   {RULE_CARD_COUNT}
                   <span className="ml-0.5 text-body font-normal">장</span>
@@ -223,7 +224,7 @@ export function Landing() {
             {BOARDS.map((board) =>
             <div
               key={board.title}
-              className="flex min-h-[241px] flex-col rounded-2xl bg-surface px-8 py-8">
+              className="flex min-h-[241px] flex-col rounded-2xl bg-accent-soft px-8 py-8">
 
                 <strong className="text-h3 font-bold tracking-ir-sm text-ink lg:text-ir-panel">
                   {board.title}
@@ -238,13 +239,25 @@ export function Landing() {
           </div>
 
           <ul className="mt-4 grid gap-4 md:grid-cols-3">
-            {FLOW_STEPS.slice(0, 3).map((step) =>
+            {FLOW_STEPS.slice(0, 3).map((step, index) =>
             <li key={step.step}>
-                <div className="flex h-full min-h-[360px] flex-col rounded-2xl bg-surface px-8 py-8">
+                <div className="flex h-full min-h-[360px] flex-col rounded-2xl bg-accent-soft px-8 py-8">
                   <span className="inline-flex w-fit items-center rounded-full bg-canvas px-3.5 py-1.5 text-caption text-ink2">
                     {step.step}단계
                   </span>
-                  <strong className="mt-auto block text-h3 font-bold leading-tight tracking-ir-sm text-ink [word-break:keep-all] lg:text-ir-panel">
+                  {/*
+                    히어로 2번 장면과 같은 그림을 그 단계 칸에 하나씩 둔다 (#247 리뷰).
+                    같은 말을 위에서는 그림으로, 여기서는 글로만 하고 있었고 그 자리가 비어
+                    그림이 빠진 것처럼 보였다. 연파랑 판이라 색만 light 로 바꿔 쓴다
+                  */}
+                  <div className="mt-6 flex flex-1 items-center">
+                    {[
+                    <UploadRows key="upload" tone="light" />,
+                    <InterviewCard key="interview" tone="light" />,
+                    <VerdictCard key="verdict" tone="light" />][
+                    index]}
+                  </div>
+                  <strong className="block text-h3 font-bold leading-tight tracking-ir-sm text-ink [word-break:keep-all] lg:text-ir-panel">
                     {step.title}
                   </strong>
                   <p className="mt-5 text-body leading-6 text-ink2 [word-break:keep-all]">
@@ -303,7 +316,7 @@ export function Landing() {
             {SYSTEM_FEATURES.map((feature) =>
             <li
               key={feature.title}
-              className="flex min-h-[360px] flex-col rounded-2xl bg-surface px-8 py-8">
+              className="flex min-h-[360px] flex-col rounded-2xl bg-accent-soft px-8 py-8">
 
                 <strong className="block whitespace-pre-line text-h3 font-bold leading-tight tracking-ir-sm text-ink [word-break:keep-all] lg:text-ir-panel">
                   {feature.title}
@@ -312,7 +325,7 @@ export function Landing() {
                   {feature.body}
                 </p>
                 {feature.caption &&
-              <p className="mt-6 border-t border-accent-line pt-5 text-small text-muted">
+              <p className="mt-6 border-t border-accent-line pt-5 text-small text-ink2">
                     {feature.caption}
                   </p>
               }

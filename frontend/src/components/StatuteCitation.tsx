@@ -81,8 +81,18 @@ export function StatuteCitation({
         <h4 className="text-small font-bold text-ink">{statute.title}</h4>
       </header>
 
+      {/*
+        본문은 접어 둔다. 판정 하나에 조문이 여러 개 붙으면 상세 패널이 본문으로 꽉 차서
+        무슨 조문이 걸렸는지부터 안 보인다 (#242 리뷰). 제목·시행일·원문 링크는 늘 보이니
+        「근거까지 보여준다」는 약속은 그대로다. details 라 키보드와 스크린리더가 그냥 된다
+      */}
       {showBody &&
-      <p className="mt-2 text-small leading-6 text-ink2">{statute.body}</p>
+      <details className="mt-2">
+          <summary className="cursor-pointer text-caption font-bold text-ink2 hover:text-ink">
+            조문 보기
+          </summary>
+          <p className="mt-2 text-small leading-6 text-ink2">{statute.body}</p>
+        </details>
       }
 
       <footer className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-caption tabular-nums text-muted">
