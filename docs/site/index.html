@@ -143,6 +143,11 @@
   @media (max-width:960px) { .hero-pig { height:240px; opacity:.35; } }
   @media (max-width:860px) { .hero { margin:12px 12px 0; padding:40px 24px; } }
   @media (max-width:700px) { .hero-pig { display:none; } }
+  .person span { display:flex; flex-direction:column; line-height:1.25; }
+  .person span b { font-size:13px; } .person span small { font-size:11px; color:var(--muted); font-weight:500; }
+  .person:hover span small { color:inherit; }
+  .tag { font-style:normal; font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px; background:var(--surface); color:var(--ink2); margin-left:2px; }
+  .tag.lead { background:var(--blue); color:#fff; }
 </style>
 </head>
 <body>
@@ -228,10 +233,12 @@ const DOCS = [
 `],
 ['03-Team', '3. 팀 리소스', `
 <p>6명이 함께 만듭니다. 이름을 누르면 GitHub 프로필로 갑니다.</p>
-<div class="team"><div class="role"><b>PM</b><small>주간 develop → main PR, 머지</small><div class="ppl"><a class="person" href="https://github.com/IwanttobeaHokage" target="_blank"><img src="https://github.com/IwanttobeaHokage.png?size=80" alt="">@IwanttobeaHokage</a></div></div><div class="role"><b>백엔드</b><small>판정 엔진 · 인증 · 배포 · 모니터링</small><div class="ppl"><a class="person" href="https://github.com/yuyeol3" target="_blank"><img src="https://github.com/yuyeol3.png?size=80" alt="">@yuyeol3</a><a class="person" href="https://github.com/memoryhong" target="_blank"><img src="https://github.com/memoryhong.png?size=80" alt="">@memoryhong</a></div></div><div class="role"><b>프론트엔드</b><small>React · 화면 · 카드내역 파서</small><div class="ppl"><a class="person" href="https://github.com/Jaeseong22" target="_blank"><img src="https://github.com/Jaeseong22.png?size=80" alt="">@Jaeseong22</a><a class="person" href="https://github.com/cho104" target="_blank"><img src="https://github.com/cho104.png?size=80" alt="">@cho104</a></div></div><div class="role"><b>AI</b><small>법령 파이프라인 · RAG · 에이전트 비서 Really · 팀 자동화</small><div class="ppl"><a class="person" href="https://github.com/RainDrop3" target="_blank"><img src="https://github.com/RainDrop3.png?size=80" alt="">@RainDrop3</a></div></div></div>
+<h2>Maintainers</h2>
+<div class="team"><div class="role"><b>PM</b><small>주간 develop → main PR, 머지</small><div class="ppl"><a class="person" href="https://github.com/IwanttobeaHokage" target="_blank"><img src="https://github.com/IwanttobeaHokage.png?size=80" alt=""><span><b>정현빈</b><small>@IwanttobeaHokage</small></span><em class="tag lead">PM</em></a></div></div><div class="role"><b>백엔드</b><small>판정 엔진 · 인증 · 배포 · 모니터링</small><div class="ppl"><a class="person" href="https://github.com/yuyeol3" target="_blank"><img src="https://github.com/yuyeol3.png?size=80" alt=""><span><b>최유렬</b><small>@yuyeol3</small></span><em class="tag lead">BE 리드</em></a><a class="person" href="https://github.com/memoryhong" target="_blank"><img src="https://github.com/memoryhong.png?size=80" alt=""><span><b>홍성진</b><small>@memoryhong</small></span><em class="tag">BE · 플래너</em></a></div></div><div class="role"><b>AI</b><small>법령 파이프라인 · RAG · 에이전트 비서 Really · 팀 자동화</small><div class="ppl"><a class="person" href="https://github.com/RainDrop3" target="_blank"><img src="https://github.com/RainDrop3.png?size=80" alt=""><span><b>강민규</b><small>@RainDrop3</small></span><em class="tag lead">AI 리드</em></a></div></div><div class="role"><b>프론트엔드</b><small>React · 화면 · 카드내역 파서</small><div class="ppl"><a class="person" href="https://github.com/cho104" target="_blank"><img src="https://github.com/cho104.png?size=80" alt=""><span><b>이치오</b><small>@cho104</small></span><em class="tag lead">FE 리드</em></a><a class="person" href="https://github.com/Jaeseong22" target="_blank"><img src="https://github.com/Jaeseong22.png?size=80" alt=""><span><b>이재성</b><small>@Jaeseong22</small></span><em class="tag">FE · 메이커</em></a></div></div></div>
 <h2>링크</h2>
 <ul>
   <li><a href="https://ktc4-pusan-4.duckdns.org/" target="_blank">PreeT 실제 서비스 ↗</a></li>
+  <li><a href="https://app.notion.com/p/elice-track/4-3b92bb98425780a28c51d7d7c2174d42" target="_blank">노션 프로젝트 페이지 ↗</a> — 작업 보드(노션 지라)와 회의록</li>
   <li><a href="https://github.com/kakaotechcampus-4/ktc4-pusan-4" target="_blank">GitHub 저장소</a> · <a href="https://github.com/kakaotechcampus-4/ktc4-pusan-4/pulls" target="_blank">PR 목록</a></li>
   <li>상세 설계: 저장소의 <code>CONTEXT.md</code>, <code>docs/architecture.md</code></li>
 </ul>
@@ -246,7 +253,7 @@ const DOCS = [
 <tr><td>대화 채널</td><td>평소 팀 대화는 <b>카카오톡</b>으로 합니다.<br><b>디스코드</b>는 카카오테크 캠퍼스 멘토님·매니저님과 이야기할 때 씁니다.</td></tr>
 <tr><td>일정 공유</td><td>참여가 어려운 시간은 미리 <b>카톡으로</b> 서로 공유합니다.</td></tr>
 <tr><td>의사결정</td><td>큰 틀은 <b>다수결</b>로 정하고, 정해지지 않으면 <b>PM이 결정</b>합니다.</td></tr>
-<tr><td>작업 관리</td><td><b>노션</b>으로 관리합니다. 노션 안에 직접 만든 지라 보드에서 할 일을 관리합니다.</td></tr></table>
+<tr><td>작업 관리</td><td><a href="https://app.notion.com/p/elice-track/4-3b92bb98425780a28c51d7d7c2174d42" target="_blank"><b>노션 프로젝트 페이지</b> ↗</a>에서 관리합니다. 노션 안에 직접 만든 지라 보드에서 할 일을 관리합니다.</td></tr></table>
 <div class="board">
   <div class="board-head"><b>작업 현황</b><small>GitHub PR 기준 · 2026-11-06</small></div>
   <div class="stats">
@@ -268,12 +275,15 @@ const DOCS = [
 <h2>회의</h2>
 <table><tr><th style="width:22%">기간</th><th>규칙</th></tr>
 <tr><td>평소</td><td>매주 <b>목요일 오후 9시</b> 정기 회의</td></tr>
-<tr><td>마지막 2주</td><td>매일 <b>오후 11시, 10분</b> 브리핑 — 오늘 한 일과 내일 할 일을 공유합니다.</td></tr></table>
+<tr><td>마지막 2주</td><td>매일 <b>오후 11시, 10분</b> 브리핑 — 오늘 한 일과 내일 할 일을 공유합니다.</td></tr>
+<tr><td>수시 회의</td><td>협업이 필요한 일이 생기면 그때마다 카톡방에서 일정을 정해 회의합니다.</td></tr>
+<tr><td>회의록</td><td><a href="https://app.notion.com/p/elice-track/4-3b92bb98425780a28c51d7d7c2174d42" target="_blank">노션 프로젝트 페이지</a>에 남깁니다.</td></tr></table>
 
 <h2>PR 리뷰</h2>
 <ul>
   <li>PR이 올라오면 <b>24시간 안에</b> 리뷰합니다.</li>
   <li>주중 <b>오후 5시 전</b>에 올라온 PR은 <b>그날 안에</b>, 오후 5시 이후에 올라온 PR은 <b>다음 날 오후 5시까지</b> 봅니다.</li>
+  <li>주말에 올라온 PR은 언제 올렸든 <b>하루 안에</b> 보고 답합니다.</li>
   <li>팀원 1명 이상이 리뷰한 뒤 <b>PM이 머지</b>합니다. 각자 머지하지 않습니다.
     <p class="why"><span class="why-label">참고</span> 승인 1명 이상은 GitHub 룰셋이 강제합니다. 머지 버튼을 PM이 누르는 것은 팀 약속입니다 (<a href="#06b-Automation">협업 자동화</a>).</p></li>
   <li>매주 <b>수요일 오후 4시까지</b> 파트별로 한 내용을 정리해 PM에게 보내고, PM이 확인한 뒤 오후 6시 전에 develop에 머지합니다. 주간 일정은 <a href="#06-PR">PR · 리뷰 규칙</a>에 있습니다.</li>
@@ -348,7 +358,7 @@ docs: 커밋 컨벤션 추가</code></pre>
 <h2>머지</h2>
 <ul>
   <li>팀원 <b>1명 이상 승인</b>해야 머지 버튼이 열립니다 (GitHub 룰셋). 머지는 <b>PM</b>이 합니다.</li>
-  <li>리뷰 기한은 24시간. 주중 오후 5시 전 PR은 그날 안에, 이후는 다음 날 오후 5시까지.</li>
+  <li>리뷰 기한은 24시간. 주중 오후 5시 전 PR은 그날 안에, 이후는 다음 날 오후 5시까지. 주말 PR은 하루 안에.</li>
   <li>멘토 리뷰용 PR은 base가 <code>main</code>인지 꼭 확인 (기본값이 <code>develop</code>).</li>
 </ul>
 <h2>주간 사이클</h2>
@@ -698,7 +708,7 @@ const text = h => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 const DESC = {   // 홈 카드 한 줄 설명
   '01-Overview': '무엇을, 누구를 위해 만드는지와 히어로 시나리오',
   '02-Principles': '판정 경로에 LLM이 없는 이유와 6가지 원칙',
-  '03-Team': 'PM · 백엔드 · 프론트 · AI 팀원과 자주 쓰는 링크',
+  '03-Team': '팀원 · 파트 리더(Maintainers)와 자주 쓰는 링크',
   '00-Ground-Rules': '소통 · 회의 · 리뷰 시간과 저장소에서 지킬 것',
   '04-Branch': 'main · develop · release · feature 브랜치의 쓰임',
   '05-Commit': 'type: subject 형식과 타입 목록',
