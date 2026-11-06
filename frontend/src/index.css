@@ -13,16 +13,20 @@ body,
 #root {
   height: 100%;
 }
+/* 머리띠(AppShell·MarketingHeader)가 sticky 72px 이다. Tab 으로 옮긴 초점이나 #앵커가 그 밑에 숨지 않게 띄운다 */
+html {
+  scroll-padding-top: 5.5rem;
+}
 body {
   background-color: #ffffff;
   color: #4E5968;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
+/* 모서리는 건드리지 않는다. 테는 요소의 rounded-* 를 따라 그려진다. 4px 를 얹으면 알약·원 버튼에 네모 테가 생긴다 */
 :focus-visible {
   outline: 2px solid #191F28;
   outline-offset: 2px;
-  border-radius: 4px;
 }
 /* 팔레트에서 노랑을 뺐다. 핑크는 선택 바탕으로 쓰면 ink2 대비 2.46 · muted 1.59 라 글자가 묻힌다 */
 ::selection {
