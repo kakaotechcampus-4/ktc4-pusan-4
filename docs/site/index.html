@@ -65,6 +65,7 @@
   .toc p { margin:0 0 10px; font-weight:700; color:var(--muted); font-size:12px; }
   .toc a { display:block; padding:5px 0 5px 12px; border-left:2px solid var(--line); color:var(--muted); text-decoration:none; cursor:pointer; }
   .toc a:hover { color:var(--blue); border-color:var(--blue); }
+  .toc a.on { color:var(--text); font-weight:700; border-color:var(--blue); background:linear-gradient(90deg,var(--blue-l),transparent); }
   a.repo { text-decoration:none; white-space:nowrap; }
   a.repo:hover code { background:var(--blue); color:#fff; }
   .rel { margin-top:56px; padding:22px; background:var(--blue-l); border-radius:18px; display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px; }
@@ -574,16 +575,29 @@ function doc(i) {
   const hs = [...view.querySelectorAll('article h2')];
   const toc = document.getElementById('toc');
   if (hs.length) toc.innerHTML = '<p>이 페이지에서</p>';
-  hs.forEach(h => {   // 해시는 페이지 이동에 쓰므로 목차는 스크롤만
+  spy = hs.map(h => {   // 해시는 페이지 이동에 쓰므로 목차는 스크롤만
     const a = document.createElement('a');
     a.textContent = h.textContent;
     a.onclick = () => h.scrollIntoView();
     toc.append(a);
+    return [h, a];
   });
 }
 
+// 목차에서 지금 읽고 있는 항목 표시: 화면 위쪽을 지난 마지막 제목, 맨 아래면 마지막 항목
+let spy = [];
+function updateSpy() {
+  if (!spy.length) return;
+  let k = 0;
+  spy.forEach(([h], i) => { if (h.getBoundingClientRect().top <= 120) k = i; });
+  if (innerHeight + scrollY >= document.documentElement.scrollHeight - 2) k = spy.length - 1;
+  spy.forEach(([, a], i) => a.classList.toggle('on', i === k));
+}
+addEventListener('scroll', updateSpy, { passive: true });
+
 function render(id = location.hash.slice(1)) {
   const i = flat.findIndex(d => d.id === id);
+  spy = [];
   i < 0 ? home() : doc(i);
   document.querySelector('.fab').hidden = i < 0;   // 홈에서는 숨김
   const g = i < 0 ? null : flat[i].g;
@@ -591,6 +605,7 @@ function render(id = location.hash.slice(1)) {
     `<a href="#${flat.find(d => d.g === n).id}" class="${n === g ? 'on' : ''}">${n}</a>`).join('');
   document.title = (i < 0 ? '' : flat[i].t + ' · ') + 'PreeT 팀 문서';
   scrollTo(0, 0);
+  updateSpy();
 }
 // 내부 링크는 직접 처리: 앱 파일 미리보기처럼 주소(#) 이동이 막힌 곳에서도 동작
 document.addEventListener('click', e => {
