@@ -15,6 +15,7 @@ import type {
   User } from
 '../types/domain';
 import { api, seedSession } from '../api';
+import type { SessionEndReason } from '../auth/session';
 
 /** 업종은 프리랜서·인적용역(국세청 업종코드 940909) 고정 */
 export const DEFAULT_CONTEXT: BusinessContext = {
@@ -58,6 +59,8 @@ interface SessionValue {
   signInWithKakao: (code: string) => Promise<void>;
   /** 이 브라우저의 로그인을 바로 지우고, 서버 로그아웃은 기다리지 않는다 */
   signOut: () => void;
+  /** 로그인이 사용자 손을 거치지 않고 끝났으면 그 이유. 직접 로그아웃했거나 다시 로그인하면 null 이다 */
+  endReason: SessionEndReason | null;
   /** 서버에 저장된 배치 id */
   batchId: string | null;
   setBatchId: (id: string | null) => void;
@@ -75,6 +78,7 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
   const [user, setUser] = useState<User | null>(null);
   const userId = user?.id ?? null;
   const email = user?.email ?? null;
+  const [endReason, setEndReason] = useState<SessionEndReason | null>(null);
   const [batchId, setBatchId] = useState<string | null>(seedSession?.batchId ?? null);
   const [context, setContext] = useState<BusinessContext | StoredBusinessContext | null>(null);
   const [contextRef, setContextRef] = useState<BusinessContextRef | null>(seedSession?.contextRef ?? null);
@@ -86,10 +90,11 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
    */
   const epoch = useRef(0);
 
-  const clear = useCallback(() => {
+  const clear = useCallback((reason?: SessionEndReason) => {
     epoch.current += 1;
     setUser(null);
     setStatus('anonymous');
+    setEndReason(reason ?? null);
     setBatchId(seedSession?.batchId ?? null);
     setContext(null);
     setContextRef(seedSession?.contextRef ?? null);
@@ -102,6 +107,7 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
   const start = useCallback((me: User) => {
     setUser(me);
     setStatus('signedIn');
+    setEndReason(null);
     if (seedSession) return;
     const startedAt = epoch.current;
     void api.uploads.
@@ -135,7 +141,10 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
     };
   }, [start]);
 
-  // 재발급까지 실패했다. 서버 로그아웃은 부르지 않는다 — 이미 풀린 세션이고, 부르면 다시 401 이 난다
+  /**
+   * 재발급까지 실패했거나 다른 탭에서 로그인·로그아웃했다. 이유는 로그인 화면이 알린다.
+   * 서버 로그아웃은 부르지 않는다 — 이미 풀린 세션이고, 다른 계정으로 바뀐 경우에는 그 계정의 로그인을 끊는다
+   */
   useEffect(() => api.auth.onLost(clear), [clear]);
 
   /** 로그인·가입·카카오 로그인이 같이 쓴다. 토큰을 받고 나서 내 정보를 읽어야 로그인한 것이다 */
@@ -214,6 +223,7 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
       signUp,
       signInWithKakao,
       signOut,
+      endReason,
       batchId,
       setBatchId,
       context,
@@ -221,7 +231,7 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
       contextRef,
       setContextRef
     }),
-    [status, userId, email, user, signIn, signUp, signInWithKakao, signOut, batchId, context, contextRef]
+    [status, userId, email, user, signIn, signUp, signInWithKakao, signOut, endReason, batchId, context, contextRef]
   );
 
   return (

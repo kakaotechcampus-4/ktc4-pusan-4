@@ -1,5 +1,6 @@
 import { ApiRequestError } from './contract';
 import type { Api } from './contract';
+import type { SessionEndReason } from '../auth/session';
 
 /**
  * 실제 서버 구현. 배포에서 Caddy 가 `/api/v1/*` 를 백엔드로 넘기므로(deploy/caddy/Caddyfile)
@@ -32,7 +33,8 @@ interface Options {
  * 리프레시 토큰은 서버가 httpOnly 쿠키로 둔다 — 같은 오리진이라 fetch 가 그대로 실어 보낸다.
  */
 let accessToken: string | null = null;
-const lostListeners = new Set<() => void>();
+/** 계약(onLost)은 인자 없는 함수지만, 여기서는 끝난 이유를 넘긴다. SessionContext 가 로그인 화면에 알린다 */
+const lostListeners = new Set<(reason: SessionEndReason) => void>();
 
 /** 로그인·가입·재발급은 만료된 토큰을 싣지 않는다. 서버가 헤더의 토큰부터 검사하면 거기서 401 이 난다 */
 const NO_BEARER = new Set([
@@ -53,11 +55,54 @@ const isAuthPath = (path: string) => path.startsWith('/auth/');
 let generation = 0;
 
 /** 로그인이 풀렸다. 토큰이 있던 경우에만 한 번 알린다 — 동시에 실패한 요청이 여러 번 알리지 않게 */
-const lose = () => {
+const lose = (reason: SessionEndReason) => {
   if (accessToken === null) return;
   accessToken = null;
   generation += 1;
-  lostListeners.forEach((listener) => listener());
+  lostListeners.forEach((listener) => listener(reason));
+};
+
+/** JWT 의 sub(사용자 id). JWT 모양이 아니면 null 이다 */
+const subjectOf = (token: string): string | null => {
+  try {
+    const payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const { sub } = JSON.parse(atob(payload)) as { sub?: unknown };
+    return typeof sub === 'string' ? sub : null;
+  } catch {
+    return null;
+  }
+};
+/** 둘 다 읽혔고 서로 다를 때만 다른 계정으로 본다. 못 읽으면 비교하지 않는다 */
+const otherAccount = (a: string | null, b: string | null) => a !== null && b !== null && a !== b;
+
+type AuthMessage = {type: 'login';subject: string | null;} | {type: 'logout';};
+
+/**
+ * 다른 탭에 로그인·로그아웃을 알린다 (C44·C45). 리프레시 쿠키는 호스트마다 하나라, 다른 탭이 다른 계정으로
+ * 로그인하면 이 탭도 다음 재발급부터 그 계정이 된다. 알림을 받은 탭은 서버에 묻지 않고 자기 토큰만 버린다.
+ * 모듈을 읽을 때 열면 빌드 때 프리렌더(Node)가 이 모듈을 읽기만 해도 채널이 남아 프로세스가 끝나지 않는다.
+ * 그래서 토큰을 처음 쥘 때 연다. BroadcastChannel 이 없는 브라우저는 재발급 때 계정을 맞춰 보는 것(refresh)으로 막는다
+ */
+let channel: BroadcastChannel | null | undefined;
+const authChannel = () => {
+  if (channel === undefined) {
+    channel = typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('preet-auth');
+    channel?.addEventListener('message', ({ data }: MessageEvent<AuthMessage>) => {
+      if (accessToken === null) return;
+      if (data.type === 'logout') {
+        lose('signed-out');
+      } else if (otherAccount(data.subject, subjectOf(accessToken))) {
+        lose('account-changed');
+      }
+    });
+  }
+  return channel;
+};
+const announce = (message: AuthMessage) => authChannel()?.postMessage(message);
+
+const adopt = (token: string) => {
+  accessToken = token;
+  authChannel();
 };
 
 /**
@@ -81,7 +126,13 @@ const refresh = () => {
     const startedAt = generation;
     refreshing = serializedRefresh().
     then((result) => {
-      if (generation === startedAt) accessToken = result.accessToken;
+      if (generation !== startedAt) return;
+      // 그사이 다른 탭이 다른 계정으로 로그인해 쿠키가 그 계정 것이 됐다. 받으면 이 화면이 남의 데이터를 읽는다 (C44)
+      if (accessToken !== null && otherAccount(subjectOf(accessToken), subjectOf(result.accessToken))) {
+        lose('account-changed');
+        return;
+      }
+      adopt(result.accessToken);
     }).
     finally(() => {
       refreshing = null;
@@ -151,7 +202,7 @@ retried = false)
     );
     if (generation === sentAt) {
       if (refreshed) return request<T>(method, path, options, true);
-      lose();
+      lose('expired');
     }
   }
 
@@ -198,7 +249,9 @@ const enter = async (path: string, body: unknown) => {
   const startedAt = generation;
   const result = await post<{ accessToken: string }>(path, body);
   // 그사이 로그아웃했거나 다시 로그인했으면 이 토큰은 쓰지 않는다
-  if (generation === startedAt) accessToken = result.accessToken;
+  if (generation !== startedAt) return;
+  adopt(result.accessToken);
+  announce({ type: 'login', subject: subjectOf(result.accessToken) });
 };
 
 export const httpApi: Api = {
@@ -215,6 +268,7 @@ export const httpApi: Api = {
     },
     logout: async () => {
       generation += 1;
+      announce({ type: 'logout' });
       if (refreshing) {
         // 재발급이 끝난 뒤에 보낸다(settled). 토큰은 싣지 않는다 — /auth/* 는 토큰을 보지 않고 쿠키만 지운다
         accessToken = null;
