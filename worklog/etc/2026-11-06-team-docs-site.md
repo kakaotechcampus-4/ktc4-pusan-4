@@ -91,3 +91,12 @@ PM 요청으로 문서 사이트를 배포된 앱(ktc4-pusan-4.duckdns.org)과 �
 - 로고: 직접 만든 글자+CSS 점 대신 앱 로고 `preet-logo.svg` 를 그대로 넣었다(높이 28px, 앱 머리띠와 같음). Nunito 웹폰트 불러오기는 뺐다.
 - 모양: 첫 화면 큰 판을 안쪽으로 들어간 둥근(20px) 파란 판으로, 카드·패널은 테두리·그림자 없이 surface 회색 24px 로, 버튼·알약은 rounded-full 로, 표는 머리 위 굵은 괘선으로 바꿨다. 그림자는 머리띠에만 둔다(DESIGN.md 규칙).
 - 예외: 홈 버튼의 그림자는 PM 이 되돌려 달라고 한 것이라 그대로 둔다.
+
+## 10:27 빠진 페이지를 저장소 내용으로 추가 (fb16c04)
+
+참고 사이트(Pullit 온보딩 가이드)와 비교해 빠진 항목 중 저장소에서 근거를 찾을 수 있는 것만 페이지로 더했다. 각 페이지에 출처 문서를 링크로 남겼다.
+
+- 협업 가이드: 코드 리뷰 기록(develop → main PR 8개와 멘토 리뷰 주제, 리뷰 본문의 번호 붙은 질문 제목), 문서화 규칙(CONTEXT · docs · worklog · README, 단일 원본, worklog 스킬 규칙).
+- 개발 가이드: API(`docs/api.md` 리소스 구조 · 공통 규칙 · 엔드포인트 43개), DB 스키마(`db/README.md` 소유·적용 순서, Flyway 마이그레이션의 테이블 24개), 프론트엔드(`frontend/README.md`, `DESIGN.md`), 코딩 컨벤션(PMD 규칙, ESLint 설정, ruff, CONTEXT 16절 중 코드 쪽 10개), 테스트(`backend/README.md`, `eval/README.md`), 배포(`docs/deployment.md` 요약).
+- 기술 스택 페이지에 선정 근거(CONTEXT 12절 프레임워크 판단)를 더했다.
+- 저장소에 없어 넣지 않은 것: Maintainers(파트 리더), 노션 프로젝트 페이지 주소, 주말 리뷰 규칙. PM 에게 확인 요청했다.
