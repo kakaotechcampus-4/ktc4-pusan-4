@@ -98,6 +98,9 @@ def classify_statement(headers: list) -> tuple:
 # 취소-원결제 폴백 매칭에서 허용하는 날짜 차이
 PAIR_WINDOW_DAYS = 62
 
+# 외화만 있고 원화 금액이 없는 행의 사유. 대상제외로 남긴다 (KB)
+FOREIGN_ONLY_REASON = "해외 결제 (원화 금액 없음)"
+
 
 class Record(dict):
     """파싱 중간 표현. 승인번호·날짜가 들어 있으므로 출력하지 않는다."""
@@ -181,6 +184,7 @@ class Stats:
         self.paired_originals = 0     # 취소와 짝지어 함께 제외한 원 결제
         self.unpaired_cancels = 0
         self.no_amount = 0
+        self.zero_amount = 0
         self.no_date = 0
         self.no_natural_key = 0
         self.dup_real: list = []      # 같은 거래가 두 번 (승인번호 동일)
@@ -193,6 +197,7 @@ class Stats:
         self.non_transaction_samples: Counter = Counter()
         self.aggregated_samples: Counter = Counter()
         self.ambiguous_cancels = 0    # 취소 대상 불확정
+        self.out_of_window_cancels = 0  # unpaired_cancels 중 같은 결제가 기간 밖에만 있는 것
         self.review_flagged = 0       # needs_review 로 넘긴 행
         self.pair_log: list = []      # (상호, 금액, 매칭방법)
         self.unpaired_log: list = []  # (상호, 금액, 사유)
@@ -265,6 +270,9 @@ def resolve_cancellations(records: list, st: Stats) -> list:
     후보가 2건 이상이면 어느 것을 취소한 것인지 결정할 수 없다. 실측: 같은
     상호+같은 금액 정상결제가 2건 이상인 조합이 20개 있었다(정액 반복 결제).
     이때는 아무것도 상계하지 않고 후보 전체에 needs_review 를 세운다.
+
+    같은 상호+같은 금액 결제가 기간 밖에만 있으면 상계하지 않고 그 결제에
+    needs_review 를 세운다. 환불된 결제가 표시 없이 판정대상으로 남지 않게 한다.
     """
     live = [r for r in records if r.get("status") != ST_EXCLUDED]
     originals = [r for r in live if not r.is_cancel]
@@ -303,7 +311,7 @@ def resolve_cancellations(records: list, st: Stats) -> list:
             if len(hits) == 1:
                 mate, how = hits[0], "승인번호"
 
-        cands = []
+        cands, outside = [], []
         if mate is None:
             cands = [o for o in pairable
                      if id(o) not in used
@@ -311,9 +319,10 @@ def resolve_cancellations(records: list, st: Stats) -> list:
                      and o.amount is not None and c.amount is not None
                      and abs(o.amount) == abs(c.amount)]
             if isinstance(c.when, date):
-                cands = [o for o in cands
-                         if isinstance(o.when, date)
-                         and abs((c.when - o.when).days) <= PAIR_WINDOW_DAYS]
+                dated = [(o, abs((c.when - o.when).days)) for o in cands
+                         if isinstance(o.when, date)]
+                outside = [(o, d) for o, d in dated if d > PAIR_WINDOW_DAYS]
+                cands = [o for o, d in dated if d <= PAIR_WINDOW_DAYS]
             if len(cands) == 1:
                 mate, how = cands[0], "폴백"
 
@@ -331,6 +340,15 @@ def resolve_cancellations(records: list, st: Stats) -> list:
             for o in cands:
                 flagged[id(o)] = ("취소 대상 불확정 — 같은 상호·금액 결제가 %d건이라 "
                                   "어느 건이 취소됐는지 자동 판정 불가" % len(cands))
+        elif outside:
+            st.unpaired_cancels += 1
+            st.out_of_window_cancels += 1
+            c["review_reason"] = ("취소 행 (같은 상호·금액 결제가 %d일 밖에만 있음 — 상계하지 않음)"
+                                  % PAIR_WINDOW_DAYS)
+            st.unpaired_log.append((c.merchant, c.amount, "같은 결제가 기간 밖에만 있음"))
+            for o, d in outside:
+                flagged[id(o)] = ("같은 상호·금액 취소가 %d일 떨어져 있음 — %d일 밖이라 상계하지 않음"
+                                  % (d, PAIR_WINDOW_DAYS))
         else:
             st.unpaired_cancels += 1
             c["review_reason"] = "취소 행 (짝 후보 없음 — 원 결제가 조회 기간 밖일 수 있다)"
@@ -362,6 +380,10 @@ def to_rows(records: list, st: Stats, norm=None) -> list:
             # 금액을 못 읽은 행도 버리지 않는다. 왜 빠졌는지 남아야 한다.
             st.no_amount += 1
             status, reason = ST_EXCLUDED, reason or "금액 파싱 불가"
+        elif r.amount == 0:
+            # 0원 승인은 판정할 금액이 없다. 카드사와 상관없이 같은 규칙이다.
+            st.zero_amount += 1
+            status, reason = ST_EXCLUDED, reason or "0원 승인"
 
         aggregated = bool(AGGREGATED_RE.match(merchant))
         if aggregated:

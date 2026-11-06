@@ -34,15 +34,17 @@ export interface RawRecord {
   status: ParserStatus | null;
   needsReview: boolean;
   reviewReason: string;
+  /** 원화 금액 없이 외화만 있는 행의 외화 금액. 화면에 보이려고 둔다. 그 밖에는 null 이다 (Python 에는 없다) */
+  foreignAmount: number | null;
 }
 
 export interface AdapterResult {
   headers: string[];
   records: RawRecord[];
-  /** 가맹점명이 있는 원본 행 수 (Python st.total) */
+  /** 읽은 원본 행 수 (Python st.total). 가맹점명이나 승인일이 있는 행이다 */
   sourceRows: number;
-  /** 원화 금액 없이 외화만 있어 읽지 않은 행 */
-  foreignOnlySkipped: number;
+  /** 원화 금액 없이 외화만 있는 행. 대상제외로 남기고 보내지 않는다 */
+  foreignOnly: number;
   /** KB 파일 머리의 조회기간. IBK 파일에는 없어서 항상 null */
   declaredPeriod: { start: string; end: string } | null;
 }
@@ -73,11 +75,12 @@ export interface ParsedRow {
   reviewReason: string;
   isCancel: boolean;
   masked: boolean;
+  foreignAmount: number | null;
 }
 
 export interface ParseStats {
   sourceRows: number;
-  foreignOnlySkipped: number;
+  foreignOnly: number;
   kept: number;
   byStatus: Record<ParserStatus, number>;
   nonTransaction: number;
@@ -85,15 +88,22 @@ export interface ParseStats {
   cancelsPaired: number;
   cancelsAmbiguous: number;
   cancelsUnpaired: number;
+  /** cancelsUnpaired 가운데 같은 상호·금액 결제가 기간 밖에만 있는 것. 그 결제에 needsReview 를 세운다 (C33) */
+  cancelsOutOfWindow: number;
   noAmount: number;
+  zeroAmount: number;
   noDate: number;
   aggregated: number;
   medicalMasked: number;
   needsReview: number;
 }
 
-/** 서버가 받지 않는 행. 하나라도 보내면 업로드 전체가 400/422 로 실패한다 */
-export type UnsendableCode = 'NO_DATE' | 'NO_AMOUNT' | 'BLANK_MERCHANT' | 'APPROVAL_TOO_LONG';
+/**
+ * 보내지 않는 행. 서버가 받지 않아 하나라도 보내면 업로드 전체가 400/422 로 실패하거나,
+ * 서버는 받지만 판정할 것이 없다(외화 전용, 0원)
+ */
+export type UnsendableCode =
+'FOREIGN_ONLY' | 'NO_DATE' | 'NO_AMOUNT' | 'ZERO_AMOUNT' | 'BLANK_MERCHANT' | 'APPROVAL_TOO_LONG';
 
 export interface UnsendableRow {
   /** rows 안의 위치 */

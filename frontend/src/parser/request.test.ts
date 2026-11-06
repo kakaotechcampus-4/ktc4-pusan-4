@@ -20,6 +20,7 @@ const row = (fields: Partial<ParsedRow> = {}): ParsedRow => ({
   reviewReason: '',
   isCancel: false,
   masked: false,
+  foreignAmount: null,
   ...fields
 });
 
@@ -29,15 +30,18 @@ describe('unsendableOf', () => {
   });
 
   it('사유마다 코드를 돌려준다', () => {
+    expect(unsendableOf(row({ amount: null, foreignAmount: 12.5, naturalKey: '' }))).toBe('FOREIGN_ONLY');
     expect(unsendableOf(row({ approvedAt: '', naturalKey: '' }))).toBe('NO_DATE');
     expect(unsendableOf(row({ amount: null, naturalKey: '' }))).toBe('NO_AMOUNT');
+    expect(unsendableOf(row({ amount: 0 }))).toBe('ZERO_AMOUNT');
     expect(unsendableOf(row({ rawMerchant: '' }))).toBe('BLANK_MERCHANT');
     expect(unsendableOf(row({ approvalNo: '1'.repeat(33) }))).toBe('APPROVAL_TOO_LONG');
     expect(unsendableOf(row({ approvalNo: '1'.repeat(32) }))).toBeNull();
   });
 
-  it('먼저 걸린 사유 하나만 돌려준다', () => {
+  it('먼저 걸린 사유 하나만 돌려준다. 외화 전용이 가장 먼저다', () => {
     expect(unsendableOf(row({ approvedAt: '', amount: null, rawMerchant: '' }))).toBe('NO_DATE');
+    expect(unsendableOf(row({ approvedAt: '', amount: null, foreignAmount: 3 }))).toBe('FOREIGN_ONLY');
   });
 });
 
