@@ -60,7 +60,7 @@ function RunProgress() {
   const navigate = useNavigate();
   const { runId = null } = useParams<{ runId: string }>();
   const { showNudge } = useAssistant();
-  const { setBatchId } = useSession();
+  const { batchId, setBatchId } = useSession();
   const [run, setRun] = useState<JudgmentRun | null>(null);
   const [pollError, setPollError] = useState<PollError | null>(null);
   /** null 은 아직 받지 않음 */
@@ -99,8 +99,6 @@ function RunProgress() {
           if (stopped) return;
           setPollError(null);
           setRun(next);
-          // 새로고침하면 세션의 배치는 가장 최근 업로드로 시작한다. 「결과 보기」·질문 안내가 이 실행의 배치를 열게 맞춘다
-          setBatchId(next.batchId);
           if (runPhase(next) !== 'running') stop();
         },
         (caught: unknown) => {
@@ -117,7 +115,7 @@ function RunProgress() {
     poll();
     timer.current = window.setInterval(poll, 1000);
     return stop;
-  }, [runId, setBatchId]);
+  }, [runId]);
 
   const phase = runPhase(run);
   const finished = phase !== 'loading' && phase !== 'running';
@@ -171,9 +169,12 @@ function RunProgress() {
     };
   }, [runId, finished, failedCount]);
 
-  // FR-3: 지난번 답으로 채울 수 있는 질문이 있으면 이 실행에 한 번 알린다. 못 읽으면 알리지 않는다
+  /*
+   * FR-3: 지난번 답으로 채울 수 있는 질문이 있으면 이 실행에 한 번 알린다. 못 읽으면 알리지 않는다.
+   * 질문 화면은 고른 업로드의 질문을 연다. 다른 업로드를 보고 있을 때 알리면 엉뚱한 질문으로 가므로 알리지 않는다 (C53)
+   */
   useEffect(() => {
-    if (!runId || !judged || !runBatchId) return;
+    if (!runId || !judged || !runBatchId || runBatchId !== batchId) return;
     let cancelled = false;
     void api.progress.
     get(runBatchId).
@@ -192,7 +193,16 @@ function RunProgress() {
     return () => {
       cancelled = true;
     };
-  }, [runId, judged, runBatchId, showNudge]);
+  }, [runId, judged, runBatchId, batchId, showNudge]);
+
+  /**
+   * 이 실행의 업로드는 결과 보기를 누를 때 고른다. 화면을 여는 것만으로 바꾸면 뒤로 가기로 예전 실행을
+   * 열었을 때 보던 업로드가 말없이 바뀐다 (C53)
+   */
+  const openResults = () => {
+    if (run) setBatchId(run.batchId);
+    navigate('/results');
+  };
 
   /** 재시도는 같은 배치·문진으로 새 Run 을 만드는 것이다 (api.md 3.6 재실행) */
   const retry = async () => {
@@ -332,7 +342,7 @@ function RunProgress() {
               )}
               </dl>
             }
-            <Button className="mt-8" onClick={() => navigate('/results')}>
+            <Button className="mt-8" onClick={openResults}>
               결과 보기
               <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
             </Button>

@@ -159,7 +159,23 @@ describe('Run', () => {
     expect(text()).toContain('4건');
   });
 
-  it('지난번 답으로 채울 질문을 한 번 알린다', async () => {
+  it('예전 실행을 열기만 해서는 보던 업로드를 바꾸지 않고, 결과 보기를 누를 때 고른다 (C53)', async () => {
+    session.batchId = 'batch-other';
+    api.runs.get.mockResolvedValue(run('COMPLETED'));
+    api.judgments.summary.mockResolvedValue(summary);
+    await mount();
+    await tick(3000);
+
+    expect(session.setBatchId).not.toHaveBeenCalled();
+    // 다른 업로드를 보고 있으면 질문 화면이 엉뚱한 질문을 열므로 알리지 않는다
+    expect(api.progress.get).not.toHaveBeenCalled();
+
+    await click('결과 보기');
+    expect(session.setBatchId).toHaveBeenCalledWith('batch-run');
+    expect(text()).toContain('결과 화면');
+  });
+
+  it('보던 업로드의 실행이면 지난번 답으로 채울 질문을 한 번 알린다', async () => {
     api.runs.get.mockResolvedValue(run('COMPLETED'));
     api.judgments.summary.mockResolvedValue(summary);
     api.progress.get.mockResolvedValue({ questions: { fillableFromPrevious: 2 } });
