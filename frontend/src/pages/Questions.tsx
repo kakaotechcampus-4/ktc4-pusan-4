@@ -26,6 +26,8 @@ const SHOWN_TRANSACTIONS = 3;
 const SETTLE_MS = 600;
 /** 카드나 일괄 답변 칸이 아니라 화면 위쪽에 띄우는 오류(지난번 답 적용)의 자리 */
 const TOP = 'top';
+/** 처음 읽는 동안 값 대신 두는 자리 */
+const PLACEHOLDER = 'block animate-pulse rounded bg-line2 motion-reduce:animate-none';
 
 const errorMessage = (caught: unknown, fallback: string) =>
 caught instanceof ApiRequestError ? caught.message : fallback;
@@ -113,6 +115,8 @@ export function Questions() {
   const answered = answeredQ.data?.items ?? [];
   const answeredTotal = answeredQ.data?.page.totalElements ?? 0;
   const unresolved = pendingQ.data?.unresolved;
+  /** 처음 읽는 중. 다시 읽을 때는 이전 목록을 그대로 둔다 */
+  const loading = !pendingQ.data;
   const heldKeys = new Set(held.map(({ item }) => groupId(item)));
   /** 아직 답하지 않은 카드. 서버가 다시 주기 전에도 방금 답한 카드는 뺀다 */
   const unanswered = pending.filter((group) => !heldKeys.has(groupId(group)));
@@ -253,7 +257,7 @@ export function Questions() {
     setBusy(null);
     const missed = carryChosen.length - saved;
     if (missed > 0) fail(TOP, `지난번 답 ${formatNumber(missed)}개는 저장하지 못했습니다. 그 질문은 그대로 남아 있습니다.`);
-    if (saved > 0) announce(`지난번 답으로 질문 ${formatNumber(saved)}개에 답했습니다. 질문마다 다시 바꿀 수 있습니다.`);
+    if (saved > 0) announce(`지난번 답으로 질문 ${formatNumber(saved)}개에 답했습니다.`);
     // 이 칸이 사라지면 아래 카드가 포인터 밑으로 올라온다
     setSettling(true);
     reload();
@@ -308,15 +312,11 @@ export function Questions() {
   <header className="flex flex-wrap items-end justify-between gap-4">
       <div>
         <StepEyebrow>질문</StepEyebrow>
-        <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
-          확인이 필요한 것만 물어봅니다
-        </h1>
-        <p className="mt-2 max-w-xl text-body text-ink2">
-          같은 사유·같은 가맹점끼리 묶어 묻고, 한 번 답하면 묶인 거래에 함께 적용합니다.
-        </p>
+        {/* 판정 이름(확인 필요)을 제목에 다시 쓰지 않는다. 화면 이름 그대로다 (C12) */}
+        <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">질문</h1>
       </div>
-      <Button to="/results" variant="secondary" size="sm">
-        결과로 돌아가기
+      <Button to="/results" variant="secondary" size="sm" className="whitespace-nowrap">
+        결과 보기
       </Button>
     </header>;
 
@@ -331,7 +331,6 @@ export function Questions() {
             className="mt-6"
             icon={<SearchXIcon className="h-5 w-5" />}
             title="올린 카드내역이 없습니다"
-            description="카드내역을 올리고 판정하면 확인이 필요한 것만 여기서 묻습니다."
             action={
             <Button to="/upload" size="sm" variant="secondary">
                   카드내역 올리기
@@ -343,7 +342,6 @@ export function Questions() {
             className="mt-6"
             icon={<SearchXIcon className="h-5 w-5" />}
             title="질문을 불러오지 못했습니다"
-            description="잠시 후 다시 시도해 주세요. 계속 안 되면 새로고침해 주세요."
             action={
             <Button size="sm" variant="secondary" onClick={reload}>
                   다시 시도
@@ -361,58 +359,45 @@ export function Questions() {
       <div className="mx-auto max-w-3xl">
         {header}
 
-        <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-xl border border-line bg-surface px-4 py-3 text-small tabular-nums">
-          <span className="text-muted">
-            남은 질문{' '}
-            <strong className="font-bold text-ink">
-              {pendingQ.data ? `${formatNumber(pendingTotal)}개` : '—'}
-            </strong>
+        {/* 읽기 전에는 숫자 대신 자리만 둔다. 「—」나 0 을 보이면 실제 값처럼 읽힌다 (C66) */}
+        <p className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-1 text-body tabular-nums text-ink2">
+          <span className="flex items-center gap-2">
+            남은 질문
+            {loading ?
+            <span className={`h-4 w-10 ${PLACEHOLDER}`} /> :
+            <strong className="font-bold text-ink">{formatNumber(pendingTotal)}개</strong>
+            }
           </span>
-          {unresolved &&
-          <span className="text-muted">
-              질문이 걸린 금액{' '}
-              <strong className={`font-bold ${unresolved.count > 0 ? 'text-warn' : 'text-ink'}`}>
-                {formatWon(unresolved.amount)}
-              </strong>
+          {(loading || unresolved) &&
+          <span className="flex items-center gap-2">
+              질문이 걸린 금액
+              {unresolved ?
+            <strong className="font-bold text-ink">{formatWon(unresolved.amount)}</strong> :
+            <span className={`h-4 w-24 ${PLACEHOLDER}`} />
+            }
             </span>
           }
-        </div>
-
-        {pendingTotal > BATCH_SIZE &&
-        <p className="mt-3 text-small text-muted">
-            질문이 많아 {BATCH_SIZE}개씩 보여줍니다. 답하면 다음 질문이 앞으로 당겨지고, 건너뛴
-            질문은 아래 페이지에서 넘겨 볼 수 있습니다.
-          </p>
-        }
+        </p>
 
         {/* 결과를 읽어 주는 자리. 비어 있어도 DOM 에 남아 있어야 바뀐 내용을 읽는다 */}
         <p
           ref={noticeRef}
           role="status"
           tabIndex={-1}
-          className={notice ? 'mt-3 text-small text-ink2 outline-none' : 'sr-only'}>
+          className={notice ? 'mt-4 text-body text-ink2 outline-none' : 'sr-only'}>
 
           {notice}
         </p>
         {error?.at === TOP &&
-        <p
-          ref={errorRef}
-          role="alert"
-          tabIndex={-1}
-          className="mt-3 rounded-xl border border-deny-line bg-deny-bg px-4 py-3 text-body text-deny outline-none">
-
+        <p ref={errorRef} role="alert" tabIndex={-1} className="mt-4 text-body text-deny outline-none">
             {error.message}
           </p>
         }
 
         {carryOver.length >= 2 &&
-        <section className="mt-4 rounded-2xl border border-line bg-surface p-5">
+        <section className="mt-6 rounded-2xl border border-line p-5">
             <h2 className="text-body font-bold text-ink">지난번 답 한 번에 적용</h2>
-            <p className="mt-1 text-small text-muted">
-              다른 업로드에서 같은 질문에 한 답입니다. 확인하고 고른 것만 적용합니다. 적용한 뒤에도 질문마다 바꿀 수
-              있습니다.
-            </p>
-            <ul className="mt-3 space-y-2">
+            <ul className="mt-3 space-y-3">
               {carryOver.map(({ group, text }) => {
               const key = groupId(group);
               return (
@@ -426,10 +411,11 @@ export function Questions() {
                       onChange={(event) => setSkipped((prev) => ({ ...prev, [key]: !event.target.checked }))} />
 
                       <span>
-                        <span className="font-normal text-ink">
-                          {group.transactions[0]?.merchantNorm} · {group.questionText}
+                        <span className="text-ink">
+                          <strong className="font-bold">{group.transactions[0]?.merchantNorm}</strong>{' '}
+                          {group.questionText}
                         </span>
-                        <span className="block text-muted">{text}</span>
+                        <span className="block">{text}</span>
                       </span>
                     </label>
                   </li>);
@@ -440,6 +426,7 @@ export function Questions() {
               <Button
               variant="secondary"
               size="sm"
+              className="whitespace-nowrap"
               disabled={locked || carryChosen.length === 0}
               onClick={() => void applyCarryOver()}>
 
@@ -449,23 +436,31 @@ export function Questions() {
           </section>
         }
 
-        {/* 뒤 페이지가 비면 첫 페이지로 돌아가므로, 그 사이에 「다 답했다」를 띄우지 않는다 */}
-        {!pendingQ.loading && shown.length === 0 && shownPage === 0 ?
+        {loading ?
+        <ol aria-hidden="true" className="mt-6 space-y-3">
+            {[0, 1, 2].map((slot) =>
+          <li key={slot} className="rounded-2xl border border-line px-5 py-5">
+                <span className={`h-4 w-1/4 ${PLACEHOLDER}`} />
+                <span className={`mt-3 h-5 w-2/3 ${PLACEHOLDER}`} />
+                <span className={`mt-5 h-12 w-full ${PLACEHOLDER}`} />
+              </li>
+          )}
+          </ol> :
+        // 뒤 페이지가 비면 첫 페이지로 돌아가므로, 그 사이에 「다 답했다」를 띄우지 않는다
+        !pendingQ.loading && shown.length === 0 && shownPage === 0 ?
         <Empty
-          className="mt-4"
-          tone="ok"
+          className="mt-6"
           icon={<CheckIcon className="h-5 w-5" />}
-          title="확인할 질문이 없습니다"
-          description={
-          answeredTotal > 0 && !answeredQ.error ?
-          '모든 질문에 답했습니다. 답을 바꾸려면 아래 답한 질문에서 고르세요.' :
-          answeredQ.data && !answeredQ.loading && !answeredQ.error ?
-          '규칙으로 판정하면서 더 물어볼 것이 생기지 않았습니다.' :
-          '지금 답할 질문은 없습니다.'
+          title={
+          answeredQ.error || !answeredQ.data ?
+          '남은 질문이 없습니다' :
+          answeredTotal > 0 ?
+          '모든 질문에 답했습니다' :
+          '물어볼 질문이 없습니다'
           } /> :
 
 
-        <ol className="mt-4 space-y-3">
+        <ol className="mt-6 space-y-3">
             <AnimatePresence initial={false}>
               {shown.map((group, index) => {
               const key = groupId(group);
@@ -478,42 +473,44 @@ export function Questions() {
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}>
 
-                    <section className="overflow-hidden rounded-2xl border border-line bg-surface">
+                    <section className="overflow-hidden rounded-2xl border border-line">
                       <header className="flex items-start gap-3 border-b border-line2 px-5 py-4">
-                        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-canvas text-caption font-bold tabular-nums text-ink2">
+                        <span className="mt-0.5 w-6 shrink-0 text-center text-small font-bold tabular-nums text-muted">
                           {shownPage * BATCH_SIZE + index + 1}
                         </span>
                         <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                             {rows[0] &&
-                          <Badge>
-                                {rows[0].merchantNorm}
-                                {new Set(rows.map((row) => row.merchantNorm)).size > 1 && ' 외'}
+                          <Badge className="max-w-full">
+                                <span className="min-w-0 truncate">
+                                  {rows[0].merchantNorm}
+                                  {new Set(rows.map((row) => row.merchantNorm)).size > 1 && ' 외'}
+                                </span>
                               </Badge>
                           }
-                            <span className="flex items-center gap-1 text-caption tabular-nums text-muted">
+                            <span className="flex items-center gap-1.5 whitespace-nowrap text-caption tabular-nums text-muted">
                               <LayersIcon className="h-3 w-3" aria-hidden="true" />
-                              {formatNumber(group.count)}건 · {formatWon(group.totalAmount)}
+                              <span>{formatNumber(group.count)}건</span>
+                              <span>{formatWon(group.totalAmount)}</span>
                             </span>
                           </div>
                           <h2 className="mt-2 text-h4 font-bold text-ink">{group.questionText}</h2>
                           {rows.length > 0 &&
-                        <ul className="mt-2 space-y-0.5 text-small tabular-nums text-muted">
+                        <ul className="mt-2 space-y-0.5 text-small tabular-nums text-ink2">
                               {rows.slice(0, SHOWN_TRANSACTIONS).map((row) =>
-                          <li key={row.questionId} className="truncate">
-                                  {formatDate(row.approvedAt)} · {row.merchantRaw} · {formatWon(row.amount)}
+                          <li key={row.questionId} className="flex gap-3">
+                                  <span className="shrink-0 text-muted">{formatDate(row.approvedAt)}</span>
+                                  <span className="min-w-0 flex-1 truncate">{row.merchantRaw}</span>
+                                  <span className="shrink-0">{formatWon(row.amount)}</span>
                                 </li>
                           )}
                               {group.count > SHOWN_TRANSACTIONS &&
-                          <li>외 {formatNumber(group.count - SHOWN_TRANSACTIONS)}건</li>
+                          <li className="text-muted">외 {formatNumber(group.count - SHOWN_TRANSACTIONS)}건</li>
                           }
                             </ul>
                         }
                           {rows.some((row) => row.overridden) &&
-                        <p className="mt-2 text-small text-ink2">
-                              위 거래 중 직접 수정한 판정을 쓰는 거래가 있습니다. 답하면 기록은 남지만 그
-                              거래의 현재 판정은 수정한 값 그대로입니다.
-                            </p>
+                        <p className="mt-2 text-small text-ink2">직접 바꾼 판정이 있는 거래는 답해도 그 판정이 그대로입니다.</p>
                         }
                         </div>
                       </header>
@@ -530,6 +527,7 @@ export function Questions() {
                           <Button
                             size="sm"
                             variant="soft"
+                            className="whitespace-nowrap"
                             onClick={() => void answer(group, previous.value, { source: 'PREVIOUS_ANSWER', index })}>
 
                                   이 답으로
@@ -627,42 +625,37 @@ export function Questions() {
         }
 
         {answeredQ.error &&
-        <p role="alert" className="mt-6 rounded-xl border border-deny-line bg-deny-bg px-4 py-3 text-small text-deny">
+        <p role="alert" className="mt-8 text-small text-deny">
             답한 질문을 불러오지 못해 답을 바꿀 수 없습니다.{' '}
-            <button type="button" onClick={answeredQ.reload} className="font-bold underline">
+            <button type="button" onClick={answeredQ.reload} className="whitespace-nowrap font-bold underline">
               다시 시도
             </button>
           </p>
         }
 
         {!answeredQ.error && answeredRows.length > 0 &&
-        <section className="mt-6">
-            <h2 className="text-body font-bold text-ink">
-              답한 질문 <span className="tabular-nums text-muted">{formatNumber(answeredTotal)}개</span>
-              {answeredTotal > answered.length &&
-            <span className="ml-2 text-small font-normal text-muted">
-                  앞의 {formatNumber(answered.length)}개만 보여줍니다
-                </span>
-            }
-            </h2>
-            <ul className="mt-3 divide-y divide-line2 overflow-hidden rounded-2xl border border-line bg-surface">
+        <section className="mt-8">
+            <h2 className="text-body font-bold text-ink">답한 질문</h2>
+            <ul className="mt-3 divide-y divide-line2 overflow-hidden rounded-2xl border border-line">
               {answeredRows.map((group) => {
               const key = groupId(group);
               const open = editing === key;
               const value = answerOf(group);
               return (
                 <li key={key} className="px-5 py-3.5">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0 flex-1">
-                        <p className="text-small font-normal text-ink">{group.questionText}</p>
-                        <p className="mt-0.5 text-caption tabular-nums text-muted">
-                          {value ? `${answeredAs(value)} 답함` : '답함'} ·{' '}
-                          {formatNumber(group.count)}건 · {formatWon(group.totalAmount)}
+                        <p className="text-small text-ink">{group.questionText}</p>
+                        <p className="mt-0.5 flex flex-wrap gap-x-3 text-caption tabular-nums text-ink2">
+                          <span>{value ? `${answeredAs(value)} 답함` : '답함'}</span>
+                          <span className="text-muted">{formatNumber(group.count)}건</span>
+                          <span className="text-muted">{formatWon(group.totalAmount)}</span>
                         </p>
                       </div>
                       <Button
                       variant="ghost"
                       size="sm"
+                      className="shrink-0 whitespace-nowrap"
                       aria-expanded={open}
                       disabled={locked}
                       onClick={() => setEditing(open ? null : key)}>
@@ -690,16 +683,16 @@ export function Questions() {
           </section>
         }
 
-        <div className="mt-6 flex flex-wrap items-center gap-3">
-          <Button to="/summary">
-            요약으로
-            <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
-          </Button>
-          <p className="text-small text-muted">
-            모르는 건 건너뛰어도 됩니다. 답하지 않은 질문은 요약의 세무대리인에게 넘길 문장에
-            건수와 금액으로 적힙니다.
-          </p>
-        </div>
+        {/* 질문을 읽기 전에는 다음으로 넘기지 않는다 (C66) */}
+        {!loading &&
+        <div className="mt-8 flex flex-wrap items-center gap-3">
+            <Button to="/summary" className="whitespace-nowrap">
+              요약으로
+              <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
+            </Button>
+            {pendingTotal > 0 && <p className="text-small text-ink2">모르는 질문은 건너뛰어도 됩니다.</p>}
+          </div>
+        }
       </div>
     </AppShell>);
 
