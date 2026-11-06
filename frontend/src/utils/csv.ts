@@ -1,6 +1,7 @@
 import type { Judgment, JudgmentExportRow, LimitYear } from '../types/domain';
 import { formatWon } from './format';
 import { limitsOf } from './limit';
+import { statuteTitle } from './statute';
 
 /** 쉼표·따옴표·줄바꿈이 든 칸만 따옴표로 감싼다 (RFC 4180). 수식으로 읽힐 칸은 앞에 ' 를 붙여 막는다 */
 const cell = (value: string | number | null | undefined) => {
@@ -20,7 +21,8 @@ const HEADER = [
 '금액',
 '할부 개월',
 '판정',
-'인정 금액',
+'계정과목',
+'경비 가능 금액',
 '직접 수정',
 '세무사에게 넘김',
 '근거 조문',
@@ -28,7 +30,17 @@ const HEADER = [
 
 
 /**
- * 내보내기 API 가 없는 서버에서 판정 목록으로 같은 모양을 만든다. 인정 금액은 한도(접대비)를 반영하지 않은
+ * 근거 조문 칸 (C42). 내보내기는 statuteId 만 주므로 법령 이름도 id 에서 읽는다(소득세법시행령 → 소득세법 시행령).
+ * 조를 읽지 못하는 id(심판례 등)는 그대로 둔다
+ */
+const citationTitle = (statuteId: string) => {
+  const law = statuteId.split(/[#-]/)[0].replace(/(시행령|시행규칙)$/, ' $1');
+  const title = statuteTitle(statuteId, law);
+  return title === law ? statuteId : title;
+};
+
+/**
+ * 내보내기 API 가 없는 서버에서 판정 목록으로 같은 모양을 만든다. 경비 가능 금액은 한도(접대비)를 반영하지 않은
  * finalAmount 이고, 답한 내용은 비어 있다
  */
 export const exportRowOf = (judgment: Judgment): JudgmentExportRow => ({
@@ -40,7 +52,7 @@ export const exportRowOf = (judgment: Judgment): JudgmentExportRow => ({
 /**
  * 세무사에게 넘길 CSV (2026-10-05 협업 미팅의 칸: 상품 이름, 판정 결과, 근거 조문, 사용 목적, 사용 날짜).
  * 데이터는 GET /judgments/export 가 주고 파일 변환은 FE 가 한다(#214). 엑셀이 한글을 깨뜨리지 않게 BOM 을 붙인다.
- * 한도를 넘은 해의 접대비는 서버가 인정 금액을 비워 주므로(#226), 그해 초과액을 표 아래 한 줄로 적는다
+ * 한도를 넘은 해의 접대비는 서버가 경비 가능 금액을 비워 주므로(#226), 그해 초과액을 표 아래 한 줄로 적는다
  */
 export function judgmentsCsv(rows: JudgmentExportRow[], limits: LimitYear[]): string {
   // 서버(computedAt DESC)·목업·판정 목록 대체 경로가 순서를 다르게 준다. 파일은 늘 승인일 순이다
@@ -54,12 +66,13 @@ export function judgmentsCsv(rows: JudgmentExportRow[], limits: LimitYear[]): st
   judgment.transaction.amount,
   judgment.transaction.installmentMonths,
   judgment.verdict.label,
+  judgment.account,
   // 「확인 필요」는 아직 금액을 정하지 않았다. 0 이면 세무사가 「인정 안 됨」으로 읽으니 비워 둔다(#214 리뷰).
   // 한도를 넘은 해의 접대비는 서버가 null 을 준다(#226)
   judgment.verdict.code === 'NEEDS_REVIEW' ? null : allowedAmount,
   judgment.origin.type === 'OVERRIDE' ? '예' : '',
   judgment.outOfScope ? '예' : '',
-  judgment.citations.map((citation) => citation.statuteId).join(' '),
+  judgment.citations.map((citation) => citationTitle(citation.statuteId)).join(', '),
   answers.map((item) => `${item.question} → ${item.answer}`).join(' / ')]
   );
   const exceeded = limitsOf(limits).filter((item) => item.excessAmount > 0);
@@ -68,7 +81,7 @@ export function judgmentsCsv(rows: JudgmentExportRow[], limits: LimitYear[]): st
   [
   [],
   ...exceeded.map(({ taxYear, totalAmount, excessAmount }) => [
-  `${taxYear}년 접대비 총 ${formatWon(totalAmount)} 중 ${formatWon(excessAmount)}은 한도를 넘어 필요경비에 넣지 않습니다(직전연도 수입금액 기준 잠정). 거래별로 나눌 수 없어 이 해 가능 접대비 행의 인정 금액은 비웠습니다(승인취소·환불 행은 빼고).`]
+  `${taxYear}년 접대비 총 ${formatWon(totalAmount)} 중 ${formatWon(excessAmount)}은 한도를 넘어 필요경비에 넣지 않습니다(직전연도 수입금액 기준 잠정). 거래별로 나눌 수 없어 이 해 가능 접대비 행의 경비 가능 금액은 비웠습니다(승인취소와 환불 행은 빼고).`]
   )] :
 
   [];
