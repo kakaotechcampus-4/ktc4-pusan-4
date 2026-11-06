@@ -23,8 +23,10 @@ const NAV_OFF = 'text-ink2 hover:bg-surface';
 
 
 export function MarketingHeader() {
-  const { status, signOut } = useSession();
+  const { status, signOut, batchId, batchStatus } = useSession();
   const { pathname } = useLocation();
+  // 올린 카드내역이 있으면 결과로 간다 (C83). 업로드 목록을 읽는 중이거나 못 읽었으면 결과 화면이 그 상태를 보여 준다
+  const mine = batchStatus === 'ready' && batchId === null ? '/upload' : '/results';
 
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-canvas/95 shadow-header backdrop-blur">
@@ -61,11 +63,11 @@ export function MarketingHeader() {
           status === 'signedIn' ?
           <>
               {/* 좁은 폭에서는 접는다. 바로 아래 히어로에 같은 자리로 가는 CTA 가 있다 */}
-              <Button to="/upload" size="sm" className="hidden sm:inline-flex">
+              <Button to={mine} size="sm" className="hidden sm:inline-flex">
                 내 판정으로
               </Button>
               <Button to="/account" variant="secondary" size="sm">
-                마이페이지
+                내 정보
               </Button>
               <Button variant="secondary" size="sm" onClick={signOut}>
                 로그아웃
