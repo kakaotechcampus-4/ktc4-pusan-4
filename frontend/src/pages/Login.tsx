@@ -1,41 +1,62 @@
-import React, { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import React, { useRef, useState } from 'react';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { MessageCircleIcon } from 'lucide-react';
 import { useSession } from '../contexts/SessionContext';
 import { ApiRequestError, isMock, mockPassword } from '../api';
-import { AUTH_INPUT, AUTH_LABEL, AUTH_PRIMARY, AUTH_SECONDARY, AuthLayout } from '../components/AuthLayout';
+import { AUTH_FIELD_ERROR, AUTH_INPUT, AUTH_LABEL, AUTH_PRIMARY, AUTH_SECONDARY, AuthLayout } from '../components/AuthLayout';
 import { beginKakaoLogin, kakaoAvailable } from '../auth/kakao';
+import type { SessionEndReason } from '../auth/session';
 
 interface LocationState {
   from?: string;
+  /** RequireAuth 가 넘긴다. 로그인이 저절로 끝났을 때만 있다 */
+  reason?: SessionEndReason | null;
 }
+
+/** 로그인이 왜 끝났는지 한 줄로 알린다 (C51·C44·C45) */
+const ENDED: Record<SessionEndReason, string> = {
+  expired: '로그인이 만료됐습니다. 다시 로그인해 주세요.',
+  'account-changed': '다른 탭에서 다른 계정으로 로그인해 이 탭은 로그아웃했습니다.',
+  'signed-out': '다른 탭에서 로그아웃했습니다.'
+};
+
+/** 오류가 어느 칸 때문인지. 서버 오류는 칸을 빨갛게 칠하지 않고 버튼 위에 둔다 (C91) */
+type ErrorField = 'email' | 'password' | null;
 
 export function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { signIn } = useSession();
+  const { status, signIn } = useSession();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [errorField, setErrorField] = useState<ErrorField>(null);
   const [busy, setBusy] = useState(false);
+  /** 이 화면에서 로그인하는 중이다. 로그인이 끝나면 아래 「이미 로그인했다」로 보내지 않고 complete 가 보낸다 */
+  const signingIn = useRef(false);
 
-  const from = (location.state as LocationState | null)?.from ?? '/';
+  const state = location.state as LocationState | null;
+  const from = state?.from ?? '/';
+  const ended = state?.reason ? ENDED[state.reason] : null;
 
   // 서버 문장은 그대로 띄우지 않는다. code 로 고른다 (api.md 1.1)
   const complete = async (nextEmail: string, nextPassword: string) => {
     if (busy) return;
     setBusy(true);
     setError(null);
+    setErrorField(null);
+    signingIn.current = true;
     try {
       await signIn(nextEmail, nextPassword);
       navigate(from, { replace: true });
     } catch (caught) {
+      signingIn.current = false;
       const code = caught instanceof ApiRequestError ? caught.code : '';
-      const status = caught instanceof ApiRequestError ? caught.status : -1;
+      const offline = caught instanceof ApiRequestError && caught.status === 0;
       setError(
         code === 'INVALID_CREDENTIALS' ?
         '이메일 또는 비밀번호를 확인해 주세요.' :
-        status === 0 ?
+        offline ?
         '서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.' :
         '로그인하지 못했습니다. 잠시 후 다시 시도해 주세요.'
       );
@@ -43,15 +64,20 @@ export function Login() {
     }
   };
 
+  const invalid = (field: ErrorField, message: string) => {
+    setError(message);
+    setErrorField(field);
+  };
+
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
     if (!email.includes('@')) {
-      setError('이메일 형식을 확인해 주세요.');
+      invalid('email', '이메일 형식을 확인해 주세요.');
       return;
     }
     // 길이 규칙은 가입할 때만 본다. 가입 전에 만든 계정의 비밀번호를 여기서 막지 않는다
     if (password === '') {
-      setError('비밀번호를 입력해 주세요.');
+      invalid('password', '비밀번호를 입력해 주세요.');
       return;
     }
     void complete(email, password);
@@ -66,14 +92,27 @@ export function Login() {
     navigate(url);
   };
 
+  // 이미 로그인했으면 로그인 뒤에 갈 곳으로 보낸다 (C52). 이어 가는 중에는 폼을 그리지 않는다 — 그렸다가 바로 넘어가면 깜빡인다
+  if (status === 'signedIn' && !signingIn.current) return <Navigate to={from} replace />;
+  if (status === 'restoring') return <AuthLayout title="로그인">{null}</AuthLayout>;
+
+  const fieldError = (field: ErrorField) =>
+  error && errorField === field &&
+  <p id={`login-${field}-error`} role="alert" className={AUTH_FIELD_ERROR}>
+        {error}
+      </p>;
+
+
   return (
     <AuthLayout title="로그인">
       <h1 className="text-[26px] font-bold tracking-tight text-ink">
         로그인
       </h1>
-      <p className="mt-2 text-[14px] leading-7 text-muted">
-        판정 이력과 저장된 답변은 계정에 묶여 관리됩니다.
-      </p>
+      {ended &&
+      <p role="status" className="mt-3 text-[14px] leading-6 text-ink">
+          {ended}
+        </p>
+      }
 
       {kakaoAvailable &&
       <>
@@ -86,13 +125,10 @@ export function Login() {
             <MessageCircleIcon className="h-4 w-4" aria-hidden="true" />
             카카오로 계속하기
           </button>
-          <p className="mt-2 text-[12px] leading-6 text-muted">
-            카카오 계정은 이메일 계정과 따로입니다. 같은 이메일을 써도 합쳐지지 않습니다.
-          </p>
 
           <div className="my-6 flex items-center gap-3">
             <span className="h-px flex-1 bg-line" />
-            <span className="text-[12px] text-muted">또는 이메일로 로그인</span>
+            <span className="text-[12px] text-ink2">또는 이메일로 로그인</span>
             <span className="h-px flex-1 bg-line" />
           </div>
         </>
@@ -111,9 +147,11 @@ export function Login() {
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               placeholder="name@example.com"
-              aria-invalid={Boolean(error)}
+              aria-invalid={errorField === 'email'}
+              aria-describedby={errorField === 'email' ? 'login-email-error' : undefined}
               className={AUTH_INPUT} />
 
+            {fieldError('email')}
           </div>
           <div>
             <label htmlFor="password" className={AUTH_LABEL}>
@@ -125,13 +163,15 @@ export function Login() {
               autoComplete="current-password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              aria-invalid={Boolean(error)}
+              aria-invalid={errorField === 'password'}
+              aria-describedby={errorField === 'password' ? 'login-password-error' : undefined}
               className={AUTH_INPUT} />
 
+            {fieldError('password')}
           </div>
         </div>
 
-        {error &&
+        {error && errorField === null &&
         <p role="alert" className="mt-3 text-[13px] text-deny">
             {error}
           </p>
@@ -142,8 +182,8 @@ export function Login() {
         </button>
       </form>
 
-      <p className="mt-4 text-center text-[13px] text-muted">
-        아직 계정이 없나요?{' '}
+      <p className="mt-4 text-center text-[13px] text-ink2">
+        계정이 없으면{' '}
         <Link
           to="/signup"
           state={{ from }}
