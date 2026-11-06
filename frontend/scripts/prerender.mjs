@@ -40,7 +40,7 @@ function openGraph({ title, description, url }) {
   `<meta property="og:image" content="${SITE_URL}/og-image.png" />`,
   '<meta property="og:image:width" content="1200" />',
   '<meta property="og:image:height" content="630" />',
-  `<meta property="og:image:alt" content="PreeT · ${escape(TAGLINE)}" />`,
+  `<meta property="og:image:alt" content="PreeT, ${escape(TAGLINE)}" />`,
   '<meta name="twitter:card" content="summary_large_image" />'];
 
 }
@@ -146,10 +146,10 @@ await writeFile(
   '## 판정 근거와 범위',
   '',
   '- 판정 근거: 국가법령정보 OPEN API에서 받은 소득세법 조문. 매일 03:00 KST에 동기화합니다.',
-  '- 지원 파일: 국민카드·기업카드 이용내역',
-  '- 지원 업종: 지금은 프리랜서·인적용역 사업자(국세청 업종코드 940909)만 판정합니다.',
+  '- 지원 파일: KB국민카드, IBK기업은행 승인내역',
+  '- 지원 업종: 지금은 프리랜서 인적용역 사업자(국세청 업종코드 940909)만 판정합니다.',
   `- 하지 않는 일: ${NOT_DOING.map((item) => item.title).join(', ')}`,
-  '- 결과는 확인할 항목과 근거까지입니다. 최종 판단에는 세무대리인의 확인이 필요합니다.',
+  '- 결과는 확인할 항목과 근거까지입니다. 최종 판단에는 세무사의 확인이 필요합니다.',
   ''].
   join('\n')
 );
