@@ -8,7 +8,7 @@ import { Badge, Button, ChoiceGroup, Empty, Pagination } from '../components/ui'
 import { useSession } from '../contexts/SessionContext';
 import { api, ApiRequestError, useApi } from '../api';
 import { previousAnswer } from '../components/assistant/logic';
-import { respondOnce, UNCONFIRMED_CODE, verdictsAfter, withHeld } from '../components/questions/logic';
+import { answerLabel, respondOnce, UNCONFIRMED_CODE, verdictsAfter, withHeld } from '../components/questions/logic';
 import type { VerdictTally } from '../components/questions/logic';
 import type { AnswerSource, QuestionGroup } from '../types/domain';
 import { formatDate, formatNumber, formatWon, ro } from '../utils/format';
@@ -38,6 +38,19 @@ const groupId = (group: QuestionGroup) => `${group.groupKey}|${group.factType}`;
 /** 같은 factType 질문들이 모두 허용하는 선택지. 일괄 답변은 이 값만 보낼 수 있다 (3.11) */
 const commonOptions = (groups: QuestionGroup[]) =>
 groups[0].options.filter((option) => groups.every((group) => group.options.includes(option)));
+
+/** 선택지는 룰카드 값을 보내고 화면 이름으로 보여 준다 */
+const choicesOf = (group: QuestionGroup) => group.options.map((option) => ({ value: option, label: answerLabel(option) }));
+
+/** 「답했습니다」 앞에 붙는 답. 조사까지 화면 이름에 맞춘다 */
+const answeredAs = (value: string) => {
+  const label = answerLabel(value);
+  return `${label}${ro(label)}`;
+};
+
+/** 한 번에 답할 질문 묶음의 이름. 내부 fact_type 대신 가맹점을 적는다 (C104) */
+const merchantsOf = (groups: QuestionGroup[]) =>
+[...new Set(groups.flatMap((group) => group.transactions.slice(0, 1).map((row) => row.merchantNorm)))].join(', ');
 
 /** 답한 뒤 카드 안에 남기는 결과. tally 는 다시 판정한 결과이고 못 읽었으면 null 이다 (C28) */
 interface Outcome {
@@ -198,12 +211,8 @@ export function Questions() {
       // 건너뛴 것은 종류가 다른 질문(skipped)과 같은 종류의 소명 대기(excluded)다 (3.11)
       const left = result.skippedCount + result.excludedCount;
       announce(
-        `질문 ${formatNumber(result.answeredCount)}건에 「${value}」${ro(value)} 답하고 거래 ${formatNumber(
-          result.rejudgedTransactionCount
-        )}건을 다시 판정했습니다.${
-        left > 0 ?
-        ` 나머지 질문 ${formatNumber(left)}건은 그대로 남았습니다.` :
-        ''}`
+        `질문 ${formatNumber(result.answeredCount)}개에 ${answeredAs(value)} 답했습니다.${
+        left > 0 ? ` 나머지 질문 ${formatNumber(left)}개는 그대로 남았습니다.` : ''}`
       );
       setSettling(true);
       reload();
@@ -260,11 +269,11 @@ export function Questions() {
   }).
   filter((target) => target.groups.length > 1 && target.options.length > 0) :
   [];
-  // 소명 대기(불가인데 질문이 남음)가 섞인 종류는 한 번에 답하지 않는다. 같은 「용도」로 묶여
+  // 소명 대기(불가인데 질문이 남음)가 섞인 종류는 한 번에 답하지 않는다. 같은 fact_type 으로 묶여
   // 「전부 업무미팅」 한 번에 주말 불가 추정이 모두 풀린다 (rule-card-fields.md).
   // 서버가 그룹마다 bulkAnswerable 로 알려 준다 (3.9)
+  // 빠진 종류는 카드에서 하나씩 답한다. 왜 빠졌는지는 적지 않는다
   const bulkTargets = bulkCandidates.filter((target) => target.groups.every((group) => group.bulkAnswerable));
-  const heldBack = bulkCandidates.filter((target) => target.groups.some((group) => !group.bulkAnswerable));
 
   /** 선택지 바로 아래 한 줄. 위가 아니라 아래에 붙여야 누른 자리 밑의 선택지가 움직이지 않는다 */
   const statusLine = (key: string) => {
@@ -283,10 +292,7 @@ export function Questions() {
         tabIndex={-1}
         className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-small text-ink2 outline-none">
 
-        <span>
-          {outcome.value}
-          {ro(outcome.value)} 답했습니다.
-        </span>
+        <span>{answeredAs(outcome.value)} 답했습니다.</span>
         {outcome.tally?.map(({ verdict, count, amount }) =>
         <span key={verdict.code} className="inline-flex items-center gap-1.5 whitespace-nowrap tabular-nums">
             <VerdictBadge verdict={verdict} />
@@ -536,7 +542,7 @@ export function Questions() {
                           columns={group.options.length >= 3 ? 3 : 2}
                           value={answerOf(group) ?? ''}
                           onChange={(value) => void answer(group, value, { index })}
-                          options={group.options.map((option) => ({ value: option, label: option }))} />
+                          options={choicesOf(group)} />
 
                         </fieldset>
                         {statusLine(key)}
@@ -567,70 +573,55 @@ export function Questions() {
 
         }
 
-        {(bulkTargets.length > 0 || heldBack.length > 0) &&
-        <section className="mt-6 rounded-2xl border border-line bg-surface p-5">
+        {bulkTargets.length > 0 &&
+        <section className="mt-8 rounded-2xl border border-line p-5">
             <h2 className="text-body font-bold text-ink">남은 질문 한 번에 답하기</h2>
-            <p className="mt-1 text-small text-muted">
-              같은 종류의 질문에 같은 답을 한 번에 보냅니다. 한 번에 답한 뒤에도 질문마다 다시
-              바꿀 수 있습니다.
-            </p>
-            {heldBack.length > 0 &&
-          <p className="mt-2 text-small text-ink2">
-                {heldBack.map((target) => `「${target.factType}」`).join('·')} 질문에는 주말·공휴일처럼 추정으로
-                제외한 거래가 섞여 있어, 한 번에 답하지 않습니다. 하나씩 답해 주세요.
-              </p>
-          }
-            <div className="mt-4 space-y-5">
-              {bulkTargets.map((target) =>
-            <div key={target.factType}>
-                  <p className="text-small font-bold text-ink">
-                    「{target.factType}」 질문 {formatNumber(target.groups.length)}개 ·{' '}
-                    {formatNumber(target.groups.reduce((sum, group) => sum + group.count, 0))}건
-                  </p>
-                  {target.options.length > 1 &&
-              <ChoiceGroup
-                className="mt-2"
-                name={`「${target.factType}」 질문 한 번에 답하기`}
-                columns={target.options.length >= 3 ? 3 : 2}
-                value={bulkChoice[target.factType] ?? ''}
-                onChange={(value) =>
-                setBulkChoice((prev) => ({ ...prev, [target.factType]: value }))
-                }
-                options={target.options.map((option) => ({ value: option, label: `전부 ${option}` }))} />
+            <div className="mt-4 space-y-6">
+              {bulkTargets.map((target) => {
+              const merchants = merchantsOf(target.groups);
+              // 함께 고를 수 있는 답이 하나뿐이면 고르는 단계 없이 그 답으로 보낸다
+              const only = target.options.length === 1 ? target.options[0] : null;
+              return (
+                <div key={target.factType}>
+                    <p className="text-small font-bold text-ink">{merchants}</p>
+                    {!only &&
+                  <ChoiceGroup
+                    className="mt-2"
+                    name={`${merchants} 한 번에 답하기`}
+                    columns={target.options.length >= 3 ? 3 : 2}
+                    value={bulkChoice[target.factType] ?? ''}
+                    onChange={(value) => setBulkChoice((prev) => ({ ...prev, [target.factType]: value }))}
+                    options={target.options.map((option) => ({ value: option, label: `전부 ${answerLabel(option)}` }))} />
 
-              }
-                  <div className="mt-3 flex justify-end">
-                    {/* 함께 고를 수 있는 답이 하나뿐이면 고르는 단계 없이 그 답으로 보낸다 */}
-                    <Button
-                  variant="secondary"
-                  size="sm"
-                  disabled={target.options.length > 1 && !bulkChoice[target.factType] || locked}
-                  onClick={() =>
-                  void answerAll(
-                    target.factType,
-                    target.options.length === 1 ? target.options[0] : bulkChoice[target.factType]
-                  )
-                  }>
+                  }
+                    <div className="mt-3 flex justify-end">
+                      <Button
+                      variant="secondary"
+                      size="sm"
+                      className="whitespace-nowrap"
+                      disabled={!only && !bulkChoice[target.factType] || locked}
+                      onClick={() => void answerAll(target.factType, only ?? bulkChoice[target.factType])}>
 
-                      {busy === `bulk|${target.factType}` ?
-                  '답하는 중…' :
-                  target.options.length === 1 ?
-                  `${formatNumber(target.groups.length)}개 전부 「${target.options[0]}」${ro(target.options[0])} 답하기` :
-                  `${formatNumber(target.groups.length)}개 한 번에 답하기`}
-                    </Button>
-                  </div>
-                  {error?.at === `bulk|${target.factType}` &&
-              <p
-                ref={statusRef(error.at)}
-                role="alert"
-                tabIndex={-1}
-                className="mt-2 text-right text-small text-deny outline-none">
+                        {busy === `bulk|${target.factType}` ?
+                      '답하는 중…' :
+                      only ?
+                      `${formatNumber(target.groups.length)}개 전부 ${answeredAs(only)} 답하기` :
+                      `${formatNumber(target.groups.length)}개 한 번에 답하기`}
+                      </Button>
+                    </div>
+                    {error?.at === `bulk|${target.factType}` &&
+                  <p
+                    ref={statusRef(error.at)}
+                    role="alert"
+                    tabIndex={-1}
+                    className="mt-2 text-right text-small text-deny outline-none">
 
-                      {error.message}
-                    </p>
-              }
-                </div>
-            )}
+                        {error.message}
+                      </p>
+                  }
+                  </div>);
+
+            })}
             </div>
           </section>
         }
@@ -665,7 +656,7 @@ export function Questions() {
                       <div className="min-w-0 flex-1">
                         <p className="text-small font-normal text-ink">{group.questionText}</p>
                         <p className="mt-0.5 text-caption tabular-nums text-muted">
-                          {value ? `「${value}」${ro(value)} 답함` : '답함'} ·{' '}
+                          {value ? `${answeredAs(value)} 답함` : '답함'} ·{' '}
                           {formatNumber(group.count)}건 · {formatWon(group.totalAmount)}
                         </p>
                       </div>
@@ -687,7 +678,7 @@ export function Questions() {
                       columns={group.options.length >= 3 ? 3 : 2}
                       value={value ?? ''}
                       onChange={(next) => void answer(group, next)}
-                      options={group.options.map((option) => ({ value: option, label: option }))} />
+                      options={choicesOf(group)} />
 
                       </fieldset>
                   }
