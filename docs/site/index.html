@@ -65,7 +65,10 @@
   .toc p { margin:0 0 10px; font-weight:700; color:var(--muted); font-size:12px; }
   .toc a { display:block; padding:5px 0 5px 12px; border-left:2px solid var(--line); color:var(--muted); text-decoration:none; cursor:pointer; }
   .toc a:hover { color:var(--blue); border-color:var(--blue); }
-  .toc a.on { color:var(--text); font-weight:700; border-color:var(--blue); background:linear-gradient(90deg,var(--blue-l),transparent); }
+  .toc a { transition:color .25s, background-color .25s; }
+  .toc a.on { color:var(--text); font-weight:700; background:linear-gradient(90deg,var(--blue-l),transparent); }
+  .toc-ind { position:absolute; left:0; top:0; width:2px; height:0; background:var(--blue); border-radius:2px; transition:transform .35s cubic-bezier(.3,.7,.2,1), height .35s; pointer-events:none; }
+  @media (prefers-reduced-motion:reduce) { .toc-ind, .toc a { transition:none; } }
   a.repo { text-decoration:none; white-space:nowrap; }
   a.repo:hover code { background:var(--blue); color:#fff; }
   .rel { margin-top:56px; padding:22px; background:var(--blue-l); border-radius:18px; display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px; }
@@ -574,11 +577,11 @@ function doc(i) {
     </article><aside class="toc" id="toc"></aside></div>`;
   const hs = [...view.querySelectorAll('article h2')];
   const toc = document.getElementById('toc');
-  if (hs.length) toc.innerHTML = '<p>이 페이지에서</p>';
+  if (hs.length) toc.innerHTML = '<p>이 페이지에서</p><span class="toc-ind"></span>';
   spy = hs.map(h => {   // 해시는 페이지 이동에 쓰므로 목차는 스크롤만
     const a = document.createElement('a');
     a.textContent = h.textContent;
-    a.onclick = () => h.scrollIntoView();
+    a.onclick = () => h.scrollIntoView({ behavior: 'smooth' });
     toc.append(a);
     return [h, a];
   });
@@ -592,6 +595,8 @@ function updateSpy() {
   spy.forEach(([h], i) => { if (h.getBoundingClientRect().top <= 120) k = i; });
   if (innerHeight + scrollY >= document.documentElement.scrollHeight - 2) k = spy.length - 1;
   spy.forEach(([, a], i) => a.classList.toggle('on', i === k));
+  const a = spy[k][1], ind = document.querySelector('.toc-ind');   // 파란 선을 현재 항목으로 미끄러뜨림
+  if (ind) { ind.style.transform = `translateY(${a.offsetTop}px)`; ind.style.height = a.offsetHeight + 'px'; }
 }
 addEventListener('scroll', updateSpy, { passive: true });
 
