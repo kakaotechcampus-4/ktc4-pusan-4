@@ -79,10 +79,16 @@ if [[ -z $single && $active == green ]]; then next=blue old=green; else next=gre
 "${compose[@]}" exec -T postgres \
     psql -1 -v ON_ERROR_STOP=1 -U "$DB_USERNAME" -d "$DB_NAME" < "$repo/db/rag.sql"
 
+previous=$(cat "$upstream" 2>/dev/null || true)
 printf 'reverse_proxy backend-%s:8080\n' "$next" > "$upstream"
-# Recreates Caddy only when its own definition changed (a version bump); otherwise a no-op.
-"${compose[@]}" up -d --no-deps web
-"${compose[@]}" exec -T web caddy reload --config /etc/caddy/Caddyfile
+# `up` recreates Caddy only when its own definition changed (a version bump); otherwise a no-op.
+# If Caddy rejects the change it keeps sending to the old colour, so put the file back to match.
+# Otherwise the next deploy would take the new colour as active and recreate the serving one.
+if ! { "${compose[@]}" up -d --no-deps web &&
+    "${compose[@]}" exec -T web caddy reload --config /etc/caddy/Caddyfile; }; then
+    if [[ -n $previous ]]; then printf '%s\n' "$previous" > "$upstream"; else rm -f "$upstream"; fi
+    exit 1
+fi
 "${compose[@]}" run --rm --no-deps web-files
 
 # Traffic has moved, so the old pair finishes its requests and judgment runs (stop_grace_period)

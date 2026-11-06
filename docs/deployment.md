@@ -127,6 +127,8 @@ sudo aws ecr get-login-password --region ap-northeast-2 >/dev/null
 
 첫 `release` push 전, EC2 인스턴스 역할로 ECR 로그인과 백업 버킷 업로드가 되는지 확인한다. 서버의 ECR URI와 GitHub 변수의 값은 같아야 한다. EIP와 DNS가 연결되고 80·443 인바운드가 열려 있어야 Caddy가 인증서를 발급할 수 있다.
 
+서버를 처음 띄우는 것도 첫 `release` 배포(`deploy.sh`)가 한다. `docker compose up`을 직접 쓰지 않는다. Caddyfile이 import하는 `deploy/caddy/upstream.caddy`는 `deploy.sh`가 쓰는 서버 파일이라 그 전에는 없어서 Caddy가 뜨지 않고, backend·ai는 색별 profile에 묶여 있어 같이 뜨지 않는다.
+
 ## 4. 배포와 확인
 
 `release` push가 발생하면 `.github/workflows/aws-release.yml`이 백엔드·AI·프런트 검증을 실행하고, GitHub 러너에서 이미지를 빌드해 ECR에 올린다. SSM이 EC2의 `deploy/deploy.sh`에 커밋 SHA를 전달한다. 스크립트는 원격 `release`의 현재 SHA와 일치하는지 확인하고, 쉬는 색의 backend·ai를 새 이미지로 띄워 Flyway가 끝나면 `db/schema.sql`과 `db/rag.sql`을 적용한 뒤, Caddy를 새 색으로 돌리고 화면 파일을 반영하고 옛 쌍을 멈춘다(아래 「블루그린 전환」). DB 초기화 단계에서는 확장만 설치한다. `postgres-data`와 Caddy 인증서 볼륨은 재배포해도 유지된다.
@@ -149,7 +151,6 @@ PostgreSQL·Redis와 `upstream.caddy`의 색인 backend·ai가 healthy이고 웹
 
 SSM이 띄우는 `deploy.sh`는 직전 배포의 파일이다. 스크립트가 새 커밋을 checkout해도 bash는 이미 연 옛 파일을 끝까지 실행한다. 그래서 `deploy.sh`는 checkout까지만 하고, 대상 커밋의 `deploy.sh`를 다시 실행해 나머지를 맡긴다(배포 잠금은 이어받는다). `deploy.sh`를 고친 커밋도 자기 배포부터 새 스크립트로 돈다.
 
-- 예외는 이 재실행이 들어간 커밋을 처음 배포할 때다. 그때는 재실행이 없는 옛 스크립트가 끝까지 돈다. 그래서 화면 파일 반영(`web-files`)은 스크립트가 아니라 Compose 정의에 두었다.
 - `--rollback`으로 재실행이 없는 옛 커밋으로 돌아가면 그 커밋의 스크립트가 잠금을 다시 잡고 처음부터 돈다.
 
 ### 블루그린 전환
@@ -157,7 +158,7 @@ SSM이 띄우는 `deploy.sh`는 직전 배포의 파일이다. 스크립트가 �
 백엔드와 AI는 `blue`·`green` 두 쌍이다(`deploy/compose.yaml`). 같은 색끼리만 서로 부른다(`ASSISTANT_SERVER_URL`·`CLASSIFY_SERVER_URL`·`BACKEND_BASE_URL`). 전환하는 동안에도 옛 버전과 새 버전이 서로 부르지 않는다.
 
 - 받는 색은 `deploy/caddy/upstream.caddy` 한 줄(`reverse_proxy backend-blue:8080`)이다. `deploy.sh`가 쓰고 Caddyfile이 import한다. git에 없는 서버 파일이다(`.gitignore`).
-- 배포는 쉬는 색만 새 이미지로 띄운다. 새 backend가 부팅하며 Flyway를 돌리는 동안 옛 색이 계속 받는다. 새 쌍이 healthy가 되면 `upstream.caddy`를 바꾸고 `caddy reload`로 `/api/v1`을 넘긴다. reload는 연결을 끊지 않는다.
+- 배포는 쉬는 색만 새 이미지로 띄운다. 새 backend가 부팅하며 Flyway를 돌리는 동안 옛 색이 계속 받는다. 새 쌍이 healthy가 되면 `upstream.caddy`를 바꾸고 `caddy reload`로 `/api/v1`을 넘긴다. reload는 연결을 끊지 않는다. reload가 실패하면 `upstream.caddy`를 원래대로 되돌리고 배포가 실패한다. Caddy는 옛 색으로 계속 보내므로, 파일을 그대로 두면 다음 배포가 지금 받는 색을 쉬는 색으로 알고 다시 만들어 API가 끊긴다.
 - 넘긴 뒤 옛 쌍을 `stop`한다. 옛 백엔드는 새 요청을 받지 않고, 돌던 판정 run과 대기열의 run을 최대 60초(`app.judgment-run.await-termination`)까지 마저 처리한다. 트래픽이 이미 넘어가 사용자에게는 보이지 않는다. `stop_grace_period`는 백엔드 100초, AI 40초(비서 한 턴 상한 30초보다 길게)다. 60초 안에 못 끝낸 run은 새 백엔드의 멈춘 run 정리가 5분 뒤 `RUN_INTERRUPTED`로 끝내고, 사용자가 다시 실행한다.
 - 멈춘 쌍은 지우지 않는다. 다음 배포가 그 색을 새 이미지로 다시 만든다. 넘기기 전에 실패한 배포가 남긴 컨테이너도 다음 배포의 `stop`이 정리한다.
 - 두 쌍이 같이 뜨는 동안 메모리를 더 쓴다. 2026-11-05 운영 실측으로 backend 약 600MB, ai 약 100MB이고, 그때 서버 여유는 약 2.2GB였다.
