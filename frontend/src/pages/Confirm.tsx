@@ -116,7 +116,7 @@ export function Confirm() {
           <>
               <InfoRows
               rows={[
-              { term: '카드내역', value: uploadName(loaded.batch) },
+              { term: '파일', value: uploadName(loaded.batch) },
               { term: '기간', value: formatPeriod(loaded.batch.periodStart, loaded.batch.periodEnd) },
               { term: '판정할 거래', value: `${formatNumber(loaded.judgeable)}건` }]
               } />
