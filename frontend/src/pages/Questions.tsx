@@ -3,10 +3,13 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowRightIcon, CheckIcon, LayersIcon, SearchXIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { StepEyebrow } from '../components/StepEyebrow';
+import { VerdictBadge } from '../components/VerdictBadge';
 import { Badge, Button, ChoiceGroup, Empty, Pagination } from '../components/ui';
 import { useSession } from '../contexts/SessionContext';
 import { api, ApiRequestError, useApi } from '../api';
 import { previousAnswer } from '../components/assistant/logic';
+import { respondOnce, UNCONFIRMED_CODE, verdictsAfter, withHeld } from '../components/questions/logic';
+import type { VerdictTally } from '../components/questions/logic';
 import type { AnswerSource, QuestionGroup } from '../types/domain';
 import { formatDate, formatNumber, formatWon, ro } from '../utils/format';
 
@@ -16,6 +19,13 @@ const BATCH_SIZE = 15;
 const BULK_THRESHOLD = 5;
 /** 카드마다 보여주는 거래 수. 넘으면 「외 N건」 */
 const SHOWN_TRANSACTIONS = 3;
+/**
+ * 한 번에 답한 뒤 목록을 다 받고 나서도 선택지를 막아 두는 시간. 답한 카드가 빠지는 움직임(0.18초)보다
+ * 넉넉히 둔다. 그 사이 같은 자리를 또 누르면 올라온 다음 카드의 답이 된다 (C68)
+ */
+const SETTLE_MS = 600;
+/** 카드나 일괄 답변 칸이 아니라 화면 위쪽에 띄우는 오류(지난번 답 적용)의 자리 */
+const TOP = 'top';
 
 const errorMessage = (caught: unknown, fallback: string) =>
 caught instanceof ApiRequestError ? caught.message : fallback;
@@ -29,6 +39,12 @@ const groupId = (group: QuestionGroup) => `${group.groupKey}|${group.factType}`;
 const commonOptions = (groups: QuestionGroup[]) =>
 groups[0].options.filter((option) => groups.every((group) => group.options.includes(option)));
 
+/** 답한 뒤 카드 안에 남기는 결과. tally 는 다시 판정한 결과이고 못 읽었으면 null 이다 (C28) */
+interface Outcome {
+  value: string;
+  tally: VerdictTally[] | null;
+}
+
 /**
  * 3.9~3.11 룰엔진 확인 질문.
  * 질문을 자르지 않고 묶어서 나눠 보여준다(F1-a). 미해소 건수·금액은 항상 보이고(F1-b),
@@ -37,8 +53,15 @@ groups[0].options.filter((option) => groups.every((group) => group.options.inclu
 export function Questions() {
   const { batchId } = useSession();
   const [busy, setBusy] = useState<string | null>(null);
+  /** 한 번에 답한 뒤 목록이 다시 그려지는 동안 선택지를 막는다 (C68) */
+  const [settling, setSettling] = useState(false);
+  /** 지난번 답 적용, 한 번에 답하기의 결과 */
   const [notice, setNotice] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  /** at 은 실패한 자리다. 카드면 groupId, 한 번에 답하기면 bulk|factType, 그 밖에는 TOP */
+  const [error, setError] = useState<{at: string;message: string;} | null>(null);
+  const [outcomes, setOutcomes] = useState<Record<string, Outcome>>({});
+  /** 이 페이지에서 답한 카드. 목록을 다시 읽어도 원래 자리에 남긴다 (C68) */
+  const [held, setHeld] = useState<{index: number;item: QuestionGroup;}[]>([]);
   const [editing, setEditing] = useState<string | null>(null);
   const [bulkChoice, setBulkChoice] = useState<Record<string, string>>({});
   /** 「지난번 답 한 번에 적용」에서 뺀 그룹 */
@@ -67,69 +90,107 @@ export function Questions() {
     [batchId]
   );
   const errorRef = useRef<HTMLParagraphElement>(null);
+  /** 카드와 한 번에 답하기 칸의 결과·오류 문구. 키는 error.at 과 같다 */
+  const statusRefs = useRef(new Map<string, HTMLElement>());
   /** 지금 보이는 페이지. 다음 페이지를 받는 동안에는 이전 페이지 번호로 센다 */
   const shownPage = pendingQ.data?.page.number ?? 0;
-
-  // 마지막 질문에 답해 그 페이지가 비면 첫 페이지로 돌아간다
-  useEffect(() => {
-    if (page > 0 && pendingQ.data && pendingQ.data.items.length === 0) setPage(0);
-  }, [page, pendingQ.data]);
 
   const pending = pendingQ.data?.items ?? [];
   const pendingTotal = pendingQ.data?.page.totalElements ?? 0;
   const answered = answeredQ.data?.items ?? [];
   const answeredTotal = answeredQ.data?.page.totalElements ?? 0;
   const unresolved = pendingQ.data?.unresolved;
+  const heldKeys = new Set(held.map(({ item }) => groupId(item)));
+  /** 아직 답하지 않은 카드. 서버가 다시 주기 전에도 방금 답한 카드는 뺀다 */
+  const unanswered = pending.filter((group) => !heldKeys.has(groupId(group)));
+  const shown = withHeld(unanswered, held);
+  /** 제자리에 남긴 카드는 답한 질문 목록에 또 그리지 않는다 */
+  const answeredRows = answered.filter((group) => !heldKeys.has(groupId(group)));
+
+  // 마지막 질문에 답해 그 페이지가 비면 첫 페이지로 돌아간다
+  useEffect(() => {
+    if (page > 0 && pendingQ.data && shown.length === 0) setPage(0);
+  }, [page, pendingQ.data, shown.length]);
+
+  // 다른 업로드로 바꾸면 남겨 둔 카드도 버린다
+  useEffect(() => {
+    setHeld([]);
+  }, [batchId]);
+
+  useEffect(() => {
+    if (!settling || pendingQ.loading) return;
+    const timer = window.setTimeout(() => setSettling(false), SETTLE_MS);
+    return () => window.clearTimeout(timer);
+  }, [settling, pendingQ.loading]);
+
+  const locked = busy !== null || settling;
 
   const reload = () => {
     pendingQ.reload();
     answeredQ.reload();
   };
 
-  // 답한 카드가 목록에서 빠지면 초점이 사라진다. 결과 문구로 초점을 옮겨 읽어 준다
+  const statusRef = (at: string) => (element: HTMLElement | null) => {
+    if (element) statusRefs.current.set(at, element);else
+    statusRefs.current.delete(at);
+  };
+
+  /** 저장하는 동안 선택지가 막혀 초점이 사라진다. 결과나 오류 문구로 옮겨 읽어 준다 */
+  const focusLater = (at: string) =>
+  window.setTimeout(() => (at === TOP ? errorRef.current : statusRefs.current.get(at))?.focus(), 0);
+
   const announce = (message: string) => {
     setNotice(message);
     window.setTimeout(() => noticeRef.current?.focus(), 0);
   };
 
-  // 실패해도 눌렀던 선택지가 막혀 초점이 사라진다. 오류 문구로 옮겨 읽어 준다
-  const fail = (message: string) => {
-    setError(message);
-    window.setTimeout(() => errorRef.current?.focus(), 0);
+  const fail = (at: string, message: string) => {
+    setError({ at, message });
+    focusLater(at);
   };
 
-  const answer = async (group: QuestionGroup, value: string, source?: AnswerSource) => {
-    if (busy) return;
+  /** 지금 고른 답. 방금 답한 것은 목록을 다시 받기 전에도 반영한다 */
+  const answerOf = (group: QuestionGroup) => outcomes[groupId(group)]?.value ?? group.answer?.value;
+
+  /** index 는 남은 질문 목록에서의 자리다. 답한 뒤 그 자리에 카드를 남긴다 */
+  const answer = async (group: QuestionGroup, value: string, { source, index }: {source?: AnswerSource;index?: number;} = {}) => {
     const key = groupId(group);
+    // 이미 고른 답을 다시 누르면 보내지 않는다. 같은 판정 이력만 늘어난다
+    if (locked || answerOf(group) === value) return;
     setBusy(key);
     setError(null);
     setNotice(null);
     try {
-      const result = await api.questions.respond({
-        questionIds: group.questionIds,
-        answer: { value },
-        source
-      });
-      setEditing(null);
-      announce(
-        `「${value}」${ro(value)} 답했습니다. 거래 ${formatNumber(result.rejudgedTransactionCount)}건을 다시 판정했고, 이전 판정은 이력에 남습니다.`
-      );
-      reload();
+      await respondOnce(api, group, value, source);
     } catch (caught) {
-      if (caught instanceof ApiRequestError && caught.code === 'QUESTIONS_FROM_DIFFERENT_BATCHES') {
-        fail(MIXED_BATCHES);
-        reload();
-        return;
-      }
-      fail(errorMessage(caught, '답을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.'));
-    } finally {
       setBusy(null);
+      const code = caught instanceof ApiRequestError ? caught.code : null;
+      if (code === 'QUESTIONS_FROM_DIFFERENT_BATCHES' || code === UNCONFIRMED_CODE) reload();
+      fail(
+        key,
+        code === 'QUESTIONS_FROM_DIFFERENT_BATCHES' ?
+        MIXED_BATCHES :
+        errorMessage(caught, '답을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.')
+      );
+      return;
     }
+    const tally = await verdictsAfter(api, group);
+    setOutcomes((prev) => ({ ...prev, [key]: { value, tally } }));
+    if (index !== undefined)
+    setHeld((prev) =>
+    prev.some(({ item }) => groupId(item) === key) ?
+    prev :
+    [...prev, { index, item: group }].sort((a, b) => a.index - b.index)
+    );
+    setBusy(null);
+    reload();
+    focusLater(key);
   };
 
   const answerAll = async (factType: string, value: string | undefined) => {
-    if (!batchId || !value || busy) return;
-    setBusy(`bulk|${factType}`);
+    if (!batchId || !value || locked) return;
+    const at = `bulk|${factType}`;
+    setBusy(at);
     setError(null);
     setNotice(null);
     try {
@@ -144,9 +205,10 @@ export function Questions() {
         ` 나머지 질문 ${formatNumber(left)}건은 그대로 남았습니다.` :
         ''}`
       );
+      setSettling(true);
       reload();
     } catch (caught) {
-      fail(errorMessage(caught, '한 번에 답하지 못했습니다. 잠시 후 다시 시도해 주세요.'));
+      fail(at, errorMessage(caught, '한 번에 답하지 못했습니다. 잠시 후 다시 시도해 주세요.'));
     } finally {
       setBusy(null);
     }
@@ -158,7 +220,7 @@ export function Questions() {
     suggestionsQ.data?.items.find((item) => item.groupKey === group.groupKey && item.factType === group.factType)
   );
   /** 이 페이지에서 지난번 답으로 바로 채울 수 있는 그룹 (A 이어받기) */
-  const carryOver = pending.flatMap((group) => {
+  const carryOver = unanswered.flatMap((group) => {
     const previous = previousOf(group);
     return previous?.kind === 'apply' ? [{ group, value: previous.value, text: previous.text }] : [];
   });
@@ -166,7 +228,7 @@ export function Questions() {
 
   // 확인 목록에서 고른 것만 기존 응답 API 로 하나씩 보낸다. 한 번에 닫는 API 가 따로 없다 (3.1)
   const applyCarryOver = async () => {
-    if (busy || carryChosen.length === 0) return;
+    if (locked || carryChosen.length === 0) return;
     setBusy('carry');
     setError(null);
     setNotice(null);
@@ -181,17 +243,19 @@ export function Questions() {
     }
     setBusy(null);
     const missed = carryChosen.length - saved;
-    if (missed > 0) fail(`지난번 답 ${formatNumber(missed)}개는 저장하지 못했습니다. 그 질문은 그대로 남아 있습니다.`);
+    if (missed > 0) fail(TOP, `지난번 답 ${formatNumber(missed)}개는 저장하지 못했습니다. 그 질문은 그대로 남아 있습니다.`);
     if (saved > 0) announce(`지난번 답으로 질문 ${formatNumber(saved)}개에 답했습니다. 질문마다 다시 바꿀 수 있습니다.`);
+    // 이 칸이 사라지면 아래 카드가 포인터 밑으로 올라온다
+    setSettling(true);
     reload();
   };
 
   // 남은 질문이 적을 때만 factType 별로 묶어 일괄 답변을 연다
   const bulkCandidates =
   pendingTotal > 0 && pendingTotal <= BULK_THRESHOLD ?
-  [...new Set(pending.map((group) => group.factType))].
+  [...new Set(unanswered.map((group) => group.factType))].
   map((factType) => {
-    const groups = pending.filter((group) => group.factType === factType);
+    const groups = unanswered.filter((group) => group.factType === factType);
     return { factType, groups, options: commonOptions(groups) };
   }).
   filter((target) => target.groups.length > 1 && target.options.length > 0) :
@@ -201,6 +265,38 @@ export function Questions() {
   // 서버가 그룹마다 bulkAnswerable 로 알려 준다 (3.9)
   const bulkTargets = bulkCandidates.filter((target) => target.groups.every((group) => group.bulkAnswerable));
   const heldBack = bulkCandidates.filter((target) => target.groups.some((group) => !group.bulkAnswerable));
+
+  /** 선택지 바로 아래 한 줄. 위가 아니라 아래에 붙여야 누른 자리 밑의 선택지가 움직이지 않는다 */
+  const statusLine = (key: string) => {
+    if (busy === key) return <p className="mt-3 text-small text-ink2">저장하는 중…</p>;
+    if (error?.at === key)
+    return (
+      <p ref={statusRef(key)} role="alert" tabIndex={-1} className="mt-3 text-small text-deny outline-none">
+          {error.message}
+        </p>);
+
+    const outcome = outcomes[key];
+    if (!outcome) return null;
+    return (
+      <p
+        ref={statusRef(key)}
+        tabIndex={-1}
+        className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-small text-ink2 outline-none">
+
+        <span>
+          {outcome.value}
+          {ro(outcome.value)} 답했습니다.
+        </span>
+        {outcome.tally?.map(({ verdict, count, amount }) =>
+        <span key={verdict.code} className="inline-flex items-center gap-1.5 whitespace-nowrap tabular-nums">
+            <VerdictBadge verdict={verdict} />
+            {count > 1 && <span>{formatNumber(count)}건</span>}
+            <span className="font-bold text-ink">{formatWon(amount)}</span>
+          </span>
+        )}
+      </p>);
+
+  };
 
   const header =
   <header className="flex flex-wrap items-end justify-between gap-4">
@@ -292,14 +388,14 @@ export function Questions() {
 
           {notice}
         </p>
-        {error &&
+        {error?.at === TOP &&
         <p
           ref={errorRef}
           role="alert"
           tabIndex={-1}
           className="mt-3 rounded-xl border border-deny-line bg-deny-bg px-4 py-3 text-body text-deny outline-none">
 
-            {error}
+            {error.message}
           </p>
         }
 
@@ -320,7 +416,7 @@ export function Questions() {
                       type="checkbox"
                       className="mt-1"
                       checked={!skipped[key]}
-                      disabled={busy !== null}
+                      disabled={locked}
                       onChange={(event) => setSkipped((prev) => ({ ...prev, [key]: !event.target.checked }))} />
 
                       <span>
@@ -338,7 +434,7 @@ export function Questions() {
               <Button
               variant="secondary"
               size="sm"
-              disabled={busy !== null || carryChosen.length === 0}
+              disabled={locked || carryChosen.length === 0}
               onClick={() => void applyCarryOver()}>
 
                 {busy === 'carry' ? '적용하는 중…' : `${formatNumber(carryChosen.length)}개 적용`}
@@ -348,7 +444,7 @@ export function Questions() {
         }
 
         {/* 뒤 페이지가 비면 첫 페이지로 돌아가므로, 그 사이에 「다 답했다」를 띄우지 않는다 */}
-        {!pendingQ.loading && pending.length === 0 && shownPage === 0 ?
+        {!pendingQ.loading && shown.length === 0 && shownPage === 0 ?
         <Empty
           className="mt-4"
           tone="ok"
@@ -365,7 +461,7 @@ export function Questions() {
 
         <ol className="mt-4 space-y-3">
             <AnimatePresence initial={false}>
-              {pending.map((group, index) => {
+              {shown.map((group, index) => {
               const key = groupId(group);
               const rows = group.transactions;
               const previous = previousOf(group);
@@ -418,7 +514,8 @@ export function Questions() {
 
                       <div className="px-5 py-4">
                         {/* 저장하는 동안은 다른 카드의 선택지도 막는다. 눌러도 아무 일 없는 버튼을 두지 않는다 */}
-                        <fieldset disabled={busy !== null} className={busy !== null ? 'opacity-60' : ''}>
+                        {/* 답한 뒤에도 카드는 그대로 둔다. 지난번 답 줄도 남겨야 그 아래 선택지가 올라오지 않는다 */}
+                        <fieldset disabled={locked} className={locked ? 'opacity-60' : ''}>
                           {/* 지난번 답은 사실 그대로 적고, 이어받기(A)만 그 값으로 답할 수 있다. 이력(B)은 미리 고르지 않는다 */}
                           {previous &&
                         <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-small text-ink2">
@@ -427,7 +524,7 @@ export function Questions() {
                           <Button
                             size="sm"
                             variant="soft"
-                            onClick={() => void answer(group, previous.value, 'PREVIOUS_ANSWER')}>
+                            onClick={() => void answer(group, previous.value, { source: 'PREVIOUS_ANSWER', index })}>
 
                                   이 답으로
                                 </Button>
@@ -437,16 +534,12 @@ export function Questions() {
                           <ChoiceGroup
                           name={group.questionText}
                           columns={group.options.length >= 3 ? 3 : 2}
-                          value={group.answer?.value ?? ''}
-                          onChange={(value) => void answer(group, value)}
+                          value={answerOf(group) ?? ''}
+                          onChange={(value) => void answer(group, value, { index })}
                           options={group.options.map((option) => ({ value: option, label: option }))} />
 
                         </fieldset>
-                        <p className="mt-3 text-caption text-muted">
-                          {busy === key ?
-                        '저장하고 다시 판정하는 중…' :
-                        `고르면 묶인 ${formatNumber(group.count)}건에 함께 적용하고 바로 다시 판정합니다.`}
-                        </p>
+                        {statusLine(key)}
                       </div>
                     </section>
                   </motion.li>);
@@ -456,13 +549,21 @@ export function Questions() {
           </ol>
         }
 
-        {pendingQ.data && pendingQ.data.page.totalPages > 1 &&
+        {/* 뒤 페이지를 다 답하면 서버는 페이지가 하나라고 하지만, 답한 카드가 남아 있어 앞으로 돌아갈 길이 필요하다 */}
+        {pendingQ.data && (pendingQ.data.page.totalPages > 1 || shownPage > 0) &&
         <Pagination
-          page={pendingQ.data.page}
-          onChange={setPage}
-          note={`남은 질문 ${formatNumber(pendingTotal)}개 중 ${formatNumber(
+          page={{ ...pendingQ.data.page, totalPages: Math.max(pendingQ.data.page.totalPages, shownPage + 1) }}
+          onChange={(next) => {
+            setHeld([]);
+            setPage(next);
+          }}
+          note={
+          pending.length > 0 ?
+          `남은 질문 ${formatNumber(pendingTotal)}개 중 ${formatNumber(
             shownPage * BATCH_SIZE + 1
-          )}–${formatNumber(shownPage * BATCH_SIZE + pending.length)}번째`} />
+          )}–${formatNumber(shownPage * BATCH_SIZE + pending.length)}번째` :
+          `남은 질문 ${formatNumber(pendingTotal)}개`
+          } />
 
         }
 
@@ -503,9 +604,7 @@ export function Questions() {
                     <Button
                   variant="secondary"
                   size="sm"
-                  disabled={
-                  target.options.length > 1 && !bulkChoice[target.factType] || busy !== null
-                  }
+                  disabled={target.options.length > 1 && !bulkChoice[target.factType] || locked}
                   onClick={() =>
                   void answerAll(
                     target.factType,
@@ -520,6 +619,16 @@ export function Questions() {
                   `${formatNumber(target.groups.length)}개 한 번에 답하기`}
                     </Button>
                   </div>
+                  {error?.at === `bulk|${target.factType}` &&
+              <p
+                ref={statusRef(error.at)}
+                role="alert"
+                tabIndex={-1}
+                className="mt-2 text-right text-small text-deny outline-none">
+
+                      {error.message}
+                    </p>
+              }
                 </div>
             )}
             </div>
@@ -535,7 +644,7 @@ export function Questions() {
           </p>
         }
 
-        {!answeredQ.error && answered.length > 0 &&
+        {!answeredQ.error && answeredRows.length > 0 &&
         <section className="mt-6">
             <h2 className="text-body font-bold text-ink">
               답한 질문 <span className="tabular-nums text-muted">{formatNumber(answeredTotal)}개</span>
@@ -546,10 +655,10 @@ export function Questions() {
             }
             </h2>
             <ul className="mt-3 divide-y divide-line2 overflow-hidden rounded-2xl border border-line bg-surface">
-              {answered.map((group) => {
+              {answeredRows.map((group) => {
               const key = groupId(group);
               const open = editing === key;
-              const value = group.answer?.value;
+              const value = answerOf(group);
               return (
                 <li key={key} className="px-5 py-3.5">
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -564,29 +673,25 @@ export function Questions() {
                       variant="ghost"
                       size="sm"
                       aria-expanded={open}
-                      disabled={busy !== null}
+                      disabled={locked}
                       onClick={() => setEditing(open ? null : key)}>
 
                         {open ? '닫기' : '답 바꾸기'}
                       </Button>
                     </div>
+                    {/* 답을 바꿔도 펼친 채 둔다. 접히면 아래 줄이 포인터 밑으로 올라온다 */}
                     {open &&
-                  <fieldset
-                    disabled={busy !== null}
-                    className={busy !== null ? 'mt-3 opacity-60' : 'mt-3'}>
-
+                  <fieldset disabled={locked} className={locked ? 'mt-3 opacity-60' : 'mt-3'}>
                         <ChoiceGroup
                       name={`${group.questionText} 답 바꾸기`}
                       columns={group.options.length >= 3 ? 3 : 2}
                       value={value ?? ''}
-                      // 이미 고른 답을 다시 누르면 정정하지 않는다. 같은 판정 이력만 늘어난다
-                      onChange={(next) => {
-                        if (next !== value) void answer(group, next);
-                      }}
+                      onChange={(next) => void answer(group, next)}
                       options={group.options.map((option) => ({ value: option, label: option }))} />
 
                       </fieldset>
                   }
+                    {statusLine(key)}
                   </li>);
 
             })}
