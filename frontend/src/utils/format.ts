@@ -9,9 +9,14 @@ export const formatDate = (iso: string): string => {
   return `${Number(month)}월 ${Number(day)}일`;
 };
 
-export const formatFullDate = (iso: string): string => {
-  const [year, month, day] = iso.split('-');
-  return `${year}. ${month}. ${day}`;
+/**
+ * 화면의 날짜는 모두 이 꼴이다 (C86). `YYYY-MM-DD` 도, offset 이 붙은 시각(1.2)도 받는다 — 시각은 KST 날짜로 읽는다.
+ * 날짜로 읽히지 않는 값(파일에서 못 읽은 승인일 등)은 그대로 돌려준다
+ */
+export const formatFullDate = (value: string): string => {
+  const date = /^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:?\d{2})$/i.test(value) ? toKst(value).date : value;
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(date);
+  return match ? `${match[1]}. ${match[2]}. ${match[3]}` : value;
 };
 
 export const formatPeriod = (start: string, end: string): string =>
