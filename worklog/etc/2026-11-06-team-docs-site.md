@@ -100,3 +100,12 @@ PM 요청으로 문서 사이트를 배포된 앱(ktc4-pusan-4.duckdns.org)과 �
 - 개발 가이드: API(`docs/api.md` 리소스 구조 · 공통 규칙 · 엔드포인트 43개), DB 스키마(`db/README.md` 소유·적용 순서, Flyway 마이그레이션의 테이블 24개), 프론트엔드(`frontend/README.md`, `DESIGN.md`), 코딩 컨벤션(PMD 규칙, ESLint 설정, ruff, CONTEXT 16절 중 코드 쪽 10개), 테스트(`backend/README.md`, `eval/README.md`), 배포(`docs/deployment.md` 요약).
 - 기술 스택 페이지에 선정 근거(CONTEXT 12절 프레임워크 판단)를 더했다.
 - 저장소에 없어 넣지 않은 것: Maintainers(파트 리더), 노션 프로젝트 페이지 주소, 주말 리뷰 규칙. PM 에게 확인 요청했다.
+
+## 10:49 Maintainers · 노션 링크 · 주말 리뷰 · 회의 규칙 (ad8d4fb)
+
+PM 이 준 정보로 채웠다.
+
+- 팀 리소스에 Maintainers 를 넣었다: 정현빈 PM, 최유렬 BE 리드, 홍성진 BE · 플래너, 강민규 AI 리드, 이치오 FE 리드, 이재성 FE · 메이커.
+  이름과 GitHub 아이디는 프로필 이름(Hyunbin Jung, Chioh Lee, 재성)과 커밋 작성자 이름(Seongjin)으로 맞췄다. yuyeol3 · RainDrop3 는 프로필 이름이 없어 아이디와 `CONTEXT.md` 의 "AI 리드 Kang" 으로 맞췄다.
+- 노션 프로젝트 페이지 링크를 팀 리소스와 그라운드 룰(작업 관리 · 회의록)에 넣었다.
+- 그라운드 룰: 주말 PR 은 하루 안에 보고 답하기, 협업이 필요하면 카톡방에서 일정을 정해 수시 회의, 회의록은 노션에.
