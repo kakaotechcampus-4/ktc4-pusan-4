@@ -98,7 +98,7 @@ describe('parseCardBytes — KB 샘플', () => {
       ['ZERO_AMOUNT', '30000006'],
       ['BLANK_MERCHANT', '30000007']
     ]);
-    expect(outcome.rows).toHaveLength(outcome.request!.transactions.length + outcome.unsendable.length);
+    expect(outcome.rows).toHaveLength((outcome.request?.transactions.length ?? 0) + outcome.unsendable.length);
 
     expect(outcome.request).not.toBeNull();
     if (!outcome.request) return;
