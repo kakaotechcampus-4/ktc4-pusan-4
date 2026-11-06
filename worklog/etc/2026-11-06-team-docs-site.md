@@ -81,3 +81,13 @@ PM 이 준 캐릭터 이미지는 체크무늬 배경이 그림에 찍혀 있어
 - 누끼: 가장자리 4px 에서 섞인 체크무늬 색을 빼고 투명도를 단계적으로 계산했다. 체크무늬 두 톤이 번갈아 있어 배경색을 주변 평균으로 잡아 귀 가장자리 얼룩을 줄였다.
 - 색 확인: 사이트의 파랑·핑크는 #2F5BFF · #FF5B8F 그대로다(브라우저 계산값 확인). 작업 현황 막대 끝의 보조색 그라데이션(#6C8BFF · #FF8DB0)만 달라 보여서 메인 색 단색으로 바꿨다.
 - 캐릭터 몸 색(연분홍)은 캐릭터 그림 자체의 색이라 Really Pink 와 다르다.
+
+## 10:02 색·로고를 실제 앱에 맞춤 (685e372)
+
+PM 요청으로 문서 사이트를 배포된 앱(ktc4-pusan-4.duckdns.org)과 같은 모양으로 맞췄다. 기준은 `frontend/tailwind.config.js`, `frontend/DESIGN.md`, `frontend/src/assets/brand/`.
+
+- 색: accent #2C6AE8 · accent-hover #1C5FD4 · highlight #FF5C9A · accent-soft #E4EDFB · surface #F2F4F6 · line #E5E8EB · ink #191F28 · ink2 #4E5968 · muted #6B7684.
+  전에는 시안 이미지의 #2F5BFF·#FF5B8F 를 썼는데, 앱 화면은 #2C6AE8 을 쓰고 #2F5BFF 는 로고에만 쓴다. 핑크도 앱은 #FF5C9A 다.
+- 로고: 직접 만든 글자+CSS 점 대신 앱 로고 `preet-logo.svg` 를 그대로 넣었다(높이 28px, 앱 머리띠와 같음). Nunito 웹폰트 불러오기는 뺐다.
+- 모양: 첫 화면 큰 판을 안쪽으로 들어간 둥근(20px) 파란 판으로, 카드·패널은 테두리·그림자 없이 surface 회색 24px 로, 버튼·알약은 rounded-full 로, 표는 머리 위 굵은 괘선으로 바꿨다. 그림자는 머리띠에만 둔다(DESIGN.md 규칙).
+- 예외: 홈 버튼의 그림자는 PM 이 되돌려 달라고 한 것이라 그대로 둔다.
