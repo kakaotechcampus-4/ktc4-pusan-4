@@ -6,7 +6,7 @@ import { useSession } from '../../contexts/SessionContext';
 import { AssistantContext } from './context';
 import type { AssistantValue, ChatEntry, Nudge, ProposalEntry } from './context';
 import { HELP_TOPICS } from './help';
-import { applyErrorText, applyProposal, chatErrorText, historyOf, MESSAGE_CHARS, routeName } from './logic';
+import { applyErrorText, applyProposal, chatErrorText, historyOf, MESSAGE_CHARS, nextAnswer, routeName } from './logic';
 
 const entryId = () => crypto.randomUUID();
 
@@ -87,39 +87,42 @@ export function AssistantProvider({ children }: {children: React.ReactNode;}) {
     if (pending) return;
     // 묻는 말을 먼저 붙이고, 진행 상황을 읽는 동안은 다른 말을 받지 않는다
     setEntries((prev) => [...prev, { id: entryId(), role: 'user', content: '다음에 할 일', proposals: [], local: true }]);
-    const answer = (entry: Omit<ChatEntry, 'id' | 'role' | 'local'>) =>
-    setEntries((prev) => [...prev, { id: entryId(), role: 'assistant', local: true, ...entry }]);
+    const answer = (content: string, route: string | null = null) =>
+    setEntries((prev) => [
+    ...prev,
+    {
+      id: entryId(),
+      role: 'assistant',
+      local: true,
+      content,
+      // 지금 있는 화면으로 가는 카드는 붙이지 않는다 (C106)
+      proposals:
+      route && route !== pathname ?
+      toEntries([{ kind: 'navigation', route, card: `${routeName(route) ?? '다음'} 화면으로 이동` }]) :
+      []
+    }]
+    );
     if (!batchId) {
-      answer({
-        content: '카드내역을 먼저 올려 주세요. 올리면 분류 확인부터 차례로 안내합니다.',
-        proposals: toEntries([{ kind: 'navigation', route: '/upload', card: '카드내역 화면으로 이동' }])
-      });
+      answer('카드내역을 먼저 올려 주세요.', '/upload');
       return;
     }
     setPending(true);
     try {
       const { next } = await api.progress.get(batchId);
-      answer({
-        content: `다음 할 일은 「${next.label}」입니다.`,
-        proposals: toEntries([
-        { kind: 'navigation', route: next.route, card: `${routeName(next.route) ?? next.label} 화면으로 이동` }]
-        )
-      });
+      const { content, route } = nextAnswer(next, pathname);
+      answer(content, route);
     } catch (caught) {
       const flow = HELP_TOPICS.find((topic) => topic.id === 'flow');
       if (caught instanceof ApiRequestError && caught.code === 'BATCH_NOT_FOUND') {
         setBatchId(null);
-        answer({
-          content: '보던 업로드를 찾을 수 없습니다. 업로드 이력에서 볼 업로드를 골라 주세요.',
-          proposals: toEntries([{ kind: 'navigation', route: '/uploads', card: '업로드 이력 화면으로 이동' }])
-        });
+        answer('보던 업로드를 찾을 수 없습니다. 업로드 이력에서 볼 업로드를 골라 주세요.', '/uploads');
         return;
       }
-      answer({ content: `진행 상황을 불러오지 못했습니다. ${flow?.text ?? ''}`, proposals: [] });
+      answer(`진행 상황을 불러오지 못했습니다. ${flow?.text ?? ''}`);
     } finally {
       setPending(false);
     }
-  }, [pending, batchId, setBatchId]);
+  }, [pending, batchId, setBatchId, pathname]);
 
   const updateProposal = (id: string, index: number, patch: Partial<ProposalEntry>) =>
   setEntries((prev) =>
