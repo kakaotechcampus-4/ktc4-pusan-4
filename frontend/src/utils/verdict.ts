@@ -17,3 +17,9 @@ export const VERDICT_LABEL: Record<Verdict, string> = {
   NEEDS_REVIEW: '확인 필요',
   UNAVAILABLE: '불가'
 };
+
+/**
+ * 질문의 답을 받기 전이라 일단 불가로 둔 거래의 이름(소명 대기). 판정의 네 번째 값이 아니라 불가에 붙는 표지다
+ * (rule-card-fields.md). 확인 필요라고 부르지 않는다 — 확인 필요는 규칙으로 정하지 못한 판정이다 (C12)
+ */
+export const AWAITING_ANSWER = '답변 대기';
