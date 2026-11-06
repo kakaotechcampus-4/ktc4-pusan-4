@@ -19,12 +19,12 @@ excessAmount > 0 ?
 
 /**
  * batch 합계 아래에 붙일 한도 초과 안내. 넘은 해가 없으면 null.
- * 초과액은 그해 모든 업로드를 합친 값이라 이 업로드 몫을 정할 수 없다(#15). 합계에서 빼지 않았다고 연도·총액과 함께 밝힌다
+ * 초과액은 그해 모든 업로드를 합친 값이라 이 업로드 몫을 정할 수 없다(#15). 합계에서 빼지 않았다고 해마다 밝힌다
  */
 export const excessNote = (limits: LimitYear[]) => {
   const exceeded = limitsOf(limits).filter((item) => item.excessAmount > 0);
   return exceeded.length > 0 ?
-  `그해 모든 업로드를 합친 기준으로 ${exceeded.map(limitLine).join(', ')}입니다(${PROVISIONAL_NOTE}). 초과액은 필요경비에 들어가지 않지만, 이 업로드 몫은 정할 수 없어 위 합계에서 빼지 않았습니다.` :
+  `${exceeded.map((item) => `${item.taxYear}년 접대비가 연간 한도를 ${formatWon(item.excessAmount)} 넘었습니다.`).join(' ')} 넘은 금액은 경비에 들어가지 않지만 위 금액에서는 빼지 않았습니다.` :
   null;
 };
 
