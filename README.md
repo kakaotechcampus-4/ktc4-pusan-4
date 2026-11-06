@@ -48,7 +48,7 @@
 
 - **[Git 규칙](#git-규칙)**
 - **[코드 컨벤션](#코드-컨벤션)**
-- **[로컬 실행](#로컬-실행)**
+- **[실행 · 배포](#실행--배포)**
 - **[팀원](#팀원)**
 
 </td>
@@ -249,10 +249,39 @@ fix: 카드사 CSV 헤더 공백 처리
 
 ---
 
-## 로컬 실행
+## 실행 · 배포
 
-- 백엔드: [`backend/README.md`](backend/README.md)
-- 배포: [`docs/deployment.md`](docs/deployment.md)
+### 빠른 시작 (전체 실행)
+
+<!-- TODO(@RainDrop3): clone → .env 준비 → docker compose 로 전체를 띄우는 순서 -->
+> ✏️ 작성 필요
+
+### 환경 변수
+
+<!-- TODO(@yuyeol3): 필요한 .env 항목과 예시 파일 위치 -->
+> ✏️ 작성 필요
+
+### 파트별 실행
+
+#### Backend
+
+<!-- TODO(@yuyeol3 @memoryhong): 핵심 명령 한두 줄. 자세한 내용은 backend/README.md 링크 -->
+> ✏️ 작성 필요
+
+#### Frontend
+
+<!-- TODO(@cho104 @Jaeseong22): 핵심 명령 한두 줄. 자세한 내용은 frontend/README.md 링크 -->
+> ✏️ 작성 필요
+
+#### AI
+
+<!-- TODO(@RainDrop3): AI 서버 실행 명령 -->
+> ✏️ 작성 필요
+
+### 배포
+
+<!-- TODO(@memoryhong @yuyeol3): develop → release 자동 배포 흐름 요약. 자세한 내용은 docs/deployment.md 링크 -->
+> ✏️ 작성 필요
 
 ---
 
