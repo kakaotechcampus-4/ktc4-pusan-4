@@ -4,6 +4,7 @@ import { ArrowRightIcon, CircleHelpIcon, DownloadIcon, SearchXIcon } from 'lucid
 import { AppShell } from '../components/AppShell';
 import { StepEyebrow } from '../components/StepEyebrow';
 import { JudgmentDetailPanel } from '../components/results/JudgmentDetailPanel';
+import { merchantTitle, verdictNote } from '../components/results/display';
 import { VerdictBadge } from '../components/VerdictBadge';
 import {
   BottomSheet,
@@ -52,13 +53,23 @@ catch(async (caught: unknown) => {
   return { items: (await readAllJudgments(batchId)).map(exportRowOf), limits: [] };
 });
 
+/** 표 머리 글자. 골격 줄 옆에서 열이 좁아져도 한 글자씩 꺾이지 않게 한다 (C66) */
+const head = (text: string) => <span className="whitespace-nowrap">{text}</span>;
+
+/**
+ * 넓은 화면의 상세 상자. 화면보다 길면 테두리 상자째 안에서 스크롤해, 스크롤해도 테두리가 끊기지 않는다 (C72).
+ * macOS 는 스크롤 막대를 숨겨 아래가 더 있는지 모르므로 막대를 늘 그린다
+ */
+const PANEL_SCROLL =
+'max-h-[calc(100vh-10rem)] overflow-y-auto [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted/40 [&::-webkit-scrollbar]:w-2';
+
 /**
  * 3.7 판정 결과.
  * batchId 로 거래별 「현재」 판정을 읽는다. runId 로 읽으면 그 Run 이 만든 판정만 와서
  * 답변·사용자 수정이 화면에 반영되지 않는다.
  */
 export function Results() {
-  const { batchId } = useSession();
+  const { batchId, batchStatus, reloadBatch } = useSession();
   const [filter, setFilter] = useState<Filter>('ALL');
   const [page, setPage] = useState(0);
   /** 고른 거래. 거래 정보를 아직 못 받은 행도 고를 수 있게 id 만 든다 */
@@ -70,7 +81,9 @@ export function Results() {
   /** 넓은 화면은 표 옆에 상세를 늘 띄우고, 좁은 화면은 행을 누를 때만 아래에서 올린다 */
   const wide = useMediaQuery('(min-width: 1024px)');
   const [exporting, setExporting] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [exportFailed, setExportFailed] = useState(false);
+  /** 방금 판정 대상에서 뺀 거래의 이름. 다시 넣는 곳을 알려 준다 */
+  const [excludedName, setExcludedName] = useState<string | null>(null);
 
   const batchQ = useApi(
     () => batchId ? api.uploads.get(batchId) : Promise.resolve(null),
@@ -92,10 +105,11 @@ export function Results() {
     Promise.resolve(null),
     [batchId, filter, page]
   );
+  // 답을 기다리는 질문. 걸린 거래가 불가면 행에 답변 대기를 붙인다 (C12). 한 번에 100개까지라 그 밖의 거래는 표지가 빠질 수 있다
   const questionsQ = useApi(
     () =>
     batchId ?
-    api.questions.grouped({ batchId, status: 'PENDING', size: 1 }) :
+    api.questions.list({ batchId, status: 'PENDING', size: 100 }) :
     Promise.resolve(null),
     [batchId]
   );
@@ -104,6 +118,14 @@ export function Results() {
     () =>
     batchId ?
     api.questions.grouped({ batchId, status: 'ANSWERED', size: 1 }) :
+    Promise.resolve(null),
+    [batchId]
+  );
+  // 분류하지 않고 넘긴 거래는 판정에 없다. 결과에서도 알린다 (C36). 요약과 같은 조건으로 센다
+  const unclassifiedQ = useApi(
+    () =>
+    batchId ?
+    api.transactions.list({ batchId, status: 'JUDGEABLE', classificationStatus: 'NEEDS_REVIEW', size: 1 }) :
     Promise.resolve(null),
     [batchId]
   );
@@ -155,31 +177,43 @@ export function Results() {
     setFocusKey((key) => key + 1);
   };
 
+  // 판정 대상에서 빼면 그 거래의 질문도 집계에서 빠진다(3.9). 질문 안내도 다시 읽는다
   const changed = () => {
     judgmentsQ.reload();
     summaryQ.reload();
     panelQ.reload();
+    questionsQ.reload();
+  };
+
+  /** 처음 불러오기가 실패했을 때. 표만이 아니라 기간, 질문 안내, 분류 안내도 다시 읽는다 (C64) */
+  const reloadAll = () => {
+    batchQ.reload();
+    summaryQ.reload();
+    judgmentsQ.reload();
+    questionsQ.reload();
+    answeredQ.reload();
+    unclassifiedQ.reload();
   };
 
   /** 판정 대상에서 뺀 거래는 목록에서 사라진다. 다시 넣는 곳을 알려 준다 */
   const excluded = (merchant: string) => {
     excludedId.current = selectedId;
     setSelectedId(null);
-    setNotice(`${merchant} 거래를 판정 대상에서 뺐습니다. 거래 화면의 「대상제외」에서 다시 넣을 수 있습니다.`);
+    setExcludedName(merchant);
     changed();
   };
 
   const exportCsv = async () => {
     if (!batchId || exporting) return;
     setExporting(true);
-    setNotice(null);
+    setExportFailed(false);
     try {
       const { items, limits } = await readExport(batchId);
       const batch = batchQ.data;
       const period = batch ? `${batch.periodStart}_${batch.periodEnd}` : batchId.slice(0, 8);
       download(`PreeT-판정결과-${period}.csv`, judgmentsCsv(items, limits));
     } catch {
-      setNotice('CSV 를 만들지 못했습니다. 잠시 후 다시 시도해 주세요.');
+      setExportFailed(true);
     } finally {
       setExporting(false);
     }
@@ -196,12 +230,22 @@ export function Results() {
   { value: 'UNAVAILABLE' as const, label: '불가', count: summary?.byVerdict.UNAVAILABLE.count }];
 
   const unresolved = questionsQ.data?.unresolved;
-  const questionGroups = questionsQ.data?.page.totalElements ?? 0;
+  const awaiting = new Set(questionsQ.data?.items.map((question) => question.transactionId));
+  // 다시 읽다가 실패하면 예전 질문 수를 띄우지 않고 실패를 알린다
+  const questionsFailed = Boolean(questionsQ.error) && !questionsQ.loading;
   const answeredGroups = answeredQ.data?.page.totalElements ?? 0;
+  const unclassified = unclassifiedQ.data?.page.totalElements ?? 0;
+  /**
+   * 처음 읽는 동안. 머리글 줄, 질문 안내, 분류 안내, 표를 다 받은 뒤 한 번에 그린다.
+   * 따로 그리면 늦게 온 줄이 이미 그린 표를 밀어 내린다 (C66). 실패한 것은 기다리지 않는다
+   */
+  const firstLoad = [batchQ, summaryQ, questionsQ, unclassifiedQ].some(
+    (query) => query.loading && !query.data && !query.error
+  );
 
   const columns: Column<Judgment>[] = [
   {
-    header: '승인일',
+    header: head('승인일'),
     width: 'w-[7.5rem]',
     hideBelow: 'sm',
     cell: (row) =>
@@ -211,35 +255,34 @@ export function Results() {
 
   },
   {
-    header: '가맹점',
+    header: head('가맹점'),
     // 남는 폭을 가맹점이 갖고 넘치면 말줄임한다. 금액·판정은 좁은 화면에서도 보여야 한다
     width: 'w-full max-w-0',
     cell: (row) => {
       const { transaction } = row;
       return (
         <span className="block min-w-0">
-            <span className="flex items-center gap-1.5 truncate font-normal text-ink">
+            <span className="flex items-center gap-1.5 font-normal text-ink">
               {/* 고른 행은 옅은 바탕만으로는 잘 안 보여 점을 붙인다 */}
               {row.transactionId === selectedId &&
           <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-accent" />
           }
-              <span className="truncate">{transaction.merchantNorm}</span>
+              <span className="truncate">{merchantTitle(transaction)}</span>
             </span>
             {/* 승인일 열은 좁은 화면에서 숨기므로 여기로 옮긴다. 가맹점명 줄에 붙이면 말줄임에 같이 잘린다 */}
             <span className="block whitespace-nowrap text-small tabular-nums text-muted sm:hidden">
               {formatFullDate(transaction.approvedAt)}
             </span>
-            <span className="block truncate text-small text-muted">
-              {transaction.merchantRaw} · {transaction.merchantCategory}
-              {transaction.installmentMonths > 0 &&
-            ` · ${transaction.installmentMonths}개월 할부`}
+            <span className="block truncate text-small text-ink2">
+              {transaction.merchantCategory}
+              {transaction.installmentMonths > 0 && `, ${transaction.installmentMonths}개월 할부`}
             </span>
           </span>);
 
     }
   },
   {
-    header: '금액',
+    header: head('금액'),
     align: 'right',
     cell: (row) => {
       const { transaction } = row;
@@ -248,18 +291,18 @@ export function Results() {
       const asset = row.attributes['자산'] === true;
       const partial =
       row.verdict.code === 'AVAILABLE' &&
-      row.finalAmount !== null &&
-      (asset || row.finalAmount !== transaction.amount);
-      // 한도를 넘은 해의 접대비는 거래별 인정액이 없다(#226). 금액 대신 한도 대상임을 적는다
+      row.finalAmount !== null && (
+      asset || row.finalAmount !== transaction.amount);
+      // 한도를 넘은 해의 접대비는 거래별 금액이 없다(#226). 금액 대신 한도 대상임을 적는다
       const overLimit = exceededLimitOf(row, limits);
       return (
         <span className="block">
             <span className="whitespace-nowrap font-bold text-ink">{formatWon(transaction.amount)}</span>
             {overLimit ?
-          <span className="block whitespace-nowrap text-caption text-warn">연간 한도 대상</span> :
+          <span className="block whitespace-nowrap text-caption text-ink2">연간 한도 대상</span> :
           partial && row.finalAmount !== null &&
-          <span className="block whitespace-nowrap text-caption text-ok">
-                  {asset ? '최대' : '산입'} {formatWon(row.finalAmount)}
+          <span className="block whitespace-nowrap text-caption text-ink2">
+                  {asset ? '최대' : '경비 가능'} {formatWon(row.finalAmount)}
                 </span>
           }
           </span>);
@@ -267,82 +310,128 @@ export function Results() {
     }
   },
   {
-    header: '판정',
+    header: head('판정'),
     align: 'right',
-    cell: (row) =>
-    <span className="inline-flex flex-col items-end gap-1">
-          <VerdictBadge verdict={row.verdict} />
-          {row.origin.type === 'OVERRIDE' &&
-      <span className="text-caption text-muted">직접 수정</span>
-      }
-          {/* ②(넘김)는 목록에서도 ①·③과 다르게 보여야 한다 (rule-card-fields.md) */}
-          {row.outOfScope && row.origin.type !== 'OVERRIDE' &&
-      <span className="text-caption text-muted">세무사에게 넘김</span>
-      }
-        </span>
+    cell: (row) => {
+      // 직접 수정, 세무사에게 넘김(rule-card-fields.md ②), 답변 대기는 같은 배지라도 할 일이 달라 배지 아래에 적는다
+      const note = verdictNote(row, awaiting.has(row.transactionId));
+      return (
+        <span className="inline-flex flex-col items-end gap-1">
+            <VerdictBadge verdict={row.verdict} />
+            {note && <span className="whitespace-nowrap text-caption text-ink2">{note}</span>}
+          </span>);
 
+    }
   }];
 
 
   const header =
   <header className="flex flex-wrap items-end justify-between gap-4">
-      <div>
+      <div className="min-w-0">
         <StepEyebrow>결과</StepEyebrow>
-        <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">판정 결과</h1>
-        {summary &&
-      <p className="mt-2 text-body tabular-nums text-muted">
+        <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">결과</h1>
+        {summary && !firstLoad ?
+      <p className="mt-2 flex flex-wrap gap-x-4 text-body tabular-nums text-ink2">
             {batchQ.data &&
-        `${formatPeriod(batchQ.data.periodStart, batchQ.data.periodEnd)} · `}
-            {formatNumber(summary.totalCount)}건 · 인정 경비{' '}
-            <strong className="font-bold text-ink">
-              {formatWon(summary.byVerdict.AVAILABLE.finalAmount)}
-            </strong>
+        <span>{formatPeriod(batchQ.data.periodStart, batchQ.data.periodEnd)}</span>
+        }
+            <span>{formatNumber(summary.totalCount)}건</span>
+            <span>
+              경비 가능 금액{' '}
+              <strong className="font-bold text-ink">
+                {formatWon(summary.byVerdict.AVAILABLE.finalAmount)}
+              </strong>
+            </span>
+          </p> :
+      // 줄 높이를 미리 잡아 둔다. 늦게 들어와도 아래를 밀지 않는다 (C66)
+      batchId && firstLoad &&
+      <span className="mt-2 block h-6 w-72 max-w-full animate-pulse rounded bg-line2" />
+      }
+        {excess && !firstLoad &&
+      <p className="mt-1 max-w-2xl text-small text-ink2">{excess}</p>
+      }
+        {unclassified > 0 && !firstLoad &&
+      <p className="mt-1 flex flex-wrap items-center gap-x-2 text-small text-ink2">
+            분류가 필요한 거래 {formatNumber(unclassified)}건은 판정하지 않았습니다.
+            <Link
+          to="/preview"
+          className="inline-flex items-center gap-1 py-1 font-bold text-accent hover:underline">
+
+              분류 확인하기
+              <ArrowRightIcon className="h-3.5 w-3.5" aria-hidden="true" />
+            </Link>
           </p>
       }
-        {excess &&
-      <p className="mt-1 max-w-2xl text-small text-warn">{excess}</p>
-      }
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        {/* 판정이 끝난 뒤 나가는 길. 빵부스러기의 「홈」만으로는 눈에 띄지 않는다 (#242 리뷰) */}
-        <Button to="/" variant="ghost" size="sm">
-          홈으로
-        </Button>
-        {/* 확인할 질문이 없을 때는 아래 안내가 사라지므로, 답을 바꾸러 가는 길을 여기 남긴다 */}
-        {!(unresolved && unresolved.count > 0) && answeredGroups > 0 &&
-      <Button to="/questions" variant="ghost" size="sm">
-            답한 질문 보기
+      <div className="flex flex-col items-end gap-1">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* 판정이 끝난 뒤 나가는 길. 빵부스러기의 「홈」만으로는 눈에 띄지 않는다 (#242 리뷰) */}
+          <Button to="/" variant="ghost" size="sm" className="whitespace-nowrap">
+            홈으로
           </Button>
-      }
-        {batchId && summary && summary.totalCount > 0 &&
-      <Button variant="ghost" size="sm" disabled={exporting} onClick={() => void exportCsv()}>
-            <DownloadIcon className="h-4 w-4" aria-hidden="true" />
-            {exporting ? 'CSV 만드는 중…' : 'CSV 내려받기'}
+          {/* 확인할 질문이 없을 때는 아래 안내가 사라지므로, 답을 바꾸러 가는 길을 여기 남긴다 */}
+          {!(unresolved && unresolved.count > 0) && answeredGroups > 0 &&
+        <Button to="/questions" variant="ghost" size="sm" className="whitespace-nowrap">
+              답한 질문 보기
+            </Button>
+        }
+          {batchId && summary && summary.totalCount > 0 &&
+        <Button
+          variant="ghost"
+          size="sm"
+          className="whitespace-nowrap"
+          disabled={exporting}
+          onClick={() => void exportCsv()}>
+
+              <DownloadIcon className="h-4 w-4" aria-hidden="true" />
+              {exporting ? 'CSV 만드는 중…' : 'CSV 내려받기'}
+            </Button>
+        }
+          <Button to="/summary" variant="secondary" size="sm" className="whitespace-nowrap">
+            요약 보기
+            <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
           </Button>
+        </div>
+        {/* 실패는 누른 버튼 옆에 오류로 알린다. 안내 상자와 같은 모양이면 실패로 읽히지 않는다 (C67) */}
+        {exportFailed &&
+      <p role="alert" className="text-small text-deny">
+            CSV를 만들지 못했습니다. 잠시 후 다시 시도해 주세요.
+          </p>
       }
-        <Button to="/summary" variant="secondary" size="sm">
-          요약 보기
-          <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
-        </Button>
       </div>
     </header>;
 
 
   if (!batchId) {
+    // 로그인 직후 업로드 목록을 고르는 동안에는 「없다」고 하지 않는다. 못 읽었으면 다시 시도를 준다 (C56)
     return (
       <AppShell>
         {header}
+        {batchStatus === 'loading' ?
+        <Table className="mt-6" caption="거래별 판정 결과" columns={columns} rows={[]} rowKey={() => ''} loading /> :
+        batchStatus === 'error' ?
+        <Empty
+          className="mt-6"
+          icon={<SearchXIcon className="h-5 w-5" />}
+          title="올린 카드내역을 불러오지 못했습니다"
+          action={
+          <Button size="sm" variant="secondary" onClick={reloadBatch}>
+                다시 시도
+              </Button>
+          } /> :
+
+
         <Empty
           className="mt-6"
           icon={<SearchXIcon className="h-5 w-5" />}
           title="올린 카드내역이 없습니다"
-          description="카드내역을 올리고 판정을 마치면 결과가 여기에 쌓입니다."
           action={
           <Button to="/upload" size="sm" variant="secondary">
-              카드내역 올리기
-            </Button>
+                카드내역 올리기
+              </Button>
           } />
 
+        }
       </AppShell>);
 
   }
@@ -354,16 +443,8 @@ export function Results() {
   <Empty
     icon={<SearchXIcon className="h-5 w-5" />}
     title="판정 결과를 불러오지 못했습니다"
-    description="잠시 후 다시 시도해 주세요. 계속 안 되면 새로고침해 주세요."
     action={
-    <Button
-      size="sm"
-      variant="secondary"
-      onClick={() => {
-        judgmentsQ.reload();
-        summaryQ.reload();
-      }}>
-
+    <Button size="sm" variant="secondary" onClick={reloadAll}>
           다시 시도
         </Button>
     } /> :
@@ -372,7 +453,6 @@ export function Results() {
   <Empty
     icon={<SearchXIcon className="h-5 w-5" />}
     title="아직 판정한 거래가 없습니다"
-    description="분류 확인과 사업자 문진을 마친 뒤 판정을 실행하면 결과가 나옵니다."
     action={
     <Button to="/confirm" size="sm" variant="secondary">
             판정하러 가기
@@ -380,16 +460,9 @@ export function Results() {
     } /> :
 
   filter === 'NEEDS_REVIEW' ?
-  <Empty
-    tone="ok"
-    icon={<SearchXIcon className="h-5 w-5" />}
-    title="확인이 필요한 거래가 없습니다"
-    description="남은 판정은 모두 가능 또는 불가로 정리됐습니다." /> :
+  <Empty icon={<SearchXIcon className="h-5 w-5" />} title="확인이 필요한 거래가 없습니다" /> :
 
-  <Empty
-    icon={<SearchXIcon className="h-5 w-5" />}
-    title="이 판정에 해당하는 거래가 없습니다"
-    description="다른 판정을 골라 보세요." />;
+  <Empty icon={<SearchXIcon className="h-5 w-5" />} title="이 판정에 해당하는 거래가 없습니다" />;
 
 
   const panel =
@@ -400,20 +473,21 @@ export function Results() {
     exceededLimit={exceededLimitOf(panelData.judgment, limits)}
     focusKey={focusKey}
     onChanged={changed}
-    onExcluded={excluded} /> :
+    onExcluded={excluded}
+    className={wide ? PANEL_SCROLL : undefined} /> :
 
   // 수정 뒤 다시 읽기가 실패해도 이전 판정을 그리지 않고 실패를 알린다
   panelData?.failed ?
-  <div role="alert" className="rounded-2xl border border-deny-line bg-deny-bg p-5 text-body text-deny">
+  <p role="alert" className="rounded-2xl border border-line p-5 text-body text-deny">
         이 거래의 판정을 불러오지 못했습니다.{' '}
-        <button type="button" onClick={panelQ.reload} className="font-bold underline">
+        <button type="button" onClick={panelQ.reload} className="py-1 font-bold underline">
           다시 시도
         </button>
-      </div> :
+      </p> :
 
   panelData ?
-  <p className="rounded-2xl border border-line bg-surface p-5 text-body text-muted">
-        이 거래에는 현재 판정이 없습니다. 판정 대상에서 빠졌거나 아직 판정하지 않은 거래입니다.
+  <p className="rounded-2xl border border-line p-5 text-body text-ink2">
+        이 거래는 판정 대상에서 빠졌거나 아직 판정하지 않았습니다.
       </p> :
 
   <span className="block h-96 animate-pulse rounded-2xl bg-line2" />;
@@ -423,39 +497,54 @@ export function Results() {
     <AppShell>
       {header}
 
-      {notice &&
-      <p role="status" className="mt-4 flex items-start justify-between gap-3 rounded-xl border border-line bg-surface px-4 py-3 text-small text-ink2">
+      {excludedName &&
+      <p
+        role="status"
+        className="mt-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl border border-line px-4 py-3 text-small text-ink2">
+
           <span>
-            {notice}{' '}
-            {notice.includes('대상제외') &&
-          <Link to="/transactions" className="font-bold underline underline-offset-4">거래 화면으로</Link>
-          }
+            {excludedName} 거래를 판정 대상에서 뺐습니다.{' '}
+            <Link to="/transactions" className="font-bold text-accent hover:underline">
+              거래에서 다시 넣기
+            </Link>
           </span>
-          <button type="button" onClick={() => setNotice(null)} className="shrink-0 text-muted hover:text-ink">
+          <button type="button" onClick={() => setExcludedName(null)} className="shrink-0 py-1 text-ink2 hover:text-ink">
             닫기
           </button>
         </p>
       }
 
-      {unresolved && unresolved.count > 0 &&
+      {!firstLoad && !questionsFailed && unresolved && unresolved.count > 0 &&
       <Link
         to="/questions"
-        className="mt-6 flex items-center gap-3 rounded-2xl border border-warn-line bg-warn-bg px-5 py-4 transition-colors duration-150 ease-snap hover:bg-warn-bg/70">
+        className="mt-6 flex items-center gap-3 rounded-2xl border border-line px-5 py-4 transition-colors duration-150 ease-snap hover:bg-surface">
 
-          <CircleHelpIcon className="h-5 w-5 shrink-0 text-warn" aria-hidden="true" />
+          <CircleHelpIcon className="h-5 w-5 shrink-0 text-ink" aria-hidden="true" />
           <span className="min-w-0 flex-1">
+            {/* count 는 「확인 필요」 판정 수가 아니라 PENDING 질문 수다(3.9). 한 거래에 질문이 여럿이고, 불가에도 소명 질문이 남는다 */}
             <span className="block text-body font-bold tabular-nums text-ink">
-              {/* count 는 「확인 필요」 판정 수가 아니라 PENDING 질문 수다(3.9). 한 거래에 질문이 여럿이고, 불가에도 소명 질문이 남는다 */}
-              답할 질문 {formatNumber(unresolved.count)}개 · {formatWon(unresolved.amount)}
+              답할 질문 {formatNumber(unresolved.count)}개
             </span>
-            <span className="mt-0.5 block text-small text-ink2">
-              {/* questionGroups 는 그룹 수다. 「질문 N개」로 또 적으면 위 질문 수와 다른 수가 같은 말로 읽힌다 */}
-              같은 사유끼리 {formatNumber(questionGroups)}묶음으로 모았습니다. 답하면 묶인
-              거래를 바로 다시 판정합니다.
+            <span className="mt-0.5 block text-small tabular-nums text-ink2">
+              관련 거래 {formatWon(unresolved.amount)}, 답하면 다시 판정합니다.
             </span>
           </span>
-          <ArrowRightIcon className="h-4 w-4 shrink-0 text-warn" aria-hidden="true" />
+          <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-small font-bold text-accent">
+            질문에 답하기
+            <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
+          </span>
         </Link>
+      }
+      {/* 판정을 마친 결과에는 대개 답할 질문이 있다. 그 자리를 미리 잡아 표가 밀려 내려가지 않게 한다 (C66) */}
+      {firstLoad && <span aria-hidden="true" className="mt-6 block h-20 animate-pulse rounded-2xl bg-line2" />}
+      {/* 질문을 못 읽으면 안내가 말없이 사라지지 않게 그 자리에 알린다 (C64) */}
+      {questionsFailed &&
+      <p role="alert" className="mt-6 text-small text-deny">
+          답할 질문을 불러오지 못했습니다.{' '}
+          <button type="button" onClick={questionsQ.reload} className="py-1 font-bold underline">
+            다시 시도
+          </button>
+        </p>
       }
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
@@ -475,24 +564,20 @@ export function Results() {
             className="mt-3"
             caption="거래별 판정 결과"
             columns={columns}
-            rows={failed ? [] : judgments}
+            rows={failed || firstLoad ? [] : judgments}
             rowKey={(row) => row.id}
-            loading={judgmentsQ.loading}
+            loading={judgmentsQ.loading || firstLoad}
             selectedKey={judgments.find((row) => row.transactionId === selectedId)?.id}
             onRowClick={(row) => select(row.transactionId)}
             empty={empty} />
 
-          {!failed && judgmentsQ.data && judgments.length > 0 &&
+          {!failed && !firstLoad && judgmentsQ.data && judgments.length > 0 &&
           <Pagination page={judgmentsQ.data.page} onChange={setPage} />
           }
         </section>
 
-        {wide && selectedId && !failed && !nothingJudged &&
-        // 패널이 화면보다 길면 수정 버튼·이력이 접힌 아래로 밀린다. 화면 높이 안에서 따로 스크롤한다.
-        // 아래 여백은 오른쪽 아래 비서 버튼이 패널 끝을 가리지 않게 둔 것이다
-        <aside className="sticky top-32 max-h-[calc(100vh-9rem)] self-start overflow-y-auto pb-20">
-            {panel}
-          </aside>
+        {wide && selectedId && !failed && !nothingJudged && !firstLoad &&
+        <aside className="sticky top-32 self-start">{panel}</aside>
         }
       </div>
 
@@ -500,7 +585,7 @@ export function Results() {
         open={!wide && selectedId !== null && !failed && !nothingJudged}
         onClose={() => setSelectedId(null)}
         label="거래 판정 상세">
-        
+
         {panel}
       </BottomSheet>
     </AppShell>);
