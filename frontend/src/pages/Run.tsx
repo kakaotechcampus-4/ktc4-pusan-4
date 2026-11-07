@@ -300,7 +300,8 @@ function RunProgress() {
   const animate = usePrefersMotion();
   const total = run?.totalCount ?? 0;
   const processed = run?.processedCount ?? 0;
-  const progress = judged ? 100 : total ? Math.round(processed / total * 100) : 0;
+  /** 다 마치면 끝까지 차고, 일부만 마쳤으면 판정한 몫까지만 찬다(못 한 몫은 빈 칸으로 남는다) */
+  const progress = phase === 'completed' ? 100 : total ? Math.round(processed / total * 100) : 0;
   /** 끝난 칸. 판정별 건수를 다 받았을 때만 움직임을 시작한다 */
   const tiles = byVerdict ?
   [
@@ -358,7 +359,7 @@ function RunProgress() {
             <p aria-live="polite" className="text-stat font-bold leading-none tabular-nums text-ink">
               {run ?
               <>
-                  {formatNumber(judged ? total : processed)}
+                  {formatNumber(phase === 'completed' ? total : processed)}
                   <span className="text-lead font-normal text-ink2"> / {formatNumber(total)}건</span>
                 </> :
               <span className="invisible">0</span>}
@@ -379,12 +380,13 @@ function RunProgress() {
               transition={animate ? { duration: judged ? FILL_SECONDS : 0.3, ease: EASE } : { duration: 0 }} />
               {tiles && tileTotal > 0 &&
             <motion.div
-              className="absolute inset-0 flex gap-0.5"
+              className="absolute inset-y-0 left-0 flex gap-0.5 bg-canvas"
+              style={{ width: `${progress}%` }}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={motionOf(settleDelay, 0.24)}>
                   {tiles.filter((tile) => tile.count > 0).map((tile) =>
-              <span key={tile.key} className={tile.bar} style={{ width: `${tile.count / tileTotal * 100}%` }} />
+              <span key={tile.key} className={tile.bar} style={{ flex: `${tile.count} 1 0` }} />
               )}
                 </motion.div>
             }
@@ -439,15 +441,18 @@ function RunProgress() {
               )}
               </dl>
             }
-            <motion.div
-            initial={animate ? { opacity: 0 } : false}
-            animate={tiles || countsFailed ? { opacity: 1 } : undefined}
-            transition={motionOf(settleDelay + (tiles?.length ?? 3) * STAGGER_SECONDS + 0.1)}>
+            {/* 보이기 전에는 visibility 로 숨겨 투명한 채로 초점이 가거나 눌리지 않게 한다 */}
+            <div
+            className={cn(
+              animate && 'transition-[opacity,visibility] duration-300',
+              tiles || countsFailed ? 'visible opacity-100' : 'invisible opacity-0'
+            )}
+            style={animate && tiles ? { transitionDelay: `${settleDelay + tiles.length * STAGGER_SECONDS + 0.1}s` } : undefined}>
               <Button className="mt-8" onClick={openResults}>
                 결과 보기
                 <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
               </Button>
-            </motion.div>
+            </div>
           </section>
         }
 
