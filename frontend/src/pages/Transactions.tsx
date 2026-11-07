@@ -16,7 +16,7 @@ import {
   type Column } from
 '../components/ui';
 import type { EffectiveStatus, Transaction } from '../types/domain';
-import { formatFullDate, formatNumber, formatWon } from '../utils/format';
+import { formatFullDate, formatWon } from '../utils/format';
 
 type StatusFilter = 'ALL' | EffectiveStatus;
 
@@ -349,10 +349,7 @@ export function Transactions() {
 
 
         {listQ.data && rows.length > 0 &&
-        <Pagination
-          page={listQ.data.page}
-          onChange={setPage}
-          note={`${formatNumber(listQ.data.page.totalElements)}건 중 ${formatNumber(rows.length)}건 표시`} />
+        <Pagination page={listQ.data.page} onChange={setPage} />
 
         }
       </div>

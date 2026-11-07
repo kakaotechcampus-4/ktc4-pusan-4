@@ -211,7 +211,7 @@ export function Uploads() {
               취소
             </Button>
             <Button
-            variant="danger"
+            variant="primary"
             size="md"
             disabled={deleting}
             onClick={() => void remove()}>
