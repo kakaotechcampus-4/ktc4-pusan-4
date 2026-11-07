@@ -5,7 +5,7 @@ import { StepEyebrow } from '../components/StepEyebrow';
 import { useSession } from '../contexts/SessionContext';
 import { api, ApiRequestError } from '../api';
 import type { BookkeepingDuty } from '../types/domain';
-import { Button, ChoiceGroup, type ChoiceOption } from '../components/ui';
+import { Button, ChoiceGroup, Empty, type ChoiceOption } from '../components/ui';
 import { formatNumber } from '../utils/format';
 import {
   FIELD_ORDER,
@@ -82,12 +82,15 @@ export function Interview() {
       {contextStatus === 'loading' ?
       <p role="status" className="mt-6 text-body text-ink2">불러오는 중…</p> :
       contextStatus === 'error' ?
-      <div className="mt-6">
-          <p role="alert" className="text-body text-deny">문진을 불러오지 못했습니다.</p>
-          <Button variant="secondary" size="sm" className="mt-3" onClick={reloadContext}>
-            다시 시도
-          </Button>
-        </div> :
+      <Empty
+        className="mt-6"
+        tone="error"
+        title="문진을 불러오지 못했습니다"
+        action={
+        <Button variant="secondary" size="sm" onClick={reloadContext}>
+              다시 시도
+            </Button>
+        } /> :
 
       <InterviewBody />
       }
