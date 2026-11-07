@@ -86,6 +86,13 @@ export function Account() {
 
         <InfoPanel title="내 자료">
           <ul className="divide-y divide-line text-small">
+            {/* 올린 파일을 합쳐 한 해 단위로 본다. 파일 하나를 따라가는 판정 흐름(단계 띠)과 섞지 않는다 */}
+            <li>
+              <Link to="/yearly" className="flex items-center justify-between gap-3 px-5 py-3 text-ink hover:bg-surface">
+                연간 결과
+                <ArrowRightIcon className="h-4 w-4 text-ink2" aria-hidden="true" />
+              </Link>
+            </li>
             <li>
               <Link to="/uploads" className="flex items-center justify-between gap-3 px-5 py-3 text-ink hover:bg-surface">
                 업로드 이력

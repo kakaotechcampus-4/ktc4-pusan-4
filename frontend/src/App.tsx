@@ -33,6 +33,7 @@ const RunEntry = page(() => import('./pages/Run'), 'RunEntry');
 const Results = page(() => import('./pages/Results'), 'Results');
 const Questions = page(() => import('./pages/Questions'), 'Questions');
 const Summary = page(() => import('./pages/Summary'), 'Summary');
+const Yearly = page(() => import('./pages/Yearly'), 'Yearly');
 /** 개발용 화면이다. 배포 빌드에는 넣지 않는다 */
 const Styleguide = import.meta.env.DEV ? page(() => import('./pages/Styleguide'), 'Styleguide') : null;
 const ClassificationPreview = page(() => import('./pages/ClassificationPreview'), 'ClassificationPreview');
@@ -63,6 +64,7 @@ const PROTECTED: { path: string; element: React.ReactElement }[] = [
 { path: '/results', element: <Results /> },
 { path: '/questions', element: <Questions /> },
 { path: '/summary', element: <Summary /> },
+{ path: '/yearly', element: <Yearly /> },
 { path: '/account', element: <Account /> },
 { path: '/admin', element: <Admin /> }];
 
