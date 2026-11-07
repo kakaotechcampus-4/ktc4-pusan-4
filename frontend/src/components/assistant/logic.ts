@@ -10,6 +10,7 @@ import type {
 '../../types/domain';
 import { formatNumber, ro } from '../../utils/format';
 import { answerLabel } from '../questions/logic';
+import { categoryLabel } from '../results/display';
 
 /** 9장 요청 규칙 */
 export const MESSAGE_CHARS = 1000;
@@ -118,7 +119,8 @@ idempotencyKey: string)
           reviewIds: proposal.reviewIds,
           merchantCategory: proposal.merchantCategory
         });
-        return `거래 ${formatNumber(result.resolvedCount)}건을 ${proposal.merchantCategory}${ro(proposal.merchantCategory)} 정했습니다.`;
+        const label = categoryLabel(proposal.merchantCategory);
+        return `거래 ${formatNumber(result.resolvedCount)}건을 ${label}${ro(label)} 정했습니다.`;
       }
     case 'override':
       await api.judgments.override(

@@ -10,11 +10,26 @@ export const MASKED_MEDICAL = '의료기관 (이름 가림)';
  * 결과 표와 상세의 거래 제목. 카드에 찍힌 이름을 쓴다.
  * 정규화 이름(merchantNorm)은 FIGMA.COM 을 FIGMACOM 으로, 온새미로 공방을 온새미로공방으로 붙여 써서 사람이 읽을 이름이 아니다
  */
-export const merchantTitle = ({ merchantRaw, merchantNorm }: Pick<TransactionSummary, 'merchantRaw' | 'merchantNorm'>) => {
+export const merchantTitle = ({ merchantRaw, merchantNorm }: Pick<TransactionSummary, 'merchantRaw' | 'merchantNorm'>) =>
+merchantName(merchantRaw) || merchantNorm;
+
+/**
+ * 카드에 찍힌 상호를 화면 이름으로 바꾼다. 올리기 미리보기처럼 거래가 되기 전의 행에도 쓴다.
+ * 가린 의료기관(의료_마스킹_01)과 카드사가 소액 교통비를 묶어 찍은 합산 행(버스_모바일 3 건)은 그대로 보여 주지 않는다 (C32)
+ */
+export const merchantName = (merchantRaw: string) => {
   const raw = merchantRaw.trim();
   if (raw.startsWith(MEDICAL_PREFIX)) return MASKED_MEDICAL;
-  return raw || merchantNorm;
+  const merged = /^(\S+)_(\S+) (\d+) 건$/.exec(raw);
+  return merged ? `${merged[1]} ${merged[2]} ${merged[3]}건` : raw;
 };
+
+/** 카테고리의 화면 이름. 어휘(rules/categories.yaml)의 키는 밑줄로 잇거나 내부 표시라 그대로 보여 주지 않는다 */
+const CATEGORY_LABEL: Record<string, string> = {
+  PG_미상: '결제대행 (가맹점 모름)'
+};
+
+export const categoryLabel = (category: string) => CATEGORY_LABEL[category] ?? category.replace(/_/g, ' ');
 
 /**
  * 판정 배지 아래에 붙는 한 마디. 같은 배지라도 사용자가 할 일이 달라서 표와 상세에 같이 쓴다.

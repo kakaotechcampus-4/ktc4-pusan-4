@@ -4,7 +4,9 @@ import {
   MASKED_MEDICAL,
   attributeRows,
   bookingNote,
+  categoryLabel,
   formatStamp,
+  merchantName,
   merchantTitle,
   unavailableReason,
   verdictNote } from
@@ -35,6 +37,26 @@ describe('merchantTitle', () => {
 
   it('카드에 찍힌 이름이 비어 있으면 정규화 이름으로 둔다', () => {
     expect(merchantTitle({ merchantRaw: '', merchantNorm: '가게' })).toBe('가게');
+  });
+});
+
+describe('merchantName', () => {
+  it('카드사가 묶어 찍은 합산 행은 밑줄과 띄운 건을 풀어 쓴다', () => {
+    expect(merchantName('버스_모바일 3 건')).toBe('버스 모바일 3건');
+    expect(merchantName('지하철_모바일 50 건')).toBe('지하철 모바일 50건');
+  });
+
+  it('가린 의료기관은 중립 이름이고, 나머지는 그대로다', () => {
+    expect(merchantName('의료_마스킹_02')).toBe(MASKED_MEDICAL);
+    expect(merchantName('해운대 바다횟집')).toBe('해운대 바다횟집');
+  });
+});
+
+describe('categoryLabel', () => {
+  it('내부 키는 읽을 이름으로 바꾸고, 밑줄은 띄운다', () => {
+    expect(categoryLabel('PG_미상')).toBe('결제대행 (가맹점 모름)');
+    expect(categoryLabel('경찰청_범칙금')).toBe('경찰청 범칙금');
+    expect(categoryLabel('음식점')).toBe('음식점');
   });
 });
 

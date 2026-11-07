@@ -6,6 +6,7 @@ import { api, ApiRequestError, useApi } from '../api';
 import { useSession } from '../contexts/SessionContext';
 import { Button, Empty, cn } from '../components/ui';
 import { MERCHANT_CATEGORIES } from '../types/domain';
+import { categoryLabel, merchantName } from '../components/results/display';
 import type { ClassificationReviewGroup } from '../types/domain';
 import { uploadName } from '../copy';
 import { formatFullDate, formatNumber, formatPeriod, formatWon } from '../utils/format';
@@ -16,7 +17,7 @@ import { formatFullDate, formatNumber, formatPeriod, formatWon } from '../utils/
  */
 const PICKABLE_CATEGORIES: string[] = MERCHANT_CATEGORIES.
 filter((category) => category !== 'PG_미상').
-sort((a, b) => a === '기타' ? 1 : b === '기타' ? -1 : a.localeCompare(b, 'ko'));
+sort((a, b) => a === '기타' ? 1 : b === '기타' ? -1 : categoryLabel(a).localeCompare(categoryLabel(b), 'ko'));
 
 /** 고르는 칸. 추천도, 다른 카테고리도, 펼치는 칸도 같은 모양이다 */
 const CHOICE =
@@ -162,11 +163,13 @@ export function ClassificationPreview() {
 
     }
     if (groups.length === 0) {
+      // 이 화면에서 다 고른 것이면 고른 만큼 말한다. 처음부터 없던 것과 같은 말을 하면 고른 일이 사라진 듯 읽힌다
+      const done = Object.values(cards).filter((card) => card.kind === 'gone' || card.kind === 'saved').length;
       return (
         <Empty
           className="mt-8"
           icon={<CheckIcon className="h-5 w-5" strokeWidth={2.5} />}
-          title="분류할 가맹점이 없습니다"
+          title={done > 0 ? `가맹점 ${formatNumber(done)}곳을 모두 분류했습니다` : '분류할 가맹점이 없습니다'}
           action={
           <Button to={nextTo} size="md">
                 {toInterview ? '다음: 사업자 문진' : '다음: 판정 전 확인'}
@@ -232,9 +235,9 @@ export function ClassificationPreview() {
 
   return (
     <AppShell>
-      <div className="mx-auto max-w-3xl">
+      <div className="max-w-3xl">
         <header>
-          <StepEyebrow>분류 확인</StepEyebrow>
+          <StepEyebrow />
           <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">분류 확인</h1>
           {/* 어느 업로드를 보고 있는지 (C54). 업로드 이력·판정 전 확인과 같은 이름을 쓴다 */}
           {batch &&
@@ -323,7 +326,7 @@ function ReviewCard({
   // 한 가맹점이 카드사에서 여러 표기로 찍힌 경우 제목은 정규화된 이름을 쓴다.
   // groupKey 는 형식을 보장하지 않으므로 파싱하지 않고 merchantNorm 을 쓴다.
   const rawVariants = new Set(rows.map((row) => row.merchantRaw)).size;
-  const title = rawVariants > 1 ? group.merchantNorm : group.merchantRaw;
+  const title = rawVariants > 1 ? group.merchantNorm : merchantName(group.merchantRaw);
 
   const suggested = group.suggestedCategories;
   const others = PICKABLE_CATEGORIES.filter((category) => !suggested.includes(category));
@@ -339,7 +342,7 @@ function ReviewCard({
     disabled={busy}
     onClick={() => onPick(title, category)}>
 
-      {category}
+      {categoryLabel(category)}
     </Choice>;
 
 
@@ -373,7 +376,7 @@ function ReviewCard({
           {rows.slice(0, 4).map((row) => {
             // 그룹 제목과 같은 표기면 반복하지 않는다
             const detail = [
-            row.merchantRaw === title ? '' : row.merchantRaw,
+            merchantName(row.merchantRaw) === title ? '' : merchantName(row.merchantRaw),
             row.installmentMonths > 0 ? `${row.installmentMonths}개월 할부` : ''].
             filter(Boolean).join(', ');
             return (

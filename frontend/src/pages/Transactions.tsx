@@ -3,7 +3,7 @@ import { SearchXIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { api, ApiRequestError, useApi } from '../api';
 import { useSession } from '../contexts/SessionContext';
-import { merchantTitle } from '../components/results/display';
+import { categoryLabel, merchantTitle } from '../components/results/display';
 import {
   Badge,
   Button,
@@ -178,7 +178,7 @@ export function Transactions() {
               <Badge>분류 필요</Badge>
             </span> :
       row.classificationStatus.code === 'CLASSIFIED' &&
-      <span className="block truncate text-small text-ink2 md:hidden">{row.merchantCategory}</span>
+      <span className="block truncate text-small text-ink2 md:hidden">{categoryLabel(row.merchantCategory)}</span>
       }
           <span className="mt-2 block sm:hidden">{inclusion(row, true)}</span>
         </span>
@@ -192,7 +192,7 @@ export function Transactions() {
     needsCategory(row) ?
     <Badge>분류 필요</Badge> :
     row.classificationStatus.code === 'CLASSIFIED' ?
-    <span className="whitespace-nowrap text-ink2">{row.merchantCategory}</span> :
+    <span className="whitespace-nowrap text-ink2">{categoryLabel(row.merchantCategory)}</span> :
     <span className="text-muted">—</span>
 
   },

@@ -10,6 +10,7 @@ import { VERDICT_LABEL, VERDICT_META } from '../../utils/verdict';
 import { formatFullDate, formatWon, ro } from '../../utils/format';
 import {
   attributeRows,
+  categoryLabel,
   bookingNote,
   formatStamp,
   merchantTitle,
@@ -285,7 +286,7 @@ export function JudgmentDetailPanel({
         </h2>
         <p className="mt-1 flex flex-wrap gap-x-3 text-small tabular-nums text-ink2">
           <span>{formatFullDate(transaction.approvedAt)}</span>
-          <span>{transaction.merchantCategory}</span>
+          <span>{categoryLabel(transaction.merchantCategory)}</span>
           {transaction.installmentMonths > 0 && <span>{transaction.installmentMonths}개월 할부</span>}
         </p>
       </header>

@@ -9,6 +9,7 @@ import {
 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { StepEyebrow } from '../components/StepEyebrow';
+import { merchantName } from '../components/results/display';
 import { Badge, Button, Table, cn, type Column } from '../components/ui';
 import { useSession } from '../contexts/SessionContext';
 import { api, ApiRequestError, isMock } from '../api';
@@ -267,7 +268,7 @@ export function Upload() {
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0">
           <header>
-            <StepEyebrow>카드내역 올리기</StepEyebrow>
+            <StepEyebrow />
             <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
               카드내역 올리기
             </h1>
@@ -544,7 +545,7 @@ function PreviewCard({
 
   const unsentColumns: Column<UnsendableRow>[] = [
   { header: '승인일', cell: (u) => <span className="whitespace-nowrap tabular-nums">{u.row.approvedAt ? formatFullDate(u.row.approvedAt) : '—'}</span> },
-  { header: '가맹점명', cell: (u) => merchantCell(u.row.rawMerchant) },
+  { header: '가맹점명', cell: (u) => merchantCell(merchantName(u.row.rawMerchant)) },
   {
     header: '금액',
     align: 'right',
@@ -566,7 +567,7 @@ function PreviewCard({
   const head = rows.filter((_, index) => !unsentIndex.has(index)).slice(0, 10);
   const rowColumns: Column<ParsedRow>[] = [
   { header: '승인일', cell: (r) => <span className="whitespace-nowrap tabular-nums">{r.approvedAt ? formatFullDate(r.approvedAt) : '—'}</span> },
-  { header: '가맹점명', cell: (r) => merchantCell(r.rawMerchant) },
+  { header: '가맹점명', cell: (r) => merchantCell(merchantName(r.rawMerchant)) },
   {
     header: '금액',
     align: 'right',

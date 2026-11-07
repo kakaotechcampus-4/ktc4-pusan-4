@@ -4,7 +4,7 @@ import { ArrowRightIcon, CircleHelpIcon, DownloadIcon, SearchXIcon } from 'lucid
 import { AppShell } from '../components/AppShell';
 import { StepEyebrow } from '../components/StepEyebrow';
 import { JudgmentDetailPanel } from '../components/results/JudgmentDetailPanel';
-import { merchantTitle, verdictNote } from '../components/results/display';
+import { categoryLabel, merchantTitle, verdictNote } from '../components/results/display';
 import { VerdictBadge } from '../components/VerdictBadge';
 import {
   BottomSheet,
@@ -58,10 +58,12 @@ const head = (text: string) => <span className="whitespace-nowrap">{text}</span>
 
 /**
  * 넓은 화면의 상세 상자. 화면보다 길면 테두리 상자째 안에서 스크롤해, 스크롤해도 테두리가 끊기지 않는다 (C72).
- * macOS 는 스크롤 막대를 숨겨 아래가 더 있는지 모르므로 막대를 늘 그린다
+ * macOS 는 스크롤 막대를 숨겨 아래가 더 있는지 모르므로 막대를 늘 그린다.
+ * 높이는 끝까지 내렸을 때를 기준으로 잡는다. 그때 sticky 상자는 표 영역 바닥(꼬리말 위, 화면 아래에서 약 11rem)에
+ * 밀려 올라가므로, 상자가 그보다 길면 위쪽이 머리말(72px) 밑으로 들어간다. 표가 짧아도 같다
  */
 const PANEL_SCROLL =
-'max-h-[calc(100vh-10rem)] overflow-y-auto [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted/40 [&::-webkit-scrollbar]:w-2';
+'max-h-[calc(100vh-16.5rem)] overflow-y-auto [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted/40 [&::-webkit-scrollbar]:w-2';
 
 /**
  * 3.7 판정 결과.
@@ -268,7 +270,7 @@ export function Results() {
               {formatFullDate(transaction.approvedAt)}
             </span>
             <span className="block truncate text-small text-ink2">
-              {transaction.merchantCategory}
+              {categoryLabel(transaction.merchantCategory)}
               {transaction.installmentMonths > 0 && `, ${transaction.installmentMonths}개월 할부`}
             </span>
           </span>);
@@ -322,7 +324,7 @@ export function Results() {
   const header =
   <header className="flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-0">
-        <StepEyebrow>결과</StepEyebrow>
+        <StepEyebrow />
         <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">결과</h1>
         {summary && !firstLoad ?
       <p className="mt-2 flex flex-wrap gap-x-4 text-body tabular-nums text-ink2">
@@ -573,7 +575,7 @@ export function Results() {
         </section>
 
         {wide && selectedId && !failed && !nothingJudged && !firstLoad &&
-        <aside className="sticky top-32 self-start">{panel}</aside>
+        <aside className="sticky top-24 self-start">{panel}</aside>
         }
       </div>
 
