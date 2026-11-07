@@ -869,7 +869,7 @@ Idempotency-Key: {uuid}
 | branchRaw | string | N |  |
 | memo | string | N |  |
 | isAggregated | boolean | N |  |
-| needsReview | boolean | N | 파서 단계 확인 필요 여부 |
+| needsReview | boolean | N | 파서 단계 확인 필요 여부. 저장만 하고 아직 판정과 응답에는 쓰지 않는다 |
 | reviewReason | string | N |  |
 | sourceCard | string | N |  |
 
@@ -2014,7 +2014,7 @@ Query: `batchId` 또는 `year` 중 정확히 하나. 0개거나 2개면 `400 INV
 | origin | 이 revision이 생성된 직접 원인 |
 | outOfScope | 룰엔진 판정 범위 밖(핸드오프)인지. `verdict = NEEDS_REVIEW`일 때만 `true`일 수 있고 그 외 verdict에서는 항상 `false` |
 | account | 계정과목 ID. 비교와 집계는 이 값으로 한다. 허용 값은 `rules/accounts.yaml`이다 |
-| accountLabel | 계정과목 화면 이름. 화면, 내보내기, 비서는 이 값을 보인다. 이름이 따로 없으면 `account`와 같다(`접대비` → `기업업무추진비`, 소득세법 §35) |
+| accountLabel | 계정과목 화면 이름. 사람에게 보일 때는 이 값을 쓴다. 이름이 따로 없으면 `account`와 같다(`접대비` → `기업업무추진비`, 소득세법 §35) |
 | finalAmount | 안분, 상각 적용 후 인정 금액. `AVAILABLE`이 아니면 0. G6 한도는 연간 집계라 반영하지 않는다(`year` 요약과 `limits`가 반영한다, 3.7 summary) |
 | isInference | 룰로 확정하지 못해 fallback 결과인지 |
 | unmatchedReason | 매칭 실패 원인 |
