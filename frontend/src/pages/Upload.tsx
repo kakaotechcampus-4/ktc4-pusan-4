@@ -23,7 +23,7 @@ import type {
 '../parser';
 import type { SourceStatus, UploadBatchCreated, UploadBatchRequest } from '../types/domain';
 import { ISSUER_LABEL, uploadName } from '../copy';
-import { formatNumber, formatPeriod, formatWon } from '../utils/format';
+import { formatFullDate, formatNumber, formatPeriod, formatWon } from '../utils/format';
 import {
   APPROVAL_EXPORT_STEPS,
   ASSISTANT_DESTINATION,
@@ -543,7 +543,7 @@ function PreviewCard({
 
 
   const unsentColumns: Column<UnsendableRow>[] = [
-  { header: '승인일', cell: (u) => <span className="whitespace-nowrap tabular-nums">{u.row.approvedAt || '—'}</span> },
+  { header: '승인일', cell: (u) => <span className="whitespace-nowrap tabular-nums">{u.row.approvedAt ? formatFullDate(u.row.approvedAt) : '—'}</span> },
   { header: '가맹점명', cell: (u) => merchantCell(u.row.rawMerchant) },
   {
     header: '금액',
@@ -565,7 +565,7 @@ function PreviewCard({
   const unsentIndex = new Set(unsendable.map((u) => u.index));
   const head = rows.filter((_, index) => !unsentIndex.has(index)).slice(0, 10);
   const rowColumns: Column<ParsedRow>[] = [
-  { header: '승인일', cell: (r) => <span className="whitespace-nowrap tabular-nums">{r.approvedAt || '—'}</span> },
+  { header: '승인일', cell: (r) => <span className="whitespace-nowrap tabular-nums">{r.approvedAt ? formatFullDate(r.approvedAt) : '—'}</span> },
   { header: '가맹점명', cell: (r) => merchantCell(r.rawMerchant) },
   {
     header: '금액',

@@ -7,7 +7,7 @@ import { InfoPanel, InfoRows, PANEL_LINK, PanelFailed, PanelNote } from '../comp
 import { api, ApiRequestError, useApi } from '../api';
 import { useSession } from '../contexts/SessionContext';
 import { Button, Modal } from '../components/ui';
-import { formatFullDate, toKst } from '../utils/format';
+import { formatFullDate } from '../utils/format';
 import { accountLabel } from '../utils/account';
 import { contextRows } from '../utils/context';
 
@@ -49,7 +49,7 @@ export function Account() {
   [
   { term: '로그인 방식', value: kakao ? '카카오' : '이메일' },
   ...(me.email ? [{ term: '가입 이메일', value: me.email }] : []),
-  { term: '가입일', value: formatFullDate(toKst(me.createdAt).date) }] :
+  { term: '가입일', value: formatFullDate(me.createdAt) }] :
   [];
 
   return (
@@ -173,7 +173,7 @@ export function Account() {
               <div className="flex justify-between gap-3">
                 <dt className="text-ink2">가입일</dt>
                 <dd className="tabular-nums text-ink">
-                  {formatFullDate(toKst(me.createdAt).date)}
+                  {formatFullDate(me.createdAt)}
                 </dd>
               </div>
             </dl>
