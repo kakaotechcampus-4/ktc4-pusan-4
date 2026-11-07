@@ -51,7 +51,8 @@ export function Table<T>({
   loading = false,
   className
 }: TableProps<T>) {
-  if (!loading && rows.length === 0 && empty) return <>{empty}</>;
+  // 비었을 때도 표 자리의 간격(className)을 지킨다. 빼면 빈 상태가 위의 필터에 붙는다
+  if (!loading && rows.length === 0 && empty) return <div className={className}>{empty}</div>;
 
   // 칸 안의 글자는 줄을 바꾸지 않는다(「제/외/하/기」). 긴 가맹점명은 그 칸이 truncate 로 말줄임한다
   const cellClass = (column: Column<T>) =>

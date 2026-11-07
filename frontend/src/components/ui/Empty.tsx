@@ -22,6 +22,11 @@ interface EmptyProps {
   /** 다음에 할 행동이 있을 때만 */
   action?: React.ReactNode;
   tone?: EmptyTone;
+  /**
+   * 걸러 낸 표가 비었을 때. 상자를 그리지 않고 표 머리의 굵은 괘선 아래를 비운다.
+   * 필터 바로 아래에 점선 상자가 붙으면 필터와 한 덩어리로 보인다
+   */
+  inTable?: boolean;
   className?: string;
 }
 
@@ -32,13 +37,16 @@ export function Empty({
   description,
   action,
   tone = 'neutral',
+  inTable = false,
   className
 }: EmptyProps) {
   return (
     <div
       className={cn(
-        'flex flex-col items-center rounded-2xl border px-6 py-14 text-center',
-        tone === 'error' ? 'border-deny-line bg-deny-bg' : 'border-dashed border-line bg-canvas',
+        'flex flex-col items-center text-center',
+        inTable && tone !== 'error' ?
+        'border-t-2 border-rule px-6 py-12' :
+        cn('rounded-2xl border px-6 py-14', tone === 'error' ? 'border-deny-line bg-deny-bg' : 'border-dashed border-line bg-canvas'),
         className
       )}>
 

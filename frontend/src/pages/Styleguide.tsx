@@ -365,7 +365,7 @@ export function Styleguide() {
           
         </Block>
 
-        <Block title="Empty" note="없음이 아니라 왜 없는지를 말한다. 문장 하나와 동작 하나. 다 처리해서 비었으면 tone=ok(초록이 아니다), 화면 전체를 불러오지 못했으면 tone=error.">
+        <Block title="Empty" note="없음이 아니라 왜 없는지를 말한다. 문장 하나와 동작 하나. 다 처리해서 비었으면 tone=ok(초록이 아니다), 화면 전체를 불러오지 못했으면 tone=error. 걸러 낸 표가 비었으면 inTable 로 상자 없이 표 괘선 아래를 비운다.">
           <div className="grid gap-4 lg:grid-cols-2">
             <Empty
               icon={<InboxIcon className="h-5 w-5" />}
@@ -376,6 +376,11 @@ export function Styleguide() {
               tone="ok"
               icon={<CheckIcon className="h-5 w-5" />}
               title="분류할 가맹점이 없습니다" />
+
+            <Empty
+              inTable
+              icon={<InboxIcon className="h-5 w-5" />}
+              title="확인이 필요한 거래가 없습니다" />
 
             <Empty
               tone="error"
