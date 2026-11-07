@@ -25,7 +25,7 @@ import {
 /** 토큰 값은 tailwind.config.js와 같아야 한다. 여기서는 보여주기용으로만 적는다. */
 const COLORS: { name: string; cls: string; hex: string; use: string }[] = [
 { name: 'canvas', cls: 'bg-canvas', hex: '#FFFFFF', use: '페이지 바탕' },
-{ name: 'surface', cls: 'bg-surface', hex: '#F2F4F6', use: 'hover, 고른 상태 (카드·패널을 칠하지 않는다)' },
+{ name: 'surface', cls: 'bg-surface', hex: '#F2F4F6', use: 'hover, 고른 상태 (카드와 패널은 칠하지 않는다)' },
 { name: 'surface2', cls: 'bg-surface2', hex: '#2C6AE8', use: '첫 화면 큰 판 (글자는 흰색)' },
 { name: 'sheet', cls: 'bg-sheet', hex: '#FFFFFF', use: '패널 위 흰 바탕, 표' },
 { name: 'line', cls: 'bg-line', hex: '#E5E8EB', use: '테두리 기본, 행 괘선' },
@@ -44,21 +44,21 @@ const COLORS: { name: string; cls: string; hex: string; use: string }[] = [
 { name: 'ok', cls: 'bg-ok', hex: '#00703D', use: '가능 — 글자' },
 { name: 'ok-bg', cls: 'bg-ok-bg', hex: '#E8F6F0', use: '가능 — 박스 바탕' },
 { name: 'ok-line', cls: 'bg-ok-line', hex: '#B2E3CE', use: '가능 — 박스 테두리' },
-{ name: 'ok-bar', cls: 'bg-ok-bar', hex: '#12B76A', use: '가능 — 막대·점' },
+{ name: 'ok-bar', cls: 'bg-ok-bar', hex: '#12B76A', use: '가능 — 막대, 점' },
 { name: 'warn', cls: 'bg-warn', hex: '#8A5A10', use: '확인 필요 — 글자' },
 { name: 'warn-bg', cls: 'bg-warn-bg', hex: '#FDF3E3', use: '확인 필요 — 박스 바탕' },
 { name: 'warn-line', cls: 'bg-warn-line', hex: '#EFD7A4', use: '확인 필요 — 박스 테두리' },
-{ name: 'warn-bar', cls: 'bg-warn-bar', hex: '#F7A51B', use: '확인 필요 — 막대·점' },
+{ name: 'warn-bar', cls: 'bg-warn-bar', hex: '#F7A51B', use: '확인 필요 — 막대, 점' },
 { name: 'deny', cls: 'bg-deny', hex: '#C5283D', use: '불가 — 글자' },
 { name: 'deny-bg', cls: 'bg-deny-bg', hex: '#FDEDEF', use: '불가 — 박스 바탕' },
 { name: 'deny-line', cls: 'bg-deny-line', hex: '#F7CDD4', use: '불가 — 박스 테두리' },
-{ name: 'deny-bar', cls: 'bg-deny-bar', hex: '#FF5A5A', use: '불가 — 막대·점' }];
+{ name: 'deny-bar', cls: 'bg-deny-bar', hex: '#FF5A5A', use: '불가 — 막대, 점' }];
 
 
 const TYPE: { token: string; cls: string; spec: string; use: string }[] = [
 { token: 'ir-display', cls: 'text-ir-display font-normal tracking-ir', spec: '48/60, 굵기 400, 자간 -1px', use: '첫 화면 큰 판 제목' },
 { token: 'ir-section', cls: 'text-ir-section font-normal tracking-ir', spec: '48/72, 굵기 400, 자간 -1px', use: '랜딩 섹션 제목' },
-{ token: 'ir-panel', cls: 'text-ir-panel tracking-ir-sm', spec: '30/45, 자간 -0.8px', use: '랜딩 패널·카드 제목, 큰 숫자' },
+{ token: 'ir-panel', cls: 'text-ir-panel tracking-ir-sm', spec: '30/45, 자간 -0.8px', use: '랜딩 패널과 카드 제목, 큰 숫자' },
 { token: 'ir-num', cls: 'text-ir-num tracking-ir-sm', spec: '26/39', use: '띠 카드 숫자' },
 { token: 'ir-lead', cls: 'text-ir-lead font-normal tracking-ir-xs', spec: '22/33, 굵기 400', use: '큰 알약 글자' },
 { token: 'h1 / h1-lg', cls: 'text-h1 sm:text-h1-lg', spec: '38/48 → 52/66', use: '앱 화면 큰 제목' },
@@ -135,7 +135,7 @@ export function Styleguide() {
           </ul>
         </Block>
 
-        <Block title="타이포" note="임의 px 크기 금지. 반응형은 h1·h2·h3만 sm: 접두로 키운다.">
+        <Block title="타이포" note="임의 px 크기 금지. 반응형은 h1, h2, h3만 sm: 접두로 키운다.">
           <ul className="divide-y divide-line2">
             {TYPE.map((t) =>
             <li key={t.token} className="grid items-baseline gap-4 py-4 sm:grid-cols-[160px_minmax(0,1fr)_200px]">
@@ -152,7 +152,7 @@ export function Styleguide() {
           </ul>
         </Block>
 
-        <Block title="Button" note="sm 헤더·표, md 폼, lg 랜딩 CTA. 한 화면에 primary는 하나.">
+        <Block title="Button" note="sm 헤더와 표, md 폼, lg 랜딩 CTA. 한 화면에 primary는 하나.">
           <div className="space-y-6">
             {BUTTON_VARIANTS.map((variant) =>
             <div key={variant} className="flex flex-wrap items-center gap-4">
@@ -177,7 +177,7 @@ export function Styleguide() {
           </div>
         </Block>
 
-        <Block title="Badge" note="색만으로 상태를 말하지 않는다. 판정 배지는 VerdictBadge에 API의 {code,label}을 넘기면 기호·색이 붙는다.">
+        <Block title="Badge" note="색만으로 상태를 말하지 않는다. 판정 배지는 VerdictBadge에 API의 {code,label}을 넘기면 기호와 색이 붙는다.">
           <div className="space-y-5">
             <div className="flex flex-wrap items-center gap-3">
               {BADGE_TONES.map((tone) =>
@@ -264,7 +264,7 @@ export function Styleguide() {
           </div>
         </Block>
 
-        <Block title="Table · Pagination" note="정렬·페이지네이션은 서버가 한다. hideBelow 로 좁은 화면에서 숨길 열을 고르되 핵심 정보에는 쓰지 않는다.">
+        <Block title="Table, Pagination" note="정렬·페이지네이션은 서버가 한다. hideBelow 로 좁은 화면에서 숨길 열을 고르되 핵심 정보에는 쓰지 않는다.">
           <Table
             caption="표 예시"
             rowKey={(row) => row.id}
@@ -342,7 +342,7 @@ export function Styleguide() {
           </ul>
         </Block>
 
-        <Block title="Modal" note="되돌릴 수 없는 동작 앞에서만. 무엇이 함께 사라지는지 description 에 적는다. Esc·바깥 클릭으로 닫히고, Tab 은 대화상자 안에서만 돌며, 닫으면 열었던 버튼으로 초점이 돌아온다.">
+        <Block title="Modal" note="되돌릴 수 없는 동작 앞에서만. 무엇이 함께 사라지는지 description 에 적는다. Esc나 바깥 클릭으로 닫히고, Tab 은 대화상자 안에서만 돌며, 닫으면 열었던 버튼으로 초점이 돌아온다.">
           <Button variant="secondary" size="md" onClick={() => setModalOpen(true)}>
             삭제 확인 열기
           </Button>
@@ -386,7 +386,7 @@ export function Styleguide() {
           </div>
         </Block>
 
-        <Block title="StatuteCitation" note="GET /statutes/{id} 응답 그대로. 시행일·버전·원문 링크가 항상 붙고, hierarchy 로 근거와 참고(해석기준·사례)를 나눈다.">
+        <Block title="StatuteCitation" note="GET /statutes/{id} 응답 그대로. 시행일과 원문 링크가 항상 붙고, hierarchy 로 근거와 참고(해석기준·사례)를 나눈다.">
           <div className="grid max-w-2xl gap-3">
             <StatuteCitation statuteVersionId={1435} />
             <StatuteCitation statuteVersionId={2071} />

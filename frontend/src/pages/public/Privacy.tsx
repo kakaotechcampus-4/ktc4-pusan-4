@@ -79,11 +79,11 @@ export function PrivacyBody() {
     <LegalSection title="1. 모으는 정보와 쓰는 곳">
       <div className="overflow-x-auto rounded-xl border border-line">
         <table className="w-full min-w-[560px] text-left text-small">
-          <thead className="bg-surface text-muted">
+          <thead className="border-b border-line text-muted">
             <tr>
-              <th scope="col" className="px-3.5 py-2.5 font-normal">항목</th>
-              <th scope="col" className="px-3.5 py-2.5 font-normal">내용</th>
-              <th scope="col" className="px-3.5 py-2.5 font-normal">목적</th>
+              <th scope="col" className="whitespace-nowrap px-3.5 py-2.5 font-normal">항목</th>
+              <th scope="col" className="whitespace-nowrap px-3.5 py-2.5 font-normal">내용</th>
+              <th scope="col" className="whitespace-nowrap px-3.5 py-2.5 font-normal">목적</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line2 bg-sheet">
@@ -116,17 +116,17 @@ export function PrivacyBody() {
     <LegalSection title="3. 외부로 보내는 정보">
       <div className="overflow-x-auto rounded-xl border border-line">
         <table className="w-full min-w-[560px] text-left text-small">
-          <thead className="bg-surface text-muted">
+          <thead className="border-b border-line text-muted">
             <tr>
-              <th scope="col" className="px-3.5 py-2.5 font-normal">받는 곳</th>
-              <th scope="col" className="px-3.5 py-2.5 font-normal">보내는 정보</th>
-              <th scope="col" className="px-3.5 py-2.5 font-normal">목적</th>
+              <th scope="col" className="whitespace-nowrap px-3.5 py-2.5 font-normal">받는 곳</th>
+              <th scope="col" className="whitespace-nowrap px-3.5 py-2.5 font-normal">보내는 정보</th>
+              <th scope="col" className="whitespace-nowrap px-3.5 py-2.5 font-normal">목적</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line2 bg-sheet">
             {SENT.map((row) =>
             <tr key={row.to} className="align-top">
-                <th scope="row" className="px-3.5 py-2.5 font-bold text-ink">{row.to}</th>
+                <th scope="row" className="whitespace-nowrap px-3.5 py-2.5 font-bold text-ink">{row.to}</th>
                 <td className="px-3.5 py-2.5 leading-6">{row.what}</td>
                 <td className="px-3.5 py-2.5 leading-6">{row.why}</td>
               </tr>

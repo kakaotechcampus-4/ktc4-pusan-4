@@ -106,7 +106,7 @@ for (const page of pages) {
 await writeFile(
   join(dist, 'robots.txt'),
   [
-  '# PreeT: 검색엔진과 AI 크롤러(학습·검색·열람)를 모두 허용합니다.',
+  '# PreeT: 검색엔진과 AI 크롤러(학습, 검색, 열람)를 모두 허용합니다.',
   'User-agent: *',
   'Allow: /',
   '',

@@ -48,6 +48,8 @@ type ButtonAsLink = CommonProps & {
   to: string;
   href?: undefined;
   replace?: boolean;
+  /** 이동할 화면에 넘길 location.state. 예: 문진에 돌아올 곳(from)을 넘긴다 */
+  state?: unknown;
 };
 
 type ButtonAsAnchor = CommonProps &
@@ -64,9 +66,9 @@ export function Button(props: ButtonProps) {
   const classes = cn(BASE, VARIANT[variant], SIZE[size], className);
 
   if (props.to !== undefined) {
-    const { to, replace } = props;
+    const { to, replace, state } = props;
     return (
-      <Link to={to} replace={replace} className={classes}>
+      <Link to={to} replace={replace} state={state} className={classes}>
         {children}
       </Link>);
 

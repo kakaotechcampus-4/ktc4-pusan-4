@@ -5,7 +5,7 @@ import { DISCLAIMER } from '../copy';
 
 export function MarketingFooter() {
   return (
-    <footer className="border-t border-line bg-surface">
+    <footer className="border-t border-line bg-canvas">
       <Container className="py-12">
         <div className="flex flex-wrap items-start justify-between gap-8">
           <div className="max-w-xl">
