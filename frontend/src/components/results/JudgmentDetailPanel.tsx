@@ -14,6 +14,7 @@ import {
   bookingNote,
   formatStamp,
   merchantTitle,
+  plainLaw,
   unavailableReason,
   verdictNote } from
 './display';
@@ -173,7 +174,7 @@ export function JudgmentDetailPanel({
   // 질문을 아직 읽는 중이면 기다린다. 먼저 띄우면 답변 대기로 바뀌면서 문장이 갈린다
   const because = overridden ?
   null :
-  judgment.explanation ?? (reviewState || reviewQ.loading ? null : unavailableReason(judgment));
+  (judgment.explanation && plainLaw(judgment.explanation)) ?? (reviewState || reviewQ.loading ? null : unavailableReason(judgment));
   // 문장으로 말할 것이 없으면 「판정 이유」 칸을 통째로 뺀다. 근거는 아래 조문 칸에 있다
   const hasReason = Boolean(reviewState || overridden || because);
   const note = verdictNote(judgment, reviewState === 'PRESUMED');
@@ -358,7 +359,7 @@ export function JudgmentDetailPanel({
               자동 판정 <VerdictBadge verdict={engine.verdict} />
             </p>
             {engine.explanation &&
-          <p className="mt-1.5 leading-6">{engine.explanation}</p>
+          <p className="mt-1.5 leading-6">{plainLaw(engine.explanation)}</p>
           }
           </div>
         }

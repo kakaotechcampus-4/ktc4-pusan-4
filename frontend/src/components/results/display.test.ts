@@ -8,6 +8,7 @@ import {
   formatStamp,
   merchantName,
   merchantTitle,
+  plainLaw,
   unavailableReason,
   verdictNote } from
 './display';
@@ -142,10 +143,22 @@ describe('bookingNote', () => {
     expect(bookingNote({ 계상_안내: '그해 장부에 계상해야 합니다' })).toBe('그해 장부에 계상해야 합니다');
     expect(bookingNote({})).toBeNull();
   });
+
+  it('자산으로 나눠 처리하는 거래에는 즉시 경비 안내를 띄우지 않는다', () => {
+    expect(bookingNote({ 자산: true, 계상_안내: '그해 장부에 계상해야 합니다(시행령 §67⑦)' })).toBeNull();
+    expect(bookingNote({ 계상_안내: '그해 장부에 계상해야 합니다(시행령 §67⑦)' })).toBe('그해 장부에 계상해야 합니다(시행령 제67조 제7항)');
+  });
 });
 
 describe('formatStamp', () => {
   it('날짜는 다른 화면과 같은 꼴이고 KST 시:분을 붙인다', () => {
     expect(formatStamp('2026-11-05T12:22:00Z')).toBe('2026. 11. 05 21:22');
+  });
+});
+
+describe('plainLaw', () => {
+  it('조문 기호를 조, 항, 호로 푼다', () => {
+    expect(plainLaw('인정됩니다(시행령 §67⑦)')).toBe('인정됩니다(시행령 제67조 제7항)');
+    expect(plainLaw('§33①5 와 §81의6')).toBe('제33조 제1항 제5호 와 제81조의6');
   });
 });

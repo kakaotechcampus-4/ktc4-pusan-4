@@ -81,8 +81,28 @@ ATTRIBUTES.flatMap(([key, label, read]) => {
   return value === null ? [] : [{ label, value }];
 });
 
-/** 장부에 올려야 경비가 되는 경우의 안내(R-240 등). 놓치면 경비를 잃는 문장이라 따로 보여 준다 */
-export const bookingNote = (attributes: Record<string, unknown>) => text(attributes['계상_안내']);
+const CIRCLED = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳';
+
+/**
+ * 규칙 카드 문장의 조문 기호를 말로 푼다. 시행령 §67⑦ → 시행령 제67조 제7항, §33①5 → 제33조 제1항 제5호.
+ * 화면 문구에 §와 원 숫자를 쓰지 않는다 (11/5 치오 방향)
+ */
+export const plainLaw = (sentence: string) =>
+sentence.replace(/§\s?(\d+)(의\d+)?([①-⑳])?(\d+)?/g, (_, article: string, branch = '', paragraph?: string, item?: string) =>
+[`제${article}조${branch}`, paragraph && `제${CIRCLED.indexOf(paragraph) + 1}항`, item && `제${item}호`].
+filter(Boolean).
+join(' ')
+);
+
+/**
+ * 장부에 올려야 경비가 되는 경우의 안내(R-240 등). 놓치면 경비를 잃는 문장이라 따로 보여 준다.
+ * 자산으로 나눠 처리하기로 답한 거래에는 즉시 경비 안내가 맞지 않아 보이지 않는다
+ */
+export const bookingNote = (attributes: Record<string, unknown>) => {
+  if (attributes['자산'] === true) return null;
+  const note = text(attributes['계상_안내']);
+  return note && plainLaw(note);
+};
 
 /** 판정 이력의 시각. 다른 날짜와 같은 꼴(2026. 11. 05)에 시:분을 붙인다 (C86) */
 export const formatStamp = (iso: string) => {
