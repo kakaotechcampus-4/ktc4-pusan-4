@@ -155,6 +155,17 @@ describe('거래', () => {
     expect(container.textContent).not.toContain('없습니다');
   });
 
+  it('가맹점은 카드에 찍힌 이름으로 쓰고 가린 의료기관 토큰은 보이지 않는다', async () => {
+    const medical = { ...row('9', '의료_마스킹_01', 'JUDGEABLE', 'CLASSIFIED'), merchantNorm: '의료_마스킹_01' };
+    const spaced = { ...row('8', 'FIGMA.COM', 'JUDGEABLE', 'CLASSIFIED'), merchantNorm: 'FIGMACOM' };
+    transactions.list.mockResolvedValue(pageOf([medical, spaced]));
+    await render();
+    expect(container.textContent).toContain('의료기관 (이름 가림)');
+    expect(container.textContent).not.toContain('의료_마스킹');
+    expect(container.textContent).toContain('FIGMA.COM');
+    expect(container.textContent).not.toContain('FIGMACOM');
+  });
+
   it('화면 문구에 가운뎃점과 낫표가 없다', async () => {
     await render();
     expect(container.textContent).not.toMatch(/[·・•「」『』]/);

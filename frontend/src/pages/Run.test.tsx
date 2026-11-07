@@ -200,14 +200,14 @@ describe('Run', () => {
     api.runs.get.mockResolvedValue(run('PARTIAL_FAILED', { processedCount: 8, failedCount: 1 }));
     api.judgments.summary.mockResolvedValue(summary);
     api.runs.failures.mockResolvedValue({ items: [{ transactionId: 'tx-1', errorCode: 'RUN_INTERRUPTED', message: '', failedAt: '' }] });
-    api.transactions.get.mockResolvedValue({ id: 'tx-1', merchantNorm: '다온컴퍼니', amount: 12000 });
+    api.transactions.get.mockResolvedValue({ id: 'tx-1', merchantRaw: '다온 컴퍼니', merchantNorm: '다온컴퍼니', amount: 12000 });
     api.runs.create.mockRejectedValue(new Error('down'));
     await mount();
     await tick();
 
     expect(text()).toContain('일부를 판정하지 못했습니다');
     expect(text()).toContain('1건을 판정하지 못했습니다');
-    expect(text()).toContain('다온컴퍼니');
+    expect(text()).toContain('다온 컴퍼니');
     expect(text()).toContain('중단됨');
     expect(control('결과 보기')).toBeDefined();
 

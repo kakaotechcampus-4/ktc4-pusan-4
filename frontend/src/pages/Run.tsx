@@ -6,6 +6,7 @@ import { StepEyebrow } from '../components/StepEyebrow';
 import { useAssistant } from '../components/assistant/context';
 import { api, ApiRequestError, isMock } from '../api';
 import { useSession } from '../contexts/SessionContext';
+import { merchantTitle } from '../components/results/display';
 import type {
   JudgmentRun,
   JudgmentRunFailure,
@@ -366,7 +367,7 @@ function RunProgress() {
                 return (
                   <li key={failure.transactionId} className="flex items-center gap-3 py-3">
                       <span className="min-w-0 flex-1 truncate text-body text-ink">
-                        {transaction?.merchantNorm ?? '이름을 불러오지 못한 거래'}
+                        {transaction ? merchantTitle(transaction) : '이름을 불러오지 못한 거래'}
                       </span>
                       {transaction &&
                     <span className="shrink-0 whitespace-nowrap text-small tabular-nums text-ink2">

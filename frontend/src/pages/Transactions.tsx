@@ -3,6 +3,7 @@ import { SearchXIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { api, ApiRequestError, useApi } from '../api';
 import { useSession } from '../contexts/SessionContext';
+import { merchantTitle } from '../components/results/display';
 import {
   Badge,
   Button,
@@ -167,11 +168,10 @@ export function Transactions() {
     width: 'w-full max-w-0',
     cell: (row) =>
     <span className="block min-w-0">
-          <span className="block truncate font-normal text-ink">{row.merchantNorm}</span>
+          <span className="block truncate font-normal text-ink">{merchantTitle(row)}</span>
           <span className="block whitespace-nowrap text-small tabular-nums text-muted sm:hidden">
             {formatFullDate(row.approvedAt)}
           </span>
-          <span className="block truncate text-small text-ink2">{row.merchantRaw}</span>
           {/* 분류 열은 좁은 화면에서 숨기므로, 그 정보를 여기로 옮긴다 */}
           {needsCategory(row) ?
       <span className="mt-1 block md:hidden">
@@ -296,6 +296,7 @@ export function Transactions() {
           empty={
           batchStatus === 'error' ?
           <Empty
+            tone="error"
             icon={<SearchXIcon className="h-5 w-5" />}
             title="업로드 목록을 불러오지 못했습니다"
             action={
@@ -306,6 +307,7 @@ export function Transactions() {
 
           listQ.error ?
           <Empty
+            tone="error"
             icon={<SearchXIcon className="h-5 w-5" />}
             title="거래를 불러오지 못했습니다"
             action={
