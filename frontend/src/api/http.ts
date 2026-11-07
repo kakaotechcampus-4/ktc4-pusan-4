@@ -33,7 +33,7 @@ interface Options {
  * 리프레시 토큰은 서버가 httpOnly 쿠키로 둔다 — 같은 오리진이라 fetch 가 그대로 실어 보낸다.
  */
 let accessToken: string | null = null;
-/** 계약(onLost)은 인자 없는 함수지만, 여기서는 끝난 이유를 넘긴다. SessionContext 가 로그인 화면에 알린다 */
+/** 세션이 끝난 이유를 넘긴다(계약의 onLost). SessionContext 가 로그인 화면에 알린다 */
 const lostListeners = new Set<(reason: SessionEndReason) => void>();
 
 /** 로그인·가입·재발급은 만료된 토큰을 싣지 않는다. 서버가 헤더의 토큰부터 검사하면 거기서 401 이 난다 */

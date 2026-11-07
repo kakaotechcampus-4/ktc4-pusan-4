@@ -68,9 +68,5 @@ export const AUTH_LABEL = 'block text-[13px] font-normal text-ink2';
  * 로그인·가입의 버튼은 ui Button(size md, w-full)이다 (C90). 아래 둘은 아직 Button 으로 옮기지 않은
  * 카카오 콜백 화면만 쓴다. 모양은 Button md 와 같다
  */
-export const AUTH_PRIMARY =
-'inline-flex h-12 w-full items-center justify-center whitespace-nowrap rounded-full bg-accent px-6 text-body-lg font-bold text-white transition-colors duration-150 ease-snap hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40';
-export const AUTH_SECONDARY =
-'inline-flex h-12 w-full items-center justify-center whitespace-nowrap rounded-full border border-accent-line bg-sheet px-6 text-body-lg font-bold text-ink transition-colors duration-150 ease-snap hover:border-ink disabled:cursor-not-allowed disabled:opacity-40';
 /** 칸 바로 아래의 오류 한 줄. 칸에는 aria-describedby 로 잇는다 */
 export const AUTH_FIELD_ERROR = 'mt-1.5 text-[13px] text-deny';
