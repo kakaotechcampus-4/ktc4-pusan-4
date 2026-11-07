@@ -20,7 +20,7 @@ const TAX_YEAR = 2026;
 export function AssistantProvider({ children }: {children: React.ReactNode;}) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const { batchId, setBatchId, reloadBatch } = useSession();
+  const { batchId, batchStatus, setBatchId, reloadBatch } = useSession();
   const [open, setOpen] = useState(false);
   const [entries, setEntries] = useState<ChatEntry[]>([]);
   const [pending, setPending] = useState(false);
@@ -105,6 +105,16 @@ export function AssistantProvider({ children }: {children: React.ReactNode;}) {
       []
     }]
     );
+    // 업로드 목록을 고르는 중이면 batchId 가 아직 없다. 올린 게 없다는 말은 다 읽은 뒤에만 한다 (C56)
+    if (batchStatus === 'loading') {
+      answer('올린 카드내역을 불러오는 중입니다. 잠시 뒤 다시 눌러 주세요.');
+      return;
+    }
+    if (batchStatus === 'error') {
+      reloadBatch();
+      answer('올린 카드내역을 불러오지 못했습니다. 다시 불러오고 있으니 잠시 뒤 다시 눌러 주세요.');
+      return;
+    }
     if (!batchId) {
       answer('카드내역을 먼저 올려 주세요.', '/upload');
       return;
@@ -126,7 +136,7 @@ export function AssistantProvider({ children }: {children: React.ReactNode;}) {
     } finally {
       setPending(false);
     }
-  }, [pending, batchId, setBatchId, reloadBatch, pathname]);
+  }, [pending, batchId, batchStatus, setBatchId, reloadBatch, pathname]);
 
   const updateProposal = (id: string, index: number, patch: Partial<ProposalEntry>) =>
   setEntries((prev) =>

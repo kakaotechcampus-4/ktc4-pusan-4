@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { CheckIcon, UserIcon } from 'lucide-react';
+import { CheckIcon } from 'lucide-react';
 import { DisclaimerBar } from './DisclaimerBar';
 import { Button } from './ui';
 import { BugReportButton } from './BugReport';
@@ -41,12 +41,11 @@ const CRUMB: Record<string, [string, string]> = {
 let lastProgress: Progress | null = null;
 
 /** 흐름의 단계가 아니라 언제든 들러보는 자료 화면 */
-/** short 는 640px 보다 좁을 때 보이는 이름이다 */
-interface NavRef {path: string;label: string;short?: string;}
+interface NavRef {path: string;label: string;}
 
 const REFS: NavRef[] = [
 { path: '/transactions', label: '거래' },
-{ path: '/uploads', label: '업로드 이력', short: '이력' }];
+{ path: '/uploads', label: '업로드 이력' }];
 
 /** 관리자에게만 보인다 (M1) */
 const ADMIN_REF: NavRef = { path: '/admin', label: '관리자' };
@@ -154,17 +153,11 @@ export function AppShell({ children, showSteps = true, disclaimer = true }: AppS
                     key={ref.path}
                     to={ref.path}
                     aria-current={active ? 'page' : undefined}
-                    aria-label={ref.short ? ref.label : undefined}
                     className={`shrink-0 whitespace-nowrap rounded-full px-2.5 py-1.5 font-bold transition-colors duration-150 ease-snap sm:px-3 ${
                     active ? 'bg-accent text-white' : 'text-ink2 hover:bg-surface'}`
                     }>
 
-                    {ref.short ?
-                    <>
-                        <span className="sm:hidden">{ref.short}</span>
-                        <span className="hidden sm:inline">{ref.label}</span>
-                      </> :
-                    ref.label}
+                    {ref.label}
                   </Link>);
 
               })}
@@ -181,19 +174,18 @@ export function AppShell({ children, showSteps = true, disclaimer = true }: AppS
 
               {accountLabel(email)}
             </Link>
-            {/* 이메일을 줄인 폭에서도 내 정보로 갈 수 있게 한다. 640px 보다 좁아도 숨기지 않는다 */}
+            {/* 이메일을 줄인 폭에서도 내 정보로 갈 수 있게 한다. 아이콘만 두지 않고 화면 이름을 적는다 */}
             <Link
               to="/account"
               aria-current={pathname.startsWith('/account') ? 'page' : undefined}
-              aria-label={`내 정보 (${accountLabel(email)})`}
               title={accountLabel(email)}
-              className={`inline-flex shrink-0 rounded-full p-2 transition-colors duration-150 ease-snap lg:hidden ${
+              className={`shrink-0 whitespace-nowrap rounded-full px-2.5 py-1.5 font-bold transition-colors duration-150 ease-snap sm:px-3 lg:hidden ${
               pathname.startsWith('/account') ?
               'bg-accent text-white' :
               'hover:bg-surface hover:text-ink'}`
               }>
 
-              <UserIcon className="h-4 w-4" aria-hidden="true" />
+              내 정보
             </Link>
             {/* 랜딩 머리말의 로그인 버튼과 같은 자리(맨 오른쪽)·같은 모양이다 */}
             <Button
@@ -240,13 +232,15 @@ export function AppShell({ children, showSteps = true, disclaimer = true }: AppS
         </nav>
       }
 
-      <main className="mx-auto w-full max-w-page flex-1 px-6 pb-12 pt-5">
+      {/* 오른쪽 아래의 비서 버튼(오른쪽 20px, 56px)이 표 끝 칸과 상세 값을 덮지 않게 그만큼 비워 둔다 */}
+      <main className="mx-auto w-full max-w-page flex-1 px-6 pb-12 pt-5 sm:pr-24">
         {children}
       </main>
 
       {/* 링크 순서는 공개 화면의 꼬리말(MarketingFooter)과 같다 (C96) */}
       <footer className="mt-10 border-t border-line print:hidden">
-        <nav aria-label="도움말과 약관" className="mx-auto max-w-page px-6 py-8 text-caption text-ink2">
+        {/* 좁은 화면에서는 오른쪽을 비울 폭이 없어 비서 버튼 높이만큼 아래를 비운다 */}
+        <nav aria-label="도움말과 약관" className="mx-auto max-w-page px-6 pb-24 pt-8 text-caption text-ink2 sm:pb-8 sm:pr-24">
           <ul className="flex flex-wrap items-center gap-x-5 gap-y-2">
             <li><Link to="/faq" className="hover:text-ink hover:underline underline-offset-4">자주 묻는 질문</Link></li>
             <li><BugReportButton /></li>

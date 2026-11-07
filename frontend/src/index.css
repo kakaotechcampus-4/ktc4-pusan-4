@@ -22,6 +22,9 @@ body {
   color: #4E5968;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  /* 한글이 음절 단위로 꺾이지 않게 어절에서 줄을 바꾼다. 띄어쓰기 없는 긴 글(주소, 메일)은 넘치지 않게 끊는다 */
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 /* 모서리는 건드리지 않는다. 테는 요소의 rounded-* 를 따라 그려진다. 4px 를 얹으면 알약·원 버튼에 네모 테가 생긴다 */
 :focus-visible {
