@@ -12,7 +12,7 @@ import { StepEyebrow } from '../components/StepEyebrow';
 import { merchantName } from '../components/results/display';
 import { Badge, Button, Table, cn, type Column } from '../components/ui';
 import { useSession } from '../contexts/SessionContext';
-import { api, ApiRequestError, isMock } from '../api';
+import { api, ApiRequestError } from '../api';
 import { parseCardFile, sampleFiles } from '../parser';
 import type {
   BlockedOutcome,
@@ -393,7 +393,6 @@ function SampleList({ onPick }: {onPick: (file: File) => void;}) {
   return (
     <section className="mt-8">
       <h2 className="text-body font-bold text-ink">샘플 파일로 해 보기</h2>
-      {!isMock && <p className="mt-1 text-body text-ink2">올리면 업로드 이력에 남습니다.</p>}
       <ul className="mt-3 space-y-2">
         {samples.map((sample) =>
         <li key={sample.id}>

@@ -91,12 +91,12 @@ const ratioOf = (text: string) => {
 /** 칸마다의 오류와, 오류가 없으면 보낼 문진. today 는 한국 시각 YYYY-MM-DD 다 */
 export function checkForm(form: InterviewForm, today: string): {errors: InterviewErrors;body: BusinessContext | null;} {
   const errors: InterviewErrors = {};
-  if (form.revenue === '') errors.revenue = '직전연도 수입금액을 적어 주세요.';
+  if (form.revenue === '') errors.revenue = '직전연도 수입금액을 입력해 주세요.';
   if (form.openDate === '') errors.openDate = '개업일을 입력해 주세요.';
   else if (form.openDate > today) errors.openDate = '개업일은 오늘이나 그 전이어야 합니다.';
   if (form.home === '') errors.home = '자택에서 작업하는지 골라 주세요.';
   const ratio = ratioOf(form.ratio);
-  if (form.home === 'yes' && ratio === null) errors.ratio = '1과 100 사이의 숫자를 적어 주세요.';
+  if (form.home === 'yes' && ratio === null) errors.ratio = '1과 100 사이의 숫자를 입력해 주세요.';
   if (Object.keys(errors).length > 0) return { errors, body: null };
   const revenue = Number(form.revenue);
   return {

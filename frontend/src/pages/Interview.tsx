@@ -27,7 +27,7 @@ import {
  * 있지만 안 되는 선택지는 '준비 중'으로 표기한다 (DESIGN.md).
  */
 const INDUSTRIES: ChoiceOption<string>[] = [
-{ value: JUDGED_INDUSTRY, label: '프리랜서, 인적용역', hint: '940909 기타자영업 (컴퓨터 프로그래머 등)' },
+{ value: JUDGED_INDUSTRY, label: '프리랜서, 인적용역' },
 { value: '73203', label: '디자이너', disabled: true },
 { value: '85699', label: '온라인 강사', disabled: true },
 { value: '59120', label: '영상 편집', disabled: true },
@@ -221,7 +221,7 @@ function InterviewBody() {
     <>
       {welcome &&
       <p role="status" className="mt-3 text-body text-ink2">
-          가입을 마쳤습니다. 판정에 쓸 사업자 정보를 알려 주세요. 판정을 시작하기 전에만 마치면 됩니다.
+          가입을 마쳤습니다. 판정에 쓸 사업자 정보를 알려 주세요.
         </p>
       }
       {restored &&
@@ -347,7 +347,7 @@ function InterviewBody() {
                     value={form.ratio}
                     placeholder="예: 25"
                     aria-invalid={errors.ratio !== undefined}
-                    aria-describedby={errors.ratio ? 'ratio-error' : 'ratio-hint'}
+                    aria-describedby={errors.ratio ? 'ratio-error' : undefined}
                     onChange={(event) => {
                       const ratio = event.target.value.replace(/\D/g, '').slice(0, 3);
                       change((prev) => ({ ...prev, ratio }));
@@ -355,12 +355,8 @@ function InterviewBody() {
                     className={`w-24 ${fieldClass}`} />
                     <span className="text-body font-bold text-ink">%</span>
                   </div>
-                  {errors.ratio ?
-                <p id="ratio-error" role="alert" className={fieldErrorClass}>{errors.ratio}</p> :
-
-                <p id="ratio-hint" className="mt-2 text-small text-ink2">
-                      방 네 칸 중 한 칸을 작업실로 쓰면 25%입니다.
-                    </p>
+                  {errors.ratio &&
+                <p id="ratio-error" role="alert" className={fieldErrorClass}>{errors.ratio}</p>
                 }
                 </div>
               }

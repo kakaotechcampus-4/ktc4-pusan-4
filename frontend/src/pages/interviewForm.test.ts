@@ -48,7 +48,7 @@ describe('새 문진 (C1)', () => {
   it('6번만 고르면 수입금액과 개업일이 없어 저장하지 않는다', () => {
     const { errors, body } = checkForm({ ...EMPTY_FORM, home: 'no' }, TODAY);
     expect(body).toBeNull();
-    expect(errors).toEqual({ revenue: '직전연도 수입금액을 적어 주세요.', openDate: '개업일을 입력해 주세요.' });
+    expect(errors).toEqual({ revenue: '직전연도 수입금액을 입력해 주세요.', openDate: '개업일을 입력해 주세요.' });
   });
 });
 
