@@ -1,0 +1,20 @@
+# 계정과목 허용 어휘와 화면 이름의 단일 원본.
+# backend RuleCardLoader 가 이 목록을 읽어 룰카드와 질문 선택지의 account 값을 검증한다.
+# 목록 밖의 값은 기동 실패다. 새 계정과목이 필요하면 PM 에게 요청할 것.
+#
+# id 는 판정(judgment.account)에 저장되고 비교·집계에 쓰는 키라 바꾸지 않는다.
+# 화면·내보내기·비서가 보일 이름은 label 이고, 없으면 id 를 그대로 보인다(api.md 3.7 accountLabel).
+# limit_bucket 은 계정과목과 다른 키지만 같은 이름이면 이 label 을 함께 쓴다(limits[].bucketLabel).
+accounts:
+  - { id: 접대비, label: 기업업무추진비 }   # 소득세법 §35 의 이름
+  - { id: 광고선전비 }
+  - { id: 교육훈련비 }
+  - { id: 도서인쇄비 }
+  - { id: 보험료 }
+  - { id: 소모품비 }
+  - { id: 수도광열비 }
+  - { id: 수선비 }
+  - { id: 여비교통비 }
+  - { id: 지급수수료 }
+  - { id: 지급임차료 }
+  - { id: 통신비 }
