@@ -24,7 +24,7 @@
 | `match` | object | ✅ | 아래 **match** 참고. 조건은 **전부 AND** |
 | `verdict` | enum | 조건부 | `가능`·`불가`·`확인필요`. 차단형(G1·G2)은 필수 |
 | `out_of_scope` | bool | | 판정하지 않고 넘긴다. `verdict: 확인필요`일 때만 |
-| `account` | string | | 계정과목. 예 `소모품비` |
+| `account` | string | | 계정과목 ID. 예 `소모품비`. `rules/accounts.yaml` 목록 안의 값만 쓴다(밖이면 로딩 거부). 화면 이름은 그 파일의 `label` |
 | `citations` | list | 조건부 | 확정 verdict(`가능`·`불가`)면 필수 |
 | `attributes` | map | | `match`만으로 확정되는 속성 |
 | `question` | object | | 되묻기. 아래 **question** 참고 |

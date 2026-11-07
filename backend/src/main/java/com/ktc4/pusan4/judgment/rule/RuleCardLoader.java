@@ -39,12 +39,17 @@ public final class RuleCardLoader {
     // 파일이 없으면 빈 집합으로 두어 카테고리 검증을 건너뛴다.
     private Set<String> categoryVocabulary = Set.of();
 
+    // 계정과목 어휘와 화면 이름의 단일 원본은 rules/accounts.yaml 이다. ID → 화면 이름(label 이 없으면 ID).
+    // 파일이 없으면 빈 맵으로 두어 계정과목 검증을 건너뛴다.
+    private Map<String, String> accountVocabulary = Map.of();
+
     public RuleSet load(Path rulesDirectory) throws IOException {
         Path cardsDirectory = rulesDirectory.resolve("cards");
         if (!Files.isDirectory(cardsDirectory)) {
             throw new RuleCardValidationException("Rule cards directory does not exist: " + cardsDirectory);
         }
         categoryVocabulary = loadCategoryVocabulary(rulesDirectory.resolve("categories.yaml"));
+        accountVocabulary = loadAccountVocabulary(rulesDirectory.resolve("accounts.yaml"));
 
         List<RuleCard> cards;
         try (Stream<Path> files = Files.list(cardsDirectory)) {
@@ -57,7 +62,7 @@ public final class RuleCardLoader {
         validateUniqueIds(cards);
         validateBlockingConflicts(cards);
         validateAttributeConflicts(cards);
-        return new RuleSet(cards);
+        return new RuleSet(cards, accountVocabulary);
     }
 
     private RuleCard readUnchecked(Path path) {
@@ -158,13 +163,18 @@ public final class RuleCardLoader {
         questions.forEach(question ->
             question.effects().values().forEach(effect -> validateAssetAttributes(id, effect.attributes())));
 
+        String account = optionalText(root, "account");
+        validateAccount(id, account);
+        questions.forEach(question ->
+            question.effects().values().forEach(effect -> validateAccount(id, effect.account())));
+
         JsonNode review = root.path("review");
         String reviewedBy = requiredText(review, "by");
         LocalDate reviewedAt = LocalDate.parse(requiredText(review, "date"));
 
         return new RuleCard(
             id, version, gate, priority, ruleMatch, verdict, outOfScope,
-            optionalText(root, "account"), citations,
+            account, citations,
             attributes, questions,
             effectiveFrom, effectiveTo, reviewedBy, reviewedAt
         );
@@ -415,6 +425,31 @@ public final class RuleCardLoader {
         Set<String> vocabulary = new HashSet<>();
         names.forEach(name -> vocabulary.add(name.asText()));
         return Set.copyOf(vocabulary);
+    }
+
+    private Map<String, String> loadAccountVocabulary(Path accountsFile) throws IOException {
+        if (!Files.exists(accountsFile)) {
+            return Map.of();
+        }
+        JsonNode accounts = mapper.readTree(accountsFile.toFile()).path("accounts");
+        if (!accounts.isArray()) {
+            throw new RuleCardValidationException("accounts.yaml: accounts must be a list");
+        }
+        Map<String, String> vocabulary = new java.util.LinkedHashMap<>();
+        for (JsonNode account : accounts) {
+            String id = requiredText(account, "id");
+            String label = optionalText(account, "label");
+            if (vocabulary.put(id, label == null ? id : label) != null) {
+                throw new RuleCardValidationException("accounts.yaml: duplicate account '" + id + "'");
+            }
+        }
+        return Map.copyOf(vocabulary);
+    }
+
+    private void validateAccount(String id, String account) {
+        if (account != null && !accountVocabulary.isEmpty() && !accountVocabulary.containsKey(account)) {
+            throw new RuleCardValidationException(id + ": account '" + account + "' not in accounts.yaml");
+        }
     }
 
     private void validateCategories(String id, RuleMatch match) {

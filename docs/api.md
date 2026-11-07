@@ -869,7 +869,7 @@ Idempotency-Key: {uuid}
 | branchRaw | string | N |  |
 | memo | string | N |  |
 | isAggregated | boolean | N |  |
-| needsReview | boolean | N | 파서 단계 확인 필요 여부 |
+| needsReview | boolean | N | 파서 단계 확인 필요 여부. 저장만 하고 아직 판정과 응답에는 쓰지 않는다 |
 | reviewReason | string | N |  |
 | sourceCard | string | N |  |
 
@@ -1860,6 +1860,7 @@ GET /api/v1/judgments/summary?runId=R1
   "byAccount": [
     {
       "account": "소모품비",
+      "accountLabel": "소모품비",
       "count": 42,
       "finalAmount": 1820000
     }
@@ -1868,7 +1869,9 @@ GET /api/v1/judgments/summary?runId=R1
   "limits": [
     {
       "bucket": "접대비",
+      "bucketLabel": "기업업무추진비",
       "taxYear": 2026,
+      "limitAmount": 12090000,
       "totalAmount": 13006500,
       "excessAmount": 916500
     }
@@ -1889,11 +1892,13 @@ GET /api/v1/judgments/summary?runId=R1
 | 필드 | 설명 |
 | --- | --- |
 | bucket | 한도 묶음. 판정 `attributes.limit_bucket`과 같은 값(`접대비`) |
+| bucketLabel | 한도 묶음 화면 이름. `rules/accounts.yaml`의 label이다(`기업업무추진비`) |
 | taxYear | 과세연도 |
+| limitAmount | 그해 한도. 최신 문진의 직전연도 수입금액으로 계산한 잠정치라 해마다 같은 값이다. `totalAmount - excessAmount`가 한도 안에서 인정된 금액이다 |
 | totalAmount | 그해 이 묶음 Judgment 금액의 합(한도 전) |
 | excessAmount | 한도를 넘어 필요경비에 넣지 않는 금액. 넘지 않았으면 0 |
 
-`byAccount`는 `AVAILABLE`이면서 `account`가 있는 Judgment만 모은다. 정렬은 `finalAmount DESC`이고, 같으면 `account` 이름순이다.
+`byAccount`는 `AVAILABLE`이면서 `account`가 있는 Judgment만 모은다. 정렬은 `finalAmount DESC`이고, 같으면 `account` 이름순이다. `accountLabel`은 계정과목 화면 이름이다(`GET /judgments/{judgmentId}`의 `accountLabel`).
 
 다른 사용자의 `batchId`·`runId`를 넘기면 404가 아니라 빈 집계(`totalCount` 0)다.
 
@@ -1911,7 +1916,7 @@ Query: `batchId` 또는 `year` 중 정확히 하나. 0개거나 2개면 `400 INV
 {
   "items": [
     {
-      "judgment": { "id": "0199f1c3-...", "transaction": { "approvedAt": "2026-01-12", "merchantRaw": "스타벅스코리아 서면점", "amount": 12800 }, "verdict": { "code": "AVAILABLE", "label": "가능" }, "account": "기업업무추진비", "finalAmount": 12800, "citations": [{ "statuteVersionId": 1418, "statuteId": "소득세법-35-1" }] },
+      "judgment": { "id": "0199f1c3-...", "transaction": { "approvedAt": "2026-01-12", "merchantRaw": "스타벅스코리아 서면점", "amount": 12800 }, "verdict": { "code": "AVAILABLE", "label": "가능" }, "account": "접대비", "accountLabel": "기업업무추진비", "finalAmount": 12800, "citations": [{ "statuteVersionId": 1418, "statuteId": "소득세법-35-1" }] },
       "allowedAmount": 12800,
       "answers": [
         { "question": "이 가맹점에서 사용한 비용은 주로 어떤 목적으로 지출하셨나요?", "answer": "업무미팅" }
@@ -1919,7 +1924,7 @@ Query: `batchId` 또는 `year` 중 정확히 하나. 0개거나 2개면 `400 INV
     }
   ],
   "limits": [
-    { "bucket": "접대비", "taxYear": 2026, "totalAmount": 12800, "excessAmount": 0 }
+    { "bucket": "접대비", "bucketLabel": "기업업무추진비", "taxYear": 2026, "limitAmount": 12090000, "totalAmount": 12800, "excessAmount": 0 }
   ]
 }
 ```
@@ -1966,6 +1971,7 @@ Query: `batchId` 또는 `year` 중 정확히 하나. 0개거나 2개면 `400 INV
   "outOfScope": false,
   "blockedAtGate": null,
   "account": "소모품비",
+  "accountLabel": "소모품비",
   "finalAmount": 1200000,
 
   "isInference": false,
@@ -2007,7 +2013,8 @@ Query: `batchId` 또는 `year` 중 정확히 하나. 0개거나 2개면 `400 INV
 | revision | Transaction 재판정마다 증가 |
 | origin | 이 revision이 생성된 직접 원인 |
 | outOfScope | 룰엔진 판정 범위 밖(핸드오프)인지. `verdict = NEEDS_REVIEW`일 때만 `true`일 수 있고 그 외 verdict에서는 항상 `false` |
-| account | 계정과목 |
+| account | 계정과목 ID. 비교와 집계는 이 값으로 한다. 허용 값은 `rules/accounts.yaml`이다 |
+| accountLabel | 계정과목 화면 이름. 사람에게 보일 때는 이 값을 쓴다. 이름이 따로 없으면 `account`와 같다(`접대비` → `기업업무추진비`, 소득세법 §35) |
 | finalAmount | 안분, 상각 적용 후 인정 금액. `AVAILABLE`이 아니면 0. G6 한도는 연간 집계라 반영하지 않는다(`year` 요약과 `limits`가 반영한다, 3.7 summary) |
 | isInference | 룰로 확정하지 못해 fallback 결과인지 |
 | unmatchedReason | 매칭 실패 원인 |
@@ -2664,6 +2671,11 @@ Question을 삭제하지 않고 상태를 남겨 판정 이력을 보존한다.
 ```
 
 법률, 시행령, 기본통칙, 판례 등의 표시를 구분할 수 있도록 `hierarchy`를 반환한다.
+
+법령(`hierarchy`가 법률, 시행령, 시행규칙)은 응답할 때 두 값을 고친다. 법령 동기화가 저장한 값을 바꾸지 않아 이미 저장된 행에도 적용된다.
+
+- `title`: 동기화는 법령 이름만 저장한다. `statuteId`의 조, 항, 호를 붙인다(`소득세법-33-1-5` → `소득세법 제33조 제1항 제5호`, `소득세법시행령-208의2-1-1` → `소득세법 시행령 제208조의2 제1항 제1호`). 제목에 이미 조가 있으면 그대로 둔다.
+- `sourceUrl`: 가지 조문 주소 `제81의6조`를 국가법령정보 주소 모양 `제81조의6`으로 바꾼다.
 
 없는 법령이면 `404 STATUTE_NOT_FOUND`.
 

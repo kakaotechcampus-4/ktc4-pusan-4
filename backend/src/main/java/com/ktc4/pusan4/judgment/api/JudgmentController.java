@@ -1,6 +1,7 @@
 package com.ktc4.pusan4.judgment.api;
 
 import com.ktc4.pusan4.judgment.api.JudgmentSummaryResponse.Scope;
+import com.ktc4.pusan4.judgment.domain.RuleSet;
 import com.ktc4.pusan4.judgment.domain.Verdict;
 import com.ktc4.pusan4.judgment.persistence.JudgmentListQuery;
 import com.ktc4.pusan4.judgment.persistence.JudgmentOverrideService;
@@ -38,10 +39,15 @@ public class JudgmentController {
 
     private final JudgmentQueryService queryService;
     private final JudgmentOverrideService overrideService;
+    /** 계정과목 화면 이름(rules/accounts.yaml)을 응답에 붙인다. */
+    private final RuleSet rules;
 
-    public JudgmentController(JudgmentQueryService queryService, JudgmentOverrideService overrideService) {
+    public JudgmentController(
+        JudgmentQueryService queryService, JudgmentOverrideService overrideService, RuleSet rules
+    ) {
         this.queryService = queryService;
         this.overrideService = overrideService;
+        this.rules = rules;
     }
 
     @Operation(summary = "판정 목록 및 revision 조회",
@@ -61,7 +67,7 @@ public class JudgmentController {
         @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size
     ) {
         JudgmentListQuery query = new JudgmentListQuery(transactionId, batchId, year, verdict, latestOnly, runId);
-        return PageResponse.of(queryService.list(currentUser.id(), query, page, size).map(JudgmentResponse::from));
+        return PageResponse.of(queryService.list(currentUser.id(), query, page, size).map(judgment -> JudgmentResponse.from(judgment, rules)));
     }
 
     @Operation(summary = "판정 결과 요약",
@@ -82,7 +88,7 @@ public class JudgmentController {
         }
         return JudgmentSummaryResponse.from(scope(batchId, year, runId),
             queryService.summary(currentUser.id(), batchId, year, runId),
-            queryService.limits(currentUser.id(), batchId, year));
+            queryService.limits(currentUser.id(), batchId, year), rules);
     }
 
     @Operation(summary = "세무사에게 넘길 내보내기",
@@ -101,7 +107,7 @@ public class JudgmentController {
                 "batchId, year 중 정확히 하나를 지정해야 합니다.");
         }
         return JudgmentExportResponse.from(queryService.export(currentUser.id(), batchId, year),
-            queryService.limits(currentUser.id(), batchId, year));
+            queryService.limits(currentUser.id(), batchId, year), rules);
     }
 
     private static Scope scope(UUID batchId, Integer year, UUID runId) {
@@ -119,7 +125,7 @@ public class JudgmentController {
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @GetMapping("/{judgmentId}")
     public JudgmentResponse detail(CurrentUser currentUser, @PathVariable UUID judgmentId) {
-        return JudgmentResponse.from(queryService.get(currentUser.id(), judgmentId));
+        return JudgmentResponse.from(queryService.get(currentUser.id(), judgmentId), rules);
     }
 
     @Operation(summary = "사용자 판정 수정 (Override)",
@@ -139,6 +145,6 @@ public class JudgmentController {
     ) {
         UUID revisionId = overrideService.override(currentUser.id(), judgmentId, request.toVerdict(), request.reason());
         // 저장 트랜잭션이 끝난 뒤 다시 읽어야 DB 가 정한 computedAt 이 실린다.
-        return JudgmentResponse.from(queryService.get(currentUser.id(), revisionId));
+        return JudgmentResponse.from(queryService.get(currentUser.id(), revisionId), rules);
     }
 }

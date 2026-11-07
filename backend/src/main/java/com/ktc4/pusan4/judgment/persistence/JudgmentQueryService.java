@@ -12,6 +12,7 @@ import com.ktc4.pusan4.judgment.limit.EntertainmentLimit;
 import com.ktc4.pusan4.judgment.persistence.JudgmentCitationRepository.CitationRow;
 import com.ktc4.pusan4.judgment.persistence.LimitBucketEntryRepository.EntryAmount;
 import com.ktc4.pusan4.shared.api.ApiException;
+import com.ktc4.pusan4.user.persistence.BusinessContextService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -41,19 +42,22 @@ public class JudgmentQueryService {
     private final JudgmentCitationRepository citationRepository;
     private final LimitBucketEntryRepository entryRepository;
     private final QuestionQueryService questionQueryService;
+    private final BusinessContextService contextService;
 
     public JudgmentQueryService(
         JudgmentRepository judgmentRepository,
         TransactionRecordRepository transactionRepository,
         JudgmentCitationRepository citationRepository,
         LimitBucketEntryRepository entryRepository,
-        QuestionQueryService questionQueryService
+        QuestionQueryService questionQueryService,
+        BusinessContextService contextService
     ) {
         this.judgmentRepository = judgmentRepository;
         this.transactionRepository = transactionRepository;
         this.citationRepository = citationRepository;
         this.entryRepository = entryRepository;
         this.questionQueryService = questionQueryService;
+        this.contextService = contextService;
     }
 
     @Transactional(readOnly = true)
@@ -99,9 +103,12 @@ public class JudgmentQueryService {
         List<EntryAmount> entries = entryRepository.findEntryAmounts(userId, EntertainmentLimit.BUCKET);
         Map<UUID, EntryAmount> entryByJudgment = entries.stream()
             .collect(Collectors.toMap(EntryAmount::judgmentId, Function.identity()));
-        Set<Integer> exceededYears = yearTotals(entries).stream()
-            .filter(LimitYearTotal::exceeded)
-            .map(LimitYearTotal::taxYear)
+        Set<Integer> exceededYears = entries.stream()
+            .collect(Collectors.groupingBy(EntryAmount::taxYear,
+                Collectors.summingLong(entry -> entry.taggedAmount() - entry.allowedAmount())))
+            .entrySet().stream()
+            .filter(yearExcess -> yearExcess.getValue() > 0)
+            .map(Map.Entry::getKey)
             .collect(Collectors.toSet());
         Map<UUID, List<Answer>> answers = answersByTransaction(questionQueryService.find(userId, batchId, null));
         return judgments.stream()
@@ -130,17 +137,24 @@ public class JudgmentQueryService {
         Set<Integer> years = year != null
             ? Set.of(year)
             : Set.copyOf(entryRepository.findTaxYearsOfBatch(userId, EntertainmentLimit.BUCKET, batchId));
-        return yearTotals(entryRepository.findEntryAmounts(userId, EntertainmentLimit.BUCKET)).stream()
-            .filter(total -> years.contains(total.taxYear()))
-            .toList();
+        Map<Integer, List<EntryAmount>> byYear = entryRepository.findEntryAmounts(userId, EntertainmentLimit.BUCKET)
+            .stream()
+            .filter(entry -> years.contains(entry.taxYear()))
+            .collect(Collectors.groupingBy(EntryAmount::taxYear, TreeMap::new, Collectors.toList()));
+        // 항목은 문진이 있어야 생긴다. 문진 전 사용자는 여기서 끝나 문진을 읽지 않는다.
+        if (byYear.isEmpty()) {
+            return List.of();
+        }
+        // 집계(LimitSettlementService.settleProvisional)와 같은 수입금액이라 초과액과 맞는다.
+        // 문진을 고치면 같은 트랜잭션에서 다시 집계하므로 항목도 이 한도로 나뉘어 있다.
+        long annualLimit = EntertainmentLimit.annual(contextService.current(userId).prevYearRevenue());
+        return yearTotals(byYear, annualLimit);
     }
 
     /** 항목을 과세연도별로 더한다. 과세연도 순이다. */
-    private static List<LimitYearTotal> yearTotals(List<EntryAmount> entries) {
-        Map<Integer, List<EntryAmount>> byYear = entries.stream()
-            .collect(Collectors.groupingBy(EntryAmount::taxYear, TreeMap::new, Collectors.toList()));
+    private static List<LimitYearTotal> yearTotals(Map<Integer, List<EntryAmount>> byYear, long annualLimit) {
         return byYear.entrySet().stream()
-            .map(year -> new LimitYearTotal(EntertainmentLimit.BUCKET, year.getKey(),
+            .map(year -> new LimitYearTotal(EntertainmentLimit.BUCKET, year.getKey(), annualLimit,
                 year.getValue().stream().mapToLong(EntryAmount::taggedAmount).sum(),
                 year.getValue().stream().mapToLong(entry -> entry.taggedAmount() - entry.allowedAmount()).sum()))
             .toList();
