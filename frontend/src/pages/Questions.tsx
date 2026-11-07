@@ -8,6 +8,7 @@ import { Badge, Button, ChoiceGroup, Empty, Pagination } from '../components/ui'
 import { useSession } from '../contexts/SessionContext';
 import { api, ApiRequestError, useApi } from '../api';
 import { previousAnswer } from '../components/assistant/logic';
+import { merchantTitle } from '../components/results/display';
 import { answerLabel, respondOnce, UNCONFIRMED_CODE, verdictsAfter, withHeld } from '../components/questions/logic';
 import type { VerdictTally } from '../components/questions/logic';
 import type { AnswerSource, QuestionGroup } from '../types/domain';
@@ -52,7 +53,7 @@ const answeredAs = (value: string) => {
 
 /** 한 번에 답할 질문 묶음의 이름. 내부 fact_type 대신 가맹점을 적는다 (C104) */
 const merchantsOf = (groups: QuestionGroup[]) =>
-[...new Set(groups.flatMap((group) => group.transactions.slice(0, 1).map((row) => row.merchantNorm)))].join(', ');
+[...new Set(groups.flatMap((group) => group.transactions.slice(0, 1).map(merchantTitle)))].join(', ');
 
 /** 답한 뒤 카드 안에 남기는 결과. tally 는 다시 판정한 결과이고 못 읽었으면 null 이다 (C28) */
 interface Outcome {
@@ -66,7 +67,7 @@ interface Outcome {
  * 남은 꼬리는 한 번에 닫을 수 있다(F1-c). 답한 질문도 다시 바꿀 수 있다(3.10 답변 정정).
  */
 export function Questions() {
-  const { batchId } = useSession();
+  const { batchId, batchStatus, reloadBatch } = useSession();
   const [busy, setBusy] = useState<string | null>(null);
   /** 한 번에 답한 뒤 목록이 다시 그려지는 동안 선택지를 막는다 (C68) */
   const [settling, setSettling] = useState(false);
@@ -321,7 +322,28 @@ export function Questions() {
     </header>;
 
 
-  if (!batchId || pendingQ.error) {
+  // 업로드 목록을 고르는 동안은 아래 자리 표시로 기다린다. 올린 게 없다는 것은 다 읽은 뒤에만 말한다 (C56)
+  if (batchStatus === 'error') {
+    return (
+      <AppShell>
+        <div className="mx-auto max-w-3xl">
+          {header}
+          <Empty
+            className="mt-6"
+            tone="error"
+            icon={<SearchXIcon className="h-5 w-5" />}
+            title="올린 카드내역을 불러오지 못했습니다"
+            action={
+            <Button size="sm" variant="secondary" onClick={reloadBatch}>
+                다시 시도
+              </Button>
+            } />
+        </div>
+      </AppShell>);
+
+  }
+
+  if ((batchStatus === 'ready' && !batchId) || pendingQ.error) {
     return (
       <AppShell>
         <div className="mx-auto max-w-3xl">
@@ -340,6 +362,7 @@ export function Questions() {
 
           <Empty
             className="mt-6"
+            tone="error"
             icon={<SearchXIcon className="h-5 w-5" />}
             title="질문을 불러오지 못했습니다"
             action={
@@ -412,7 +435,7 @@ export function Questions() {
 
                       <span>
                         <span className="text-ink">
-                          <strong className="font-bold">{group.transactions[0]?.merchantNorm}</strong>{' '}
+                          <strong className="font-bold">{group.transactions[0] && merchantTitle(group.transactions[0])}</strong>{' '}
                           {group.questionText}
                         </span>
                         <span className="block">{text}</span>
@@ -483,8 +506,8 @@ export function Questions() {
                             {rows[0] &&
                           <Badge className="max-w-full">
                                 <span className="min-w-0 truncate">
-                                  {rows[0].merchantNorm}
-                                  {new Set(rows.map((row) => row.merchantNorm)).size > 1 && ' 외'}
+                                  {merchantTitle(rows[0])}
+                                  {new Set(rows.map(merchantTitle)).size > 1 && ' 외'}
                                 </span>
                               </Badge>
                           }
@@ -500,7 +523,7 @@ export function Questions() {
                               {rows.slice(0, SHOWN_TRANSACTIONS).map((row) =>
                           <li key={row.questionId} className="flex gap-3">
                                   <span className="shrink-0 text-muted">{formatDate(row.approvedAt)}</span>
-                                  <span className="min-w-0 flex-1 truncate">{row.merchantRaw}</span>
+                                  <span className="min-w-0 flex-1 truncate">{merchantTitle(row)}</span>
                                   <span className="shrink-0">{formatWon(row.amount)}</span>
                                 </li>
                           )}

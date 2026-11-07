@@ -113,6 +113,7 @@ export function ClassificationPreview() {
       return (
         <Empty
           className="mt-8"
+          tone="error"
           icon={<UploadIcon className="h-5 w-5" />}
           title="올린 카드내역을 불러오지 못했습니다"
           action={
@@ -128,6 +129,7 @@ export function ClassificationPreview() {
       return (
         <Empty
           className="mt-8"
+          tone="error"
           icon={<UploadIcon className="h-5 w-5" />}
           title="분류 결과를 불러오지 못했습니다"
           action={

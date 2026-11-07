@@ -168,6 +168,7 @@ export function Uploads() {
           empty={
           listQ.error ?
           <Empty
+            tone="error"
             icon={<InboxIcon className="h-5 w-5" />}
             title="업로드 이력을 불러오지 못했습니다"
             action={
