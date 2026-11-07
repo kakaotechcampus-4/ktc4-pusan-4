@@ -81,6 +81,12 @@ public class UserService {
         return userRepository.findByEmail(Emails.normalize(email)).flatMap(AppUserEntity::emailCredential);
     }
 
+    /** 비밀번호 재설정용. 가입하지 않은 이메일이면 empty 다. */
+    @Transactional(readOnly = true)
+    public Optional<UUID> findIdByEmail(String email) {
+        return userRepository.findByEmail(Emails.normalize(email)).map(AppUserEntity::toDomain).map(AppUser::id);
+    }
+
     /** 비밀번호 변경용. 비밀번호가 없는 계정(카카오 가입, 예전 고정 사용자)이면 empty 다. */
     @Transactional(readOnly = true)
     public Optional<String> findPasswordHash(UUID userId) {

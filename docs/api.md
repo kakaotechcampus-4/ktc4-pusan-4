@@ -311,6 +311,49 @@ refresh_token={token}; Path=/api/v1/auth; Max-Age=1209600; HttpOnly; Secure; Sam
 409 EMAIL_ALREADY_EXISTS   이미 가입한 이메일
 ```
 
+### `POST /api/v1/auth/password-reset`
+
+```
+{
+  "email": "user@example.com"
+}
+```
+
+비밀번호 재설정 코드를 메일로 보낸다. 응답 `202`. 가입하지 않은 이메일도 `202`이고 메일은 보내지 않는다. 가입 여부를 드러내지 않으려는 것이다.
+코드의 유효시간, 다시 받기 간격, 하루 횟수는 가입 인증과 같고, 가입 인증과 따로 센다. 가입 인증 코드와 섞어 쓸 수 없다.
+
+```
+400 VALIDATION_ERROR                 이메일 형식이 아님
+429 VERIFICATION_RESEND_TOO_SOON     60초 안에 다시 요청함 (가입한 이메일만)
+429 VERIFICATION_DAILY_LIMIT         오늘 이 이메일로 5번 보냄 (가입한 이메일만)
+502 EMAIL_SEND_FAILED                메일을 보내지 못함 (가입한 이메일만)
+503 EMAIL_VERIFICATION_UNAVAILABLE   서버에 메일 계정이 설정되지 않음
+```
+
+`429`와 `502`는 가입한 이메일에서만 나오므로, 같은 이메일로 60초 안에 두 번 요청하면 가입 여부를 알 수 있다. 그 정도는 가입 인증(`409 EMAIL_ALREADY_EXISTS`)에서도 이미 알 수 있어 막지 않는다.
+
+### `POST /api/v1/auth/password-reset/confirm`
+
+요청과 응답, 오류는 `email-verification/confirm`과 같다. 받은 토큰은 30분 동안 그 이메일의 비밀번호 재설정에만 쓸 수 있다.
+
+### `POST /api/v1/auth/password-reset/complete`
+
+```
+{
+  "email": "user@example.com",
+  "verificationToken": "...",
+  "newPassword": "..."
+}
+```
+
+비밀번호를 바꾸고 그 사용자의 모든 로그인(리프레시 토큰)을 끊는다. 응답 `204`. 새 비밀번호로 다시 로그인한다.
+`newPassword` 규칙은 가입과 같다(`signup`의 `password`). 규칙에 맞지 않으면 토큰은 그대로라 고쳐서 다시 보내면 된다. 바꾸고 나면 토큰은 더 쓸 수 없다.
+
+```
+400 VALIDATION_ERROR      새 비밀번호가 규칙에 맞지 않음. message 에 이유가 있다
+400 EMAIL_NOT_VERIFIED    토큰이 없거나, 다른 이메일 것이거나, 만료됐거나, 이미 씀 → 코드부터 다시
+```
+
 ### `POST /api/v1/auth/login`
 
 ```

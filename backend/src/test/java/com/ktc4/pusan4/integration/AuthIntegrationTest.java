@@ -409,6 +409,59 @@ class AuthIntegrationTest {
     }
 
     @Test
+    void password_reset_request_is_202_but_mails_only_registered_email() throws Exception {
+        // 가입하지 않은 이메일도 202 라 가입 여부가 드러나지 않는다. 메일은 보내지 않는다
+        requestReset("nobody@example.com").andExpect(status().isAccepted());
+        assertThat(mailbox.lastCode("nobody@example.com")).isEmpty();
+    }
+
+    @Test
+    void password_reset_logs_out_everywhere_and_only_new_password_works() throws Exception {
+        // given: 로그인한 기기가 있다
+        MvcResult device = signup("resetter@example.com", "old-password1");
+
+        // when: 코드 받기 → 확인 → 새 비밀번호
+        requestReset("Resetter@Example.com").andExpect(status().isAccepted());
+        String token = confirmedResetToken("resetter@example.com");
+        completeReset("resetter@example.com", token, "new-password2!").andExpect(status().isNoContent());
+
+        // then
+        mockMvc.perform(post("/api/v1/auth/refresh").cookie(refreshCookie(device)))
+            .andExpect(status().isUnauthorized());
+        assertThat(login(loginBody("resetter@example.com", "old-password1")).getResponse().getStatus()).isEqualTo(401);
+        assertThat(login(loginBody("resetter@example.com", "new-password2!")).getResponse().getStatus()).isEqualTo(200);
+        // 같은 토큰은 다시 쓸 수 없다
+        completeReset("resetter@example.com", token, "other-password3!")
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("EMAIL_NOT_VERIFIED"));
+    }
+
+    @Test
+    void password_reset_code_cannot_be_confirmed_as_signup_code() throws Exception {
+        signup("mixed@example.com", "old-password1");
+        requestReset("mixed@example.com").andExpect(status().isAccepted());
+        String code = mailbox.lastCode("mixed@example.com").orElseThrow();
+
+        // 가입 인증 확인으로는 이 코드가 없다
+        confirmCode("mixed@example.com", code)
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("VERIFICATION_CODE_EXPIRED"));
+    }
+
+    @Test
+    void weak_new_password_keeps_reset_token_usable() throws Exception {
+        signup("weak-reset@example.com", "old-password1");
+        requestReset("weak-reset@example.com").andExpect(status().isAccepted());
+        String token = confirmedResetToken("weak-reset@example.com");
+
+        completeReset("weak-reset@example.com", token, "onlyletters")
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+        // 규칙을 맞춰 다시 보내면 된다
+        completeReset("weak-reset@example.com", token, "new-password2!").andExpect(status().isNoContent());
+    }
+
+    @Test
     void health_stays_public() throws Exception {
         mockMvc.perform(get("/actuator/health")).andExpect(status().isOk());
     }
@@ -449,6 +502,27 @@ class AuthIntegrationTest {
         throws Exception {
         return mockMvc.perform(post("/api/v1/auth/email-verification/confirm").contentType(MediaType.APPLICATION_JSON)
             .content(objectMapper.writeValueAsString(Map.of("email", email, "code", code))));
+    }
+
+    private ResultActions requestReset(String email) throws Exception {
+        return mockMvc.perform(post("/api/v1/auth/password-reset").contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(Map.of("email", email))));
+    }
+
+    private String confirmedResetToken(String email) throws Exception {
+        String code = mailbox.lastCode(email).orElseThrow();
+        MvcResult result = mockMvc.perform(post("/api/v1/auth/password-reset/confirm")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("email", email, "code", code))))
+            .andExpect(status().isOk())
+            .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).path("verificationToken").asText();
+    }
+
+    private ResultActions completeReset(String email, String token, String newPassword) throws Exception {
+        return mockMvc.perform(post("/api/v1/auth/password-reset/complete").contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(
+                Map.of("email", email, "verificationToken", token, "newPassword", newPassword))));
     }
 
     private ResultActions changePassword(String accessToken, String currentPassword, String newPassword)

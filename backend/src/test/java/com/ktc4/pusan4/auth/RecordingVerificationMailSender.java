@@ -10,7 +10,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 메일을 보내지 않고 이메일별 마지막 코드를 기억한다. 가입 흐름을 보는 통합 테스트에 {@code @Import} 로 붙인다.
+ * 메일을 보내지 않고 이메일별 마지막 코드(용도 무관)를 기억한다. 가입 흐름을 보는 통합 테스트에 {@code @Import} 로 붙인다.
  * {@link #failNext} 를 켜면 다음 한 번은 발송 실패다.
  */
 public class RecordingVerificationMailSender implements VerificationMailSender {
@@ -24,7 +24,7 @@ public class RecordingVerificationMailSender implements VerificationMailSender {
     }
 
     @Override
-    public void send(String email, String code) {
+    public void send(String email, String code, VerificationPurpose purpose) {
         if (failNextSend) {
             failNextSend = false;
             throw new MailSendException("테스트용 발송 실패");

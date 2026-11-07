@@ -3,6 +3,7 @@ package com.ktc4.pusan4.auth.api;
 import com.ktc4.pusan4.auth.AuthService;
 import com.ktc4.pusan4.auth.AuthService.IssuedTokens;
 import com.ktc4.pusan4.auth.EmailVerificationService;
+import com.ktc4.pusan4.auth.VerificationPurpose;
 import com.ktc4.pusan4.shared.api.ErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -66,7 +67,46 @@ public class AuthController {
     public EmailVerificationResponse confirmVerificationCode(
         @Valid @RequestBody EmailVerificationConfirmRequest request
     ) {
-        return new EmailVerificationResponse(emailVerification.confirm(request.email(), request.code()));
+        return new EmailVerificationResponse(
+            emailVerification.confirm(VerificationPurpose.SIGNUP, request.email(), request.code()));
+    }
+
+    @Operation(summary = "비밀번호 재설정 코드 요청",
+        description = "가입한 이메일이면 6자리 코드(5분)를 메일로 보낸다. 가입하지 않은 이메일도 202 라 가입 여부가 드러나지 않는다. "
+            + "대기·하루 한도는 가입 인증과 같고 따로 센다")
+    @ApiResponse(responseCode = "429", description = "VERIFICATION_RESEND_TOO_SOON, VERIFICATION_DAILY_LIMIT",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode = "502", description = "EMAIL_SEND_FAILED",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode = "503", description = "EMAIL_VERIFICATION_UNAVAILABLE",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @PostMapping("/password-reset")
+    public ResponseEntity<Void> sendPasswordResetCode(@Valid @RequestBody EmailVerificationRequest request) {
+        emailVerification.sendPasswordResetCode(request.email());
+        return ResponseEntity.accepted().build();
+    }
+
+    @Operation(summary = "비밀번호 재설정 코드 확인", description = "코드가 맞으면 재설정에 쓸 인증 토큰(30분)을 준다")
+    @ApiResponse(responseCode = "400",
+        description = "INVALID_VERIFICATION_CODE / VERIFICATION_CODE_EXPIRED",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @PostMapping("/password-reset/confirm")
+    public EmailVerificationResponse confirmPasswordResetCode(
+        @Valid @RequestBody EmailVerificationConfirmRequest request
+    ) {
+        return new EmailVerificationResponse(
+            emailVerification.confirm(VerificationPurpose.PASSWORD_RESET, request.email(), request.code()));
+    }
+
+    @Operation(summary = "비밀번호 재설정",
+        description = "재설정 인증 토큰으로 비밀번호를 바꾸고 모든 기기의 로그인을 끊는다. 새 비밀번호로 다시 로그인한다")
+    @ApiResponse(responseCode = "400",
+        description = "EMAIL_NOT_VERIFIED — 토큰이 없거나 틀렸거나 만료됐거나 이미 씀 / VALIDATION_ERROR — 새 비밀번호 규칙(토큰은 남음)",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @PostMapping("/password-reset/complete")
+    public ResponseEntity<Void> resetPassword(@Valid @RequestBody PasswordResetRequest request) {
+        authService.resetPassword(request.email(), request.verificationToken(), request.newPassword());
+        return ResponseEntity.noContent().build();
     }
 
     @Operation(summary = "이메일 회원가입",

@@ -46,10 +46,10 @@ public class AuthService {
      */
     public IssuedTokens signup(String email, String password, String verificationToken) {
         Passwords.requireValid(password);
-        emailVerification.requireVerified(email, verificationToken);
+        emailVerification.requireVerified(VerificationPurpose.SIGNUP, email, verificationToken);
         UUID userId = users.registerEmailAccount(email, passwordEncoder.encode(password))
             .orElseThrow(AuthService::emailAlreadyExists);
-        emailVerification.consume(email);
+        emailVerification.consume(VerificationPurpose.SIGNUP, email);
         return issue(userId);
     }
 
@@ -65,6 +65,22 @@ public class AuthService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_CURRENT_PASSWORD", "현재 비밀번호가 맞지 않습니다.");
         }
         Passwords.requireValid(newPassword);
+        refreshTokens.revokeAll(userId);
+        users.changePasswordHash(userId, passwordEncoder.encode(newPassword));
+    }
+
+    /**
+     * 재설정 인증 토큰으로 비밀번호를 바꾸고 모든 기기의 로그인을 끊는다. 규칙에 맞지 않으면 토큰은 남아 다시 보낼 수 있다.
+     * 토큰은 지운 쪽만 이어 가서, 같은 토큰으로 동시에 와도 한 번만 바뀐다.
+     */
+    public void resetPassword(String email, String verificationToken, String newPassword) {
+        Passwords.requireValid(newPassword);
+        emailVerification.requireVerified(VerificationPurpose.PASSWORD_RESET, email, verificationToken);
+        // 인증한 뒤 탈퇴한 계정이다
+        UUID userId = users.findIdByEmail(email).orElseThrow(EmailVerificationService::notVerified);
+        if (!emailVerification.consume(VerificationPurpose.PASSWORD_RESET, email)) {
+            throw EmailVerificationService.notVerified();
+        }
         refreshTokens.revokeAll(userId);
         users.changePasswordHash(userId, passwordEncoder.encode(newPassword));
     }
