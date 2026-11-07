@@ -191,10 +191,19 @@ class AuthIntegrationTest {
     @Test
     void signup_rejects_short_or_too_long_password() throws Exception {
         assertThat(signup("short@example.com", "pw-123!").getResponse().getStatus()).isEqualTo(400);
-        // 영문, 숫자, 기호가 다 있고 27자지만 UTF-8 73바이트라 BCrypt 한계(72바이트)를 넘는다
-        MvcResult tooLong = signup("long@example.com", "pw1!가나다라마바사아자차카타파하가나다라마바사아자");
+        // 73자라 BCrypt 한계(72바이트)를 넘는다. 비밀번호는 ASCII 라 글자 수가 바이트 수다
+        MvcResult tooLong = signup("long@example.com", "pw1!".repeat(18) + "a");
         assertThat(tooLong.getResponse().getStatus()).isEqualTo(400);
-        assertThat(tooLong.getResponse().getContentAsString()).contains("72바이트");
+        assertThat(tooLong.getResponse().getContentAsString()).contains("72자 이하");
+    }
+
+    @Test
+    void signup_rejects_space_or_korean_in_password() throws Exception {
+        MvcResult result = signup("korean-pw@example.com", "비밀번호abc1!");
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(400);
+        assertThat(result.getResponse().getContentAsString()).contains("공백이나 한글");
+        assertThat(userService.isEmailRegistered("korean-pw@example.com")).isFalse();
     }
 
     @Test

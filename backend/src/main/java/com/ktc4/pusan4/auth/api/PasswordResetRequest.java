@@ -12,7 +12,7 @@ import jakarta.validation.constraints.Size;
 public record PasswordResetRequest(
     @Schema(example = "user@example.com") @NotBlank @Email @Size(max = 320) String email,
     @NotBlank @Size(max = 64) String verificationToken,
-    @Schema(description = "영문, 숫자, 기호를 모두 넣어 8자 이상, UTF-8 72바이트 이하", example = "new-password2!")
+    @Schema(description = "영문, 숫자, 기호만 써서 셋을 모두 넣은 8~72자. 공백, 한글은 쓸 수 없다", example = "new-password2!")
     @NotBlank String newPassword
 ) {
 }
