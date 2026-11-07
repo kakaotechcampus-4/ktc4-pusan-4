@@ -53,8 +53,8 @@ export function Account() {
 
   return (
     // 고지 막대를 내린다. 여기엔 세무대리로 오인할 판정 내용이 없다 (#242 리뷰)
-    <AppShell disclaimer={false}>
-      <div className="max-w-2xl">
+    <AppShell disclaimer={false} narrow>
+      <div>
         <header>
           <h1 className="text-h2 font-bold tracking-tight text-ink">내 정보</h1>
         </header>
