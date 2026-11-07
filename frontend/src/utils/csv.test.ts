@@ -40,10 +40,10 @@ describe('judgmentsCsv', () => {
     );
     expect(text.charCodeAt(0)).toBe(0xfeff);
     expect(text.split('\r\n')[0]).toBe(
-      '\uFEFF승인일,가맹점,원래 가맹점명,카테고리,금액,할부 개월,판정,계정과목,경비 가능 금액,직접 수정,세무사에게 넘김,근거 조문,사용 목적 등 답한 내용'
+      '\uFEFF승인일,가맹점,카테고리,금액,할부 개월,판정,계정과목,경비 가능 금액,직접 수정,세무사에게 넘김,근거 조문,사용 목적 등 답한 내용'
     );
     // 경비 가능 금액은 finalAmount 가 아니라 한도까지 반영한 allowedAmount 다
-    expect(text.split('\r\n')[1]).toBe('2026-01-31,가게 본점,가게 본점,식비,1000,0,가능,소모품비,800,,,소득세법 제27조 제1항,용도는? → 업무미팅');
+    expect(text.split('\r\n')[1]).toBe('2026-01-31,가게 본점,식비,1000,0,가능,소모품비,800,,,소득세법 제27조 제1항,용도는? → 거래처 접대');
   });
 
   it('가맹점은 카드에 찍힌 이름으로 쓰고, 가린 의료기관은 가린 채로 쓴다', async () => {
@@ -60,9 +60,15 @@ describe('judgmentsCsv', () => {
       allowedAmount: 1,
       answers: []
     });
-    const [, figma, medical] = judgmentsCsv([row('FIGMA.COM', 'FIGMACOM'), row('의료_마스킹_01', '의료_마스킹_01')], []).split('\r\n');
+    const [, figma, medical, bus] = judgmentsCsv(
+      [row('FIGMA.COM', 'FIGMACOM'), row('의료_마스킹_01', '의료_마스킹_01'), row('버스_모바일 3 건', '버스모바일3건')],
+      []
+    ).split('\r\n');
     expect(figma.split(',')[1]).toBe('FIGMA.COM');
     expect(medical.split(',')[1]).toBe('의료기관 (이름 가림)');
+    expect(bus.split(',')[1]).toBe('버스 모바일 3건');
+    // 가린 토큰이 어느 칸에도 남지 않는다
+    expect(`${medical}${bus}`).not.toMatch(/마스킹|_/);
   });
 
   it('근거 조문은 조·항·호를 붙인 제목으로 쓰고, 조를 읽지 못하는 id 는 그대로 둔다', async () => {
@@ -80,7 +86,7 @@ describe('judgmentsCsv', () => {
       citations
     } as unknown as import('../types/domain').Judgment;
     expect(judgmentsCsv([{ judgment, allowedAmount: 0, answers: [] }], []).split('\r\n')[1]).toBe(
-      '2026-01-31,가게,,,1000,0,불가,,0,,,"소득세법 제81조의6 제1항, 소득세법 시행령 제208조의2 제1항 제1호, 국세청사무분장규정 제13조의8, 심판례-984358",'
+      '2026-01-31,가게,,1000,0,불가,,0,,,"소득세법 제81조의6 제1항, 소득세법 시행령 제208조의2 제1항 제1호, 국세청사무분장규정 제13조의8, 심판례-984358",'
     );
   });
 
@@ -99,8 +105,8 @@ describe('judgmentsCsv', () => {
       answers: []
     });
     const [, review, unavailable] = judgmentsCsv([row('NEEDS_REVIEW', '확인 필요'), row('UNAVAILABLE', '불가')], []).split('\r\n');
-    expect(review).toBe('2026-01-31,가게,,,1000,0,확인 필요,,,,,,');
-    expect(unavailable).toBe('2026-01-31,가게,,,1000,0,불가,,0,,,,');
+    expect(review).toBe('2026-01-31,가게,,1000,0,확인 필요,,,,,,');
+    expect(unavailable).toBe('2026-01-31,가게,,1000,0,불가,,0,,,,');
   });
 
   it('서버가 어떤 순서로 주든 승인일 순으로 쓴다', async () => {
@@ -142,7 +148,7 @@ describe('judgmentsCsv', () => {
       { bucket: '접대비', taxYear: 2025, totalAmount: 100000, excessAmount: 0 }]
 
     ).split('\r\n');
-    expect(lines[1]).toBe('2026-04-06,카페,,,3500000,0,가능,,,,,,');
+    expect(lines[1]).toBe('2026-04-06,카페,,3500000,0,가능,,,,,,');
     expect(lines.slice(2)).toEqual([
     '',
     '"2026년 접대비 총 14,011,000원 중 1,750,000원은 한도를 넘어 필요경비에 넣지 않습니다(직전연도 수입금액 기준 잠정). 거래별로 나눌 수 없어 이 해 가능 접대비 행의 경비 가능 금액은 비웠습니다(승인취소와 환불 행은 빼고)."']

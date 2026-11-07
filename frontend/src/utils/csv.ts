@@ -1,4 +1,5 @@
-import { merchantTitle } from '../components/results/display';
+import { categoryLabel, merchantTitle } from '../components/results/display';
+import { answerLabel } from '../components/questions/logic';
 import type { Judgment, JudgmentExportRow, LimitYear } from '../types/domain';
 import { formatWon } from './format';
 import { limitsOf } from './limit';
@@ -17,7 +18,6 @@ export const toCsv = (rows: (string | number | null | undefined)[][]) => rows.ma
 const HEADER = [
 '승인일',
 '가맹점',
-'원래 가맹점명',
 '카테고리',
 '금액',
 '할부 개월',
@@ -62,10 +62,10 @@ export function judgmentsCsv(rows: JudgmentExportRow[], limits: LimitYear[]): st
   const body = ordered.map(({ judgment, allowedAmount, answers }) => [
   // 스프레드시트가 날짜로 읽도록 ISO 날짜로 쓴다
   judgment.transaction.approvedAt.slice(0, 10),
-  // 화면과 같은 이름이다. 붙여 쓴 정규화 이름은 사람이 읽을 이름이 아니고, 가린 의료기관은 가린 채로 쓴다 (Q7, C32)
+  // 화면과 같은 이름이다. 붙여 쓴 정규화 이름은 사람이 읽을 이름이 아니고, 가린 의료기관과 합산 행은 화면 이름으로 쓴다 (Q7, C32).
+  // 카드에 찍힌 이름을 따로 두지 않는다. 같은 값이거나 가린 토큰이라 옮길 것이 없다
   merchantTitle(judgment.transaction),
-  judgment.transaction.merchantRaw,
-  judgment.transaction.merchantCategory,
+  categoryLabel(judgment.transaction.merchantCategory),
   judgment.transaction.amount,
   judgment.transaction.installmentMonths,
   judgment.verdict.label,
@@ -76,7 +76,8 @@ export function judgmentsCsv(rows: JudgmentExportRow[], limits: LimitYear[]): st
   judgment.origin.type === 'OVERRIDE' ? '예' : '',
   judgment.outOfScope ? '예' : '',
   judgment.citations.map((citation) => citationTitle(citation.statuteId)).join(', '),
-  answers.map((item) => `${item.question} → ${item.answer}`).join(' / ')]
+  // 답은 화면의 선택지 이름으로 쓴다(개인 → 개인 용도)
+  answers.map((item) => `${item.question} → ${answerLabel(item.answer)}`).join(' / ')]
   );
   const exceeded = limitsOf(limits).filter((item) => item.excessAmount > 0);
   // 빈 줄로 표와 떼어, 표만 골라 합계를 내도 섞이지 않게 한다
