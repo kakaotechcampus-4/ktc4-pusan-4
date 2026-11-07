@@ -208,6 +208,7 @@ export function Summary() {
   batchStatus === 'error' ?
   {
     title: '올린 카드내역을 불러오지 못했습니다',
+    tone: 'error' as const,
     action:
     <Button size="sm" variant="secondary" onClick={reloadBatch}>
             다시 시도
@@ -225,6 +226,7 @@ export function Summary() {
   summaryQ.error ?
   {
     title: '요약을 불러오지 못했습니다',
+    tone: 'error' as const,
     action:
     <Button size="sm" variant="secondary" onClick={summaryQ.reload}>
           다시 시도
