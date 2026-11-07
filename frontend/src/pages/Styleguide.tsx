@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowRightIcon } from 'lucide-react';
+import { AlertTriangleIcon, ArrowRightIcon, CheckIcon, InboxIcon } from 'lucide-react';
 import { StatuteCitation } from '../components/StatuteCitation';
 import { VerdictBadge } from '../components/VerdictBadge';
 import {
@@ -25,39 +25,40 @@ import {
 /** 토큰 값은 tailwind.config.js와 같아야 한다. 여기서는 보여주기용으로만 적는다. */
 const COLORS: { name: string; cls: string; hex: string; use: string }[] = [
 { name: 'canvas', cls: 'bg-canvas', hex: '#FFFFFF', use: '페이지 바탕' },
-{ name: 'surface', cls: 'bg-surface', hex: '#F2F4F6', use: '패널, 카드' },
+{ name: 'surface', cls: 'bg-surface', hex: '#F2F4F6', use: 'hover, 고른 상태 (카드와 패널은 칠하지 않는다)' },
 { name: 'surface2', cls: 'bg-surface2', hex: '#2C6AE8', use: '첫 화면 큰 판 (글자는 흰색)' },
 { name: 'sheet', cls: 'bg-sheet', hex: '#FFFFFF', use: '패널 위 흰 바탕, 표' },
 { name: 'line', cls: 'bg-line', hex: '#E5E8EB', use: '테두리 기본, 행 괘선' },
 { name: 'line2', cls: 'bg-line2', hex: '#EDEFF2', use: '약한 구분선 (surface 위에서도 보임)' },
+{ name: 'edge', cls: 'bg-edge', hex: '#838B96', use: '입력칸, select, 고르지 않은 선택지 테두리 (3:1)' },
 { name: 'rule', cls: 'bg-rule', hex: '#191F28', use: '표 머리 위 굵은 괘선' },
 { name: 'ink', cls: 'bg-ink', hex: '#191F28', use: '제목, 어두운 판' },
-{ name: 'ink2', cls: 'bg-ink2', hex: '#4E5968', use: '본문' },
-{ name: 'muted', cls: 'bg-muted', hex: '#6B7684', use: '보조 설명, 캡션' },
-{ name: 'accent', cls: 'bg-accent', hex: '#2C6AE8', use: 'CTA, 지금 자리 알약' },
-{ name: 'accent-hover', cls: 'bg-accent-hover', hex: '#1C5FD4', use: 'CTA 누를 때' },
-{ name: 'accent-soft', cls: 'bg-accent-soft', hex: '#E4EDFB', use: '연한 채움 — 고른 선택지, 진행 중 단계' },
+{ name: 'ink2', cls: 'bg-ink2', hex: '#4E5968', use: '본문, 읽어야 하는 보조 글' },
+{ name: 'muted', cls: 'bg-muted', hex: '#5F6B78', use: '날짜, 건수 같은 작은 메타 정보' },
+{ name: 'accent', cls: 'bg-accent', hex: '#2C6AE8', use: '주 버튼, 지금 고른 자리' },
+{ name: 'accent-hover', cls: 'bg-accent-hover', hex: '#1C5FD4', use: '주 버튼 hover, accent-soft 위의 글자' },
+{ name: 'accent-soft', cls: 'bg-accent-soft', hex: '#E4EDFB', use: '고른 선택지, 고른 행, 진행 중 단계' },
 { name: 'accent-line', cls: 'bg-accent-line', hex: '#DCE3EB', use: '테두리 버튼, 패널 안 구분선' },
 { name: 'link', cls: 'bg-link', hex: '#2C6AE8', use: '문장 속 링크' },
 { name: 'highlight', cls: 'bg-highlight', hex: '#FF5C9A', use: '한 화면에 한 번 쓰는 강조' },
 { name: 'ok', cls: 'bg-ok', hex: '#00703D', use: '가능 — 글자' },
 { name: 'ok-bg', cls: 'bg-ok-bg', hex: '#E8F6F0', use: '가능 — 박스 바탕' },
 { name: 'ok-line', cls: 'bg-ok-line', hex: '#B2E3CE', use: '가능 — 박스 테두리' },
-{ name: 'ok-bar', cls: 'bg-ok-bar', hex: '#12B76A', use: '가능 — 막대·점' },
+{ name: 'ok-bar', cls: 'bg-ok-bar', hex: '#12B76A', use: '가능 — 막대, 점' },
 { name: 'warn', cls: 'bg-warn', hex: '#8A5A10', use: '확인 필요 — 글자' },
 { name: 'warn-bg', cls: 'bg-warn-bg', hex: '#FDF3E3', use: '확인 필요 — 박스 바탕' },
 { name: 'warn-line', cls: 'bg-warn-line', hex: '#EFD7A4', use: '확인 필요 — 박스 테두리' },
-{ name: 'warn-bar', cls: 'bg-warn-bar', hex: '#F7A51B', use: '확인 필요 — 막대·점' },
+{ name: 'warn-bar', cls: 'bg-warn-bar', hex: '#F7A51B', use: '확인 필요 — 막대, 점' },
 { name: 'deny', cls: 'bg-deny', hex: '#C5283D', use: '불가 — 글자' },
 { name: 'deny-bg', cls: 'bg-deny-bg', hex: '#FDEDEF', use: '불가 — 박스 바탕' },
 { name: 'deny-line', cls: 'bg-deny-line', hex: '#F7CDD4', use: '불가 — 박스 테두리' },
-{ name: 'deny-bar', cls: 'bg-deny-bar', hex: '#FF5A5A', use: '불가 — 막대·점' }];
+{ name: 'deny-bar', cls: 'bg-deny-bar', hex: '#FF5A5A', use: '불가 — 막대, 점' }];
 
 
 const TYPE: { token: string; cls: string; spec: string; use: string }[] = [
 { token: 'ir-display', cls: 'text-ir-display font-normal tracking-ir', spec: '48/60, 굵기 400, 자간 -1px', use: '첫 화면 큰 판 제목' },
 { token: 'ir-section', cls: 'text-ir-section font-normal tracking-ir', spec: '48/72, 굵기 400, 자간 -1px', use: '랜딩 섹션 제목' },
-{ token: 'ir-panel', cls: 'text-ir-panel tracking-ir-sm', spec: '30/45, 자간 -0.8px', use: '랜딩 패널·카드 제목, 큰 숫자' },
+{ token: 'ir-panel', cls: 'text-ir-panel tracking-ir-sm', spec: '30/45, 자간 -0.8px', use: '랜딩 패널과 카드 제목, 큰 숫자' },
 { token: 'ir-num', cls: 'text-ir-num tracking-ir-sm', spec: '26/39', use: '띠 카드 숫자' },
 { token: 'ir-lead', cls: 'text-ir-lead font-normal tracking-ir-xs', spec: '22/33, 굵기 400', use: '큰 알약 글자' },
 { token: 'h1 / h1-lg', cls: 'text-h1 sm:text-h1-lg', spec: '38/48 → 52/66', use: '앱 화면 큰 제목' },
@@ -113,15 +114,15 @@ export function Styleguide() {
   const [pickedRow, setPickedRow] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   return (
-    <div className="min-h-full bg-surface">
+    <div className="min-h-full bg-canvas">
       <Container className="py-16">
         <SectionHeading
-          eyebrow="Design System · 초안"
+          eyebrow="Design System"
           title="PreeT 스타일가이드"
           description="화면을 새로 만들 때 이 부품과 토큰만 씁니다. 규칙과 이유는 DESIGN.md에 있습니다." />
 
 
-        <Block title="색" note="상태색(ok·warn·deny)은 배경·테두리·글자 세트로만 쓴다. 단독 사용 금지.">
+        <Block title="색" note="판정색(ok, warn, deny)은 판정 배지와 판정 건수에만 쓴다. 회색(surface)은 hover와 고른 상태에만 쓴다.">
           <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {COLORS.map((color) =>
             <li key={color.name} className="rounded-xl border border-line p-3">
@@ -134,7 +135,7 @@ export function Styleguide() {
           </ul>
         </Block>
 
-        <Block title="타이포" note="임의 px 크기 금지. 반응형은 h1·h2·h3만 sm: 접두로 키운다.">
+        <Block title="타이포" note="임의 px 크기 금지. 반응형은 h1, h2, h3만 sm: 접두로 키운다.">
           <ul className="divide-y divide-line2">
             {TYPE.map((t) =>
             <li key={t.token} className="grid items-baseline gap-4 py-4 sm:grid-cols-[160px_minmax(0,1fr)_200px]">
@@ -151,7 +152,7 @@ export function Styleguide() {
           </ul>
         </Block>
 
-        <Block title="Button" note="sm 헤더·표, md 폼, lg 랜딩 CTA. 한 화면에 primary는 하나.">
+        <Block title="Button" note="sm 헤더와 표, md 폼, lg 랜딩 CTA. 한 화면에 primary는 하나.">
           <div className="space-y-6">
             {BUTTON_VARIANTS.map((variant) =>
             <div key={variant} className="flex flex-wrap items-center gap-4">
@@ -176,7 +177,7 @@ export function Styleguide() {
           </div>
         </Block>
 
-        <Block title="Badge" note="색만으로 상태를 말하지 않는다. 판정 배지는 VerdictBadge에 API의 {code,label}을 넘기면 기호·색이 붙는다.">
+        <Block title="Badge" note="색만으로 상태를 말하지 않는다. 판정 배지는 VerdictBadge에 API의 {code,label}을 넘기면 기호와 색이 붙는다.">
           <div className="space-y-5">
             <div className="flex flex-wrap items-center gap-3">
               {BADGE_TONES.map((tone) =>
@@ -199,25 +200,22 @@ export function Styleguide() {
           </div>
         </Block>
 
-        <Block title="Card" note="tone: surface(기본)·canvas(강조 배경)·ink(다크). padding: sm·md·lg.">
-          <div className="grid gap-4 md:grid-cols-3">
+        <Block title="Card" note="tone: canvas(흰 상자와 옅은 테두리, 기본), ink(다크). padding: sm, md, lg. 경계가 꼭 필요한 덩어리에만 쓰고 나머지는 간격으로 가른다.">
+          <div className="grid gap-4 md:grid-cols-2">
             <Card>
-              <p className="text-body-lg font-bold text-ink">surface · sm</p>
+              <p className="text-body-lg font-bold text-ink">canvas, sm</p>
               <p className="mt-2 text-body text-ink2">목록 항목, 지출 카드</p>
             </Card>
-            <Card tone="canvas" padding="md">
-              <p className="text-body-lg font-bold text-ink">canvas · md</p>
-              <p className="mt-2 text-body text-ink2">강조하고 싶은 큰 카드</p>
-            </Card>
             <Card tone="ink" padding="md">
-              <p className="text-body-lg font-bold">ink · md</p>
+              <p className="text-body-lg font-bold">ink, md</p>
               <p className="mt-2 text-body text-white/70">다크 패널, 라이브 미리보기</p>
             </Card>
           </div>
         </Block>
 
-        <Block title="SectionHeading" note="eyebrow → title → description 순서 고정. 랜딩·앱 페이지 머리에 쓴다.">
+        <Block title="SectionHeading" note="eyebrow → title → description 순서 고정. page 는 로그인 뒤 화면의 h1, 나머지는 공개 화면 섹션 제목.">
           <div className="space-y-10">
+            <SectionHeading size="page" as="h2" eyebrow="관리자" title="화면 제목 (page)" />
             <SectionHeading
               size="sm"
               eyebrow="아이브로우"
@@ -231,12 +229,12 @@ export function Styleguide() {
           </div>
         </Block>
 
-        <Block title="Field · Input · Select" note="라벨은 body-lg semibold, 힌트는 small muted, 오류는 small deny + role=alert.">
+        <Block title="Field, Input, Select" note="라벨은 body-lg bold, 힌트는 small ink2, 오류는 small deny + role=alert. 잘못 넣은 칸은 aria-invalid 로 테두리를 deny 로 바꾼다.">
           <div className="grid max-w-xl gap-5">
             <Field label="1. 업종" htmlFor="sg-industry" hint="업종 프로파일과 경비율 조회의 기준이 됩니다.">
               <Select id="sg-industry" defaultValue="940909">
-                <option value="940909">940909 · 기타자영업</option>
-                <option value="940926">940926 · 소프트웨어 프리랜서</option>
+                <option value="940909">940909 기타자영업</option>
+                <option value="940926">940926 소프트웨어 프리랜서</option>
               </Select>
             </Field>
             <Field label="2. 직전연도 수입금액" htmlFor="sg-revenue">
@@ -245,19 +243,19 @@ export function Styleguide() {
               </div>
             </Field>
             <Field label="이메일" htmlFor="sg-email" error="이메일 형식을 확인해 주세요.">
-              <Input id="sg-email" type="email" defaultValue="dev@example" />
+              <Input id="sg-email" type="email" defaultValue="dev@example" aria-invalid="true" />
             </Field>
           </div>
         </Block>
 
-        <Block title="ChoiceGroup" note="단일 선택 3~6개. 있지만 안 되는 선택지는 disabled로 — 흐리게 + '준비 중'. 눌리는데 아무 일 없는 버튼은 만들지 않는다.">
+        <Block title="ChoiceGroup" note="단일 선택 3~6개. 고르지 않은 칸은 edge 테두리. 있지만 안 되는 선택지는 disabled로 흐리게 + '준비 중'. 눌리는데 아무 일 없는 버튼은 만들지 않는다.">
           <div className="max-w-xl">
             <ChoiceGroup
               name="업종"
               value={industry}
               onChange={setIndustry}
               options={[
-              { value: '940909', label: '프리랜서 · 인적용역', hint: '940909 기타자영업 (컴퓨터 프로그래머 등)' },
+              { value: '940909', label: '프리랜서 인적용역', hint: '940909 기타자영업 (컴퓨터 프로그래머 등)' },
               { value: '73203', label: '디자이너', disabled: true },
               { value: '85699', label: '온라인 강사', disabled: true },
               { value: 'ETC', label: '그 외', disabled: true, disabledLabel: '문의' }]
@@ -266,7 +264,7 @@ export function Styleguide() {
           </div>
         </Block>
 
-        <Block title="Table · Pagination" note="정렬·페이지네이션은 서버가 한다. hideBelow 로 좁은 화면에서 숨길 열을 고르되 핵심 정보에는 쓰지 않는다.">
+        <Block title="Table, Pagination" note="정렬·페이지네이션은 서버가 한다. hideBelow 로 좁은 화면에서 숨길 열을 고르되 핵심 정보에는 쓰지 않는다.">
           <Table
             caption="표 예시"
             rowKey={(row) => row.id}
@@ -327,7 +325,7 @@ export function Styleguide() {
             { value: 'UNAVAILABLE', label: '불가', count: FILTER_ROWS.filter((r) => r.verdict === 'UNAVAILABLE').length }]
             } />
 
-          <ul className="mt-3 divide-y divide-line2 rounded-xl border border-line bg-surface">
+          <ul className="mt-3 divide-y divide-line2 rounded-xl border border-line">
             {FILTER_ROWS.filter(
               (row) => verdictFilter === 'ALL' || row.verdict === verdictFilter
             ).map((row) =>
@@ -344,7 +342,7 @@ export function Styleguide() {
           </ul>
         </Block>
 
-        <Block title="Modal" note="되돌릴 수 없는 동작 앞에서만. 무엇이 함께 사라지는지 description 에 적는다. Esc·바깥 클릭으로 닫히고, Tab 은 대화상자 안에서만 돌며, 닫으면 열었던 버튼으로 초점이 돌아온다.">
+        <Block title="Modal" note="되돌릴 수 없는 동작 앞에서만. 무엇이 함께 사라지는지 description 에 적는다. Esc나 바깥 클릭으로 닫히고, Tab 은 대화상자 안에서만 돌며, 닫으면 열었던 버튼으로 초점이 돌아온다.">
           <Button variant="secondary" size="md" onClick={() => setModalOpen(true)}>
             삭제 확인 열기
           </Button>
@@ -367,27 +365,33 @@ export function Styleguide() {
           
         </Block>
 
-        <Block title="Empty" note="「없음」이 아니라 「왜 없는지」를 말한다. 비어 있는 게 좋은 결과면 tone=ok.">
+        <Block title="Empty" note="없음이 아니라 왜 없는지를 말한다. 문장 하나와 동작 하나. 다 처리해서 비었으면 tone=ok(초록이 아니다), 화면 전체를 불러오지 못했으면 tone=error. 걸러 낸 표가 비었으면 inTable 로 상자 없이 표 괘선 아래를 비운다.">
           <div className="grid gap-4 lg:grid-cols-2">
             <Empty
+              icon={<InboxIcon className="h-5 w-5" />}
               title="아직 올린 파일이 없습니다"
-              description="국민·기업카드 이용내역을 올리면 여기에 쌓입니다."
               action={<Button size="sm" variant="secondary">카드내역 올리기</Button>} />
             
             <Empty
               tone="ok"
-              title="확인할 가맹점이 없습니다"
-              description="모든 거래에 업종이 붙었습니다." />
+              icon={<CheckIcon className="h-5 w-5" />}
+              title="분류할 가맹점이 없습니다" />
 
             <Empty
+              inTable
+              icon={<InboxIcon className="h-5 w-5" />}
+              title="확인이 필요한 거래가 없습니다" />
+
+            <Empty
+              tone="error"
+              icon={<AlertTriangleIcon className="h-5 w-5" />}
               title="거래를 불러오지 못했습니다"
-              description="조회 실패를 「없습니다」로 그리지 않는다. useApi 의 error 를 먼저 보고 다시 시도를 준다."
               action={<Button size="sm" variant="secondary">다시 시도</Button>} />
 
           </div>
         </Block>
 
-        <Block title="StatuteCitation" note="GET /statutes/{id} 응답 그대로. 시행일·버전·원문 링크가 항상 붙고, hierarchy 로 근거와 참고(해석기준·사례)를 나눈다.">
+        <Block title="StatuteCitation" note="GET /statutes/{id} 응답 그대로. 시행일과 원문 링크가 항상 붙고, hierarchy 로 근거와 참고(해석기준·사례)를 나눈다.">
           <div className="grid max-w-2xl gap-3">
             <StatuteCitation statuteVersionId={1435} />
             <StatuteCitation statuteVersionId={2071} />

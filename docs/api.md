@@ -2783,7 +2783,7 @@ Question을 삭제하지 않고 상태를 남겨 판정 이력을 보존한다.
 
 ## `GET /api/v1/handoff-notes`
 
-세무대리인에게 물을 질문(agent-secretary.md FR-16). 요약 화면의 "세무대리인에게 넘길 문장" 끝에 붙는다.
+세무대리인에게 물을 질문(agent-secretary.md FR-16). 요약 화면의 "세무사에게 넘길 문장" 끝에 붙는다.
 본인 질문 전부를 넣은 순서(`createdAt ASC`)로 준다. 페이지 없음.
 
 ```json

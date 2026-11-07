@@ -72,7 +72,7 @@ export function ibkRecords(doc: Document): Omit<AdapterResult, 'headers' | 'decl
     }));
   }
   // IBK 는 원화 금액만 준다
-  return { records, sourceRows, foreignOnlySkipped: 0 };
+  return { records, sourceRows, foreignOnly: 0 };
 }
 
 /** 파일 하나를 한 번만 파싱한다. DOMParser 가 있어야 해서 메인 스레드에서 돈다 */

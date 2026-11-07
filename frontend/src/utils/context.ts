@@ -1,10 +1,13 @@
 import type { BusinessContext, StoredBusinessContext } from '../types/domain';
 import { formatFullDate, formatNumber } from './format';
 
-/** 문진 업종 이름. 지금은 940909 하나만 판정한다(Interview.tsx) */
+/** 문진 업종 이름. 지금은 940909 하나만 판정한다(Interview.tsx). 화면에는 문진 선택지와 같은 이름만 쓰고 코드는 보이지 않는다 */
 const INDUSTRY_NAME: Record<string, string> = {
-  '940909': '기타자영업 (컴퓨터 프로그래머 등)'
+  '940909': '프리랜서, 인적용역'
 };
+
+/** 판정하지 않는 업종(예전에 저장한 62010 등)은 문진의 「그 외」와 같은 이름이다 */
+export const industryName = (industryCode: string) => INDUSTRY_NAME[industryCode] ?? '그 외';
 
 /**
  * 판정하는 업종인가. 예전에 저장한 문진(62010 등)은 규칙 카드(940909)에 걸리지 않아 거의 다 「확인 필요」가 된다(#214)
@@ -15,9 +18,7 @@ export const isJudgedIndustry = (industryCode: string) => industryCode in INDUST
 export const contextRows = (context: BusinessContext | StoredBusinessContext) => [
 {
   term: '업종',
-  value: INDUSTRY_NAME[context.industryCode] ?
-  `${context.industryCode} · ${INDUSTRY_NAME[context.industryCode]}` :
-  context.industryCode
+  value: industryName(context.industryCode)
 },
 { term: '직전연도 수입금액', value: `${formatNumber(context.prevYearRevenue)}원` },
 { term: '개업일', value: formatFullDate(context.businessOpenDate) },

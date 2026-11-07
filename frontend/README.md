@@ -43,7 +43,7 @@ scripts/
 
 1. `vite build --ssr src/entry-server.tsx` 로 서버 렌더 묶음(`dist-ssr/`)을 만든다.
 2. `scripts/prerender.mjs` 가 `seo.ts` 의 `PAGES` 마다 화면을 그려 `dist/<file>` 로 쓴다. title·description·canonical·og 태그도 채운다.
-3. 본문 없는 `dist/app.html`(noindex)을 쓴다. 웹 서버가 공개 페이지가 아닌 주소에 이것을 낸다(`deploy/Caddyfile`).
+3. 본문 없는 `dist/app.html`(noindex)을 쓴다. 웹 서버가 공개 페이지가 아닌 주소에 이것을 낸다(`deploy/caddy/Caddyfile`).
 4. `robots.txt`·`sitemap.xml`·`llms.txt` 를 쓴다.
 
 - 공개 페이지를 더하면 `seo.ts` 의 `PAGES` 에 넣는다. 빠지면 크롤러에게는 빈 화면이 나간다.

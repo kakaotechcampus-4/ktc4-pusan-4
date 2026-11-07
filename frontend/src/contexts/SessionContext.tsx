@@ -15,20 +15,24 @@ import type {
   User } from
 '../types/domain';
 import { api, seedSession } from '../api';
-
-/** 업종은 프리랜서·인적용역(국세청 업종코드 940909) 고정 */
-export const DEFAULT_CONTEXT: BusinessContext = {
-  industryCode: '940909',
-  prevYearRevenue: 83_000_000,
-  businessOpenDate: '2024-03-01',
-  bookkeepingDuty: '복식부기',
-  hasEmployee: false,
-  // 정해 두지 않는다. 그냥 두면 그 값으로 자택 경비 금액이 계산된다(#214). 문진에서 직접 고른다
-  homeOfficeRatio: null
-};
+import { chooseBatch, saveBatchId, savedBatchId } from '../auth/session';
+import type { SessionEndReason } from '../auth/session';
 
 /** restoring: 새로고침 뒤 리프레시 쿠키로 로그인을 이어 가는 중. 이때는 로그인 화면으로 보내지 않는다 */
 export type AuthStatus = 'restoring' | 'anonymous' | 'signedIn';
+
+/**
+ * 로그인 뒤 볼 업로드를 고르는 중인지 (C56). loading 이면 아직 모른다 — 「올린 카드내역이 없습니다」를 그리지 않는다.
+ * ready 인데 batchId 가 null 이면 정말 올린 것이 없다. error 면 목록을 못 읽었다 — reloadBatch 로 다시 고른다.
+ * 로그인 전에는 loading 이다
+ */
+export type BatchStatus = 'loading' | 'error' | 'ready';
+
+/**
+ * 저장된 문진을 읽었는지 (C57). none 은 정말 문진 전이고, error 는 조회가 실패한 것이다 — 문진 전으로 다루지 않고
+ * reloadContext 로 다시 읽는다. 로그인 전에는 loading 이다
+ */
+export type ContextStatus = 'loading' | 'error' | 'none' | 'ready';
 
 /** 가입은 됐지만 그 뒤 내 정보를 읽지 못해 로그인하지 못했다. reason 은 실제 실패다 */
 export class SignedUpError extends Error {
@@ -58,14 +62,27 @@ interface SessionValue {
   signInWithKakao: (code: string) => Promise<void>;
   /** 이 브라우저의 로그인을 바로 지우고, 서버 로그아웃은 기다리지 않는다 */
   signOut: () => void;
+  /** 로그인이 사용자 손을 거치지 않고 끝났으면 그 이유. 직접 로그아웃했거나 다시 로그인하면 null 이다 */
+  endReason: SessionEndReason | null;
   /** 서버에 저장된 배치 id */
   batchId: string | null;
+  /** 고른 배치를 계정마다 기억한다. 새로고침이나 다시 로그인해도 이 배치로 돌아온다. null 이면 기억을 지운다 */
   setBatchId: (id: string | null) => void;
+  batchStatus: BatchStatus;
+  /**
+   * 서버 목록에서 배치를 다시 고른다. 기억해 둔 배치가 아직 있으면 그것, 없으면 거래가 든 가장 최근 것, 그것도 없으면
+   * 가장 최근 것이다. batchStatus 가 error 일 때의 「다시 시도」, 보던 배치를 지운 뒤(setBatchId(null) 다음)에 쓴다
+   */
+  reloadBatch: () => void;
   /** 문진 입력값과 서버 참조. 서버에서 읽은 것이면 자택 비율이 null(미입력)일 수 있다 */
   context: BusinessContext | StoredBusinessContext | null;
   setContext: (context: BusinessContext | StoredBusinessContext) => void;
   contextRef: BusinessContextRef | null;
+  /** 문진을 저장했으면 ref 를 넘긴다. contextStatus 가 ready 가 된다 */
   setContextRef: (ref: BusinessContextRef | null) => void;
+  contextStatus: ContextStatus;
+  /** 저장된 문진을 다시 읽는다. contextStatus 가 error 일 때의 「다시 시도」 */
+  reloadContext: () => void;
 }
 
 const SessionContext = createContext<SessionValue | null>(null);
@@ -75,9 +92,15 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
   const [user, setUser] = useState<User | null>(null);
   const userId = user?.id ?? null;
   const email = user?.email ?? null;
-  const [batchId, setBatchId] = useState<string | null>(seedSession?.batchId ?? null);
+  const [endReason, setEndReason] = useState<SessionEndReason | null>(null);
+  const [batchId, setBatchIdState] = useState<string | null>(seedSession?.batchId ?? null);
+  // 목업은 시드 배치로 시작해 고를 것이 없다
+  const [batchStatus, setBatchStatus] = useState<BatchStatus>(seedSession ? 'ready' : 'loading');
   const [context, setContext] = useState<BusinessContext | StoredBusinessContext | null>(null);
-  const [contextRef, setContextRef] = useState<BusinessContextRef | null>(seedSession?.contextRef ?? null);
+  const [contextRef, setContextRefState] = useState<BusinessContextRef | null>(seedSession?.contextRef ?? null);
+  const [contextStatus, setContextStatus] = useState<ContextStatus>('loading');
+  /** 올리면 문진을 다시 읽는다 */
+  const [contextAttempt, setContextAttempt] = useState(0);
 
   /**
    * 로그인·로그아웃·풀림마다 올린다. 그 전에 시작한 이어 가기·내 정보·최근 업로드 응답이 늦게 와도
@@ -85,34 +108,70 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
    * 앞 사람의 최근 업로드가 새 세션의 배치로 들어가지 않게 한다
    */
   const epoch = useRef(0);
+  /** 배치를 고르거나 지울 때마다 올린다. 늦게 온 목록이 그사이 사용자가 고른 배치를 덮지 않게 한다 */
+  const batchPick = useRef(0);
+  /** 문진을 저장할 때마다 올린다. 저장 전에 보낸 조회가 늦게 와서 방금 저장한 문진을 덮지 않게 한다 */
+  const contextPick = useRef(0);
+  /** 배치를 기억할 계정. 콜백이 렌더마다 바뀌지 않게 상태와 따로 둔다 */
+  const userIdRef = useRef<string | null>(null);
 
-  const clear = useCallback(() => {
+  const clear = useCallback((reason?: SessionEndReason) => {
     epoch.current += 1;
+    batchPick.current += 1;
+    contextPick.current += 1;
+    userIdRef.current = null;
     setUser(null);
     setStatus('anonymous');
-    setBatchId(seedSession?.batchId ?? null);
+    setEndReason(reason ?? null);
+    setBatchIdState(seedSession?.batchId ?? null);
+    setBatchStatus(seedSession ? 'ready' : 'loading');
     setContext(null);
-    setContextRef(seedSession?.contextRef ?? null);
+    setContextRefState(seedSession?.contextRef ?? null);
+    setContextStatus('loading');
   }, []);
 
-  /**
-   * 로그인했다. 실서버에서는 보던 배치가 메모리에만 있어 새로고침하면 사라지므로, 가장 최근 업로드로 시작한다
-   * (3.3 목록은 createdAt DESC). 목업은 시드 배치로 시작한다
-   */
-  const start = useCallback((me: User) => {
-    setUser(me);
-    setStatus('signedIn');
-    if (seedSession) return;
-    const startedAt = epoch.current;
+  /** 3.3 목록(createdAt DESC)에서 고른다. 기억해 둔 배치가 첫 100개 밖에 있으면 따로 읽어 넣는다 */
+  const pickBatch = useCallback((forUser: string) => {
+    const picking = ++batchPick.current;
+    setBatchStatus('loading');
     void api.uploads.
-    list({ size: 1 }).
-    then((page) => {
-      if (epoch.current === startedAt) setBatchId((current) => current ?? page.items[0]?.id ?? null);
+    list({ size: 100 }).
+    then(async (page) => {
+      // 목업은 기억해 두지 않는다(setBatchId). 거래가 든 가장 최근 것을 고른다
+      const saved = seedSession ? null : savedBatchId(forUser);
+      const older =
+      saved && page.page.hasNext && !page.items.some((item) => item.id === saved) ?
+      await api.uploads.get(saved).catch(() => null) :
+      null;
+      if (batchPick.current !== picking) return;
+      setBatchIdState(chooseBatch(older ? [...page.items, older] : page.items, saved));
+      setBatchStatus('ready');
     }).
     catch(() => {
-      // 못 읽으면 「올린 카드내역이 없습니다」에서 업로드 이력으로 가면 된다
+      if (batchPick.current === picking) setBatchStatus('error');
     });
   }, []);
+
+  const setBatchId = useCallback((id: string | null) => {
+    batchPick.current += 1;
+    setBatchIdState(id);
+    setBatchStatus('ready');
+    // 목업은 새로고침하면 데이터가 사라져 기억해 둘 것이 없다
+    if (userIdRef.current && !seedSession) saveBatchId(userIdRef.current, id);
+  }, []);
+
+  const reloadBatch = useCallback(() => {
+    if (userIdRef.current) pickBatch(userIdRef.current);
+  }, [pickBatch]);
+
+  /** 로그인했다. 실서버는 보던 배치를 계정마다 기억해 둔 것으로 시작한다. 목업은 시드 배치로 시작한다 */
+  const start = useCallback((me: User) => {
+    userIdRef.current = me.id;
+    setUser(me);
+    setStatus('signedIn');
+    setEndReason(null);
+    if (!seedSession) pickBatch(me.id);
+  }, [pickBatch]);
 
   // 새로고침 뒤 리프레시 쿠키로 로그인을 이어 간다 (#139)
   useEffect(() => {
@@ -135,13 +194,15 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
     };
   }, [start]);
 
-  // 재발급까지 실패했다. 서버 로그아웃은 부르지 않는다 — 이미 풀린 세션이고, 부르면 다시 401 이 난다
+  /**
+   * 재발급까지 실패했거나 다른 탭에서 로그인·로그아웃했다. 이유는 로그인 화면이 알린다.
+   * 서버 로그아웃은 부르지 않는다 — 이미 풀린 세션이고, 다른 계정으로 바뀐 경우에는 그 계정의 로그인을 끊는다
+   */
   useEffect(() => api.auth.onLost(clear), [clear]);
 
   /** 로그인·가입·카카오 로그인이 같이 쓴다. 토큰을 받고 나서 내 정보를 읽어야 로그인한 것이다 */
   const enter = useCallback(async (authenticate: () => Promise<void>) => {
-    // 로그인한 채로 /login 에서 다른 계정으로 들어오면 앞 사람의 배치·문진·실행이 남는다.
-    // start 는 이미 있는 배치를 덮지 않고, 문진 효과는 서버에 문진이 없으면 그대로 둔다 (#142 리뷰)
+    // 앞 사람의 배치·문진이 남지 않게 먼저 비운다 (#142 리뷰). 배치와 문진은 start 뒤에 새 계정 것으로 다시 읽는다
     clear();
     const startedAt = epoch.current;
     await authenticate();
@@ -177,26 +238,42 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
   /**
    * 3.2 — 서버에 이미 문진이 있으면 그것을 쓴다. 저장만 하고 다시 읽지 않으면
    * 새로고침할 때마다 「사업자 문진을 먼저 마쳐 주세요」로 돌아간다.
-   * 문진 전이면 404 이고 http 구현이 null 로 바꿔 준다.
+   * 문진 전이면 404 이고 http 구현이 null 로 바꿔 준다. 조회 실패는 문진 전과 가른다 (C57)
    */
   useEffect(() => {
     // 카카오 계정은 email 이 null 이라 사용자 id 로 본다
     if (userId === null) return;
     let cancelled = false;
+    const picking = contextPick.current;
+    const stale = () => cancelled || contextPick.current !== picking;
+    setContextStatus('loading');
     void api.contexts.
     current().
     then((current) => {
-      if (cancelled || !current) return;
+      if (stale()) return;
+      if (!current) {
+        setContextStatus('none');
+        return;
+      }
       setContext(current);
-      setContextRef({ id: current.id, version: current.version });
+      setContextRefState({ id: current.id, version: current.version });
+      setContextStatus('ready');
     }).
     catch(() => {
-      // 조회 실패는 「문진 전」과 같게 다룬다. 화면이 막아 주고 안내도 거기서 한다
+      if (!stale()) setContextStatus('error');
     });
     return () => {
       cancelled = true;
     };
-  }, [userId]);
+  }, [userId, contextAttempt]);
+
+  const setContextRef = useCallback((ref: BusinessContextRef | null) => {
+    contextPick.current += 1;
+    setContextRefState(ref);
+    setContextStatus(ref ? 'ready' : 'none');
+  }, []);
+
+  const reloadContext = useCallback(() => setContextAttempt((attempt) => attempt + 1), []);
 
   const signOut = useCallback(() => {
     void api.auth.logout().catch(() => undefined);
@@ -214,14 +291,38 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
       signUp,
       signInWithKakao,
       signOut,
+      endReason,
       batchId,
       setBatchId,
+      batchStatus,
+      reloadBatch,
       context,
       setContext,
       contextRef,
-      setContextRef
+      setContextRef,
+      contextStatus,
+      reloadContext
     }),
-    [status, userId, email, user, signIn, signUp, signInWithKakao, signOut, batchId, context, contextRef]
+    [
+    status,
+    userId,
+    email,
+    user,
+    signIn,
+    signUp,
+    signInWithKakao,
+    signOut,
+    endReason,
+    batchId,
+    setBatchId,
+    batchStatus,
+    reloadBatch,
+    context,
+    contextRef,
+    setContextRef,
+    contextStatus,
+    reloadContext]
+
   );
 
   return (

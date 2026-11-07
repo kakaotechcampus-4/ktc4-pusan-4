@@ -1,5 +1,15 @@
 import type { WorkSheet } from 'xlsx';
-import { CANCEL_MARK, ParserError, cellText, makeRecord, parseAmount, parseDate, parseInstallment } from './primitives';
+import {
+  CANCEL_MARK,
+  FOREIGN_ONLY_REASON,
+  ParserError,
+  ST_EXCLUDED,
+  cellText,
+  makeRecord,
+  parseAmount,
+  parseDate,
+  parseInstallment } from
+'./primitives';
 import { detectFormat } from './detect';
 import type { AdapterResult, Cell, Grid, RawRecord } from './types';
 
@@ -70,33 +80,45 @@ export function kbHeaders(grid: Grid): string[] {
 export function kbRecords(grid: Grid): Omit<AdapterResult, 'headers' | 'declaredPeriod'> {
   const records: RawRecord[] = [];
   let sourceRows = 0;
-  let foreignOnlySkipped = 0;
+  let foreignOnly = 0;
   for (let r = HEADER_ROW + 1; r < grid.nrows; r++) {
     const merchant = cellText(grid.cell(r, COL.merchant)).trim();
-    if (!merchant) continue;
+    const when = parseDate(grid.cell(r, COL.date));
+    // 가맹점명도 승인일도 없으면 빈 줄이다. 가맹점명만 빈 행은 IBK 처럼 남겨 보내지 않는 행으로 보인다 (C34)
+    if (!merchant && when === null) continue;
     sourceRows++;
 
-    const domestic = parseAmount(grid.cell(r, COL.domestic)) ?? 0;
+    // 빈 칸은 null, 0 은 0 이다
+    const domestic = parseAmount(grid.cell(r, COL.domestic));
     const foreign = parseAmount(grid.cell(r, COL.foreign)) ?? 0;
-    if (domestic === 0 && foreign !== 0) {
-      // 외화 전용 행. 원화 환산액이 없어 그대로 넣으면 단위가 섞인다
-      foreignOnlySkipped++;
-      continue;
-    }
+    // 외화 전용 행. 원화 환산액이 없어 그대로 넣으면 단위가 섞인다. 버리지 않고 대상제외로 남긴다
+    const isForeignOnly = !domestic && foreign !== 0;
 
-    records.push(makeRecord({
+    const record = makeRecord({
       merchant,
-      amount: domestic === 0 ? null : domestic,
+      amount: isForeignOnly ? null : domestic,
       bizNo: '', // KB 파일에는 가맹점 사업자번호가 없다
       memo: cellText(grid.cell(r, COL.memo)).trim(),
       source: 'kb',
       approvalNo: grid.cell(r, COL.approval),
-      when: parseDate(grid.cell(r, COL.date)),
+      when,
       installment: parseInstallment(grid.cell(r, COL.payment)),
-      isCancel: cellText(grid.cell(r, COL.status)).includes(CANCEL_MARK)
-    }));
+      isCancel: cellText(grid.cell(r, COL.status)).includes(CANCEL_MARK),
+      foreignAmount: isForeignOnly ? foreignValue(grid.cell(r, COL.foreign)) : null
+    });
+    if (isForeignOnly) {
+      foreignOnly++;
+      record.status = ST_EXCLUDED;
+      record.reviewReason = FOREIGN_ONLY_REASON;
+    }
+    records.push(record);
   }
-  return { records, sourceRows, foreignOnlySkipped };
+  return { records, sourceRows, foreignOnly };
+}
+
+/** 해외이용금액($). 화면에 그대로 보이므로 반올림하지 않는다 */
+function foreignValue(cell: Cell): number {
+  return typeof cell === 'number' ? cell : Number(cellText(cell).replace(/[^\d.-]/g, ''));
 }
 
 const PERIOD_RE = /(\d{4}[-.]\d{1,2}[-.]\d{1,2})\s*~\s*(\d{4}[-.]\d{1,2}[-.]\d{1,2})/;

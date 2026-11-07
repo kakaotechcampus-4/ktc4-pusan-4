@@ -64,7 +64,7 @@ describe('readIbk — 샘플 full', () => {
     const result = readIbk(html);
     expect(result.sourceRows).toBe(22);
     expect(result.records).toHaveLength(22);
-    expect(result.foreignOnlySkipped).toBe(0);
+    expect(result.foreignOnly).toBe(0);
     expect(result.declaredPeriod).toBeNull();
   });
 
@@ -82,7 +82,8 @@ describe('readIbk — 샘플 full', () => {
       installment: 0,
       status: null,
       needsReview: false,
-      reviewReason: ''
+      reviewReason: '',
+      foreignAmount: null
     });
     expect(records[1]).toMatchObject({ merchant: '편의점할인', bizNo: '', isCancel: true, amount: 500 });
     expect(records[2]).toMatchObject({ merchant: '행복할인', bizNo: '2208212345', isCancel: true });

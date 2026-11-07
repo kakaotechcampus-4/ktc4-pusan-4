@@ -1,20 +1,33 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ArrowRightIcon, InfoIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
-import { StepEyebrow } from '../components/StepEyebrow';
-import { DEFAULT_CONTEXT, useSession } from '../contexts/SessionContext';
+import { useSession } from '../contexts/SessionContext';
 import { api, ApiRequestError } from '../api';
-import type { BookkeepingDuty, BusinessContext, StoredBusinessContext } from '../types/domain';
-import { ChoiceGroup, type ChoiceOption } from '../components/ui';
+import type { BookkeepingDuty } from '../types/domain';
+import { Button, ChoiceGroup, Empty, type ChoiceOption } from '../components/ui';
 import { formatNumber } from '../utils/format';
+import {
+  FIELD_ORDER,
+  JUDGED_INDUSTRY,
+  checkForm,
+  dutyFor,
+  formFrom,
+  revenueDigits,
+  sameContext,
+  sameForm,
+  saveDraft,
+  savedDraft,
+  withRevenue,
+  type HomeAnswer,
+  type InterviewForm } from
+'./interviewForm';
 
 /**
  * 서비스는 프리랜서·인적용역(940909)만 동작한다. 다른 직종은 보이되 선택되지 않는다 —
  * 있지만 안 되는 선택지는 '준비 중'으로 표기한다 (DESIGN.md).
  */
 const INDUSTRIES: ChoiceOption<string>[] = [
-{ value: '940909', label: '프리랜서 · 인적용역', hint: '940909 기타자영업 (컴퓨터 프로그래머 등)' },
+{ value: JUDGED_INDUSTRY, label: '프리랜서, 인적용역' },
 { value: '73203', label: '디자이너', disabled: true },
 { value: '85699', label: '온라인 강사', disabled: true },
 { value: '59120', label: '영상 편집', disabled: true },
@@ -29,38 +42,13 @@ const BOOKKEEPING: ChoiceOption<BookkeepingDuty>[] = [
 
 
 /**
- * 저장된 문진으로 폼을 채운다. 보낼 필드만 골라 담는다(서버가 붙인 id·version 은 보내지 않는다).
- * 지금 고를 수 없는 업종은 기본값으로 둔다 — 업종 코드가 바뀌기 전 문진을 다시 보내지 않게 한다.
- * 자택 비율이 미입력(null)이면 새 폼과 같은 값으로 시작한다
+ * welcome: 가입 직후에 왔다(Signup.tsx). 이때 from 은 로그인 전에 가려던 곳이다.
+ * 그 밖의 from 은 문진을 연 화면(내 정보, 판정 전 확인)이다. 저장하거나 돌아가면 그리로 간다 (C3)
  */
-const formFrom = (saved: BusinessContext | StoredBusinessContext | null): BusinessContext =>
-saved ?
-{
-  industryCode: INDUSTRIES.some((option) => !option.disabled && option.value === saved.industryCode) ?
-  saved.industryCode :
-  DEFAULT_CONTEXT.industryCode,
-  prevYearRevenue: saved.prevYearRevenue,
-  businessOpenDate: saved.businessOpenDate,
-  bookkeepingDuty: saved.bookkeepingDuty,
-  hasEmployee: saved.hasEmployee,
-  homeOfficeRatio: saved.homeOfficeRatio
-} :
-DEFAULT_CONTEXT;
-
-/** 6번 「자택에서 작업하나요?」. 빈 값은 아직 고르지 않음이다 */
-type HomeAnswer = 'yes' | 'no' | '';
-const homeAnswerOf = (ratio: number | null): HomeAnswer => ratio === null ? '' : ratio > 0 ? 'yes' : 'no';
-const ratioTextOf = (ratio: number | null) => ratio !== null && ratio > 0 ? String(ratio) : '';
-
-/** 가입 직후에 왔다(Signup.tsx). from 은 로그인 전에 가려던 곳이다 */
 interface LocationState {
   welcome?: boolean;
   from?: string;
 }
-
-/** 인적용역(940909)은 직전연도 수입 7,500만 원부터 복식부기 의무다. 화면 힌트와 같은 기준이다 */
-const DOUBLE_ENTRY_FROM = 75_000_000;
-const dutyFor = (revenue: number): BookkeepingDuty => revenue >= DOUBLE_ENTRY_FROM ? '복식부기' : '간편장부';
 
 /** 오늘(한국 시각) 날짜. 개업일은 오늘을 넘길 수 없다 */
 const todayKst = () => new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
@@ -68,104 +56,157 @@ const todayKst = () => new Date(Date.now() + 9 * 3600_000).toISOString().slice(0
 /*
  * 칸 하나가 틀렸을 때의 모양. 3번 개업일과 6번 면적 비율이 서로 달랐다 (#242 리뷰) —
  * 개업일은 빨간 글자만 띄우고 테두리는 그대로였고, 비율은 aria-invalid 만 걸어 둬서
- * 아무것도 안 보였다. 테두리와 글자를 묶어 두 칸이 같은 식으로 알리게 한다
+ * 아무것도 안 보였다. 테두리와 글자를 묶어 모든 칸이 같은 식으로 알리게 한다
  */
 const fieldClass =
-'rounded-xl border border-line px-3.5 py-2.5 text-[14px] tabular-nums text-ink aria-[invalid=true]:border-deny';
+'rounded-xl border border-edge bg-canvas px-3.5 py-2.5 text-body tabular-nums text-ink placeholder:text-muted aria-[invalid=true]:border-deny';
 const fieldErrorClass = 'mt-2 text-small text-deny';
-
-const cardClass = 'rounded-2xl border border-line bg-surface p-5';
-const labelClass = 'text-[14px] font-bold text-ink';
-const hintClass = 'mt-1 text-[13px] leading-6 text-muted';
+const labelClass = 'text-body-lg font-bold text-ink';
 
 export function Interview() {
+  const { contextStatus, reloadContext } = useSession();
+
+  return (
+    // 진행 단계에 없는 화면이다. 띠를 띄우면 어느 칸도 켜지지 않아 고장난 것처럼 보인다
+    <AppShell showSteps={false} narrow>
+      <header>
+        <h1 className="text-h2 font-bold tracking-tight text-ink">사업자 문진</h1>
+      </header>
+
+      {/*
+        저장된 문진을 다 읽은 뒤에 폼을 연다. 읽는 중에 고치기 시작하면 늦게 온 문진과 섞이고,
+        못 읽었는데 빈 폼을 열면 저장된 답을 모른 채 새 버전을 만든다 (C57)
+      */}
+      {contextStatus === 'loading' ?
+      <p role="status" className="mt-6 text-body text-ink2">불러오는 중…</p> :
+      contextStatus === 'error' ?
+      <Empty
+        className="mt-6"
+        tone="error"
+        title="문진을 불러오지 못했습니다"
+        action={
+        <Button variant="secondary" size="sm" onClick={reloadContext}>
+              다시 시도
+            </Button>
+        } /> :
+
+      <InterviewBody />
+      }
+    </AppShell>);
+
+}
+
+function InterviewBody() {
   const navigate = useNavigate();
   const location = useLocation();
-  const welcome = (location.state as LocationState | null)?.welcome === true;
+  const state = location.state as LocationState | null;
+  const welcome = state?.welcome === true;
   /**
-   * 가입 직후에는 올린 카드내역이 없어 판정 확인으로 가도 막힌다. 카드내역부터 올리게 한다.
+   * 가입 직후에는 올린 카드내역이 없어 판정 전 확인으로 가도 막힌다. 카드내역부터 올리게 한다.
    * 로그인 화면이 넘긴 기본값('/')이나 이 화면 자체로는 보내지 않는다 — '/' 는 랜딩이고, 같은 주소로 가면 저장 중에 멈춘다
    */
-  const requested = (location.state as LocationState | null)?.from;
+  const requested = state?.from;
   const afterWelcome = requested && requested !== '/' && requested !== '/interview' ? requested : '/upload';
-  const { context, setContext, setContextRef } = useSession();
-  const [form, setForm] = useState<BusinessContext>(() => formFrom(context));
-  /**
-   * 자택 작업 여부와 면적 비율은 폼과 따로 든다. 비율을 미리 채워 두지 않으므로(#214) 「예」를 고르고
-   * 아직 적지 않은 상태가 있다. 저장할 때 homeOfficeRatio 로 합친다
-   */
-  const [home, setHome] = useState<HomeAnswer>(() => homeAnswerOf(formFrom(context).homeOfficeRatio));
-  const [ratioText, setRatioText] = useState(() => ratioTextOf(formFrom(context).homeOfficeRatio));
+  const from = !welcome && requested && requested !== '/interview' ? requested : null;
+  const { userId, context, contextRef, setContext, setContextRef } = useSession();
+
+  // 저장하지 않고 떠났던 입력이 있으면 그것으로 연다. 저장된 문진과 같으면 남길 것이 없다
+  const [initial] = useState(() => {
+    const draft = userId ? savedDraft(userId) : null;
+    const stored = formFrom(context);
+    return draft && !sameForm(draft, stored) ? { form: draft, restored: true } : { form: stored, restored: false };
+  });
+  const [form, setForm] = useState<InterviewForm>(initial.form);
+  const [restored, setRestored] = useState(initial.restored);
+  /** 한 번이라도 고쳤다. 고친 것만 임시로 남긴다 */
+  const edited = useRef(initial.restored);
+  /** 저장을 한 번 눌렀다. 빈 칸은 그때부터 알린다 */
+  const [attempted, setAttempted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  /** 한 번이라도 고쳤으면 늦게 온 저장 문진으로 덮지 않는다 */
-  const edited = useRef(false);
-  /**
-   * 기장의무를 직접 골랐으면 수입금액이 바뀌어도 바꾸지 않는다. 고르기 전에는 수입금액을 따라간다.
-   * 저장된 문진의 기장의무가 수입금액 기준과 다르면 예전에 직접 고른 것이다
-   */
-  const dutyChosen = useRef(context !== null && context.bookkeepingDuty !== dutyFor(context.prevYearRevenue));
   const today = todayKst();
 
-  // 새로고침 직후에는 저장된 문진(3.2)이 화면보다 늦게 온다
+  // 고친 것은 이 탭에 남긴다. 다른 화면에 다녀오거나 새로고침해도 말없이 버리지 않는다 (C5)
   useEffect(() => {
-    if (edited.current) return;
-    const next = formFrom(context);
-    dutyChosen.current = context !== null && context.bookkeepingDuty !== dutyFor(context.prevYearRevenue);
-    setForm(next);
-    setHome(homeAnswerOf(next.homeOfficeRatio));
-    setRatioText(ratioTextOf(next.homeOfficeRatio));
-  }, [context]);
+    if (!userId || !edited.current) return;
+    saveDraft(userId, sameForm(form, formFrom(context)) ? null : form);
+  }, [userId, form, context]);
 
-  const update = <K extends keyof BusinessContext,>(
-  key: K,
-  value: BusinessContext[K]) =>
-  {
+  const change = (next: (prev: InterviewForm) => InterviewForm) => {
     edited.current = true;
-    setForm((prev) => ({ ...prev, [key]: value }));
+    setForm(next);
   };
 
-  const bookkeeping =
-  dutyFor(form.prevYearRevenue) === '복식부기' ? '복식부기 의무자' : '간편장부 대상자';
-  const futureOpen = form.businessOpenDate > today;
-  const ratio = /^\d{1,3}$/.test(ratioText) ? Number(ratioText) : NaN;
-  const ratioValid = ratio >= 1 && ratio <= 100;
+  const discardDraft = () => {
+    edited.current = false;
+    if (userId) saveDraft(userId, null);
+    setForm(formFrom(context));
+    setRestored(false);
+    setAttempted(false);
+  };
 
-  const impacts = [
-  form.hasEmployee ?
-  '직원이 있어 복리후생비·급여 관련 판정 분기가 켜집니다.' :
-  '직원이 없어 회식·복리후생 성격의 지출은 가사 관련 경비로 봅니다.',
-  home === 'no' ?
-  '자택에서 일하지 않아 월세·관리비·공과금을 나누어 보지 않습니다.' :
-  home === 'yes' && ratioValid ?
-  `작업 공간이 따로 나뉜 자택의 월세·관리비·공과금은 ${ratio}%만 경비로 봅니다. 나뉘지 않으면 세무사 확인으로 넘깁니다.` :
-  '작업 공간 면적 비율을 적으면 자택의 월세·관리비·공과금을 그 비율만큼 경비로 봅니다.'];
+  const revenueRef = useRef<HTMLInputElement>(null);
+  /** 쉼표를 다시 넣으면 커서가 끝으로 튄다. 커서 뒤에 있던 숫자 개수를 기억해 같은 자리로 돌려놓는다 */
+  const caretFromEnd = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    const input = revenueRef.current;
+    const after = caretFromEnd.current;
+    if (!input || after === null || document.activeElement !== input) return;
+    caretFromEnd.current = null;
+    let position = input.value.length;
+    for (let seen = 0; position > 0 && seen < after; position -= 1) {
+      if (/\d/.test(input.value[position - 1])) seen += 1;
+    }
+    input.setSelectionRange(position, position);
+  });
 
+  const { errors: found, body } = checkForm(form, today);
+  // 빈 칸은 저장을 누른 뒤에 알린다. 틀린 값(앞날의 개업일, 범위 밖 비율)은 적는 대로 알린다
+  const errors = attempted ?
+  found :
+  {
+    openDate: form.openDate !== '' ? found.openDate : undefined,
+    ratio: form.ratio !== '' ? found.ratio : undefined
+  };
+
+  /** 저장했거나 고친 것이 없다. 남겨 둔 입력을 지우고 간다 */
+  const leave = () => {
+    edited.current = false;
+    if (userId) saveDraft(userId, null);
+    navigate(welcome ? afterWelcome : from ?? '/confirm', { replace: welcome });
+  };
+
+  const back = () => {
+    if (welcome) navigate(afterWelcome, { replace: true });
+    else if (from) navigate(from);
+    // 주소를 바로 열었으면 뒤로 갈 곳이 없다
+    else if (location.key !== 'default') navigate(-1);
+    else navigate('/account');
+  };
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     // 두 번 누르면 같은 문진이 버전 두 개로 저장된다
     if (saving) return;
-    if (futureOpen) {
-      setError('개업일이 오늘보다 뒤입니다. 날짜를 확인해 주세요.');
+    if (!body) {
+      setAttempted(true);
+      const first = FIELD_ORDER.find((field) => found[field]);
+      const target = first ? document.getElementById(first) : null;
+      (target instanceof HTMLInputElement ? target : target?.querySelector<HTMLElement>('[role="radio"]'))?.focus();
       return;
     }
-    if (home === '') {
-      setError('6번, 자택에서 작업하는지 골라 주세요.');
+    // 고친 것이 없으면 새 버전을 만들지 않고 그대로 간다
+    if (contextRef && sameContext(body, context)) {
+      leave();
       return;
     }
-    if (home === 'yes' && !ratioValid) {
-      setError('작업 공간 면적 비율을 1~100 사이 숫자로 적어 주세요.');
-      return;
-    }
-    const body: BusinessContext = { ...form, homeOfficeRatio: home === 'yes' ? ratio : 0 };
     setSaving(true);
     setError(null);
     try {
       const ref = await api.contexts.create(body);
       setContext(body);
       setContextRef(ref);
-      navigate(welcome ? afterWelcome : '/confirm', { replace: welcome });
+      leave();
     } catch (caught) {
       setError(
         caught instanceof ApiRequestError ?
@@ -177,239 +218,176 @@ export function Interview() {
   };
 
   return (
-    // 진행 단계에 없는 화면이다. 띠를 띄우면 어느 칸도 켜지지 않아 고장난 것처럼 보인다
-    <AppShell showSteps={false}>
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <form onSubmit={(event) => void submit(event)}>
-          <header>
-            <StepEyebrow prefix="설정">사업자 문진</StepEyebrow>
-            <h1 className="mt-1.5 text-[28px] font-bold tracking-tight text-ink">
-              사업자 문진
-            </h1>
-            <p className="mt-2 max-w-2xl text-[14px] leading-6 text-ink2">
-              같은 지출도 사업자 상황에 따라 결과가 달라집니다. 답변은 버전으로
-              저장되고, 판정 결과에는 어떤 버전으로 판단했는지 기록됩니다.
-            </p>
-          </header>
+    <>
+      {welcome &&
+      <p role="status" className="mt-3 text-body text-ink2">
+          가입을 마쳤습니다. 판정에 쓸 사업자 정보를 알려 주세요.
+        </p>
+      }
+      {restored &&
+      <p role="status" className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-body text-ink2">
+          저장하지 않은 입력을 이어서 보여 줍니다.
+          <Button variant="ghost" size="inline" className="text-body" onClick={discardDraft}>
+            되돌리기
+          </Button>
+        </p>
+      }
 
-          {welcome &&
-          <p
-            role="status"
-            className="mt-5 rounded-xl border border-accent-line bg-accent-soft px-4 py-3 text-[14px] leading-6 text-ink2">
-
-              가입을 마쳤습니다. 판정에 쓸 사업자 정보를 먼저 알려 주세요. 지금 하지 않아도 되고,
-              판정을 시작하기 전에만 마치면 됩니다.
-            </p>
-          }
-
-          <div className="mt-6 space-y-4">
-            <section className={cardClass}>
+      {/* 브라우저 말풍선 대신 칸 아래에 알린다 (C7) */}
+      <form noValidate className="mt-8" onSubmit={(event) => void submit(event)}>
+          <div className="space-y-8">
+            <section>
               <span className={labelClass}>1. 업종</span>
-              <p className={hintClass}>
-                지금은 프리랜서·인적용역(940909)만 판정합니다. 다른 직종은 규칙 카드가 준비되면
-                열립니다.
-              </p>
               <ChoiceGroup
                 name="업종"
                 className="mt-3"
                 value={form.industryCode}
-                onChange={(value) => update('industryCode', value)}
+                onChange={(value) => change((prev) => ({ ...prev, industryCode: value }))}
                 options={INDUSTRIES} />
             </section>
 
-            <section className={cardClass}>
+            <section>
               <label htmlFor="revenue" className={labelClass}>
                 2. 직전연도 수입금액
               </label>
-              <p className={hintClass}>
-                기장 의무와 연중 한도 잠정 계산의 기준입니다.
-              </p>
               <div className="mt-3 flex items-center gap-2">
+                {/* 숫자 칸(type=number)은 지우면 0 이 남고 휠로 값이 바뀐다 (C6). 글자 칸에 쉼표를 넣어 보여 준다 */}
                 <input
+                  ref={revenueRef}
                   id="revenue"
-                  type="number"
-                  min={0}
-                  value={form.prevYearRevenue}
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  placeholder="예: 50,000,000"
+                  value={form.revenue === '' ? '' : formatNumber(Number(form.revenue))}
+                  aria-invalid={errors.revenue !== undefined}
+                  aria-describedby={errors.revenue ? 'revenue-error' : undefined}
                   onChange={(event) => {
-                    const revenue = Number(event.target.value);
-                    update('prevYearRevenue', revenue);
-                    if (!dutyChosen.current) update('bookkeepingDuty', dutyFor(revenue));
+                    const input = event.target;
+                    caretFromEnd.current = input.value.slice(input.selectionStart ?? input.value.length).replace(/\D/g, '').length;
+                    const digits = revenueDigits(input.value);
+                    change((prev) => withRevenue(prev, digits));
                   }}
-                  className="w-56 rounded-xl border border-line px-3.5 py-2.5 text-[14px] tabular-nums text-ink" />
-                
-                <span className="text-[13px] tabular-nums text-muted">
-                  {formatNumber(form.prevYearRevenue)}원
-                </span>
+                  className={`w-56 ${fieldClass}`} />
+                <span className="text-body text-ink">원</span>
               </div>
+              {errors.revenue &&
+              <p id="revenue-error" role="alert" className={fieldErrorClass}>{errors.revenue}</p>
+              }
             </section>
 
-            <section className={cardClass}>
+            <section>
               <label htmlFor="openDate" className={labelClass}>
                 3. 개업일
               </label>
-              <p className={hintClass}>신규 사업자 여부에 따라 경비율 구간이 달라집니다.</p>
               <input
                 id="openDate"
                 type="date"
-                value={form.businessOpenDate}
+                value={form.openDate}
                 max={today}
-                aria-invalid={futureOpen}
-                onChange={(event) =>
-                update('businessOpenDate', event.target.value)
-                }
-                className={`mt-3 ${fieldClass}`} />
-              {futureOpen &&
-              <p role="alert" className={fieldErrorClass}>개업일은 오늘이나 그 전이어야 합니다.</p>
+                aria-invalid={errors.openDate !== undefined}
+                aria-describedby={errors.openDate ? 'openDate-error' : undefined}
+                onChange={(event) => {
+                  const openDate = event.target.value;
+                  change((prev) => ({ ...prev, openDate }));
+                }}
+                className={`mt-3 block ${fieldClass}`} />
+              {errors.openDate &&
+              <p id="openDate-error" role="alert" className={fieldErrorClass}>{errors.openDate}</p>
               }
-              
             </section>
 
-            <section className={cardClass}>
-              <span className={labelClass}>4. 기장의무</span>
-              <p className={hintClass}>
-                직전연도 수입금액으로 자동 판정된 값이 기본 선택됩니다.
-              </p>
-              <ChoiceGroup
+            <section>
+              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                <span className={labelClass}>4. 기장의무</span>
+                {/* 수입금액을 적기 전에는 판정할 것이 없다 (C1). 한 단 화면이라 옆 칸 대신 이 질문 옆에 둔다 */}
+                {form.revenue !== '' &&
+                <span className="text-small text-ink2">
+                    수입금액 기준{' '}
+                    <b className="text-ink">
+                      {dutyFor(Number(form.revenue)) === '복식부기' ? '복식부기 의무자' : '간편장부 대상자'}
+                    </b>
+                  </span>
+                }
+              </div>
+              <ChoiceGroup<BookkeepingDuty | ''>
                 className="mt-3"
                 name="기장의무"
-                value={form.bookkeepingDuty}
-                onChange={(value) => {
-                  dutyChosen.current = true;
-                  update('bookkeepingDuty', value);
-                }}
+                value={form.duty}
+                onChange={(value) => change((prev) => ({ ...prev, duty: value, dutyChosen: true }))}
                 options={BOOKKEEPING} />
-              
             </section>
 
-            <section className={cardClass}>
+            <section>
               <span className={labelClass}>5. 직원이 있나요?</span>
-              <p className={hintClass}>
-                직원 보유 사업자는 서비스 대상 밖입니다. 복리후생비 판정에만
-                사용합니다.
-              </p>
               <ChoiceGroup
                 className="mt-3"
                 name="직원 유무"
                 value={form.hasEmployee}
-                onChange={(value) => update('hasEmployee', value)}
+                onChange={(value) => change((prev) => ({ ...prev, hasEmployee: value }))}
                 options={[
                 { value: false, label: '없음 (1인)' },
-                { value: true, label: '있음' }]
+                { value: true, label: '있음', hint: '서비스 대상 밖 (참고용)' }]
                 } />
-              
             </section>
 
-            <section className={cardClass}>
+            <section id="home">
               <span className={labelClass}>6. 자택에서 작업하나요?</span>
-              <p className={hintClass}>
-                자택 안에 작업 공간이 따로 나뉘어 있으면, 월세·관리비·전기·수도·가스를 그 면적 비율만큼
-                경비로 봅니다. 따로 나뉘는지는 해당 거래의 질문에서 다시 묻습니다.
-              </p>
               <ChoiceGroup<HomeAnswer>
                 className="mt-3"
                 name="자택 작업 여부"
-                value={home}
-                onChange={(value) => {
-                  edited.current = true;
-                  setHome(value);
-                }}
+                value={form.home}
+                onChange={(value) => change((prev) => ({ ...prev, home: value }))}
                 options={[
-                { value: 'no', label: '아니오', hint: '자택에서 일하지 않음' },
-                { value: 'yes', label: '예', hint: '작업 공간 면적 비율을 적습니다' }]
+                { value: 'no', label: '아니요' },
+                { value: 'yes', label: '예' }]
                 } />
-              
-              {home === 'yes' &&
-              <div className="mt-4 rounded-xl bg-canvas p-4">
-                  <label
-                  htmlFor="ratio"
-                  className="text-[13px] font-bold text-ink">
-                  
+              {errors.home && <p role="alert" className={fieldErrorClass}>{errors.home}</p>}
+
+              {form.home === 'yes' &&
+              <div className="mt-5">
+                  <label htmlFor="ratio" className="text-body font-bold text-ink">
                     집 전체 면적에서 작업 공간이 차지하는 비율
                   </label>
                   <div className="mt-2.5 flex items-center gap-2">
                     <input
                     id="ratio"
                     inputMode="numeric"
-                    value={ratioText}
+                    autoComplete="off"
+                    value={form.ratio}
                     placeholder="예: 25"
-                    aria-invalid={ratioText !== '' && !ratioValid}
+                    aria-invalid={errors.ratio !== undefined}
+                    aria-describedby={errors.ratio ? 'ratio-error' : undefined}
                     onChange={(event) => {
-                      edited.current = true;
-                      setRatioText(event.target.value.replace(/\D/g, '').slice(0, 3));
+                      const ratio = event.target.value.replace(/\D/g, '').slice(0, 3);
+                      change((prev) => ({ ...prev, ratio }));
                     }}
                     className={`w-24 ${fieldClass}`} />
-                  
-                    <span className="text-[14px] font-bold text-ink">%</span>
+                    <span className="text-body font-bold text-ink">%</span>
                   </div>
-                  {ratioText !== '' && !ratioValid &&
-                <p role="alert" className={fieldErrorClass}>1 과 100 사이의 숫자를 적어 주세요.</p>
+                  {errors.ratio &&
+                <p id="ratio-error" role="alert" className={fieldErrorClass}>{errors.ratio}</p>
                 }
-                  <p className="mt-2 text-[12px] leading-5 text-muted">
-                    미리 채워 두지 않습니다. 대략이라도 실제 면적으로 적어 주세요. 예: 방 네 칸 중 한 칸을 작업실로 쓰면 25%.
-                  </p>
                 </div>
               }
             </section>
           </div>
 
           {error &&
-          <p
-            role="alert"
-            className="mt-6 rounded-xl border border-deny-line bg-deny-bg px-4 py-3 text-small leading-6 text-deny">
-
+          <p role="alert" className="mt-8 text-small text-deny">
               {error}
             </p>
           }
 
-          <div className="mt-6 flex items-center gap-3">
-            <button
-              type="submit"
-              disabled={saving}
-              className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-bold text-white transition-colors duration-150 ease-snap hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line disabled:text-muted">
-
-              {saving ? '저장하는 중…' : '다음: 입력 확정'}
-              <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              onClick={() => welcome ? navigate(afterWelcome, { replace: true }) : navigate('/upload')}
-              className="text-[13px] font-normal text-muted transition-colors duration-150 hover:text-ink">
-              
-              {welcome ? '나중에 하기' : '이전 단계'}
-            </button>
+          <div className="mt-8 flex flex-wrap items-center gap-2">
+            <Button type="submit" size="md" disabled={saving}>
+              {saving ? '저장하는 중…' : '저장'}
+            </Button>
+            <Button variant="secondary" size="md" onClick={back}>
+              {welcome ? '나중에 하기' : '돌아가기'}
+            </Button>
           </div>
         </form>
-
-        <aside className="lg:sticky lg:top-32 lg:self-start">
-          <div className="rounded-2xl border border-line bg-surface p-5">
-            <p className="text-[12px] text-muted">자동 판정</p>
-            <p className="mt-1 text-[18px] font-bold text-ink">{bookkeeping}</p>
-            <p className="mt-2 text-[13px] leading-6 text-muted">
-              직전연도 수입금액 {formatNumber(form.prevYearRevenue)}원 기준으로
-              산정했습니다.
-            </p>
-          </div>
-
-          <div className="mt-4 rounded-2xl border border-line bg-surface p-5">
-            <div className="flex items-center gap-2">
-              <InfoIcon className="h-4 w-4 text-accent" aria-hidden="true" />
-              <h2 className="text-sm font-bold text-ink">
-                이 답변이 바꾸는 것
-              </h2>
-            </div>
-            <ul className="mt-3 space-y-2.5">
-              {impacts.map((impact) =>
-              <li
-                key={impact}
-                className="text-[13px] leading-6 text-ink2 before:mr-1.5 before:text-muted before:content-['·']">
-                
-                  {impact}
-                </li>
-              )}
-            </ul>
-          </div>
-        </aside>
-      </div>
-    </AppShell>);
+    </>);
 
 }
