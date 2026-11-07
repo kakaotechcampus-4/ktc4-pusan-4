@@ -48,6 +48,7 @@ class ApiContractIntegrationTest {
         "GET /api/v1/users/me",
         "DELETE /api/v1/users/me",
         "PUT /api/v1/users/me/password",
+        "POST /api/v1/bug-reports",
         "POST /api/v1/users/me/contexts",
         "GET /api/v1/users/me/contexts",
         "GET /api/v1/users/me/contexts/current",
