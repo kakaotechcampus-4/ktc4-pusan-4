@@ -317,8 +317,15 @@ uv run ruff check . && uv run pytest               # CI 와 같은 검사
 
 ### 배포
 
-<!-- TODO(@memoryhong @yuyeol3): develop → release 자동 배포 흐름 요약. 자세한 내용은 docs/deployment.md 링크 -->
-> ✏️ 작성 필요
+`develop` → `release` PR 이 머지되면 GitHub Actions(`aws-release.yml`)가 자동으로 배포합니다.
+
+1. 백엔드 · AI · 프런트 검증 후 이미지를 빌드해 ECR 에 올립니다
+2. SSM 으로 EC2 의 `deploy/deploy.sh` 에 커밋 SHA 를 넘깁니다
+3. EC2 가 이미지를 받아 `deploy/compose.yaml` 로 다시 띄우고, 백엔드가 기동하면서 Flyway 마이그레이션을 적용합니다
+
+`release` 로 가는 PR 은 이 레포의 `develop` 에서만 열 수 있습니다. 문제가 생기면 이전 SHA 로 되돌립니다: `sudo bash /opt/ktc4/repo/deploy/deploy.sh <이전 SHA> --rollback`
+
+AWS 준비, 백업, 주간 배치 타이머 설치는 [docs/deployment.md](docs/deployment.md)를 참고하세요.
 
 ---
 
