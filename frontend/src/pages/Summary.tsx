@@ -3,9 +3,11 @@ import { Link } from 'react-router-dom';
 import { ArrowRightIcon, CopyCheckIcon, CopyIcon, PrinterIcon, SearchXIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { StepEyebrow } from '../components/StepEyebrow';
-import { Button, Empty, Table, type Column } from '../components/ui';
+import { Badge, Button, Empty, Table, type Column } from '../components/ui';
+import { AmountHero } from '../components/results/AmountHero';
 import { useSession } from '../contexts/SessionContext';
 import { api, useApi } from '../api';
+import { readAll } from '../api/readAll';
 import { uploadName } from '../copy';
 import type {
   BookkeepingDuty,
@@ -13,14 +15,33 @@ import type {
   JudgmentSummary,
   StoredBusinessContext,
   UploadBatch,
-  UnresolvedSummary } from
+  UnresolvedSummary,
+  Verdict } from
 '../types/domain';
 import { formatNumber, formatPeriod, formatWon } from '../utils/format';
 import { excessNote, LIMITED_ACCOUNT, limitLine, limitsOf, PROVISIONAL_NOTE } from '../utils/limit';
-import { AWAITING_ANSWER, awaitingOf } from '../utils/verdict';
+import { AWAITING_ANSWER, VERDICT_LABEL, VERDICT_META, awaitingOf } from '../utils/verdict';
 import { industryName } from '../utils/context';
 
 type AccountRow = JudgmentSummary['byAccount'][number];
+
+/** 판정별 몫 한 줄. amount 는 그 판정이 난 거래의 결제 금액 합이고, 못 읽었으면 null */
+interface Share {
+  key: Verdict | 'AWAITING';
+  count: number;
+  amount: number | null;
+  bar: string;
+}
+
+/** 판정색 채움. 답변 대기는 판정이 아니라 불가에 붙는 표지라 판정 색을 쓰지 않는다 */
+const SHARE_BAR: Record<Share['key'], string> = {
+  AVAILABLE: 'bg-ok-bar',
+  NEEDS_REVIEW: 'bg-warn-bar',
+  UNAVAILABLE: 'bg-deny-bar',
+  AWAITING: 'bg-edge'
+};
+
+const spendOf = (judgments: Judgment[]) => judgments.reduce((sum, judgment) => sum + judgment.transaction.amount, 0);
 
 /* 접대비 한도는 연 단위로만 다룬다(#15, #226). batch 요약의 접대비는 한도 전 금액이고, 그해 초과액은 limits 로 따로 온다 */
 
@@ -152,11 +173,11 @@ export function Summary() {
     Promise.resolve(null),
     [batchId]
   );
-  // 불가 가운데 답변 대기를 따로 센다 (C12). 질문 목록처럼 100개까지다
+  // 불가 가운데 답변 대기를 따로 센다 (C12). 질문을 끝까지 읽어야 몇 건이어도 맞는다
   const pendingQ = useApi(
     () =>
     batchId ?
-    api.questions.list({ batchId, status: 'PENDING', size: 100 }) :
+    readAll((page, size) => api.questions.list({ batchId, status: 'PENDING', page, size })) :
     Promise.resolve(null),
     [batchId]
   );
@@ -197,6 +218,11 @@ export function Summary() {
       <div>
         <StepEyebrow />
         <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">요약</h1>
+        {batch &&
+        <p className="mt-1 text-small tabular-nums text-ink2">
+            {uploadName(batch)}, {periodLabel(batch)}
+          </p>
+        }
       </div>
       {/* PDF 는 서버에서 만들지 않는다. 인쇄용 스타일(index.css)로 화면 틀을 빼고 브라우저 인쇄로 저장한다 */}
       {summary && summary.totalCount > 0 &&
@@ -266,28 +292,36 @@ export function Summary() {
       </AppShell>);
 
 
-  const awaitingCount =
-  exportQ.data && pendingQ.data ?
-  awaitingOf(exportQ.data.items.map((row) => row.judgment), pendingQ.data.items.map((question) => question.transactionId)).length :
-  0;
-  const counts = {
-    available: summary?.byVerdict.AVAILABLE.count ?? 0,
-    needsReview: summary?.byVerdict.NEEDS_REVIEW.count ?? 0,
-    unavailable: (summary?.byVerdict.UNAVAILABLE.count ?? 0) - awaitingCount
-  };
-  const total = summary?.totalCount ?? 0;
+  const judgments = exportQ.data?.items.map((row) => row.judgment) ?? null;
+  const awaitingRows =
+  judgments && pendingQ.data ? awaitingOf(judgments, pendingQ.data.map((question) => question.transactionId)) : null;
+  const awaitingCount = awaitingRows?.length ?? 0;
+  const awaitingSet = new Set(awaitingRows);
+  /** 판정별 결제 금액. 현재 판정 전부(내보내기)에서 더한다. 못 읽었으면 건수만 보인다 */
+  const amountBy = (key: Share['key']) =>
+  judgments && awaitingRows ?
+  spendOf(
+    key === 'AWAITING' ?
+    awaitingRows :
+    judgments.filter((judgment) => judgment.verdict.code === key && !awaitingSet.has(judgment))
+  ) :
+  null;
+  const shares: Share[] = [
+  ...(['AVAILABLE', 'NEEDS_REVIEW', 'UNAVAILABLE'] as const).map((key) => ({
+    key,
+    count: (summary?.byVerdict[key].count ?? 0) - (key === 'UNAVAILABLE' ? awaitingCount : 0),
+    amount: amountBy(key),
+    bar: SHARE_BAR[key]
+  })),
+  ...(awaitingCount > 0 ? [{ key: 'AWAITING' as const, count: awaitingCount, amount: amountBy('AWAITING'), bar: SHARE_BAR.AWAITING }] : [])];
 
-  const distribution = [
-  { label: '가능', value: counts.available, bar: 'bg-ok-bar' },
-  { label: '확인 필요', value: counts.needsReview, bar: 'bg-warn-bar' },
-  { label: '불가', value: counts.unavailable, bar: 'bg-deny-bar' },
-  // 판정이 아니라 불가에 붙는 표지라 판정 색을 쓰지 않는다
-  ...(awaitingCount > 0 ? [{ label: AWAITING_ANSWER, value: awaitingCount, bar: 'bg-edge' }] : [])];
-
+  const spend = judgments ? spendOf(judgments) : null;
+  /** 막대는 금액으로 나눈다. 금액을 못 읽었으면 건수로 나눈다 */
+  const byAmount = spend !== null && spend > 0 && shares.every((share) => share.amount !== null);
+  const shareTotal = shares.reduce((sum, share) => sum + (byAmount ? share.amount ?? 0 : share.count), 0);
 
   // 신고는 해마다 따로 한다. 두 해에 걸친 업로드는 합계를 해마다 나눠 보인다 (C20)
   const years = batch ? yearsOf(batch) : [];
-  const judgments = exportQ.data?.items.map((row) => row.judgment) ?? null;
   const byYear: [number, number][] | null =
   years.length > 1 && judgments ?
   years.map((year) => [
@@ -321,29 +355,34 @@ export function Summary() {
       finalAmount: rest
     });
   }
+  accountRows.sort((a, b) => b.finalAmount - a.finalAmount);
+  const accountMax = accountRows[0]?.finalAmount ?? 0;
 
-  const accountColumns: Column<AccountRow>[] = [
+  const shareColumns: Column<Share>[] = [
   {
-    header: '계정과목',
-    cell: (row) => <span className="whitespace-nowrap text-ink">{row.account}</span>
+    header: '판정',
+    cell: (row) =>
+    row.key === 'AWAITING' ?
+    <Badge>{AWAITING_ANSWER}</Badge> :
+    <Badge tone={VERDICT_META[row.key].tone} symbol={VERDICT_META[row.key].symbol}>
+            {VERDICT_LABEL[row.key]}
+          </Badge>
+
   },
   {
     header: '건수',
     align: 'right',
-    width: 'w-20',
-    cell: (row) => <span className="whitespace-nowrap text-ink2">{formatNumber(row.count)}건</span>
+    width: 'w-24',
+    cell: (row) => <span className="text-ink">{formatNumber(row.count)}건</span>
   },
   {
-    header: <span className="whitespace-nowrap">경비 가능 금액</span>,
+    header: '결제 금액',
     align: 'right',
-    width: 'w-36',
+    width: 'w-40',
     cell: (row) =>
-    <span className="whitespace-nowrap font-bold text-ink">
-          {formatWon(row.finalAmount)}
-        </span>
+    <span className="font-bold text-ink">{row.amount === null ? '—' : formatWon(row.amount)}</span>
 
   }];
-
 
 
   const answeredGroups = answeredQ.data?.page.totalElements ?? 0;
@@ -385,20 +424,15 @@ export function Summary() {
       {header}
 
       <section className="mt-8">
-        <p className="text-small text-ink2">이 업로드의 경비 가능 금액</p>
         {summary ?
-        <p className="mt-1.5 text-stat font-bold tabular-nums text-ink">
-            {formatWon(summary.byVerdict.AVAILABLE.finalAmount)}
-          </p> :
+        <AmountHero
+          label="이 업로드의 경비 가능 금액"
+          amount={summary.byVerdict.AVAILABLE.finalAmount}
+          spend={spend} /> :
 
-        <span className="mt-1.5 block h-9 w-48 animate-pulse rounded bg-line2" />
+        <span className="block h-[6.5rem] w-72 max-w-full animate-pulse rounded bg-line2" />
         }
-        {batch &&
-        <p className="mt-2 text-small tabular-nums text-ink2">
-            {uploadName(batch)}, {periodLabel(batch)}
-          </p>
-        }
-        {spanLine && <p className="mt-1 text-small tabular-nums text-ink2">{spanLine}</p>}
+        {spanLine && <p className="mt-2 text-small tabular-nums text-ink2">{spanLine}</p>}
         {/* 초과액은 그해 사용자 전체 기준이라 이 업로드 몫을 정할 수 없다(#15). 합계에서 빼지 않고 따로 알린다 */}
         {excess && <p className="mt-4 max-w-2xl text-small text-ink2">{excess}</p>}
 
@@ -424,46 +458,59 @@ export function Summary() {
             </Link>
           </p>
         }
+      </section>
 
-        <div className="mt-6" aria-hidden="true">
-          <div className="flex h-2.5 overflow-hidden rounded-full bg-line2">
-            {distribution.map((item) =>
-            <div
-              key={item.label}
-              className={item.bar}
-              style={{ width: `${total ? item.value / total * 100 : 0}%` }} />
-
-            )}
-          </div>
+      <section className="mt-10">
+        <h2 className="text-body font-bold text-ink">판정 결과</h2>
+        {/* 판정별 몫. 금액으로 나누고, 아래 표가 같은 순서로 건수와 금액을 적는다 */}
+        <div
+          className={`mt-4 flex h-3 gap-0.5 overflow-hidden rounded-full ${summary && shareTotal > 0 ? '' : 'bg-line2'}`}
+          aria-hidden="true">
+          {summary && shareTotal > 0 &&
+          shares.map((share) => {
+            const value = byAmount ? share.amount ?? 0 : share.count;
+            return value > 0 &&
+            <span key={share.key} className={share.bar} style={{ width: `${value / shareTotal * 100}%` }} />;
+          })}
         </div>
-        <dl className={`mt-4 grid gap-4 ${distribution.length > 3 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
-          {distribution.map((item) =>
-          <div key={item.label}>
-              <dt className="flex items-center gap-1.5 whitespace-nowrap text-caption text-ink2">
-                <span className={`h-2 w-2 rounded-full ${item.bar}`} aria-hidden="true" />
-                {item.label}
-              </dt>
-              <dd className="mt-1 text-h4 font-bold tabular-nums text-ink">
-                {summary ?
-              `${formatNumber(item.value)}건` :
-              <span className="block h-6 w-12 animate-pulse rounded bg-line2" />}
-              </dd>
-            </div>
-          )}
-        </dl>
+        <Table
+          className="mt-5"
+          caption="판정별 건수와 결제 금액"
+          columns={shareColumns}
+          rows={summary ? shares : []}
+          rowKey={(row) => row.key}
+          loading={!summary} />
       </section>
 
       <section className="mt-10">
         <h2 className="text-body font-bold text-ink">계정과목별 경비 가능 금액</h2>
-        <Table
-          className="mt-3"
-          caption="계정과목별 경비 가능 금액"
-          columns={accountColumns}
-          rows={accountRows}
-          rowKey={(row) => row.account}
-          loading={summaryQ.loading}
-          empty={<Empty title="가능으로 판정한 거래가 아직 없습니다" />} />
+        {summaryQ.loading && !summary ?
+        <span className="mt-4 block h-24 animate-pulse rounded bg-line2" /> :
+        accountRows.length === 0 ?
+        <Empty className="mt-4" inTable title="가능으로 판정한 거래가 아직 없습니다" /> :
 
+        <ul aria-label="계정과목별 경비 가능 금액" className="mt-4 divide-y divide-line2 border-t-2 border-rule">
+            {accountRows.map((row) =>
+          <li
+            key={row.account}
+            className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 py-3.5 sm:grid-cols-[minmax(0,10rem)_minmax(0,1fr)_auto]">
+                <span className="truncate text-body text-ink">{row.account}</span>
+                {/* 가장 큰 계정과목을 꽉 채운 길이로 놓고 나머지를 견준다 */}
+                <span
+              aria-hidden="true"
+              className="order-last col-span-2 h-2 overflow-hidden rounded-full bg-line2 sm:order-none sm:col-span-1">
+                  <span
+                className="block h-full rounded-full bg-ink"
+                style={{ width: `${accountMax > 0 ? row.finalAmount / accountMax * 100 : 0}%` }} />
+                </span>
+                <span className="whitespace-nowrap text-right tabular-nums">
+                  <span className="text-body font-bold text-ink">{formatWon(row.finalAmount)}</span>
+                  <span className="ml-2 inline-block w-12 text-small text-ink2">{formatNumber(row.count)}건</span>
+                </span>
+              </li>
+          )}
+          </ul>
+        }
       </section>
 
       <section className="mt-10">
