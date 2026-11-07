@@ -234,7 +234,7 @@ export function ClassificationPreview() {
   };
 
   return (
-    <AppShell>
+    <AppShell narrow>
       <div className="max-w-3xl">
         <header>
           <StepEyebrow />

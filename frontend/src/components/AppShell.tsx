@@ -65,9 +65,20 @@ interface AppShellProps {
    * 판정을 보여주지 않는 화면(내 정보)에서만 내린다 — 거기엔 오인할 판정 내용이 없다 (#242 리뷰)
    */
   disclaimer?: boolean;
+  /**
+   * 한 줄로 읽어 내려가는 흐름 화면(문진, 분류 확인, 판정 전 확인, 판정, 질문). 빵부스러기와 내용을
+   * 가운데 한 단(max-w-3xl)에 둔다. 1440px 바탕의 왼쪽에 붙이면 오른쪽 절반이 빈다
+   */
+  narrow?: boolean;
 }
 
-export function AppShell({ children, showSteps = true, disclaimer = true }: AppShellProps) {
+export function AppShell({ children, showSteps = true, disclaimer = true, narrow = false }: AppShellProps) {
+  const column = narrow ? 'mx-auto w-full max-w-3xl' : '';
+  /**
+   * 오른쪽 아래의 비서 버튼(오른쪽 20px, 56px)이 표 끝 칸과 상세 값을 덮지 않게 그만큼 비워 둔다.
+   * 한 단 화면은 lg 부터 단 옆이 비어 덮을 것이 없으니 좌우를 같게 둔다. 빵부스러기도 같은 여백이라야 단과 줄이 맞는다
+   */
+  const gutter = narrow ? 'px-6 sm:pr-24 lg:pr-6' : 'px-6 sm:pr-24';
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { email, isAdmin, signOut, batchId } = useSession();
@@ -212,9 +223,9 @@ export function AppShell({ children, showSteps = true, disclaimer = true }: AppS
       {crumb &&
       <nav
         aria-label="현재 위치"
-        className="mx-auto w-full max-w-page px-6 pt-8 text-caption text-ink2 print:hidden">
+        className={`mx-auto w-full max-w-page pt-8 text-caption text-ink2 print:hidden ${narrow ? gutter : 'px-6'}`}>
 
-          <ol className="flex items-center gap-2">
+          <ol className={`flex items-center gap-2 ${column}`}>
             <li>
               <Link to="/" className="transition-colors hover:text-ink">
                 홈
@@ -236,9 +247,8 @@ export function AppShell({ children, showSteps = true, disclaimer = true }: AppS
         </nav>
       }
 
-      {/* 오른쪽 아래의 비서 버튼(오른쪽 20px, 56px)이 표 끝 칸과 상세 값을 덮지 않게 그만큼 비워 둔다 */}
-      <main className="mx-auto w-full max-w-page flex-1 px-6 pb-12 pt-5 sm:pr-24">
-        {children}
+      <main className={`mx-auto w-full max-w-page flex-1 pb-12 pt-5 ${gutter}`}>
+        {narrow ? <div className={column}>{children}</div> : children}
       </main>
 
       {/* 링크 순서와 색은 공개 화면의 꼬리말(MarketingFooter)과 같다 (C96) */}

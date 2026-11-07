@@ -88,7 +88,7 @@ export function Confirm() {
   };
 
   return (
-    <AppShell>
+    <AppShell narrow>
       <div className="max-w-3xl">
         <header>
           <StepEyebrow />

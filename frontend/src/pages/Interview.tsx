@@ -68,7 +68,7 @@ export function Interview() {
 
   return (
     // 진행 단계에 없는 화면이다. 띠를 띄우면 어느 칸도 켜지지 않아 고장난 것처럼 보인다
-    <AppShell showSteps={false}>
+    <AppShell showSteps={false} narrow>
       <header>
         <h1 className="text-h2 font-bold tracking-tight text-ink">사업자 문진</h1>
       </header>
@@ -233,9 +233,8 @@ function InterviewBody() {
         </p>
       }
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
-        {/* 브라우저 말풍선 대신 칸 아래에 알린다 (C7) */}
-        <form noValidate onSubmit={(event) => void submit(event)}>
+      {/* 브라우저 말풍선 대신 칸 아래에 알린다 (C7) */}
+      <form noValidate className="mt-8" onSubmit={(event) => void submit(event)}>
           <div className="space-y-8">
             <section>
               <span className={labelClass}>1. 업종</span>
@@ -299,7 +298,18 @@ function InterviewBody() {
             </section>
 
             <section>
-              <span className={labelClass}>4. 기장의무</span>
+              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                <span className={labelClass}>4. 기장의무</span>
+                {/* 수입금액을 적기 전에는 판정할 것이 없다 (C1). 한 단 화면이라 옆 칸 대신 이 질문 옆에 둔다 */}
+                {form.revenue !== '' &&
+                <span className="text-small text-ink2">
+                    수입금액 기준{' '}
+                    <b className="text-ink">
+                      {dutyFor(Number(form.revenue)) === '복식부기' ? '복식부기 의무자' : '간편장부 대상자'}
+                    </b>
+                  </span>
+                }
+              </div>
               <ChoiceGroup<BookkeepingDuty | ''>
                 className="mt-3"
                 name="기장의무"
@@ -378,19 +388,6 @@ function InterviewBody() {
             </Button>
           </div>
         </form>
-
-        {/* 수입금액을 적기 전에는 판정할 것이 없다 (C1) */}
-        {form.revenue !== '' &&
-        <aside className="lg:sticky lg:top-32 lg:self-start">
-            <div className="rounded-2xl border border-line p-5">
-              <p className="text-small text-ink2">자동 판정</p>
-              <p className="mt-1 text-h4 font-bold text-ink">
-                {dutyFor(Number(form.revenue)) === '복식부기' ? '복식부기 의무자' : '간편장부 대상자'}
-              </p>
-            </div>
-          </aside>
-        }
-      </div>
     </>);
 
 }

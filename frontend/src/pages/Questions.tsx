@@ -346,7 +346,7 @@ export function Questions() {
   // 업로드 목록을 고르는 동안은 아래 자리 표시로 기다린다. 올린 게 없다는 것은 다 읽은 뒤에만 말한다 (C56)
   if (batchStatus === 'error') {
     return (
-      <AppShell>
+      <AppShell narrow>
         <div className="max-w-3xl">
           {header}
           <Empty
@@ -366,7 +366,7 @@ export function Questions() {
 
   if ((batchStatus === 'ready' && !batchId) || pendingQ.error) {
     return (
-      <AppShell>
+      <AppShell narrow>
         <div className="max-w-3xl">
           {header}
           {!batchId ?
@@ -399,7 +399,7 @@ export function Questions() {
   }
 
   return (
-    <AppShell>
+    <AppShell narrow>
       <div className="max-w-3xl">
         {header}
 
