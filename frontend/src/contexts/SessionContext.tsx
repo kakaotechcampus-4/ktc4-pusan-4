@@ -130,16 +130,21 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
     setContextStatus('loading');
   }, []);
 
-  /** 3.3 목록(createdAt DESC)에서 고른다. 100개(최대 크기)면 기억해 둔 배치가 그 밖으로 밀려날 일이 없다 */
+  /** 3.3 목록(createdAt DESC)에서 고른다. 기억해 둔 배치가 첫 100개 밖에 있으면 따로 읽어 넣는다 */
   const pickBatch = useCallback((forUser: string) => {
     const picking = ++batchPick.current;
     setBatchStatus('loading');
     void api.uploads.
     list({ size: 100 }).
-    then((page) => {
-      if (batchPick.current !== picking) return;
+    then(async (page) => {
       // 목업은 기억해 두지 않는다(setBatchId). 거래가 든 가장 최근 것을 고른다
-      setBatchIdState(chooseBatch(page.items, seedSession ? null : savedBatchId(forUser)));
+      const saved = seedSession ? null : savedBatchId(forUser);
+      const older =
+      saved && page.page.hasNext && !page.items.some((item) => item.id === saved) ?
+      await api.uploads.get(saved).catch(() => null) :
+      null;
+      if (batchPick.current !== picking) return;
+      setBatchIdState(chooseBatch(older ? [...page.items, older] : page.items, saved));
       setBatchStatus('ready');
     }).
     catch(() => {
