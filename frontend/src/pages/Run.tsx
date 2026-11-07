@@ -16,7 +16,7 @@ import type {
 '../types/domain';
 import { Badge, Button, cn } from '../components/ui';
 import { formatNumber, formatWon } from '../utils/format';
-import { VERDICT_LABEL, VERDICT_META } from '../utils/verdict';
+import { AWAITING_ANSWER, VERDICT_LABEL, VERDICT_META, awaitingOf } from '../utils/verdict';
 import { pollErrorOf, runPhase, type PollError } from './runPhase';
 
 /**
@@ -66,6 +66,8 @@ function RunProgress() {
   const [pollError, setPollError] = useState<PollError | null>(null);
   /** null 은 아직 받지 않음 */
   const [byVerdict, setByVerdict] = useState<JudgmentSummary['byVerdict'] | null>(null);
+  /** 불가 가운데 답을 기다리는 거래 수. 불가와 따로 센다 (C12) */
+  const [awaitingCount, setAwaitingCount] = useState(0);
   const [countsFailed, setCountsFailed] = useState(false);
   /** 올리면 집계를 다시 읽는다 */
   const [countsAttempt, setCountsAttempt] = useState(0);
@@ -127,14 +129,19 @@ function RunProgress() {
 
   // 집계를 못 읽어도 판정은 끝났다. 결과 보기는 그대로 두고 그 자리에서 다시 읽게 한다 (C62)
   useEffect(() => {
-    if (!runId || !judged) return;
+    if (!runId || !judged || !runBatchId) return;
     let cancelled = false;
     setCountsFailed(false);
-    void api.judgments.
-    summary({ runId }).
+    void Promise.all([
+    api.judgments.summary({ runId }),
+    api.judgments.list({ runId, verdict: 'UNAVAILABLE', size: 100 }),
+    api.questions.list({ batchId: runBatchId, status: 'PENDING', size: 100 })]
+    ).
     then(
-      (summary) => {
-        if (!cancelled) setByVerdict(summary.byVerdict);
+      ([summary, unavailable, questions]) => {
+        if (cancelled) return;
+        setAwaitingCount(awaitingOf(unavailable.items, questions.items.map((question) => question.transactionId)).length);
+        setByVerdict(summary.byVerdict);
       },
       () => {
         if (!cancelled) setCountsFailed(true);
@@ -143,7 +150,7 @@ function RunProgress() {
     return () => {
       cancelled = true;
     };
-  }, [runId, judged, countsAttempt]);
+  }, [runId, judged, runBatchId, countsAttempt]);
 
   useEffect(() => {
     if (!runId || !finished || failedCount === 0) return;
@@ -324,7 +331,7 @@ function RunProgress() {
                   다시 시도
                 </Button>
               </div> :
-            <dl className="grid grid-cols-3 gap-6">
+            <dl className={cn('grid gap-6', awaitingCount > 0 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3')}>
                 {VERDICTS.map((verdict) =>
               <div key={verdict}>
                     <dt>
@@ -337,10 +344,19 @@ function RunProgress() {
                     'mt-2 text-h3 font-bold tabular-nums text-ink',
                     !byVerdict && 'invisible'
                   )}>
-                      {formatNumber(byVerdict?.[verdict].count ?? 0)}건
+                      {formatNumber((byVerdict?.[verdict].count ?? 0) - (verdict === 'UNAVAILABLE' ? awaitingCount : 0))}건
                     </dd>
                   </div>
               )}
+                {/* 판정이 아니라 불가에 붙는 표지라 판정 색을 쓰지 않는다 */}
+                {awaitingCount > 0 &&
+              <div>
+                    <dt>
+                      <Badge>{AWAITING_ANSWER}</Badge>
+                    </dt>
+                    <dd className="mt-2 text-h3 font-bold tabular-nums text-ink">{formatNumber(awaitingCount)}건</dd>
+                  </div>
+              }
               </dl>
             }
             <Button className="mt-8" onClick={openResults}>

@@ -1,4 +1,4 @@
-import type { Verdict } from '../types/domain';
+import type { Judgment, Verdict } from '../types/domain';
 import type { BadgeTone } from '../components/ui/Badge';
 
 /**
@@ -23,3 +23,15 @@ export const VERDICT_LABEL: Record<Verdict, string> = {
  * (rule-card-fields.md). 확인 필요라고 부르지 않는다 — 확인 필요는 규칙으로 정하지 못한 판정이다 (C12)
  */
 export const AWAITING_ANSWER = '답변 대기';
+
+/**
+ * 답변 대기 거래만 고른다. 불가 판정 가운데 답을 기다리는 질문이 걸린 거래다.
+ * 결과, 실행, 요약이 불가와 따로 센다 (C12)
+ */
+export const awaitingOf = <T extends Pick<Judgment, 'transactionId' | 'verdict'>>(
+judgments: T[],
+pendingTransactionIds: Iterable<string>)
+: T[] => {
+  const pending = new Set(pendingTransactionIds);
+  return judgments.filter((judgment) => judgment.verdict.code === 'UNAVAILABLE' && pending.has(judgment.transactionId));
+};

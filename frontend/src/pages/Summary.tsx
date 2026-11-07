@@ -17,6 +17,8 @@ import type {
 '../types/domain';
 import { formatNumber, formatPeriod, formatWon } from '../utils/format';
 import { excessNote, LIMITED_ACCOUNT, limitLine, limitsOf, PROVISIONAL_NOTE } from '../utils/limit';
+import { AWAITING_ANSWER, awaitingOf } from '../utils/verdict';
+import { industryName } from '../utils/context';
 
 type AccountRow = JudgmentSummary['byAccount'][number];
 
@@ -60,6 +62,8 @@ interface Handoff {
   overridden: Judgment[] | null;
   unclassified: number;
   unresolved: UnresolvedSummary | undefined;
+  /** 불가 가운데 답을 기다리는 거래 수 (C12) */
+  awaiting: number;
   context: StoredBusinessContext | null | undefined;
 }
 
@@ -67,11 +71,13 @@ interface Handoff {
  * 세무사에게 넘길 문장. 화면에 보이는 숫자와 문진 응답만으로 만든다.
  * 판정하지 않은 것을 판정한 것처럼 말하지 않는다.
  */
-const handoffText = ({ batch, summary, byYear, overridden, unclassified, unresolved, context }: Handoff) => {
+const handoffText = ({ batch, summary, byYear, overridden, unclassified, unresolved, awaiting, context }: Handoff) => {
   const { AVAILABLE, UNAVAILABLE, NEEDS_REVIEW } = summary.byVerdict;
+  // 답을 받기 전이라 일단 불가로 둔 거래는 확정된 불가와 따로 적는다 (C12)
   const lines = [
   `${batch ? `${periodLabel(batch)} ${uploadName(batch)}` : '카드내역'} 중 판정한 ${formatNumber(summary.totalCount)}건의 결과입니다.`,
-  `가능 ${formatNumber(AVAILABLE.count)}건(경비 가능 금액 ${formatWon(AVAILABLE.finalAmount)}), 불가 ${formatNumber(UNAVAILABLE.count)}건, 확인 필요 ${formatNumber(NEEDS_REVIEW.count)}건입니다.`];
+  `가능 ${formatNumber(AVAILABLE.count)}건(경비 가능 금액 ${formatWon(AVAILABLE.finalAmount)}), 불가 ${formatNumber(UNAVAILABLE.count - awaiting)}건, ${
+  awaiting > 0 ? `${AWAITING_ANSWER} ${formatNumber(awaiting)}건, ` : ''}확인 필요 ${formatNumber(NEEDS_REVIEW.count)}건입니다.`];
   // 사용자가 바꾼 판정은 규칙이 낸 것이 아니다. 세무사가 따로 볼 수 있게 몇 건을 어느 쪽으로 바꿨는지 적는다 (C27)
   if (overridden) {
     const toAvailable = overridden.filter((judgment) => judgment.verdict.code === 'AVAILABLE');
@@ -105,7 +111,7 @@ const handoffText = ({ batch, summary, byYear, overridden, unclassified, unresol
   // 판정에 쓴 문진이 이와 다를 수 있다. 지금 응답임을 밝힌다
   if (context)
   lines.push(
-    `현재 문진 응답: 업종코드 ${context.industryCode}, ${DUTY[context.bookkeepingDuty]}, 직원 ${
+    `현재 문진 응답: 업종 ${industryName(context.industryCode)}, ${DUTY[context.bookkeepingDuty]}, 직원 ${
     context.hasEmployee ? '있음' : '없음'}, 작업 공간 면적 비율 ${
     context.homeOfficeRatio === null ?
     '입력 안 함' :
@@ -143,6 +149,14 @@ export function Summary() {
     () =>
     batchId ?
     api.questions.grouped({ batchId, status: 'PENDING', size: 1 }) :
+    Promise.resolve(null),
+    [batchId]
+  );
+  // 불가 가운데 답변 대기를 따로 센다 (C12). 질문 목록처럼 100개까지다
+  const pendingQ = useApi(
+    () =>
+    batchId ?
+    api.questions.list({ batchId, status: 'PENDING', size: 100 }) :
     Promise.resolve(null),
     [batchId]
   );
@@ -252,17 +266,23 @@ export function Summary() {
       </AppShell>);
 
 
+  const awaitingCount =
+  exportQ.data && pendingQ.data ?
+  awaitingOf(exportQ.data.items.map((row) => row.judgment), pendingQ.data.items.map((question) => question.transactionId)).length :
+  0;
   const counts = {
     available: summary?.byVerdict.AVAILABLE.count ?? 0,
     needsReview: summary?.byVerdict.NEEDS_REVIEW.count ?? 0,
-    unavailable: summary?.byVerdict.UNAVAILABLE.count ?? 0
+    unavailable: (summary?.byVerdict.UNAVAILABLE.count ?? 0) - awaitingCount
   };
   const total = summary?.totalCount ?? 0;
 
   const distribution = [
   { label: '가능', value: counts.available, bar: 'bg-ok-bar' },
   { label: '확인 필요', value: counts.needsReview, bar: 'bg-warn-bar' },
-  { label: '불가', value: counts.unavailable, bar: 'bg-deny-bar' }];
+  { label: '불가', value: counts.unavailable, bar: 'bg-deny-bar' },
+  // 판정이 아니라 불가에 붙는 표지라 판정 색을 쓰지 않는다
+  ...(awaitingCount > 0 ? [{ label: AWAITING_ANSWER, value: awaitingCount, bar: 'bg-edge' }] : [])];
 
 
   // 신고는 해마다 따로 한다. 두 해에 걸친 업로드는 합계를 해마다 나눠 보인다 (C20)
@@ -329,12 +349,12 @@ export function Summary() {
   const answeredGroups = answeredQ.data?.page.totalElements ?? 0;
   // 문장에 들어갈 건수를 아직 다 읽지 못했으면 복사하지 않는다. 빠진 채로 넘기면 「남은 것 없음」으로 읽힌다
   const settling =
-  batchQ.loading || exportQ.loading || questionsQ.loading || unclassifiedQ.loading || contextQ.loading || notesQ.loading;
+  batchQ.loading || exportQ.loading || questionsQ.loading || pendingQ.loading || unclassifiedQ.loading || contextQ.loading || notesQ.loading;
   const omitted = [
   batchQ.error && '기간',
   exportQ.error && '직접 바꾼 판정',
   exportQ.error && years.length > 1 && '해마다 나눈 금액',
-  questionsQ.error && '답하지 않은 질문',
+  (questionsQ.error || pendingQ.error) && '답하지 않은 질문',
   unclassifiedQ.error && '분류하지 못한 거래 수',
   contextQ.error && '문진 응답',
   notesQ.error && '따로 물을 질문'].
@@ -346,7 +366,7 @@ export function Summary() {
   const overridden = judgments?.filter((judgment) => judgment.origin.type === 'OVERRIDE') ?? null;
   // 못 읽은 항목은 화면에만 알리지 않고, 붙여 넣은 문장에도 남긴다
   const text = summary ?
-  `${handoffText({ batch, summary, byYear, overridden, unclassified, unresolved, context: contextQ.data })}${notesText}${
+  `${handoffText({ batch, summary, byYear, overridden, unclassified, unresolved, awaiting: awaitingCount, context: contextQ.data })}${notesText}${
   omitted.length > 0 ? ` (불러오지 못해 빠진 항목: ${omitted.join(', ')})` : ''}` :
   '';
 
@@ -416,7 +436,7 @@ export function Summary() {
             )}
           </div>
         </div>
-        <dl className="mt-4 grid grid-cols-3 gap-4">
+        <dl className={`mt-4 grid gap-4 ${distribution.length > 3 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
           {distribution.map((item) =>
           <div key={item.label}>
               <dt className="flex items-center gap-1.5 whitespace-nowrap text-caption text-ink2">

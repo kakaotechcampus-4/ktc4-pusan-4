@@ -20,11 +20,13 @@ import { useAssistantSubject } from '../components/assistant/context';
 import { api, ApiRequestError, useApi } from '../api';
 import type { Judgment, Verdict } from '../types/domain';
 import { formatFullDate, formatNumber, formatPeriod, formatWon } from '../utils/format';
+import { AWAITING_ANSWER, awaitingOf } from '../utils/verdict';
 import { download, exportRowOf, judgmentsCsv } from '../utils/csv';
 import { exceededLimitOf, excessNote } from '../utils/limit';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 
-type Filter = 'ALL' | Verdict;
+/** 답변 대기는 판정이 아니라 불가에 붙는 표지라 서버 필터가 없다. 불가를 읽어 화면에서 가른다 (C12) */
+type Filter = 'ALL' | Verdict | 'AWAITING';
 
 /** 내보내기 API(#214)가 아직 없는 서버는 판정 목록을 끝까지 읽어 같은 모양을 만든다 */
 const readAllJudgments = async (batchId: string) => {
@@ -100,7 +102,7 @@ export function Results() {
     batchId ?
     api.judgments.list({
       batchId,
-      verdict: filter === 'ALL' ? undefined : filter,
+      verdict: filter === 'ALL' || filter === 'AWAITING' ? undefined : filter,
       page,
       size: 20
     }) :
@@ -112,6 +114,14 @@ export function Results() {
     () =>
     batchId ?
     api.questions.list({ batchId, status: 'PENDING', size: 100 }) :
+    Promise.resolve(null),
+    [batchId]
+  );
+  // 불가 가운데 답변 대기를 따로 세고 거른다 (C12). 질문 목록처럼 100건까지다
+  const unavailableQ = useApi(
+    () =>
+    batchId ?
+    api.judgments.list({ batchId, verdict: 'UNAVAILABLE', size: 100 }) :
     Promise.resolve(null),
     [batchId]
   );
@@ -132,7 +142,16 @@ export function Results() {
     [batchId]
   );
 
-  const judgments: Judgment[] = judgmentsQ.data?.items ?? [];
+  const awaiting = new Set(questionsQ.data?.items.map((question) => question.transactionId));
+  /** 불가와 답변 대기는 불가를 한 번에 읽어 화면에서 가르고, 쪽을 나누지 않는다 */
+  const splitUnavailable = filter === 'UNAVAILABLE' || filter === 'AWAITING';
+  const awaitingRows = awaitingOf(unavailableQ.data?.items ?? [], awaiting);
+  const judgments: Judgment[] =
+  filter === 'AWAITING' ?
+  awaitingRows :
+  filter === 'UNAVAILABLE' ?
+  (unavailableQ.data?.items ?? []).filter((row) => !awaitingRows.includes(row)) :
+  judgmentsQ.data?.items ?? [];
 
   // 패널은 고른 거래의 현재 판정을 따로 읽는다(거래 요약이 함께 온다). 수정하면 그 행이 목록 맨 위로
   // 올라가도(computedAt DESC) 패널은 그 거래에 머문다
@@ -182,6 +201,7 @@ export function Results() {
   // 판정 대상에서 빼면 그 거래의 질문도 집계에서 빠진다(3.9). 질문 안내도 다시 읽는다
   const changed = () => {
     judgmentsQ.reload();
+    unavailableQ.reload();
     summaryQ.reload();
     panelQ.reload();
     questionsQ.reload();
@@ -192,6 +212,7 @@ export function Results() {
     batchQ.reload();
     summaryQ.reload();
     judgmentsQ.reload();
+    unavailableQ.reload();
     questionsQ.reload();
     answeredQ.reload();
     unclassifiedQ.reload();
@@ -229,10 +250,17 @@ export function Results() {
   { value: 'ALL' as const, label: '전체', count: summary?.totalCount },
   { value: 'AVAILABLE' as const, label: '가능', count: summary?.byVerdict.AVAILABLE.count },
   { value: 'NEEDS_REVIEW' as const, label: '확인 필요', count: summary?.byVerdict.NEEDS_REVIEW.count },
-  { value: 'UNAVAILABLE' as const, label: '불가', count: summary?.byVerdict.UNAVAILABLE.count }];
+  {
+    value: 'UNAVAILABLE' as const,
+    label: '불가',
+    count: summary && unavailableQ.data ? summary.byVerdict.UNAVAILABLE.count - awaitingRows.length : undefined
+  },
+  // 답을 기다리는 거래가 있을 때만 둔다. 고른 채로 다 답했으면 빈 목록이 보이도록 남긴다
+  ...(awaitingRows.length > 0 || filter === 'AWAITING' ?
+  [{ value: 'AWAITING' as const, label: AWAITING_ANSWER, count: awaitingRows.length }] :
+  [])];
 
   const unresolved = questionsQ.data?.unresolved;
-  const awaiting = new Set(questionsQ.data?.items.map((question) => question.transactionId));
   // 다시 읽다가 실패하면 예전 질문 수를 띄우지 않고 실패를 알린다
   const questionsFailed = Boolean(questionsQ.error) && !questionsQ.loading;
   const answeredGroups = answeredQ.data?.page.totalElements ?? 0;
@@ -241,7 +269,7 @@ export function Results() {
    * 처음 읽는 동안. 머리글 줄, 질문 안내, 분류 안내, 표를 다 받은 뒤 한 번에 그린다.
    * 따로 그리면 늦게 온 줄이 이미 그린 표를 밀어 내린다 (C66). 실패한 것은 기다리지 않는다
    */
-  const firstLoad = [batchQ, summaryQ, questionsQ, unclassifiedQ].some(
+  const firstLoad = [batchQ, summaryQ, questionsQ, unavailableQ, unclassifiedQ].some(
     (query) => query.loading && !query.data && !query.error
   );
 
@@ -433,7 +461,7 @@ export function Results() {
 
   }
 
-  const failed = Boolean(judgmentsQ.error || summaryQ.error);
+  const failed = Boolean(judgmentsQ.error || summaryQ.error || unavailableQ.error);
   const nothingJudged = summary?.totalCount === 0;
 
   const empty = failed ?
@@ -459,6 +487,9 @@ export function Results() {
 
   filter === 'NEEDS_REVIEW' ?
   <Empty icon={<SearchXIcon className="h-5 w-5" />} title="확인이 필요한 거래가 없습니다" /> :
+
+  filter === 'AWAITING' ?
+  <Empty icon={<SearchXIcon className="h-5 w-5" />} title="답을 기다리는 거래가 없습니다" /> :
 
   <Empty icon={<SearchXIcon className="h-5 w-5" />} title="이 판정에 해당하는 거래가 없습니다" />;
 
@@ -564,12 +595,12 @@ export function Results() {
             columns={columns}
             rows={failed || firstLoad ? [] : judgments}
             rowKey={(row) => row.id}
-            loading={judgmentsQ.loading || firstLoad}
+            loading={(splitUnavailable ? unavailableQ.loading : judgmentsQ.loading) || firstLoad}
             selectedKey={judgments.find((row) => row.transactionId === selectedId)?.id}
             onRowClick={(row) => select(row.transactionId)}
             empty={empty} />
 
-          {!failed && !firstLoad && judgmentsQ.data && judgments.length > 0 &&
+          {!failed && !firstLoad && !splitUnavailable && judgmentsQ.data && judgments.length > 0 &&
           <Pagination page={judgmentsQ.data.page} onChange={setPage} />
           }
         </section>

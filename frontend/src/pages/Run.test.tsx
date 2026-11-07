@@ -10,7 +10,8 @@ import { Run } from './Run';
 const { api, session, showNudge } = vi.hoisted(() => ({
   api: {
     runs: { get: vi.fn(), failures: vi.fn(), create: vi.fn() },
-    judgments: { summary: vi.fn() },
+    judgments: { summary: vi.fn(), list: vi.fn() },
+    questions: { list: vi.fn() },
     progress: { get: vi.fn() },
     transactions: { get: vi.fn() }
   },
@@ -86,6 +87,8 @@ beforeEach(() => {
   vi.resetAllMocks();
   session.batchId = 'batch-run';
   api.progress.get.mockResolvedValue({ questions: { fillableFromPrevious: 0 } });
+  api.judgments.list.mockResolvedValue({ items: [] });
+  api.questions.list.mockResolvedValue({ items: [] });
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -111,6 +114,20 @@ describe('Run', () => {
     // 머리글(단계 띠)을 뺀 본문에는 가운뎃점과 낫표가 없다
     const body = [...container.querySelectorAll('header ~ *')].map((el) => el.textContent).join('');
     expect(body).not.toMatch(/[·・•「」『』]/);
+  });
+
+  it('답을 기다리는 불가는 불가와 따로 센다 (C12)', async () => {
+    api.runs.get.mockResolvedValue(run('COMPLETED'));
+    api.judgments.summary.mockResolvedValue(summary);
+    api.judgments.list.mockResolvedValue({
+      items: ['t1', 't2', 't3', 't4'].map((transactionId) => ({ transactionId, verdict: { code: 'UNAVAILABLE' } }))
+    });
+    api.questions.list.mockResolvedValue({ items: [{ transactionId: 't1' }, { transactionId: 't9' }] });
+    await mount();
+
+    const counts = [...container.querySelectorAll('dl > div')].map((el) => el.textContent);
+    expect(counts).toEqual(['✓가능3건', '?확인 필요2건', '✕불가3건', '답변 대기1건']);
+    expect(api.questions.list).toHaveBeenCalledWith({ batchId: 'batch-run', status: 'PENDING', size: 100 });
   });
 
   it('진행 중 조회가 한 번 실패해도 진행 화면을 두고, 다시 올리라고 하지 않는다 (C63)', async () => {
