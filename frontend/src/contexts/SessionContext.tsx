@@ -18,17 +18,6 @@ import { api, seedSession } from '../api';
 import { chooseBatch, saveBatchId, savedBatchId } from '../auth/session';
 import type { SessionEndReason } from '../auth/session';
 
-/** 업종은 프리랜서·인적용역(국세청 업종코드 940909) 고정 */
-export const DEFAULT_CONTEXT: BusinessContext = {
-  industryCode: '940909',
-  prevYearRevenue: 83_000_000,
-  businessOpenDate: '2024-03-01',
-  bookkeepingDuty: '복식부기',
-  hasEmployee: false,
-  // 정해 두지 않는다. 그냥 두면 그 값으로 자택 경비 금액이 계산된다(#214). 문진에서 직접 고른다
-  homeOfficeRatio: null
-};
-
 /** restoring: 새로고침 뒤 리프레시 쿠키로 로그인을 이어 가는 중. 이때는 로그인 화면으로 보내지 않는다 */
 export type AuthStatus = 'restoring' | 'anonymous' | 'signedIn';
 
@@ -149,7 +138,8 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
     list({ size: 100 }).
     then((page) => {
       if (batchPick.current !== picking) return;
-      setBatchIdState(chooseBatch(page.items, savedBatchId(forUser)));
+      // 목업은 기억해 두지 않는다(setBatchId). 거래가 든 가장 최근 것을 고른다
+      setBatchIdState(chooseBatch(page.items, seedSession ? null : savedBatchId(forUser)));
       setBatchStatus('ready');
     }).
     catch(() => {
@@ -166,7 +156,7 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
   }, []);
 
   const reloadBatch = useCallback(() => {
-    if (userIdRef.current && !seedSession) pickBatch(userIdRef.current);
+    if (userIdRef.current) pickBatch(userIdRef.current);
   }, [pickBatch]);
 
   /** 로그인했다. 실서버는 보던 배치를 계정마다 기억해 둔 것으로 시작한다. 목업은 시드 배치로 시작한다 */
