@@ -97,6 +97,33 @@ class JudgmentExecutorIntegrationTest {
     }
 
     @Test
+    void parser_review_transaction_stops_at_g0_without_question_or_unmatched_log() {
+        // given: 파서가 62일 밖 취소로 표시한 원 결제(카드로는 카페 질문이 뜰 거래)
+        UUID transactionId = insertCafeTransaction("2025-10-08");
+        jdbcTemplate.update("update transaction set needs_review = true, review_reason = ? where id = ?",
+            "같은 상호·금액 취소가 63일 떨어져 있음", transactionId);
+
+        // when
+        UUID judgmentId = executor.judge(transactionId, contextService.version(userId, 1), runOrigin(insertRun()));
+
+        // then: 0원 확인 필요, 질문 없음, 규칙 후보를 만드는 미매칭 기록도 없음
+        assertThat(jdbcTemplate.queryForMap("""
+            select verdict, blocked_at_gate, final_amount, rule_card_id, unmatched_reason, is_inference
+            from judgment where id = ?
+            """, judgmentId))
+            .containsEntry("verdict", "NEEDS_REVIEW")
+            .containsEntry("blocked_at_gate", "G0")
+            .containsEntry("final_amount", 0L)
+            .containsEntry("rule_card_id", null)
+            .containsEntry("unmatched_reason", null)
+            .containsEntry("is_inference", false);
+        assertThat(jdbcTemplate.queryForObject(
+            "select count(*) from question_queue where judgment_id = ?", Integer.class, judgmentId)).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+            "select count(*) from unmatched_log where judgment_id = ?", Integer.class, judgmentId)).isZero();
+    }
+
+    @Test
     void public_holiday_from_table_switches_to_holiday_card_and_cancels_old_question() {
         UUID transactionId = insertCafeTransaction("2025-10-09");
         UUID runId = insertRun();

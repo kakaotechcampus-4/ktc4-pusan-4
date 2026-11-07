@@ -1991,6 +1991,7 @@ Query: `batchId` 또는 `year` 중 정확히 하나. 0개거나 2개면 `400 INV
   "userContextVersion": 4,
 
   "explanation": "사업 수행에 직접 사용한 비용으로 분류되었습니다.",
+  "reviewReason": null,
 
   "computedAt": "2026-09-12T14:05:00+09:00",
 
@@ -2025,7 +2026,10 @@ Query: `batchId` 또는 `year` 중 정확히 하나. 0개거나 2개면 `400 INV
 | rulesCommitSha | 사용된 Rules revision |
 | userContextVersion | 판정에 사용된 Context 버전 |
 | explanation | 판정 설명 문장. RuleCard에 설명 필드가 없어 지금은 늘 `null`이다 |
+| reviewReason | 파서가 확인 필요로 표시한 이유(업로드의 `reviewReason`). `blockedAtGate = G0`이면서 `NEEDS_REVIEW`일 때만 값이 있다. 판정을 수정한 revision은 `blockedAtGate`를 이어받지만 이 값은 비운다 |
 | citations | 근거 법령 |
+
+업로드에서 `needsReview = true`인 거래(취소 대상 불확정, 62일 밖 취소 등, `docs/schema_mapping.md`)는 결제가 실제로 남았는지부터 사람이 정해야 한다. 그래서 카드를 보지 않고 `blockedAtGate = G0`(입력 검증)에서 `NEEDS_REVIEW`로 멈춘다. 답할 질문이 없고 `finalAmount`는 0이다. 규칙을 못 찾은 것이 아니므로 `unmatchedReason`은 `null`이고 규칙 후보 집계에도 들어가지 않는다. 사용자는 결제가 취소됐으면 거래를 제외하고(3.4), 남았으면 판정을 수정한다(3.8).
 
 ### Judgment `state` 제거
 
