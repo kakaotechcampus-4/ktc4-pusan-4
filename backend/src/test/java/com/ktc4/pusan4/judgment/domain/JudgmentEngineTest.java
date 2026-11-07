@@ -52,32 +52,6 @@ class JudgmentEngineTest {
     }
 
     @Test
-    void parser_review_stops_at_g0_before_any_card() {
-        // given: 63일 뒤 같은 금액이 취소돼 상계하지 않은 원 결제. 카드로는 바로 가능이 될 거래다
-        RuleCard g2 = new RuleCard(
-            "R-027", 1, Gate.G2, 500,
-            RuleMatch.categories("여비교통"),
-            Verdict.AVAILABLE, "여비교통비",
-            List.of(new Citation("소득세법-27-1")),
-            Map.of(), List.of()
-        );
-        TransactionInput transaction = new TransactionInput(
-            UUID.randomUUID(), LocalDate.of(2025, 3, 14), "코레일", "코레일", "여비교통", 59_800, false, true
-        );
-
-        // when
-        Judgment result = JudgmentEngine.judge(
-            transaction, new UserContext("940909", false, null), List.of(), new RuleSet(List.of(g2))
-        );
-
-        // then: 결제가 남았는지 사람이 정해야 해 확인 필요다. 규칙을 못 찾은 게 아니라 미매칭 사유는 없다
-        assertThat(result)
-            .extracting(Judgment::verdict, Judgment::blockedAtGate, Judgment::inference,
-                Judgment::unmatchedReason, Judgment::account, Judgment::appliedRuleIds, Judgment::questions)
-            .containsExactly(Verdict.NEEDS_REVIEW, Gate.G0, false, null, null, List.of(), List.of());
-    }
-
-    @Test
     void g1_winner_is_the_more_specific_card_on_equal_priority() {
         RuleCard general = new RuleCard(
             "R-090", 1, Gate.G1, 500,

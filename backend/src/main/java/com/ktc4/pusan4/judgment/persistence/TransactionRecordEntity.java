@@ -219,13 +219,11 @@ public class TransactionRecordEntity extends AssignedIdEntity<UUID> {
 
     JudgedTransaction toJudged() {
         return new JudgedTransaction(
-            approvedAt, merchantRaw, merchantNorm, merchantCategory, amount, installmentMonths, reviewReason
+            approvedAt, merchantRaw, merchantNorm, merchantCategory, amount, installmentMonths
         );
     }
 
     TransactionInput toInput() {
-        return new TransactionInput(
-            id, approvedAt, merchantRaw, merchantNorm, merchantCategory, amount, aggregated, needsReview
-        );
+        return new TransactionInput(id, approvedAt, merchantRaw, merchantNorm, merchantCategory, amount, aggregated);
     }
 }

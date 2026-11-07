@@ -34,26 +34,14 @@ public record JudgmentRevision(
     List<CitedStatute> citations
 ) {
 
-    /** @param reviewReason 파서가 남긴 사유(transaction.review_reason). 정상 상계 행에도 있어 needs_review 와 같이 봐야 한다 */
     public record JudgedTransaction(
         LocalDate approvedAt,
         String merchantRaw,
         String merchantNorm,
         String merchantCategory,
         long amount,
-        int installmentMonths,
-        String reviewReason
+        int installmentMonths
     ) {
-        public JudgedTransaction(
-            LocalDate approvedAt,
-            String merchantRaw,
-            String merchantNorm,
-            String merchantCategory,
-            long amount,
-            int installmentMonths
-        ) {
-            this(approvedAt, merchantRaw, merchantNorm, merchantCategory, amount, installmentMonths, null);
-        }
     }
 
     public record CitedStatute(long statuteVersionId, String statuteId) {

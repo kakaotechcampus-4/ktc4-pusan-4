@@ -40,8 +40,6 @@ public record JudgmentResponse(
     String rulesCommitSha,
     @Schema(description = "판정에 사용된 Context 버전") Integer userContextVersion,
     @Schema(description = "판정 설명. 값의 출처는 api.md 확정 후 반영") String explanation,
-    @Schema(description = "파서가 확인 필요로 표시한 이유. G0(입력 검증)에서 멈춘 확인 필요일 때만 값이 있다",
-        example = "같은 상호·금액 취소가 63일 떨어져 있음 — 62일 밖이라 상계하지 않음") String reviewReason,
     OffsetDateTime computedAt,
     List<CitationResponse> citations
 ) {
@@ -56,20 +54,10 @@ public record JudgmentResponse(
             judgment.outOfScope(), judgment.account(), rules.accountLabel(judgment.account()), judgment.finalAmount(), judgment.inference(),
             judgment.unmatchedReason(), judgment.attributes(), judgment.ruleCardId(), judgment.ruleCardVersion(),
             judgment.appliedRuleIds(), judgment.rulesCommitSha(), judgment.userContextVersion(),
-            /* explanation */ null, reviewReason(judgment), judgment.computedAt(),
+            /* explanation */ null, judgment.computedAt(),
             judgment.citations().stream()
                 .map(citation -> new CitationResponse(citation.statuteVersionId(), citation.statuteId()))
                 .toList());
-    }
-
-    /**
-     * G0 에서 멈춘 확인 필요만 파서 사유를 보인다. 카드로 정해진 판정(G0 전에 저장된 것)이나,
-     * blockedAtGate 를 이어받는 사용자 수정 revision 에 붙이면 판정과 이유가 어긋난다.
-     */
-    private static String reviewReason(JudgmentRevision judgment) {
-        return judgment.blockedAtGate() == Gate.G0 && judgment.verdict() == Verdict.NEEDS_REVIEW
-            ? judgment.transaction().reviewReason()
-            : null;
     }
 
     /** 화면 문구는 api.md 2.1 을 따른다. */

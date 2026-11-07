@@ -37,14 +37,6 @@ public final class JudgmentEngine {
         RuleSet rules,
         Set<LocalDate> publicHolidays
     ) {
-        // G0 입력 검증: 파서가 사람이 봐야 한다고 표시한 거래는 결제가 남았는지부터 모르니 카드를 보지 않는다.
-        // 규칙을 못 찾은 것이 아니라 unmatched_reason 은 두지 않는다(미매칭 집계가 규칙 후보를 만든다, V5 와 같은 이유).
-        if (transaction.needsReview()) {
-            return new Judgment(
-                Verdict.NEEDS_REVIEW, Gate.G0, false, null, false, null,
-                List.of(), List.of(), List.of(), Map.of(), List.of()
-            );
-        }
         Judgment blocked = rules.get(Gate.G1).stream()
             .filter(rule -> rule.isEffectiveOn(transaction.approvedAt()))
             .filter(rule -> matches(rule.match(), transaction, context, publicHolidays))

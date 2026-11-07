@@ -381,7 +381,7 @@ class ApiResponseContractTest {
         "merchantCategory", "amount", "installmentMonths");
     private static final Set<String> JUDGMENT_KEYS = Set.of("id", "transactionId", "transaction", "revision", "origin",
         "verdict", "outOfScope", "blockedAtGate", "account", "accountLabel", "finalAmount", "isInference", "unmatchedReason", "attributes",
-        "ruleCardId", "ruleCardVersion", "appliedRuleIds", "rulesCommitSha", "userContextVersion", "explanation", "reviewReason",
+        "ruleCardId", "ruleCardVersion", "appliedRuleIds", "rulesCommitSha", "userContextVersion", "explanation",
         "computedAt", "citations");
     private static final Set<String> QUESTION_KEYS = Set.of("id", "batchId", "transactionId", "groupKey", "factType",
         "code", "questionText", "options", "status", "answeredFactId", "answer", "createdAt", "answeredAt");
@@ -566,43 +566,11 @@ class ApiResponseContractTest {
             .andExpect(jsonPath("$.limits[0].limitAmount").value(12_246_000L));
     }
 
-    @Test
-    void parser_review_judgment_carries_the_parser_reason() throws Exception {
-        // given: 파서가 확인 필요로 표시해 G0 에서 멈춘 판정
-        given(judgmentQueryService.get(any(), any()))
-            .willReturn(judgment(Gate.G0, Verdict.NEEDS_REVIEW, null, "62일 밖 취소"));
-
-        // when / then
-        mockMvc.perform(get("/api/v1/judgments/" + ID))
-            .andExpect(jsonPath("$.blockedAtGate").value("G0"))
-            .andExpect(jsonPath("$.reviewReason").value("62일 밖 취소"));
-    }
-
-    @ParameterizedTest(name = "{0} {1}")
-    @MethodSource("judgmentsNotStoppedByParser")
-    void parser_reason_is_left_out_unless_judgment_stopped_at_g0(Gate gate, Verdict verdict) throws Exception {
-        // given: 파서 이유가 남은 거래지만 카드로 정해졌거나(G0 전에 저장된 판정), 사용자가 고친 revision 이다
-        given(judgmentQueryService.get(any(), any())).willReturn(judgment(gate, verdict, null, "62일 밖 취소"));
-
-        // when / then
-        mockMvc.perform(get("/api/v1/judgments/" + ID))
-            .andExpect(jsonPath("$.reviewReason").value(org.hamcrest.Matchers.nullValue()));
-    }
-
-    static Stream<Arguments> judgmentsNotStoppedByParser() {
-        // G0 → 가능 수정은 blockedAtGate 를 이어받는다(JudgmentEntity.overriddenAs)
-        return Stream.of(Arguments.of(Gate.G2, Verdict.NEEDS_REVIEW), Arguments.of(Gate.G0, Verdict.AVAILABLE));
-    }
-
     private static JudgmentRevision judgment(String account) {
-        return judgment(Gate.G2, Verdict.NEEDS_REVIEW, account, null);
-    }
-
-    private static JudgmentRevision judgment(Gate gate, Verdict verdict, String account, String reviewReason) {
         return new JudgmentRevision(UUID.fromString(ID), UUID.fromString(ID),
             new JudgmentRevision.JudgedTransaction(LocalDate.parse("2026-01-12"), "스타벅스코리아 서면점", "스타벅스",
-                "카페", 12_800L, 0, reviewReason),
-            1, new JudgmentOrigin(JudgmentOriginType.RUN, UUID.fromString(ID)), verdict, gate, false,
+                "카페", 12_800L, 0),
+            1, new JudgmentOrigin(JudgmentOriginType.RUN, UUID.fromString(ID)), Verdict.NEEDS_REVIEW, Gate.G2, false,
             account, null, false, null, Map.of(), "R-300", 1, List.of("R-300"), "0".repeat(40), 1,
             OffsetDateTime.parse("2026-09-12T14:05:00+09:00"),
             List.of(new JudgmentRevision.CitedStatute(1418, "소득세법-27-1")));
