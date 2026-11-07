@@ -175,7 +175,7 @@ export function JudgmentDetailPanel({
   const because = overridden ?
   null :
   (judgment.explanation && plainLaw(judgment.explanation)) ?? (reviewState || reviewQ.loading ? null : unavailableReason(judgment));
-  // 문장으로 말할 것이 없으면 「판정 이유」 칸을 통째로 뺀다. 근거는 아래 조문 칸에 있다
+  // 문장으로 말할 것이 없으면 「판정 이유」 칸을 통째로 뺀다. 근거는 맨 아래 조문 칸에 있다
   const hasReason = Boolean(reviewState || overridden || because);
   const note = verdictNote(judgment, reviewState === 'PRESUMED');
   const details = [
@@ -366,7 +366,7 @@ export function JudgmentDetailPanel({
       </section>
       }
 
-      {/* 계정과목·증빙은 짧고 먼저 읽을 것이라 긴 조문 목록 위에 둔다 (C72) */}
+      {/* 계정과목·증빙은 짧고 먼저 읽을 것이라 바꾸기 위에 둔다 (C72) */}
       {(details.length > 0 || booking) &&
       <section className="px-5 py-4">
           {details.length > 0 &&
@@ -384,29 +384,6 @@ export function JudgmentDetailPanel({
         }
         </section>
       }
-
-      <section className="px-5 py-4">
-        {/* 수정한 판정은 규칙 엔진의 근거를 그대로 들고 있다. 수정의 근거로 읽히지 않게 한다 */}
-        <h3 className="text-body font-bold text-ink">
-          {overridden ? '자동 판정의 근거 조문' : '근거 조문'}
-        </h3>
-        {judgment.citations.length > 0 ?
-        <div className="mt-2.5 space-y-2">
-            {judgment.citations.map((citation) =>
-          <StatuteCitation
-            key={citation.statuteVersionId}
-            statuteVersionId={citation.statuteVersionId} />
-
-          )}
-          </div> :
-
-        <p className="mt-2 text-small text-ink2">
-            {judgment.verdict.code === 'NEEDS_REVIEW' && !overridden ?
-          '붙일 근거 조문이 없어 가능이나 불가로 정하지 않았습니다.' :
-          '붙은 근거 조문이 없습니다.'}
-          </p>
-        }
-      </section>
 
       <section className="px-5 py-4">
         <h3 ref={editHeading} tabIndex={-1} className="text-body font-bold text-ink outline-none">
@@ -530,6 +507,30 @@ export function JudgmentDetailPanel({
         }
         </section>
       }
+
+      {/* 할 일(바꾸기, 빼기)을 먼저 두고 조문은 맨 끝에 둔다. 사람들은 조문보다 할 일을 먼저 찾는다 */}
+      <section className="px-5 py-4">
+        {/* 수정한 판정은 규칙 엔진의 근거를 그대로 들고 있다. 수정의 근거로 읽히지 않게 한다 */}
+        <h3 className="text-body font-bold text-ink">
+          {overridden ? '자동 판정의 근거 조문' : '근거 조문'}
+        </h3>
+        {judgment.citations.length > 0 ?
+        <div className="mt-2.5 space-y-2">
+            {judgment.citations.map((citation) =>
+          <StatuteCitation
+            key={citation.statuteVersionId}
+            statuteVersionId={citation.statuteVersionId} />
+
+          )}
+          </div> :
+
+        <p className="mt-2 text-small text-ink2">
+            {judgment.verdict.code === 'NEEDS_REVIEW' && !overridden ?
+          '붙일 근거 조문이 없어 가능이나 불가로 정하지 않았습니다.' :
+          '붙은 근거 조문이 없습니다.'}
+          </p>
+        }
+      </section>
     </div>);
 
 }
