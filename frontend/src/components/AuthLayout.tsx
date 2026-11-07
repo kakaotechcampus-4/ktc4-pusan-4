@@ -1,10 +1,11 @@
 import React from 'react';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { DISCLAIMER } from '../copy';
 import { Logo } from './Logo';
 
 const PRINCIPLES = [
-'판정마다 조문의 시행 버전을 붙입니다',
-'근거를 못 붙이면 가능·불가로 저장하지 않습니다',
+'판정마다 근거 조문과 시행일을 붙입니다',
+'근거를 못 붙이면 가능이나 불가로 저장하지 않습니다',
 '카드내역 원본은 서버로 올라가지 않습니다'];
 
 
@@ -12,7 +13,7 @@ const PRINCIPLES = [
 export function AuthLayout({ title, children }: {title: string;children: React.ReactNode;}) {
   useDocumentTitle(title);
   return (
-    <div className="flex min-h-full w-full bg-surface">
+    <div className="flex min-h-full w-full bg-canvas">
       {/* 좌측 브랜드 패널 */}
       <aside className="hidden w-[46%] flex-col justify-between bg-ink px-12 py-12 lg:flex">
         <Logo tone="light" />
@@ -40,10 +41,7 @@ export function AuthLayout({ title, children }: {title: string;children: React.R
         </div>
 
         {/* /40 은 bg-ink 위에서 대비 3.80 이라 본문 글자로 모자란다 (접근성 보고서 2026-10-22). /60 이면 7.03 */}
-        <p className="max-w-md text-[12px] leading-6 text-white/60">
-          이 서비스는 확인할 항목과 근거까지만 제시합니다. 세액을 확정하거나 세무
-          신고를 대리하지 않습니다.
-        </p>
+        <p className="max-w-md text-[12px] leading-6 text-white/60">{DISCLAIMER}</p>
       </aside>
 
       <div className="flex flex-1 items-center justify-center px-6 py-14">
@@ -59,11 +57,16 @@ export function AuthLayout({ title, children }: {title: string;children: React.R
 
 }
 
-/** 로그인·가입 폼의 입력칸. 로그인 화면의 기존 모양 그대로다 */
+/**
+ * 로그인·가입 폼의 입력칸. 흰 바탕에 진한 테두리(edge)다. 틀린 칸은 aria-invalid 로 테두리가 빨개진다 (C91).
+ * placeholder 를 흐리게(/70) 두면 흰 바탕 대비가 2.67 이라 읽히지 않는다 (C70)
+ */
 export const AUTH_INPUT =
-'mt-1.5 w-full rounded-xl border border-line px-3.5 py-2.5 text-[14px] text-ink placeholder:text-muted/70 disabled:bg-canvas disabled:text-muted';
+'mt-1.5 w-full rounded-xl border border-edge bg-canvas px-3.5 py-2.5 text-[14px] text-ink placeholder:text-muted aria-[invalid=true]:border-deny disabled:bg-surface disabled:text-ink2';
 export const AUTH_LABEL = 'block text-[13px] font-normal text-ink2';
-export const AUTH_PRIMARY =
-'w-full rounded-xl bg-accent px-4 py-3 text-[15px] font-bold text-white transition-colors duration-150 ease-snap hover:bg-accent-hover disabled:opacity-60';
-export const AUTH_SECONDARY =
-'w-full rounded-xl border border-line px-4 py-3 text-[14px] font-bold text-ink transition-colors duration-150 ease-snap hover:bg-canvas disabled:opacity-60';
+/**
+ * 로그인·가입의 버튼은 ui Button(size md, w-full)이다 (C90). 아래 둘은 아직 Button 으로 옮기지 않은
+ * 카카오 콜백 화면만 쓴다. 모양은 Button md 와 같다
+ */
+/** 칸 바로 아래의 오류 한 줄. 칸에는 aria-describedby 로 잇는다 */
+export const AUTH_FIELD_ERROR = 'mt-1.5 text-[13px] text-deny';

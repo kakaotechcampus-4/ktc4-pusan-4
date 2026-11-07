@@ -18,10 +18,10 @@ import type { AdapterResult, ParseStats, ParsedRow, RawRecord } from './types';
  * reviewReason 만 제자리에서 고친다.
  */
 
-export function newStats(sourceRows: number, foreignOnlySkipped: number): ParseStats {
+export function newStats(sourceRows: number, foreignOnly: number): ParseStats {
   return {
     sourceRows,
-    foreignOnlySkipped,
+    foreignOnly,
     kept: 0,
     byStatus: { 판정대상: 0, 취소상계: 0, 대상제외: 0 },
     nonTransaction: 0,
@@ -29,7 +29,9 @@ export function newStats(sourceRows: number, foreignOnlySkipped: number): ParseS
     cancelsPaired: 0,
     cancelsAmbiguous: 0,
     cancelsUnpaired: 0,
+    cancelsOutOfWindow: 0,
     noAmount: 0,
+    zeroAmount: 0,
     noDate: 0,
     aggregated: 0,
     medicalMasked: 0,
@@ -60,6 +62,9 @@ export function markNonTransactions(records: RawRecord[], stats: ParseStats): Ra
  *
  * 1순위: 승인번호가 정확히 하나 일치. 2순위(폴백): 같은 상호 + 같은 절대금액 +
  * PAIR_WINDOW_DAYS 이내. 날짜 없는 취소에는 기간 제한을 걸지 않는다.
+ *
+ * 짝이 기간 밖에만 있으면 상계하지 않고 그 결제에 needsReview 를 세운다. 환불된 결제가
+ * 아무 표시 없이 판정대상으로 남지 않게 한다 (C33)
  */
 export function resolveCancellations(records: RawRecord[], stats: ParseStats): RawRecord[] {
   const live = records.filter((r) => r.status !== ST_EXCLUDED);
@@ -92,6 +97,8 @@ export function resolveCancellations(records: RawRecord[], stats: ParseStats): R
     }
 
     let cands: RawRecord[] = [];
+    /** 같은 상호·금액이지만 기간 밖에 있는 결제와 그 날짜 차이 */
+    let outside: [RawRecord, number][] = [];
     if (mate === null) {
       const cancelAmount = c.amount;
       cands = pairable.filter((o) =>
@@ -103,9 +110,11 @@ export function resolveCancellations(records: RawRecord[], stats: ParseStats): R
       const cancelWhen = c.when;
       if (cancelWhen !== null) {
         const cancelDay = dayNumber(cancelWhen);
-        cands = cands.filter((o) =>
-        o.when !== null && Math.abs(cancelDay - dayNumber(o.when)) <= PAIR_WINDOW_DAYS
+        const dated = cands.flatMap((o): [RawRecord, number][] =>
+        o.when === null ? [] : [[o, Math.abs(cancelDay - dayNumber(o.when))]]
         );
+        outside = dated.filter(([, days]) => days > PAIR_WINDOW_DAYS);
+        cands = dated.filter(([, days]) => days <= PAIR_WINDOW_DAYS).map(([o]) => o);
       }
       if (cands.length === 1) {
         mate = cands[0];
@@ -126,6 +135,13 @@ export function resolveCancellations(records: RawRecord[], stats: ParseStats): R
         flagged.set(o,
         `취소 대상 불확정 — 같은 상호·금액 결제가 ${cands.length}건이라 어느 건이 취소됐는지 자동 판정 불가`
         );
+      }
+    } else if (outside.length > 0) {
+      stats.cancelsUnpaired += 1;
+      stats.cancelsOutOfWindow += 1;
+      c.reviewReason = `취소 행 (같은 상호·금액 결제가 ${PAIR_WINDOW_DAYS}일 밖에만 있음 — 상계하지 않음)`;
+      for (const [o, days] of outside) {
+        flagged.set(o, `같은 상호·금액 취소가 ${days}일 떨어져 있음 — ${PAIR_WINDOW_DAYS}일 밖이라 상계하지 않음`);
       }
     } else {
       stats.cancelsUnpaired += 1;
@@ -182,6 +198,11 @@ export async function toRows(records: RawRecord[], stats: ParseStats): Promise<P
       stats.noAmount += 1;
       status = ST_EXCLUDED;
       reason = reason || '금액 파싱 불가';
+    } else if (r.amount === 0) {
+      // 0원 승인은 판정할 금액이 없다. 카드사와 상관없이 같은 규칙이다 (C38)
+      stats.zeroAmount += 1;
+      status = ST_EXCLUDED;
+      reason = reason || '0원 승인';
     }
 
     const isAggregated = AGGREGATED_RE.test(r.merchant);
@@ -222,7 +243,8 @@ export async function toRows(records: RawRecord[], stats: ParseStats): Promise<P
       needsReview: r.needsReview,
       reviewReason: reason,
       isCancel: r.isCancel,
-      masked
+      masked,
+      foreignAmount: r.foreignAmount
     });
   }
 
@@ -234,7 +256,7 @@ export async function toRows(records: RawRecord[], stats: ParseStats): Promise<P
 }
 
 export async function runPipeline(adapter: AdapterResult): Promise<{rows: ParsedRow[];stats: ParseStats;}> {
-  const stats = newStats(adapter.sourceRows, adapter.foreignOnlySkipped);
+  const stats = newStats(adapter.sourceRows, adapter.foreignOnly);
   const records = resolveCancellations(markNonTransactions(adapter.records, stats), stats);
   const rows = await toRows(records, stats);
   return { rows, stats };

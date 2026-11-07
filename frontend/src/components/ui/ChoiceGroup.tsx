@@ -29,7 +29,11 @@ const COLUMNS = {
   4: 'sm:grid-cols-4'
 } as const;
 
-/** 단일 선택 버튼 묶음. 문진·질문 응답처럼 선택지가 3~6개일 때 쓴다. */
+/**
+ * 단일 선택 버튼 묶음. 문진·질문 응답처럼 선택지가 3~6개일 때 쓴다.
+ * 고르지 않은 칸은 흰 바탕에 edge 테두리, 고른 칸은 accent 테두리와 accent-soft 바탕이다.
+ * 고른 칸의 글자는 accent-hover 다. accent 는 accent-soft 위에서 4.11 이라 13px 글자에 모자란다
+ */
 export function ChoiceGroup<T extends string | boolean>({
   name,
   options,
@@ -43,7 +47,7 @@ export function ChoiceGroup<T extends string | boolean>({
       role="radiogroup"
       aria-label={name}
       className={cn('grid gap-2', COLUMNS[columns], className)}>
-      
+
       {options.map((option) => {
         const selected = option.value === value;
         return (
@@ -59,18 +63,18 @@ export function ChoiceGroup<T extends string | boolean>({
               'rounded-xl border px-3.5 py-3 text-left transition-colors duration-150 ease-snap',
               selected ?
               'border-accent bg-accent-soft' :
-              'border-line bg-surface hover:bg-canvas',
-              option.disabled &&
-              'cursor-not-allowed border-dashed bg-canvas opacity-60 hover:bg-canvas'
+              option.disabled ?
+              'cursor-not-allowed border-dashed border-edge bg-canvas opacity-60' :
+              'border-edge bg-canvas hover:bg-surface'
             )}>
-            
+
             <span className="flex items-center justify-between gap-2">
               <span
                 className={cn(
                   'block text-small font-bold',
-                  selected ? 'text-accent' : 'text-ink'
+                  selected ? 'text-accent-hover' : 'text-ink'
                 )}>
-                
+
                 {option.label}
               </span>
               {option.disabled &&
@@ -80,7 +84,7 @@ export function ChoiceGroup<T extends string | boolean>({
               }
             </span>
             {option.hint &&
-            <span className="mt-0.5 block text-caption text-muted">
+            <span className="mt-0.5 block text-caption text-ink2">
                 {option.hint}
               </span>
             }

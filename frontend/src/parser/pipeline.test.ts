@@ -39,6 +39,8 @@ function resolve(records: RawRecord[]) {
 const AMBIGUOUS = (n: number) =>
 `취소 대상 불확정 — 같은 상호·금액 결제가 ${n}건이라 어느 건이 취소됐는지 자동 판정 불가`;
 const UNPAIRED = '취소 행 (짝 후보 없음 — 원 결제가 조회 기간 밖일 수 있다)';
+const OUT_OF_WINDOW = '취소 행 (같은 상호·금액 결제가 62일 밖에만 있음 — 상계하지 않음)';
+const REFUNDED = (days: number) => `같은 상호·금액 취소가 ${days}일 떨어져 있음 — 62일 밖이라 상계하지 않음`;
 
 describe('markNonTransactions', () => {
   it('사업자번호 없는 할인 · 포인트사용 행을 대상제외로 표시한다', () => {
@@ -87,8 +89,29 @@ describe('resolveCancellations', () => {
     const c2 = cancel({ when: '2026-03-05' }); // 63일
     const stats = resolve([o2, c2]);
     expect(o2.status).toBe('판정대상');
-    expect(c2).toMatchObject({ status: '취소상계', reviewReason: UNPAIRED });
-    expect(stats.cancelsUnpaired).toBe(1);
+    expect(c2).toMatchObject({ status: '취소상계', reviewReason: OUT_OF_WINDOW });
+    expect(stats).toMatchObject({ cancelsUnpaired: 1, cancelsOutOfWindow: 1 });
+  });
+
+  it('짝이 기간 밖에만 있으면 상계하지 않고 그 결제에 needsReview 를 세운다', () => {
+    const before = rec({ when: '2025-10-01' });
+    const after = rec({ when: '2026-04-30' });
+    const c = cancel({ when: '2026-01-10' });
+    const stats = resolve([before, after, c]);
+    expect(before).toMatchObject({ status: '판정대상', needsReview: true, reviewReason: REFUNDED(101) });
+    expect(after).toMatchObject({ status: '판정대상', needsReview: true, reviewReason: REFUNDED(110) });
+    expect(c.reviewReason).toBe(OUT_OF_WINDOW);
+    expect(stats).toMatchObject({ cancels: 1, cancelsPaired: 0, cancelsAmbiguous: 0, cancelsUnpaired: 1, cancelsOutOfWindow: 1 });
+  });
+
+  it('기간 안에 짝이 하나 있으면 기간 밖 결제는 표시하지 않는다', () => {
+    const near = rec({ when: '2026-01-05' });
+    const far = rec({ when: '2025-06-01' });
+    const c = cancel({ when: '2026-01-10' });
+    const stats = resolve([far, near, c]);
+    expect(near.status).toBe('취소상계');
+    expect(far).toMatchObject({ status: '판정대상', needsReview: false, reviewReason: '' });
+    expect(stats.cancelsOutOfWindow).toBe(0);
   });
 
   it('날짜 없는 취소는 기간 제한 없이 200일 떨어진 원 결제와 짝짓는다', () => {
@@ -220,6 +243,16 @@ describe('toRows', () => {
     expect(stats.byStatus.대상제외).toBe(2);
   });
 
+  it('0원이면 카드사와 상관없이 대상제외이고, 앞 단계 사유가 있으면 남긴다', async () => {
+    const stats = newStats(3, 0);
+    const rows = await toRows([rec({ amount: 0 }), rec({ amount: 0, source: 'ibk' }), cancel({ amount: 0 })], stats);
+    expect(rows.map((r) => [r.status, r.reviewReason])).toEqual([
+      ['대상제외', '0원 승인'],
+      ['대상제외', '0원 승인'],
+      ['대상제외', '0원 승인']]);
+    expect(stats).toMatchObject({ zeroAmount: 3, noAmount: 0 });
+  });
+
   it('상태가 없으면 판정대상이고, 날짜가 없으면 키를 만들지 않는다', async () => {
     const stats = newStats(1, 0);
     const [row] = await toRows([rec({ when: null, installment: 3 })], stats);
@@ -256,7 +289,7 @@ describe('runPipeline', () => {
       headers: [],
       records,
       sourceRows: 10,
-      foreignOnlySkipped: 1,
+      foreignOnly: 1,
       declaredPeriod: null
     });
 
@@ -266,7 +299,7 @@ describe('runPipeline', () => {
     expect(rows.map((r) => r.isCancel)).toEqual([false, false, true, false, false, true, true, false, false]);
     expect(stats).toMatchObject({
       sourceRows: 10,
-      foreignOnlySkipped: 1,
+      foreignOnly: 1,
       kept: 9,
       byStatus: { 판정대상: 3, 취소상계: 4, 대상제외: 2 },
       nonTransaction: 1,
@@ -283,6 +316,7 @@ describe('runPipeline', () => {
     const { 판정대상, 취소상계, 대상제외 } = stats.byStatus;
     expect(판정대상 + 취소상계 + 대상제외).toBe(stats.kept);
     expect(stats.cancelsPaired + stats.cancelsAmbiguous + stats.cancelsUnpaired).toBe(stats.cancels);
+    expect(stats.cancelsOutOfWindow).toBeLessThanOrEqual(stats.cancelsUnpaired);
     expect(rows.filter((r) => r.needsReview)).toHaveLength(stats.needsReview);
   });
 });

@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Loader2Icon } from 'lucide-react';
 import { useSession } from '../contexts/SessionContext';
 import { ApiRequestError } from '../api';
-import { AUTH_PRIMARY, AUTH_SECONDARY, AuthLayout } from '../components/AuthLayout';
+import { AuthLayout } from '../components/AuthLayout';
+import { Button } from '../components/ui';
 import { takeKakaoLogin } from '../auth/kakao';
 
 const ERRORS: Record<string, string> = {
@@ -73,12 +74,12 @@ export function KakaoCallback() {
           <p role="alert" className="mt-3 text-[14px] leading-7 text-deny">
             {error}
           </p>
-          <button type="button" onClick={() => navigate('/login', { replace: true })} className={`mt-6 ${AUTH_PRIMARY}`}>
+          <Button className="mt-6 w-full" onClick={() => navigate('/login', { replace: true })}>
             로그인 화면으로
-          </button>
-          <button type="button" onClick={() => navigate('/', { replace: true })} className={`mt-2 ${AUTH_SECONDARY}`}>
+          </Button>
+          <Button variant="secondary" className="mt-2 w-full" onClick={() => navigate('/', { replace: true })}>
             홈으로
-          </button>
+          </Button>
         </> :
 
       <p role="status" className="flex items-center gap-2 text-[15px] text-ink2">

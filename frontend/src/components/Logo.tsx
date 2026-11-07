@@ -12,6 +12,7 @@ import light from '../assets/brand/logo/preet-logo-white.svg';
  * 비율은 원본(391×126)을 따르고 높이만 정한다 — 늘이거나 줄이지 않는다.
  *
  * tone 은 바탕색이다. light 는 어두운 판 위(로그인 화면 왼쪽)에 쓴다.
+ * 어두운 판 위에서는 전역 포커스 테두리(ink)가 안 보여 흰색으로 바꾼다 (C76)
  */
 export function Logo({
   tone = 'dark',
@@ -22,7 +23,9 @@ export function Logo({
   return (
     <Link
       to="/"
-      className="flex shrink-0 items-center gap-2.5 whitespace-nowrap"
+      className={`flex shrink-0 items-center gap-2.5 whitespace-nowrap${
+      tone === 'light' ? ' focus-visible:outline-white' : ''}`
+      }
       aria-label="PreeT 홈">
 
       <img

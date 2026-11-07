@@ -50,6 +50,7 @@ import type {
   User,
   Verdict } from
 '../types/domain';
+import type { SessionEndReason } from '../auth/session';
 
 /**
  * docs/api.md (v2) 의 엔드포인트 27개와 1:1.
@@ -127,8 +128,8 @@ export interface Api {
     restore(): Promise<boolean>;
     /** 이 브라우저의 토큰은 부르는 즉시 지운다. 서버 응답은 기다리지 않아도 된다 */
     logout(): Promise<void>;
-    /** 재발급까지 실패해 로그인이 풀렸을 때 부른다. 해제 함수를 돌려준다 */
-    onLost(listener: () => void): () => void;
+    /** 로그인이 사용자 손을 거치지 않고 풀렸을 때 그 이유와 함께 부른다(auth/session.ts). 해제 함수를 돌려준다 */
+    onLost(listener: (reason: SessionEndReason) => void): () => void;
   };
   /** 3.1 사용자 */
   users: {

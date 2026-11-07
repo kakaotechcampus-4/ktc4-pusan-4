@@ -23,7 +23,7 @@ function SignInLauncher() {
         type="button"
         aria-label="로그인하고 비서에게 묻기"
         onClick={() => navigate('/login', { state: { from: '/' } })}
-        className="block h-14 w-14 rounded-full transition-transform duration-150 ease-snap hover:-translate-y-0.5 focus-visible:rounded-full">
+        className="block h-14 w-14 rounded-full transition-transform duration-150 ease-snap hover:-translate-y-0.5">
 
         <img src={really} alt="" className="block h-14 w-14 rounded-full" />
       </button>
@@ -104,7 +104,7 @@ export function Assistant() {
         {nudge && !open &&
         <div
           role="status"
-          className="w-72 rounded-2xl border border-line bg-surface p-4 text-small text-ink2 shadow-panel motion-safe:animate-rise">
+          className="w-72 rounded-2xl border border-edge bg-canvas p-4 text-small text-ink2 shadow-panel motion-safe:animate-rise">
 
             <div className="flex items-start gap-2">
               <p className="flex-1 leading-6">{nudge.text}</p>
@@ -112,7 +112,7 @@ export function Assistant() {
               type="button"
               aria-label="알림 닫기"
               onClick={dismissNudge}
-              className="shrink-0 rounded-lg p-1 text-muted hover:bg-canvas hover:text-ink">
+              className="shrink-0 rounded-lg p-1 text-muted hover:bg-surface hover:text-ink">
 
                 <XIcon className="h-4 w-4" aria-hidden="true" />
               </button>
@@ -140,8 +140,7 @@ export function Assistant() {
           aria-label={open ? '비서 접기' : '비서에게 묻기'}
           onClick={() => setOpen(!open)}
           className={cn(
-            // 전역 :focus-visible 이 border-radius 4px 를 얹는다. 원형 버튼에 모난 테가 그려져 되돌린다
-            'h-14 w-14 rounded-full transition-transform duration-150 ease-snap hover:-translate-y-0.5 focus-visible:rounded-full',
+            'h-14 w-14 rounded-full transition-transform duration-150 ease-snap hover:-translate-y-0.5',
             open ? 'flex items-center justify-center bg-ink text-white' : 'block'
           )}>
 
@@ -192,7 +191,7 @@ function Panel({
       type="button"
       disabled={pending}
       onClick={() => void showNext()}
-      className="rounded-full border border-line bg-surface px-3 py-1.5 text-caption font-bold text-ink hover:bg-canvas">
+      className="whitespace-nowrap rounded-full border border-line bg-canvas px-3 py-1.5 text-caption font-bold text-ink hover:bg-surface">
 
         다음에 할 일
       </button>
@@ -202,7 +201,7 @@ function Panel({
       type="button"
       disabled={pending}
       onClick={() => showHelp(topic.id)}
-      className="rounded-full border border-line bg-surface px-3 py-1.5 text-caption font-bold text-ink hover:bg-canvas">
+      className="whitespace-nowrap rounded-full border border-line bg-canvas px-3 py-1.5 text-caption font-bold text-ink hover:bg-surface">
 
           {topic.label}
         </button>
@@ -216,23 +215,18 @@ function Panel({
       role="dialog"
       aria-label="비서 Really"
       onKeyDown={onKeyDown}
-      /* 테두리를 line(흰 바탕 대비 1.19)에서 muted(4.62)로 올린다. 대화창 바탕이 흰 화면과
-         거의 같은 밝기라 어디서 끝나는지 보이지 않았다 (#242 리뷰) */
-      className="fixed inset-0 z-40 flex flex-col bg-surface sm:inset-auto sm:bottom-20 sm:right-5 sm:h-[min(38rem,calc(100vh-8rem))] sm:w-[25rem] sm:rounded-2xl sm:border sm:border-muted sm:shadow-panel">
+      /* 흰 화면 위에 흰 창이 뜬다. 테두리는 edge(흰 바탕 3.44)로 세워 어디서 끝나는지 보이게 한다.
+         line(1.23)은 안 보였다 (#242 리뷰) */
+      className="fixed inset-0 z-40 flex flex-col bg-canvas sm:inset-auto sm:bottom-20 sm:right-5 sm:h-[min(38rem,calc(100vh-8rem))] sm:w-[25rem] sm:rounded-2xl sm:border sm:border-edge sm:shadow-panel">
 
-      <header className="flex items-start gap-3 border-b border-line px-5 py-4">
-        <div className="min-w-0 flex-1">
-          <h2 className="text-body font-bold text-ink">Really</h2>
-          <p className="mt-0.5 text-caption text-muted">
-            지금 화면을 보고 답합니다. 바꾸는 일은 카드의 [적용]을 눌러야 됩니다.
-          </p>
-        </div>
+      <header className="flex items-center gap-3 border-b border-line px-5 py-4">
+        <h2 className="min-w-0 flex-1 text-body font-bold text-ink">Really</h2>
         {/* 접어도 대화는 남는다. 다시 열면 이어서 묻는다 */}
         <button
           type="button"
           aria-label="비서 접기"
           onClick={onClose}
-          className="shrink-0 rounded-lg p-1 text-muted hover:bg-canvas hover:text-ink">
+          className="shrink-0 rounded-lg p-1 text-muted hover:bg-surface hover:text-ink">
 
           <ChevronDownIcon className="h-5 w-5" aria-hidden="true" />
         </button>
@@ -244,8 +238,11 @@ function Panel({
         <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
             <img src={really} alt="" className="h-20 w-20 rounded-full" />
             <p className="text-body font-bold text-ink">무엇이든 물어보세요</p>
+            {/* 물어볼 수 있는 말의 예. 기호로 감싸지 않고 한 줄씩 둔다 */}
             <p className="text-small leading-6 text-ink2">
-              거래·판정·질문에 대해 답합니다. 예: 「토요일 스타벅스는 미팅이었어」, 「3월에 카페 얼마 썼어?」
+              토요일 스타벅스는 미팅이었어
+              <br />
+              3월에 카페 얼마 썼어?
             </p>
           </div>
         }
@@ -309,16 +306,16 @@ function Message({ entry }: {entry: ChatEntry;}) {
         // 적용한 카드는 한 줄로 접는다. 무엇을 했는지만 남긴다 (#143 리뷰)
         if (item.state === 'done')
         return (
-          <p key={item.key} className="w-full rounded-xl border border-line2 bg-surface px-3.5 py-2 text-caption text-muted">
-                <Badge>{PROPOSAL_LABEL[item.proposal.kind]}</Badge> <span className="ml-1">적용함 · {item.result}</span>
+          <p key={item.key} className="w-full rounded-xl border border-line bg-canvas px-3.5 py-2 text-caption text-ink2">
+                <Badge>{PROPOSAL_LABEL[item.proposal.kind]}</Badge> <span className="ml-1">{item.result}</span>
               </p>);
 
         return (
-          <div key={item.key} className="w-full rounded-2xl border border-line bg-surface p-3.5">
+          <div key={item.key} className="w-full rounded-2xl border border-line bg-canvas p-3.5">
             <Badge>{PROPOSAL_LABEL[item.proposal.kind]}</Badge>
             <p className="mt-2 text-small font-normal text-ink">{item.proposal.card}</p>
             {blocked ?
-            <p className="mt-2 text-caption text-muted">{blocked}</p> :
+            <p className="mt-2 text-caption text-ink2">{blocked}</p> :
 
             <div className="mt-3 flex items-center gap-3">
                 <Button
@@ -327,7 +324,7 @@ function Message({ entry }: {entry: ChatEntry;}) {
                 disabled={item.state === 'busy'}
                 onClick={() => void apply(entry.id, index)}>
 
-                  {item.state === 'busy' ? '적용 중…' : '적용'}
+                  {item.state === 'busy' ? '적용 중…' : item.proposal.kind === 'navigation' ? '이동' : '적용'}
                 </Button>
                 {item.result &&
               <p

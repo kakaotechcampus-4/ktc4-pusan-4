@@ -1,3 +1,5 @@
+import type { Progress } from '../types/domain';
+
 /**
  * 진행 단계: 업로드 → 분류 결과 미리보기 → 판정 → 결과 (→ 되묻기 → 재판정)
  *
@@ -33,4 +35,20 @@ export function stepIndex(pathname: string): number {
   const alias = Object.entries(STEP_ALIAS).find(([prefix]) => under(pathname, prefix));
   if (alias) return alias[1];
   return STEPS.findIndex((step) => under(pathname, step.path));
+}
+
+/**
+ * 끝난 단계의 path. 주소의 위치가 아니라 업로드의 진행 상황(GET /progress)으로 정한다 (C4) —
+ * 위치로 치면 아무것도 안 올린 사람의 결과 화면에도 ✓ 가 셋 붙었다.
+ * 카드내역은 업로드가 있으면, 분류 확인은 남은 가맹점이 없으면, 판정은 실행이 끝났으면 끝난 것이다.
+ * 결과는 질문이 다시 생길 수 있는 마지막 단계라 치지 않는다. progress 가 없으면(올린 것이 없거나 아직 못 읽음) 하나도 치지 않는다
+ */
+export function doneSteps(progress: Pick<Progress, 'classification' | 'run'> | null): Set<string> {
+  const done = new Set<string>();
+  if (!progress) return done;
+  done.add('/upload');
+  if (progress.classification.pendingCount === 0) done.add('/preview');
+  const run = progress.run?.status.code;
+  if (run === 'COMPLETED' || run === 'PARTIAL_FAILED') done.add('/run');
+  return done;
 }
