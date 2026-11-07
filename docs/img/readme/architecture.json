@@ -6,33 +6,373 @@
     "quality_profile": "showcase"
   },
   "components": [
-    { "id": "users", "type": "external", "label": "사용자", "sublabel": "브라우저", "pos": [40, 300], "size": [130, 60] },
-    { "id": "caddy", "type": "security", "label": "Caddy", "sublabel": "HTTPS · 리버스 프록시", "pos": [250, 300], "size": [150, 60] },
-    { "id": "web", "type": "frontend", "label": "웹", "sublabel": "React · Vite", "pos": [250, 470], "size": [150, 60], "brand": "react" },
-    { "id": "backend", "type": "backend", "label": "API 서버", "sublabel": "Spring Boot · 규칙 엔진", "pos": [490, 300], "size": [170, 60], "brand": "spring", "tag": "판정 경로에 LLM 없음" },
-    { "id": "redis", "type": "database", "label": "Redis", "sublabel": "토큰 · 인증 · 사용량 제한", "pos": [490, 120], "size": [170, 60], "brand": "redis" },
-    { "id": "postgres", "type": "database", "label": "PostgreSQL", "sublabel": "거래 · 판정 · 규칙 후보", "pos": [750, 120], "size": [170, 60], "brand": "postgresql" },
-    { "id": "ai", "type": "backend", "label": "AI 서버", "sublabel": "FastAPI · 업종 분류 · Really", "pos": [750, 300], "size": [190, 60], "brand": "fastapi" },
-    { "id": "llm", "type": "external", "label": "LLM API", "sublabel": "분류 · 비서 · 카드 초안", "pos": [1030, 300], "size": [170, 60] },
-    { "id": "batch", "type": "backend", "label": "주간 배치", "sublabel": "systemd timer", "pos": [750, 470], "size": [190, 60] },
-    { "id": "github", "type": "external", "label": "GitHub", "sublabel": "develop 브랜치", "pos": [1030, 470], "size": [170, 60], "brand": "github" }
+    {
+      "id": "users",
+      "type": "external",
+      "label": "사용자",
+      "sublabel": "브라우저",
+      "pos": [
+        30,
+        380
+      ],
+      "size": [
+        130,
+        60
+      ]
+    },
+    {
+      "id": "caddy",
+      "type": "security",
+      "label": "Caddy",
+      "sublabel": "HTTPS · 리버스 프록시",
+      "pos": [
+        200,
+        380
+      ],
+      "size": [
+        160,
+        60
+      ]
+    },
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "웹 화면 파일",
+      "sublabel": "React · Vite 빌드",
+      "pos": [
+        200,
+        560
+      ],
+      "size": [
+        160,
+        60
+      ],
+      "brand": "react"
+    },
+    {
+      "id": "api-blue",
+      "type": "backend",
+      "label": "API 서버",
+      "sublabel": "Spring Boot · 규칙 엔진",
+      "pos": [
+        430,
+        240
+      ],
+      "size": [
+        180,
+        60
+      ],
+      "brand": "spring"
+    },
+    {
+      "id": "ai-blue",
+      "type": "backend",
+      "label": "AI 서버",
+      "sublabel": "FastAPI · 분류 · Really",
+      "pos": [
+        660,
+        240
+      ],
+      "size": [
+        180,
+        60
+      ],
+      "brand": "fastapi"
+    },
+    {
+      "id": "api-green",
+      "type": "backend",
+      "label": "API 서버",
+      "sublabel": "Spring Boot · 규칙 엔진",
+      "pos": [
+        430,
+        520
+      ],
+      "size": [
+        180,
+        60
+      ],
+      "brand": "spring"
+    },
+    {
+      "id": "ai-green",
+      "type": "backend",
+      "label": "AI 서버",
+      "sublabel": "FastAPI · 분류 · Really",
+      "pos": [
+        660,
+        520
+      ],
+      "size": [
+        180,
+        60
+      ],
+      "brand": "fastapi"
+    },
+    {
+      "id": "redis",
+      "type": "database",
+      "label": "Redis",
+      "sublabel": "토큰 · 인증 · 사용량 제한",
+      "pos": [
+        430,
+        100
+      ],
+      "size": [
+        180,
+        60
+      ],
+      "brand": "redis"
+    },
+    {
+      "id": "postgres",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "거래 · 판정 · 규칙 후보",
+      "pos": [
+        950,
+        340
+      ],
+      "size": [
+        180,
+        60
+      ],
+      "brand": "postgresql"
+    },
+    {
+      "id": "batch",
+      "type": "backend",
+      "label": "주간 배치",
+      "sublabel": "systemd timer",
+      "pos": [
+        950,
+        460
+      ],
+      "size": [
+        180,
+        60
+      ]
+    },
+    {
+      "id": "agent",
+      "type": "cloud",
+      "label": "CloudWatch Agent",
+      "sublabel": "로그 · 지표 수집",
+      "pos": [
+        950,
+        580
+      ],
+      "size": [
+        180,
+        60
+      ]
+    },
+    {
+      "id": "llm",
+      "type": "external",
+      "label": "LLM API",
+      "sublabel": "업종 분류 · 비서 답변",
+      "pos": [
+        1200,
+        240
+      ],
+      "size": [
+        150,
+        60
+      ]
+    },
+    {
+      "id": "cloudwatch",
+      "type": "cloud",
+      "label": "CloudWatch",
+      "sublabel": "로그 · 지표 · 알람",
+      "pos": [
+        1200,
+        580
+      ],
+      "size": [
+        150,
+        60
+      ]
+    },
+    {
+      "id": "discord",
+      "type": "external",
+      "label": "Discord",
+      "sublabel": "알람 채널",
+      "pos": [
+        1200,
+        700
+      ],
+      "size": [
+        150,
+        60
+      ],
+      "brand": "discord"
+    },
+    {
+      "id": "github",
+      "type": "external",
+      "label": "GitHub",
+      "sublabel": "develop 브랜치",
+      "pos": [
+        1200,
+        460
+      ],
+      "size": [
+        150,
+        60
+      ],
+      "brand": "github"
+    }
   ],
   "boundaries": [
-    { "kind": "region", "label": "AWS EC2 · Docker Compose", "wraps": ["caddy", "web", "backend", "redis", "postgres", "ai", "batch"] }
+    {
+      "kind": "region",
+      "label": "AWS EC2 · Docker Compose",
+      "wraps": [
+        "caddy",
+        "web",
+        "api-blue",
+        "ai-blue",
+        "api-green",
+        "ai-green",
+        "redis",
+        "postgres",
+        "batch",
+        "agent"
+      ]
+    },
+    {
+      "kind": "security-group",
+      "label": "blue (live)",
+      "wraps": [
+        "api-blue",
+        "ai-blue"
+      ]
+    },
+    {
+      "kind": "security-group",
+      "label": "green (idle)",
+      "wraps": [
+        "api-green",
+        "ai-green"
+      ]
+    }
   ],
   "connections": [
-    { "id": "users-caddy", "from": "users", "to": "caddy", "label": "HTTPS", "variant": "emphasis" },
-    { "id": "caddy-web", "from": "caddy", "to": "web", "label": "정적 화면", "labelDy": 24 },
-    { "id": "caddy-backend", "from": "caddy", "to": "backend", "label": "/api/v1", "variant": "emphasis" },
-    { "id": "backend-redis", "from": "backend", "to": "redis" },
-    { "id": "backend-postgres", "from": "backend", "to": "postgres", "label": "JPA" },
-    { "id": "backend-ai", "from": "backend", "to": "ai", "label": "분류 · Really", "labelDy": 18 },
-    { "id": "ai-llm", "from": "ai", "to": "llm" },
-    { "id": "batch-github", "from": "batch", "to": "github", "label": "규칙 카드 PR", "variant": "dashed" }
+    {
+      "id": "users-caddy",
+      "from": "users",
+      "to": "caddy",
+      "label": "HTTPS",
+      "variant": "emphasis"
+    },
+    {
+      "id": "caddy-web",
+      "from": "caddy",
+      "to": "web",
+      "label": "화면 요청",
+      "labelDy": 24
+    },
+    {
+      "id": "caddy-blue",
+      "from": "caddy",
+      "to": "api-blue",
+      "label": "/api/v1",
+      "variant": "emphasis"
+    },
+    {
+      "id": "caddy-green",
+      "from": "caddy",
+      "to": "api-green",
+      "label": "배포 때 전환",
+      "variant": "dashed"
+    },
+    {
+      "id": "blue-ai",
+      "from": "api-blue",
+      "to": "ai-blue"
+    },
+    {
+      "id": "green-ai",
+      "from": "api-green",
+      "to": "ai-green"
+    },
+    {
+      "id": "blue-redis",
+      "from": "api-blue",
+      "to": "redis"
+    },
+    {
+      "id": "blue-postgres",
+      "from": "ai-blue",
+      "to": "postgres"
+    },
+    {
+      "id": "green-postgres",
+      "from": "ai-green",
+      "to": "postgres"
+    },
+    {
+      "id": "ai-llm",
+      "from": "ai-blue",
+      "to": "llm",
+      "label": "업종 분류 · 비서 답변"
+    },
+    {
+      "id": "batch-postgres",
+      "from": "batch",
+      "to": "postgres",
+      "label": "승인 후보"
+    },
+    {
+      "id": "batch-github",
+      "from": "batch",
+      "to": "github",
+      "label": "규칙 카드 PR",
+      "variant": "dashed"
+    },
+    {
+      "id": "agent-cloudwatch",
+      "from": "agent",
+      "to": "cloudwatch",
+      "label": "로그 · 지표",
+      "variant": "dashed"
+    },
+    {
+      "id": "cw-discord",
+      "from": "cloudwatch",
+      "to": "discord",
+      "label": "알람",
+      "labelDx": 0,
+      "labelDy": 24
+    }
   ],
   "cards": [
-    { "dot": "emerald", "title": "판정", "items": ["rules/cards/*.yaml 규칙 카드로 결정론적 판정", "같은 입력이면 언제나 같은 결과"] },
-    { "dot": "cyan", "title": "AI", "items": ["판정 전 가맹점 업종 분류 후보 추천", "AI 비서 Really가 판정 결과 설명"] },
-    { "dot": "rose", "title": "규칙 자동화", "items": ["관리자가 승인한 후보를 매주 카드 파일로 변환", "develop에 PR을 올려 사람이 리뷰 후 머지"] }
+    {
+      "dot": "emerald",
+      "title": "판정",
+      "items": [
+        "rules/cards/*.yaml 규칙 카드로 결정론적 판정",
+        "같은 입력이면 언제나 같은 결과"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "무중단 배포",
+      "items": [
+        "API·AI 서버를 blue·green 두 벌로 운영",
+        "배포 때 Caddy가 새 쪽으로 전환"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "운영 자동화",
+      "items": [
+        "승인된 규칙 후보를 매주 카드 PR로 올림",
+        "CloudWatch 알람을 Discord로 전달"
+      ]
+    }
   ]
 }
