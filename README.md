@@ -291,7 +291,7 @@ docker compose up -d    # PostgreSQL(15432) · Redis(16379) · AI 서버(8000)
 - **AI**: 로컬에서는 루트 `.env` 를, 운영에서는 `production.env` 를 읽습니다
 - **Frontend**: 빌드할 때 넘긴 `VITE_*` 만 사용합니다. 로컬에서는 `frontend/.env.local` 에 적거나 실행 명령 앞에 붙입니다. `VITE_API=http` 로 설정하면 목업 대신 실제 API 를 사용합니다. `VITE_API_TARGET` 은 개발 프록시의 대상이며 기본값은 배포 서버입니다. 운영에서는 `deploy/web.Dockerfile` 이 `VITE_API=http` 로 빌드합니다. 카카오 키는 GitHub variable `KAKAO_REST_API_KEY` 로 관리합니다
 
-항목별 설명은 [Backend](#backend) 와 [AI](#ai) 표에 정리되어 있습니다. GitHub Actions 의 secret 과 variable 은 [docs/deployment.md](docs/deployment.md) 에서 확인합니다.
+항목별 설명은 [Backend](#backend), [Frontend](#frontend), [AI](#ai) 절에 정리되어 있습니다. GitHub Actions 의 secret 과 variable 은 [docs/deployment.md](docs/deployment.md) 에서 확인합니다.
 
 ### 파트별 실행
 
