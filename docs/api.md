@@ -1871,6 +1871,7 @@ GET /api/v1/judgments/summary?runId=R1
       "bucket": "접대비",
       "bucketLabel": "기업업무추진비",
       "taxYear": 2026,
+      "limitAmount": 12090000,
       "totalAmount": 13006500,
       "excessAmount": 916500
     }
@@ -1893,6 +1894,7 @@ GET /api/v1/judgments/summary?runId=R1
 | bucket | 한도 묶음. 판정 `attributes.limit_bucket`과 같은 값(`접대비`) |
 | bucketLabel | 한도 묶음 화면 이름. `rules/accounts.yaml`의 label이다(`기업업무추진비`) |
 | taxYear | 과세연도 |
+| limitAmount | 그해 한도. 최신 문진의 직전연도 수입금액으로 계산한 잠정치라 해마다 같은 값이다. `totalAmount - excessAmount`가 한도 안에서 인정된 금액이다 |
 | totalAmount | 그해 이 묶음 Judgment 금액의 합(한도 전) |
 | excessAmount | 한도를 넘어 필요경비에 넣지 않는 금액. 넘지 않았으면 0 |
 
@@ -1922,7 +1924,7 @@ Query: `batchId` 또는 `year` 중 정확히 하나. 0개거나 2개면 `400 INV
     }
   ],
   "limits": [
-    { "bucket": "접대비", "bucketLabel": "기업업무추진비", "taxYear": 2026, "totalAmount": 12800, "excessAmount": 0 }
+    { "bucket": "접대비", "bucketLabel": "기업업무추진비", "taxYear": 2026, "limitAmount": 12090000, "totalAmount": 12800, "excessAmount": 0 }
   ]
 }
 ```

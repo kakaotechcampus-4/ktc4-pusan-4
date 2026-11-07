@@ -547,7 +547,7 @@ class ApiResponseContractTest {
             new JudgmentSummary.Row(Verdict.AVAILABLE, "접대비", 50_000L),
             new JudgmentSummary.Row(Verdict.AVAILABLE, "소모품비", 12_800L))));
         given(judgmentQueryService.limits(any(), any(), any()))
-            .willReturn(List.of(new LimitYearTotal("접대비", 2026, 50_000L, 0L)));
+            .willReturn(List.of(new LimitYearTotal("접대비", 2026, 12_246_000L, 50_000L, 0L)));
 
         // when / then: 분기는 account·bucket, 화면은 label (rules/accounts.yaml)
         mockMvc.perform(get("/api/v1/judgments/" + ID))
@@ -562,7 +562,8 @@ class ApiResponseContractTest {
         mockMvc.perform(get("/api/v1/judgments/summary?batchId=" + ID))
             .andExpect(jsonPath("$.byAccount[?(@.account == '접대비')].accountLabel").value("기업업무추진비"))
             .andExpect(jsonPath("$.byAccount[?(@.account == '소모품비')].accountLabel").value("소모품비"))
-            .andExpect(jsonPath("$.limits[0].bucketLabel").value("기업업무추진비"));
+            .andExpect(jsonPath("$.limits[0].bucketLabel").value("기업업무추진비"))
+            .andExpect(jsonPath("$.limits[0].limitAmount").value(12_246_000L));
     }
 
     private static JudgmentRevision judgment(String account) {
