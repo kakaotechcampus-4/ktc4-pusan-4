@@ -272,8 +272,23 @@ docker compose up -d    # PostgreSQL(15432) · Redis(16379) · AI 서버(8000)
 
 #### Backend
 
-<!-- TODO(@yuyeol3 @memoryhong): 핵심 명령 한두 줄. 자세한 내용은 backend/README.md 링크 -->
-> ✏️ 작성 필요
+JDK 21 과 Docker 만 있으면 됩니다(Gradle 은 wrapper 사용). [빠른 시작](#빠른-시작)으로 PostgreSQL · Redis 를 띄운 뒤 저장소 루트에서 실행합니다.
+
+```bash
+bash ./backend/gradlew -p backend bootRun --args='--spring.profiles.active=local'
+# 확인: curl localhost:8080/actuator/health · 스웨거: localhost:8080/swagger-ui/index.html
+bash ./backend/gradlew -p backend test              # 단위 테스트 (Docker 불필요)
+bash ./backend/gradlew -p backend integrationTest   # 통합 테스트 (Testcontainers, Docker 필요)
+```
+
+| 환경 변수 | 기능 | 비우면 |
+| --- | --- | --- |
+| `DB_*` · `REDIS_*` | DB · Redis 접속 | 로컬 compose 기본값(15432 · 16379) |
+| `APP_AUTH_EMAIL_DELIVERY` | 가입 메일 인증 | `log` — 인증 코드를 백엔드 로그에 찍음 |
+| `APP_AUTH_KAKAO_REST_API_KEY` | 카카오 로그인 | 카카오 로그인 안 됨 |
+| `HOLIDAY_API_KEY` | 공휴일 동기화 | 공휴일 거래를 평일로 판정 |
+
+Windows 명령, 테스트 구분, 관리자 계정 만드는 법은 [backend/README.md](backend/README.md)를 참고하세요.
 
 #### Frontend
 
