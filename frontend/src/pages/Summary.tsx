@@ -460,7 +460,7 @@ export function Summary() {
         }
       </section>
 
-      <section className="mt-10">
+      <section className="mt-10 max-w-xl">
         <h2 className="text-body font-bold text-ink">판정 결과</h2>
         {/* 판정별 몫. 금액으로 나누고, 아래 표가 같은 순서로 건수와 금액을 적는다 */}
         <div
@@ -470,14 +470,14 @@ export function Summary() {
           shares.map((share) => {
             const value = byAmount ? share.amount ?? 0 : share.count;
             return value > 0 &&
-            <span key={share.key} className={share.bar} style={{ width: `${value / shareTotal * 100}%` }} />;
+            <span key={share.key} className={share.bar} style={{ flex: `${value} 1 0` }} />;
           })}
         </div>
         <Table
           className="mt-5"
           caption="판정별 건수와 결제 금액"
           columns={shareColumns}
-          rows={summary ? shares : []}
+          rows={summary ? shares.filter((share) => share.count > 0) : []}
           rowKey={(row) => row.key}
           loading={!summary} />
       </section>
@@ -489,11 +489,14 @@ export function Summary() {
         accountRows.length === 0 ?
         <Empty className="mt-4" inTable title="가능으로 판정한 거래가 아직 없습니다" /> :
 
-        <ul aria-label="계정과목별 경비 가능 금액" className="mt-4 divide-y divide-line2 border-t-2 border-rule">
+        // 행마다 열을 따로 잡으면 금액이 긴 행의 막대가 짧아진다. 열은 목록이 잡고 행은 그 열을 나눠 쓴다
+        <ul
+          aria-label="계정과목별 경비 가능 금액"
+          className="mt-4 grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 divide-y divide-line2 border-t-2 border-rule sm:grid-cols-[minmax(0,10rem)_minmax(0,1fr)_auto]">
             {accountRows.map((row) =>
           <li
             key={row.account}
-            className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 py-3.5 sm:grid-cols-[minmax(0,10rem)_minmax(0,1fr)_auto]">
+            className="col-span-full grid grid-cols-subgrid items-center gap-y-2 py-3.5">
                 <span className="truncate text-body text-ink">{row.account}</span>
                 {/* 가장 큰 계정과목을 꽉 채운 길이로 놓고 나머지를 견준다 */}
                 <span

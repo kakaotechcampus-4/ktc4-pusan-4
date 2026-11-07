@@ -19,7 +19,8 @@ export function AmountHero({
 }: {amount: number;spend: number | null;label?: string;className?: string;}) {
   const share = spend && spend > 0 ? Math.min(1, Math.max(0, amount / spend)) : null;
   return (
-    <div className={cn('w-full max-w-md', className)}>
+    // 폭을 정해 둔다. 결과 머리처럼 내용만큼 줄어드는 자리에서도 요약과 같은 길이의 막대가 된다
+    <div className={cn('w-[28rem] max-w-full', className)}>
       <p className="text-small text-ink2">{label}</p>
       <p className="mt-1 text-stat font-bold tabular-nums text-ink">{formatWon(amount)}</p>
       {share !== null && spend !== null &&
