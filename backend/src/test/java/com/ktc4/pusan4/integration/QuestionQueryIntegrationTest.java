@@ -1,6 +1,6 @@
 package com.ktc4.pusan4.integration;
 
-import com.ktc4.pusan4.shared.auth.FixedUser;
+import com.ktc4.pusan4.auth.TestUser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,7 +32,7 @@ class QuestionQueryIntegrationTest {
     @ServiceConnection
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17-alpine");
 
-    private static final UUID USER_ID = FixedUser.ID;
+    private static final UUID USER_ID = TestUser.ID;
 
     @Autowired
     private MockMvc mockMvc;
@@ -159,6 +159,23 @@ class QuestionQueryIntegrationTest {
         mockMvc.perform(get("/api/v1/questions").param("batchId", batchId.toString()))
             .andExpect(jsonPath("$.items[*].id", contains(keptQuestion.toString(), excludedQuestion.toString())))
             .andExpect(jsonPath("$.unresolved.count").value(2));
+    }
+
+    @Test
+    void questions_of_unclassified_transactions_are_left_out() throws Exception {
+        // given: 대기 질문이 걸린 거래 둘 중 하나가 분류 확인을 기다린다
+        UUID kept = insertTransaction(batchId, "2025-10-08", 6_500L);
+        UUID keptQuestion = insertQuestion(insertJudgment(kept, "NEEDS_REVIEW"), "merchant:스타벅스", "용도",
+            "PENDING", null, "2025-10-09T10:00:00+09:00");
+        UUID unclassified = insertTransaction(batchId, "2025-10-09", 3_000L);
+        insertQuestion(insertJudgment(unclassified, "NEEDS_REVIEW"), "merchant:스타벅스", "용도",
+            "PENDING", null, "2025-10-09T10:01:00+09:00");
+        jdbcTemplate.update("update transaction set classification_status = 'NEEDS_REVIEW' where id = ?", unclassified);
+
+        // when / then
+        mockMvc.perform(get("/api/v1/questions").param("batchId", batchId.toString()))
+            .andExpect(jsonPath("$.items[*].id", contains(keptQuestion.toString())))
+            .andExpect(jsonPath("$.unresolved.count").value(1));
     }
 
     @Test

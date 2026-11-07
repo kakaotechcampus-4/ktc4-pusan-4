@@ -74,6 +74,10 @@ public class JudgmentRunService {
     /**
      * 대상(판정대상이면서 분류 완료)을 run 항목으로 고정하고 QUEUED 로 만든다.
      * 실행은 이 트랜잭션이 커밋된 뒤 시작된다(JudgmentRunner).
+     *
+     * <p>같은 batch 에 진행 중인 run 이 있으면 409 다(api.md 3.6). 두 run 이 같은 거래를 동시에 판정하면
+     * 늦게 쓴 쪽이 최신이 되어 다른 문진의 결과가 섞인다(#187). 끝난 run 뒤의 재실행은 막지 않는다.
+     * 동시 요청은 사용자 락으로 차례로 세운다.
      */
     @Transactional
     public JudgmentRun create(UUID userId, UUID batchId, UUID contextId) {
@@ -81,6 +85,12 @@ public class JudgmentRunService {
             throw new ApiException(HttpStatus.NOT_FOUND, "BATCH_NOT_FOUND", "업로드를 찾을 수 없습니다.");
         }
         BusinessContext context = contextService.find(userId, contextId);
+        limitSettlement.lockUser(userId);
+        List<UUID> active = runRepository.findActiveIds(batchId, now().minus(STALE_AFTER));
+        if (!active.isEmpty()) {
+            throw new ApiException(HttpStatus.CONFLICT, "RUN_ALREADY_ACTIVE",
+                "이 업로드는 이미 판정 중입니다. 끝난 뒤 다시 실행해 주세요.", active.getFirst().toString());
+        }
         List<UUID> targetIds = transactionRepository.findRunTargetIds(batchId);
 
         UUID runId = uuidGenerator.generate();

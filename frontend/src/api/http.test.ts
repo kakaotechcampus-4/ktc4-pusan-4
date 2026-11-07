@@ -41,6 +41,35 @@ describe('httpApi', () => {
     fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ code: 'INTERNAL_ERROR' }), { status: 500 }));
     await expect(httpApi.handoffNotes.list()).rejects.toMatchObject({ status: 500 });
   });
+
+  it('409 RUN_ALREADY_ACTIVE 의 runId 를 올린다 (#228)', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          code: 'RUN_ALREADY_ACTIVE',
+          message: '이미 판정 중입니다.',
+          traceId: 'tr-1',
+          runId: 'run-9'
+        }),
+        { status: 409 }
+      )
+    );
+    await expect(httpApi.runs.create({ batchId: 'b1', contextId: 'c1' })).rejects.toMatchObject({
+      status: 409,
+      code: 'RUN_ALREADY_ACTIVE',
+      traceId: 'tr-1',
+      runId: 'run-9'
+    });
+  });
+
+  it('runId 가 없는 에러에는 runId 를 만들지 않는다 (#228)', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ code: 'VALIDATION_ERROR', message: '틀렸습니다.' }), { status: 400 })
+    );
+    const caught = await httpApi.runs.create({ batchId: 'b1', contextId: 'c1' }).catch((error) => error);
+    expect(caught.code).toBe('VALIDATION_ERROR');
+    expect(caught.runId).toBeUndefined();
+  });
 });
 
 describe('인증 (#139 가정)', () => {
@@ -70,6 +99,43 @@ describe('인증 (#139 가정)', () => {
     expect(bearer(callsTo('/users/me')[0][1])).toBe('Bearer a1');
   });
 
+  it('가입·카카오 로그인도 받은 토큰을 싣는다. 요청에는 지난 토큰을 싣지 않는다', async () => {
+    const api = await fresh();
+    route({
+      '/auth/login': () => [200, { accessToken: 'a1' }],
+      '/auth/signup': () => [201, { accessToken: 's1' }],
+      '/auth/kakao': () => [200, { accessToken: 'k1' }],
+      '/users/me': () => [200, { id: 'u' }]
+    });
+    await api.auth.login({ email: 'a@b.c', password: 'secret1' });
+    await api.auth.signup({ email: 'n@b.c', password: 'longenough', verificationToken: 't' });
+    expect(bearer(callsTo('/auth/signup')[0][1])).toBeUndefined();
+    await api.users.me();
+    expect(bearer(callsTo('/users/me')[0][1])).toBe('Bearer s1');
+    await api.auth.kakao({ code: 'c' });
+    expect(bearer(callsTo('/auth/kakao')[0][1])).toBeUndefined();
+    await api.users.me();
+    expect(bearer(callsTo('/users/me')[1][1])).toBe('Bearer k1');
+  });
+
+  it('재발급을 Web Locks 로 다른 탭과 줄 세운다 (#195)', async () => {
+    const names: string[] = [];
+    vi.stubGlobal('navigator', {
+      locks: {
+        request: (name: string, callback: () => Promise<unknown>) => {
+          names.push(name);
+          return callback();
+        }
+      }
+    });
+    const api = await fresh();
+    route({ '/auth/refresh': () => [200, { accessToken: 'r1' }], '/users/me': () => [200, { id: 'u' }] });
+    expect(await api.auth.restore()).toBe(true);
+    expect(names).toEqual(['auth-refresh']);
+    await api.users.me();
+    expect(bearer(callsTo('/users/me')[0][1])).toBe('Bearer r1');
+  });
+
   it('401 이면 한 번 재발급하고 같은 요청을 다시 보낸다. 동시에 받은 401 도 재발급은 한 번이다', async () => {
     const api = await fresh();
     let refreshed = false;
@@ -89,6 +155,19 @@ describe('인증 (#139 가정)', () => {
     expect(callsTo('/users/me').map(([, init]) => bearer(init))).toEqual(['Bearer old', 'Bearer new']);
   });
 
+  it('서버 오류 문구가 없거나 영어면 상태 번호 없이 일반 문구를 쓴다 (C65)', async () => {
+    const api = await fresh();
+    route({
+      '/upload-batches': () => [502],
+      '/users/me': () => [405, { code: 'METHOD_NOT_ALLOWED', message: "Method 'PUT' is not supported." }],
+      '/judgment-runs': () => [409, { code: 'CONFLICT', message: '이미 판정 중입니다.' }]
+    });
+    const generic = '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.';
+    await expect(api.uploads.list()).rejects.toMatchObject({ status: 502, code: 'UNKNOWN', message: generic });
+    await expect(api.users.me()).rejects.toMatchObject({ code: 'METHOD_NOT_ALLOWED', message: generic });
+    await expect(api.runs.create({ batchId: 'b1', contextId: 'c1' })).rejects.toMatchObject({ message: '이미 판정 중입니다.' });
+  });
+
   it('재발급도 401 이면 로그인이 풀렸다고 한 번만 알린다', async () => {
     const api = await fresh();
     const lost = vi.fn();
@@ -103,6 +182,74 @@ describe('인증 (#139 가정)', () => {
     const results = await Promise.allSettled([api.users.me(), api.contexts.list()]);
     expect(results.map((r) => r.status)).toEqual(['rejected', 'rejected']);
     expect(lost).toHaveBeenCalledTimes(1);
+    expect(lost).toHaveBeenCalledWith('expired');
+  });
+
+  /** sub 만 든 JWT 모양의 토큰. 서명은 보지 않는다 */
+  const jwt = (sub: string, n = 1) => `h.${btoa(JSON.stringify({ sub, n })).replace(/=+$/, '')}.s`;
+
+  it('재발급 토큰이 다른 계정이면 받지 않고 로그인을 끝낸다 (C44)', async () => {
+    const api = await fresh();
+    const lost = vi.fn();
+    api.auth.onLost(lost);
+    route({
+      '/auth/login': () => [200, { accessToken: jwt('x') }],
+      // 다른 탭이 y 로 로그인해 쿠키가 y 것이 됐다
+      '/auth/refresh': () => [200, { accessToken: jwt('y') }],
+      '/users/me': (init) => bearer(init) === `Bearer ${jwt('y')}` ? [200, { id: 'y' }] : [401, { code: 'UNAUTHORIZED' }]
+    });
+    await api.auth.login({ email: 'x@b.c', password: 'secret1' });
+    await expect(api.users.me()).rejects.toMatchObject({ status: 401 });
+    expect(lost).toHaveBeenCalledWith('account-changed');
+    // y 의 토큰으로 다시 보내지 않았고, 이 탭에는 토큰이 남지 않는다
+    expect(callsTo('/users/me')).toHaveLength(1);
+    await api.users.me().catch(() => undefined);
+    expect(bearer(callsTo('/users/me')[1][1])).toBeUndefined();
+  });
+
+  it('재발급 토큰이 같은 계정이면 그대로 받는다', async () => {
+    const api = await fresh();
+    const lost = vi.fn();
+    api.auth.onLost(lost);
+    route({
+      '/auth/login': () => [200, { accessToken: jwt('x', 1) }],
+      '/auth/refresh': () => [200, { accessToken: jwt('x', 2) }],
+      '/users/me': (init) => bearer(init) === `Bearer ${jwt('x', 2)}` ? [200, { id: 'x' }] : [401, { code: 'UNAUTHORIZED' }]
+    });
+    await api.auth.login({ email: 'x@b.c', password: 'secret1' });
+    await expect(api.users.me()).resolves.toEqual({ id: 'x' });
+    expect(lost).not.toHaveBeenCalled();
+  });
+
+  describe('다른 탭의 로그인·로그아웃 (C44·C45)', () => {
+    /** 탭 둘. 모듈을 따로 읽으면 토큰과 채널도 따로다 */
+    const twoTabs = async () => {
+      const first = await fresh();
+      const second = await fresh();
+      route({
+        '/auth/login': (init) => [200, { accessToken: jwt((JSON.parse(init.body as string) as { email: string }).email) }],
+        '/auth/logout': () => [204]
+      });
+      const lost = vi.fn();
+      first.auth.onLost(lost);
+      return { first, second, lost };
+    };
+
+    it('다른 탭이 다른 계정으로 로그인하면 이 탭의 로그인을 끝낸다', async () => {
+      const { first, second, lost } = await twoTabs();
+      await first.auth.login({ email: 'x', password: 'secret1' });
+      await second.auth.login({ email: 'y', password: 'secret1' });
+      await vi.waitFor(() => expect(lost).toHaveBeenCalledWith('account-changed'));
+    });
+
+    it('같은 계정 로그인에는 그대로 두고, 로그아웃하면 이 탭도 끝낸다', async () => {
+      const { first, second, lost } = await twoTabs();
+      await first.auth.login({ email: 'x', password: 'secret1' });
+      await second.auth.login({ email: 'x', password: 'secret1' });
+      await second.auth.logout();
+      await vi.waitFor(() => expect(lost).toHaveBeenCalledWith('signed-out'));
+      expect(lost).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('로그인이 401 이면 재발급하지 않고 그대로 던진다', async () => {

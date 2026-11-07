@@ -1,6 +1,8 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useSession } from '../contexts/SessionContext';
-import { Button, Container } from './ui';
+import { Button, Container, cn } from './ui';
+import { Logo } from './Logo';
+import { BugReportButton } from './BugReport';
 
 /**
  * 랜딩·FAQ 같은 공개 화면의 머리. 랜딩 안 앵커 대신 별도 페이지로 간다.
@@ -9,37 +11,49 @@ import { Button, Container } from './ui';
  * 비워 두어, 로그인 버튼이 잠깐 보였다 바뀌지 않게 한다.
  */
 const NAV = [{ to: '/faq', label: 'FAQ' }];
+/*
+ * 로그인 뒤 머리띠(AppShell)의 「자료」 알약과 같은 모양·같은 색으로 맞춘다 (#242 리뷰).
+ * 공개 화면은 글자 링크, 로그인 뒤는 알약이라 같은 서비스로 보이지 않았다.
+ * 폭·여백(max-w-page px-6)과 높이(72px)는 원래 같았다 — 알약만 달랐다
+ */
+const NAV_LINK =
+'shrink-0 whitespace-nowrap rounded-full px-2.5 py-1.5 text-small font-bold transition-colors duration-150 ease-snap sm:px-3';
+const NAV_ON = 'bg-accent text-white';
+const NAV_OFF = 'text-ink2 hover:bg-surface';
+
 
 export function MarketingHeader() {
-  const { status, signOut } = useSession();
+  const { status, signOut, batchId, batchStatus } = useSession();
+  const { pathname } = useLocation();
+  // 올린 카드내역이 있으면 결과로 간다 (C83). 업로드 목록을 읽는 중이거나 못 읽었으면 결과 화면이 그 상태를 보여 준다
+  const mine = batchStatus === 'ready' && batchId === null ? '/upload' : '/results';
 
   return (
-    <header className="sticky top-0 z-30 bg-canvas/95 backdrop-blur">
+    <header className="sticky top-0 z-30 border-b border-line bg-canvas/95 shadow-header backdrop-blur">
       <Container className="flex h-[72px] items-center gap-6 lg:gap-10">
-        <Link to="/" className="flex shrink-0 items-center gap-2.5 whitespace-nowrap" aria-label="PreeT 홈">
-          <span aria-hidden="true" className="flex gap-[3px]">
-            <span className="block h-5 w-[5px] rounded-sm bg-ink" />
-            <span className="block h-5 w-[5px] rounded-sm bg-ink" />
-            <span className="block h-5 w-[5px] rounded-sm bg-highlight" />
-          </span>
-          <span className="text-h4 font-bold tracking-tight text-ink">
-            PreeT
-          </span>
-        </Link>
+        <Logo />
 
-        {/* 좁은 폭에서도 남긴다. 푸터에 FAQ 로 가는 길이 따로 없다 */}
-        <nav aria-label="주요 메뉴">
-          <ul className="flex items-center gap-8">
-            {NAV.map((item) =>
-            <li key={item.to}>
-                <Link
-                to={item.to}
-                className="whitespace-nowrap text-body font-normal text-ink2 transition-colors duration-150 hover:text-ink">
+        {/* 좁은 폭에서는 접는다. 같은 두 링크를 푸터에 두었다 */}
+        <nav aria-label="주요 메뉴" className="hidden sm:block">
+          <ul className="flex items-center gap-1.5">
+            {NAV.map((item) => {
+              const active = pathname === item.to;
+              return (
+                <li key={item.to}>
+                  <Link
+                    to={item.to}
+                    aria-current={active ? 'page' : undefined}
+                    className={cn(NAV_LINK, active ? NAV_ON : NAV_OFF)}>
 
-                  {item.label}
-                </Link>
-              </li>
-            )}
+                    {item.label}
+                  </Link>
+                </li>);
+
+            })}
+            {/* 페이지로 옮기지 않고 창으로 띄운다(#211). /bug-report 는 꼬리말 링크와 직접 들어올 때 쓴다 */}
+            <li>
+              <BugReportButton className={cn(NAV_LINK, NAV_OFF)} icon={false} />
+            </li>
           </ul>
         </nav>
 
@@ -49,11 +63,11 @@ export function MarketingHeader() {
           status === 'signedIn' ?
           <>
               {/* 좁은 폭에서는 접는다. 바로 아래 히어로에 같은 자리로 가는 CTA 가 있다 */}
-              <Button to="/upload" size="sm" className="hidden sm:inline-flex">
+              <Button to={mine} size="sm" className="hidden sm:inline-flex">
                 내 판정으로
               </Button>
               <Button to="/account" variant="secondary" size="sm">
-                마이페이지
+                내 정보
               </Button>
               <Button variant="secondary" size="sm" onClick={signOut}>
                 로그아웃
@@ -64,7 +78,7 @@ export function MarketingHeader() {
               <Button to="/login" variant="secondary" size="sm">
                 로그인
               </Button>
-              <Button to="/login" variant="soft" size="sm">
+              <Button to="/signup" variant="soft" size="sm">
                 회원가입
               </Button>
             </>

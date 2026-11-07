@@ -1,102 +1,166 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { MessageCircleIcon, SendIcon, XIcon } from 'lucide-react';
+import React, { useEffect, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { ChevronDownIcon, SendIcon, XIcon } from 'lucide-react';
+/*
+ * 버튼 한 장이다. SVG 가 파란 원판에 돼지까지 그려 둔 완성된 얼굴이라,
+ * 알약 안에 넣으면 원판 위에 원판이 겹친다 (#242 리뷰). 브랜드 문서가 정한 모양도
+ * 투명 버튼 + 원형 SVG 이고 크기는 44·56·72 중 56 이 기본이다
+ */
+import really from '../../assets/brand/really-fab/really-fab-blue.svg';
 import { Badge, Button, Input, cn } from '../ui';
+import { useSession } from '../../contexts/SessionContext';
 import { useAssistant } from './context';
 import type { ChatEntry } from './context';
 import { HELP_TOPICS } from './help';
 import { blockedReason, MESSAGE_CHARS, PROPOSAL_LABEL } from './logic';
 
-/** 패널 자리(right-5 + w-[25rem])에 화면과의 사이 1.5rem 을 더한 폭 */
-const PANEL_SPACE = '27.75rem';
-/** 패널을 비켜도 화면이 남는 폭. 이보다 좁으면 패널이 화면 위에 뜬다 */
-const WIDE = '(min-width: 1024px)';
-
-/**
- * 비서 Really. 로그인 뒤 모든 화면 오른쪽 아래의 버튼과 대화 패널 (FR-1).
- * 비서는 제안 카드만 만들고, 바꾸는 일은 사용자가 [적용]을 눌러야 기존 API 로 일어난다.
- * 패널은 화면을 가리지 않는 대화창이라 Modal 이 아니다 — 열어 둔 채로 화면을 쓸 수 있다
- */
-export function Assistant() {
-  const { open, setOpen, nudge, dismissNudge } = useAssistant();
+/** 로그인 전 메인에 서는 같은 모양의 버튼. 누르면 대화 대신 로그인으로 보낸다 */
+function SignInLauncher() {
   const navigate = useNavigate();
-  const button = useRef<HTMLButtonElement>(null);
-  const wasOpen = useRef(false);
-
-  // 닫으면 버튼으로 초점을 돌려준다
-  useEffect(() => {
-    if (wasOpen.current && !open) button.current?.focus();
-    wasOpen.current = open;
-  }, [open]);
-
-  // 넓은 화면에서 패널을 열면 오른쪽에 패널 폭만큼 여백을 준다. 가운데 놓인 화면이 왼쪽으로 비켜,
-  // 열어 둔 채로 답할 선택지를 가리지 않는다
-  useEffect(() => {
-    if (!open) return;
-    const wide = window.matchMedia(WIDE);
-    const place = () => {
-      document.body.style.paddingRight = wide.matches ? PANEL_SPACE : '';
-    };
-    place();
-    wide.addEventListener('change', place);
-    return () => {
-      wide.removeEventListener('change', place);
-      document.body.style.paddingRight = '';
-    };
-  }, [open]);
-
-  if (open) return <Panel onClose={() => setOpen(false)} />;
-
   return (
-    <div className="fixed bottom-5 right-5 z-40 flex flex-col items-end gap-2">
-      {nudge &&
-      <div
-        role="status"
-        className="w-72 rounded-2xl border border-line bg-surface p-4 text-small text-ink2 shadow-panel motion-safe:animate-rise">
-
-          <div className="flex items-start gap-2">
-            <p className="flex-1 leading-6">{nudge.text}</p>
-            <button
-            type="button"
-            aria-label="알림 닫기"
-            onClick={dismissNudge}
-            className="shrink-0 rounded-lg p-1 text-muted hover:bg-canvas hover:text-ink">
-
-              <XIcon className="h-4 w-4" aria-hidden="true" />
-            </button>
-          </div>
-          {nudge.route &&
-        <Button
-          size="sm"
-          variant="secondary"
-          className="mt-3"
-          onClick={() => {
-            if (nudge.route) navigate(nudge.route);
-            dismissNudge();
-          }}>
-
-              {nudge.actionLabel ?? '보기'}
-            </Button>
-        }
-        </div>
-      }
+    <div className="fixed bottom-5 right-5 z-40">
       <button
-        ref={button}
         type="button"
-        onClick={() => setOpen(true)}
-        className="flex items-center gap-2 rounded-full bg-ink px-4 py-3 text-body font-bold text-white shadow-panel transition-transform duration-150 ease-snap hover:-translate-y-0.5">
+        aria-label="로그인하고 비서에게 묻기"
+        onClick={() => navigate('/login', { state: { from: '/' } })}
+        className="block h-14 w-14 rounded-full transition-transform duration-150 ease-snap hover:-translate-y-0.5">
 
-        <MessageCircleIcon className="h-5 w-5" aria-hidden="true" />
-        Really
-        <span className="sr-only">비서에게 묻기</span>
+        <img src={really} alt="" className="block h-14 w-14 rounded-full" />
       </button>
     </div>);
 
 }
 
-function Panel({ onClose }: {onClose: () => void;}) {
+/**
+ * 비서 Really. 오른쪽 아래의 버튼과 대화 패널 (FR-1).
+ * 비서는 제안 카드만 만들고, 바꾸는 일은 사용자가 [적용]을 눌러야 기존 API 로 일어난다.
+ * 패널은 화면 위에 떠 있는 대화창이다(Modal 이 아니다). 화면을 밀지 않고 덮기 때문에 버튼은 늘 두고,
+ * 다시 누르면 접는다 — 질문 카드를 가리면 바로 접고 답할 수 있게 (#143 리뷰)
+ *
+ * 어디에 서는지는 여기서 정한다.
+ * - 로그인했으면 메인을 포함한 모든 화면. 로고로 메인에 다녀와도 버튼이 사라지지 않는다
+ * - 로그인 전이면 메인에만, 그리고 로그인으로 보내는 버튼이다.
+ *   `POST /assistant/chat` 은 토큰이 없으면 401 이라 대화를 열어 봐야 실패한다
+ */
+export function Assistant() {
+  const { open, setOpen, nudge, dismissNudge, toast } = useAssistant();
+  const { status } = useSession();
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const button = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLElement>(null);
+  const wasOpen = useRef(false);
+
+  // 접으면 버튼으로 초점을 돌려준다
+  useEffect(() => {
+    if (wasOpen.current && !open) button.current?.focus();
+    wasOpen.current = open;
+  }, [open]);
+
+  /*
+   * 패널 밖을 누르면 접는다. 버튼은 빼 둔다 — 버튼에도 접는 일이 걸려 있어서,
+   * 여기서 먼저 접으면 버튼이 다시 펴고 그대로 열려 있다.
+   *
+   * click 이 아니라 pointerdown 으로 듣는다. 누른 자리의 요소가 그 사이에 사라지면
+   * click 때는 패널 안이었는지 밖이었는지 알 수 없다.
+   * 좁은 화면에서는 패널이 화면을 다 덮어서 밖이 없다 — 그대로 둬도 달라지지 않는다
+   */
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (panel.current?.contains(target)) return;
+      if (button.current?.contains(target)) return;
+      setOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, [open, setOpen]);
+
+  if (status !== 'signedIn') {
+    // 이어 가기를 기다리는 동안 버튼이 번쩍 나타났다 바뀌지 않게, 메인에서만 로그인 버튼을 둔다
+    return pathname === '/' && status !== 'restoring' ? <SignInLauncher /> : null;
+  }
+
+  return (
+    <>
+      {open && <Panel onClose={() => setOpen(false)} panelRef={panel} />}
+      {/* 적용 결과는 왼쪽 아래에 띄운다. 오른쪽은 패널과 버튼이 차지한다.
+          좁은 화면에서 패널이 열려 있으면 아래는 입력칸이라 위로 올리고, 눌러도 뒤로 지나가게 한다 */}
+      {toast &&
+      <p
+        role="status"
+        className={cn(
+          'pointer-events-none fixed bottom-5 left-5 z-50 max-w-[calc(100vw-2.5rem)] rounded-2xl bg-ink px-4 py-3 text-small leading-6 text-white shadow-panel motion-safe:animate-rise sm:max-w-sm',
+          open && 'max-sm:bottom-auto max-sm:top-20'
+        )}>
+
+          {toast}
+        </p>
+      }
+      {/* 좁은 화면에서는 패널이 화면을 다 덮으므로 버튼을 패널 안의 「접기」로 대신한다 */}
+      <div className={cn('fixed bottom-5 right-5 z-40 flex flex-col items-end gap-2', open && 'max-sm:hidden')}>
+        {nudge && !open &&
+        <div
+          role="status"
+          className="w-72 rounded-2xl border border-edge bg-canvas p-4 text-small text-ink2 shadow-panel motion-safe:animate-rise">
+
+            <div className="flex items-start gap-2">
+              <p className="flex-1 leading-6">{nudge.text}</p>
+              <button
+              type="button"
+              aria-label="알림 닫기"
+              onClick={dismissNudge}
+              className="shrink-0 rounded-lg p-1 text-muted hover:bg-surface hover:text-ink">
+
+                <XIcon className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
+            {nudge.route &&
+          <Button
+            size="sm"
+            variant="secondary"
+            className="mt-3"
+            onClick={() => {
+              if (nudge.route) navigate(nudge.route);
+              dismissNudge();
+            }}>
+
+                {nudge.actionLabel ?? '보기'}
+              </Button>
+          }
+          </div>
+        }
+        {/* 펴면 돼지 대신 접는 화살표를 둔다. 글자가 없으니 버튼에 접는 길도 보여야 한다 */}
+        <button
+          ref={button}
+          type="button"
+          aria-expanded={open}
+          aria-label={open ? '비서 접기' : '비서에게 묻기'}
+          onClick={() => setOpen(!open)}
+          className={cn(
+            'h-14 w-14 rounded-full transition-transform duration-150 ease-snap hover:-translate-y-0.5',
+            open ? 'flex items-center justify-center bg-ink text-white' : 'block'
+          )}>
+
+          {open ?
+          <ChevronDownIcon className="h-6 w-6" aria-hidden="true" /> :
+          <img src={really} alt="" className="block h-14 w-14 rounded-full" />}
+        </button>
+      </div>
+    </>);
+
+}
+
+function Panel({
+  onClose,
+  panelRef
+
+
+
+}: {onClose: () => void; panelRef: React.RefObject<HTMLElement>;}) {
   const { entries, pending, error, draft, setDraft, send, showHelp, showNext } = useAssistant();
-  const [helpOpen, setHelpOpen] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const end = useRef<HTMLDivElement>(null);
 
@@ -119,14 +183,15 @@ function Panel({ onClose }: {onClose: () => void;}) {
     void send(draft);
   };
 
+  // 다음에 물을 말을 늘 보인다 (#143 리뷰). 길면 가로로 넘긴다.
   // 답을 기다리는 동안에는 막는다. 그사이 붙은 문답이 기다리던 답보다 먼저 와 질문과 답이 엇갈린다
   const topics =
-  <div className="flex flex-wrap gap-1.5 [&>button:disabled]:cursor-not-allowed [&>button:disabled]:opacity-50">
+  <div className="flex gap-1.5 overflow-x-auto pb-1 [&>button:disabled]:cursor-not-allowed [&>button:disabled]:opacity-50 [&>button]:shrink-0">
       <button
       type="button"
       disabled={pending}
       onClick={() => void showNext()}
-      className="rounded-full border border-line bg-surface px-3 py-1.5 text-caption font-bold text-ink hover:bg-canvas">
+      className="whitespace-nowrap rounded-full border border-line bg-canvas px-3 py-1.5 text-caption font-bold text-ink hover:bg-surface">
 
         다음에 할 일
       </button>
@@ -136,7 +201,7 @@ function Panel({ onClose }: {onClose: () => void;}) {
       type="button"
       disabled={pending}
       onClick={() => showHelp(topic.id)}
-      className="rounded-full border border-line bg-surface px-3 py-1.5 text-caption font-bold text-ink hover:bg-canvas">
+      className="whitespace-nowrap rounded-full border border-line bg-canvas px-3 py-1.5 text-caption font-bold text-ink hover:bg-surface">
 
           {topic.label}
         </button>
@@ -146,47 +211,39 @@ function Panel({ onClose }: {onClose: () => void;}) {
 
   return (
     <section
+      ref={panelRef}
       role="dialog"
       aria-label="비서 Really"
       onKeyDown={onKeyDown}
-      className="fixed inset-0 z-40 flex flex-col bg-surface sm:inset-auto sm:bottom-5 sm:right-5 sm:h-[min(40rem,calc(100vh-6rem))] sm:w-[25rem] sm:rounded-2xl sm:border sm:border-line sm:shadow-panel">
+      /* 흰 화면 위에 흰 창이 뜬다. 테두리는 edge(흰 바탕 3.44)로 세워 어디서 끝나는지 보이게 한다.
+         line(1.23)은 안 보였다 (#242 리뷰) */
+      className="fixed inset-0 z-40 flex flex-col bg-canvas sm:inset-auto sm:bottom-20 sm:right-5 sm:h-[min(38rem,calc(100vh-8rem))] sm:w-[25rem] sm:rounded-2xl sm:border sm:border-edge sm:shadow-panel">
 
-      <header className="flex items-start gap-3 border-b border-line px-5 py-4">
-        <div className="min-w-0 flex-1">
-          <h2 className="text-body font-bold text-ink">Really</h2>
-          <p className="mt-0.5 text-caption text-muted">
-            지금 화면을 보고 답합니다. 바꾸는 일은 카드의 [적용]을 눌러야 됩니다.
-          </p>
-        </div>
+      <header className="flex items-center gap-3 border-b border-line px-5 py-4">
+        <h2 className="min-w-0 flex-1 text-body font-bold text-ink">Really</h2>
+        {/* 접어도 대화는 남는다. 다시 열면 이어서 묻는다 */}
         <button
           type="button"
-          aria-expanded={helpOpen}
-          onClick={() => setHelpOpen((value) => !value)}
-          className="shrink-0 rounded-lg px-2 py-1 text-caption font-bold text-ink2 hover:bg-canvas">
-
-          도움말
-        </button>
-        <button
-          type="button"
-          aria-label="비서 닫기"
+          aria-label="비서 접기"
           onClick={onClose}
-          className="shrink-0 rounded-lg p-1 text-muted hover:bg-canvas hover:text-ink">
+          className="shrink-0 rounded-lg p-1 text-muted hover:bg-surface hover:text-ink">
 
-          <XIcon className="h-5 w-5" aria-hidden="true" />
+          <ChevronDownIcon className="h-5 w-5" aria-hidden="true" />
         </button>
       </header>
 
-      {helpOpen && entries.length > 0 &&
-      <div className="border-b border-line bg-canvas px-5 py-3">{topics}</div>
-      }
-
       <div role="log" aria-live="polite" className="flex-1 space-y-3 overflow-y-auto bg-canvas px-5 py-4">
+        {/* 열자마자 누가 답하는지 보이게 한다 (#259) */}
         {entries.length === 0 &&
-        <div className="space-y-3">
+        <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
+            <img src={really} alt="" className="h-20 w-20 rounded-full" />
+            <p className="text-body font-bold text-ink">무엇이든 물어보세요</p>
+            {/* 물어볼 수 있는 말의 예. 기호로 감싸지 않고 한 줄씩 둔다 */}
             <p className="text-small leading-6 text-ink2">
-              거래·판정·질문에 대해 물어보세요. 예: 「토요일 스타벅스는 미팅이었어」, 「3월에 카페 얼마 썼어?」
+              토요일 스타벅스는 미팅이었어
+              <br />
+              3월에 카페 얼마 썼어?
             </p>
-            {topics}
           </div>
         }
         {entries.map((entry) => <Message key={entry.id} entry={entry} />)}
@@ -195,6 +252,7 @@ function Panel({ onClose }: {onClose: () => void;}) {
       </div>
 
       <form onSubmit={submit} className="border-t border-line px-4 py-3">
+        <div className="mb-2">{topics}</div>
         {error &&
         <p role="alert" className="mb-2 text-small text-deny">
             {error}
@@ -224,33 +282,49 @@ function Message({ entry }: {entry: ChatEntry;}) {
   const mine = entry.role === 'user';
   return (
     <div className={cn('flex flex-col gap-2', mine ? 'items-end' : 'items-start')}>
-      <p
-        className={cn(
-          'max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-small leading-6',
-          mine ? 'bg-ink text-white' : 'border border-line bg-surface text-ink2'
-        )}>
+      <div className={cn('flex w-full gap-2', mine ? 'justify-end' : 'justify-start')}>
+        {/*
+          누가 말하는지 눈으로도 보이게 얼굴을 붙인다 (#259). 글자로는 아래 sr-only 로만
+          있어서 스크린리더만 알 수 있었다. 헤더에는 넣지 않는다 — 바로 옆에 같은 얼굴의
+          버튼이 떠 있어 창을 열면 돼지가 둘이 된다
+        */}
+        {!mine &&
+        <img src={really} alt="" className="mt-0.5 h-8 w-8 shrink-0 rounded-full" />
+        }
+        <p
+          className={cn(
+            'max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-small leading-6',
+            mine ? 'bg-accent text-white' : 'border border-line bg-surface text-ink2'
+          )}>
 
-        <span className="sr-only">{mine ? '나: ' : 'Really: '}</span>
-        {entry.content}
-      </p>
+          <span className="sr-only">{mine ? '나: ' : 'Really: '}</span>
+          {entry.content}
+        </p>
+      </div>
       {entry.proposals.map((item, index) => {
         const blocked = blockedReason(item.proposal);
+        // 적용한 카드는 한 줄로 접는다. 무엇을 했는지만 남긴다 (#143 리뷰)
+        if (item.state === 'done')
         return (
-          <div key={item.key} className="w-full rounded-2xl border border-line bg-surface p-3.5">
+          <p key={item.key} className="w-full rounded-xl border border-line bg-canvas px-3.5 py-2 text-caption text-ink2">
+                <Badge>{PROPOSAL_LABEL[item.proposal.kind]}</Badge> <span className="ml-1">{item.result}</span>
+              </p>);
+
+        return (
+          <div key={item.key} className="w-full rounded-2xl border border-line bg-canvas p-3.5">
             <Badge>{PROPOSAL_LABEL[item.proposal.kind]}</Badge>
             <p className="mt-2 text-small font-normal text-ink">{item.proposal.card}</p>
             {blocked ?
-            <p className="mt-2 text-caption text-muted">{blocked}</p> :
+            <p className="mt-2 text-caption text-ink2">{blocked}</p> :
 
             <div className="mt-3 flex items-center gap-3">
                 <Button
                 size="sm"
                 className="shrink-0"
-                variant={item.state === 'done' ? 'secondary' : 'primary'}
-                disabled={item.state === 'busy' || item.state === 'done'}
+                disabled={item.state === 'busy'}
                 onClick={() => void apply(entry.id, index)}>
 
-                  {item.state === 'busy' ? '적용 중…' : item.state === 'done' ? '적용함' : '적용'}
+                  {item.state === 'busy' ? '적용 중…' : item.proposal.kind === 'navigation' ? '이동' : '적용'}
                 </Button>
                 {item.result &&
               <p

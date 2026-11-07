@@ -14,13 +14,23 @@ import java.util.UUID;
 final class BatchUserFacts {
 
     private final UserFactPersistenceService userFactService;
-    private final Map<UUID, List<UserFact>> factsByBatchId = new HashMap<>();
+    private final Map<UUID, Map<UserFact, UUID>> factIdsByBatchId = new HashMap<>();
 
     BatchUserFacts(UserFactPersistenceService userFactService) {
         this.userFactService = userFactService;
     }
 
     List<UserFact> latest(UUID userId, UUID batchId) {
-        return factsByBatchId.computeIfAbsent(batchId, id -> userFactService.findAllLatest(userId, id));
+        return List.copyOf(factIds(userId, batchId).keySet());
+    }
+
+    /** latest 로 받은 답의 행 id. 최신 답은 (scopeKey, factType) 마다 하나라 값으로 찾아도 겹치지 않는다. */
+    List<UUID> idsOf(UUID userId, UUID batchId, List<UserFact> facts) {
+        Map<UserFact, UUID> ids = factIds(userId, batchId);
+        return facts.stream().map(ids::get).toList();
+    }
+
+    private Map<UserFact, UUID> factIds(UUID userId, UUID batchId) {
+        return factIdsByBatchId.computeIfAbsent(batchId, id -> userFactService.findAllLatestIds(userId, id));
     }
 }

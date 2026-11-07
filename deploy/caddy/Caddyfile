@@ -1,0 +1,39 @@
+{$DOMAIN} {
+    # 웹 접근 기록. 검색엔진·AI 크롤러가 언제 얼마나 읽어 가는지 센다(docs/deployment.md 「웹」).
+    # caddy-data 볼륨(/data)에 10MB 파일 5개까지만 둔다. IP 는 앞 두 자리(IPv4 /16, IPv6 /32)만 남기고,
+    # 쿠키·인증 헤더는 Caddy 가 기본으로 지운다. 바꾸면 개인정보처리방침(Privacy.tsx)도 맞춘다
+    log {
+        output file /data/access.log {
+            roll_size 10MiB
+            roll_keep 5
+        }
+        format filter {
+            request>remote_ip ip_mask 16 32
+            request>client_ip ip_mask 16 32
+        }
+    }
+
+    # 한 번 들어온 브라우저는 1년 동안 http 주소도 https 로 바꿔 접속한다(HSTS).
+    # http→https 넘김 직전의 암호화 안 된 첫 요청을 없앤다. 인증서가 깨지면 그동안 우회할 수 없으니 갱신이 멈추지 않게 본다
+    header Strict-Transport-Security "max-age=31536000"
+
+    handle /api/v1/* {
+        # 로그인 뒤 API 요청은 기록하지 않는다
+        log_skip
+        reverse_proxy backend:8080
+    }
+
+    handle {
+        root * /srv
+        # 화면 파일만 압축한다. API 응답은 손대지 않는다
+        encode zstd gzip
+        # 빌드 산출물은 이름에 내용 해시가 붙어 내용이 바뀌면 주소도 바뀐다
+        @assets path /assets/*
+        header @assets Cache-Control "public, max-age=31536000, immutable"
+        # 공개 페이지는 빌드 때 미리 그린 파일(/ → index.html, /faq → faq.html)이 나간다.
+        # / 는 {path}index.html 로 직접 찾는다 — {path} 의 디렉터리 매칭은 OS 마다 달라 기대지 않는다.
+        # 그 밖의 주소(로그인 뒤 화면·없는 주소)는 본문 없는 noindex 틀(app.html)을 받고 화면은 브라우저가 그린다
+        try_files {path} {path}index.html {path}.html /app.html
+        file_server
+    }
+}

@@ -81,7 +81,27 @@ public class JudgmentController {
                 "batchId, year, runId 중 정확히 하나를 지정해야 합니다.");
         }
         return JudgmentSummaryResponse.from(scope(batchId, year, runId),
-            queryService.summary(currentUser.id(), batchId, year, runId));
+            queryService.summary(currentUser.id(), batchId, year, runId),
+            queryService.limits(currentUser.id(), batchId, year));
+    }
+
+    @Operation(summary = "세무사에게 넘길 내보내기",
+        description = "batchId, year 중 정확히 하나. 거래마다 현재 판정, 인정 금액, 답한 질문과 답을 페이지 없이 준다. "
+            + "한도를 넘은 해의 접대비는 인정 금액을 비우고 limits 에 연 초과액을 준다. 파일(CSV) 변환은 FE 가 한다")
+    @ApiResponse(responseCode = "400", description = "INVALID_EXPORT_SCOPE — batchId, year 가 0개거나 2개",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @GetMapping("/export")
+    public JudgmentExportResponse export(
+        CurrentUser currentUser,
+        @RequestParam(required = false) UUID batchId,
+        @RequestParam(required = false) Integer year
+    ) {
+        if ((batchId == null) == (year == null)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_EXPORT_SCOPE",
+                "batchId, year 중 정확히 하나를 지정해야 합니다.");
+        }
+        return JudgmentExportResponse.from(queryService.export(currentUser.id(), batchId, year),
+            queryService.limits(currentUser.id(), batchId, year));
     }
 
     private static Scope scope(UUID batchId, Integer year, UUID runId) {

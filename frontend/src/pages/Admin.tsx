@@ -3,11 +3,11 @@ import { Navigate } from 'react-router-dom';
 import { InboxIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { Badge, Button, Empty, FilterBar, Modal, Pagination, SectionHeading } from '../components/ui';
-import type { BadgeTone } from '../components/ui';
 import { useSession } from '../contexts/SessionContext';
 import { api, ApiRequestError, useApi } from '../api';
-import type { RuleCandidate, RuleCandidateStatus } from '../types/domain';
+import type { RuleCandidate } from '../types/domain';
 import { formatDateTime, formatNumber } from '../utils/format';
+import { statuteTitle } from '../utils/statute';
 
 type Filter = 'PENDING' | 'ON_HOLD' | 'APPROVED' | 'REJECTED';
 
@@ -18,20 +18,22 @@ const FILTERS: { value: Filter; label: string }[] = [
 { value: 'REJECTED', label: '기각' }];
 
 
-const STATUS_TONE: Record<RuleCandidateStatus, BadgeTone> = {
-  PENDING: 'warn',
-  IN_REVIEW: 'warn',
-  ON_HOLD: 'neutral',
-  APPROVED: 'ok',
-  REJECTED: 'deny'
-};
-
 type Decision = 'approve' | 'reject';
+
+/** 후보를 부르는 이름. 업종 코드는 관리자가 어느 업종인지 알아야 해서 남긴다 */
+const candidateName = (candidate: RuleCandidate) => `${candidate.merchantCategory}(${candidate.industryCode})`;
+
+/**
+ * 근거 조문의 제목. 후보는 조문 id 만 준다(소득세법시행령-55-1-7). 법령 이름은 id 앞부분이고,
+ * 시행령·시행규칙은 띄어 쓴다 → 소득세법 시행령 제55조 제1항 제7호. 심판례처럼 조가 없는 id 는 그 앞부분만 남는다
+ */
+const docTitle = (statuteId: string) =>
+statuteTitle(statuteId, statuteId.split(/[#-]/)[0].replace(/(시행령|시행규칙)$/, ' $1'));
 
 /**
  * M1 규칙 후보 관리자 화면. 여러 사용자에게서 판정할 규칙이 없던 카테고리·업종 조합과
  * AI 가 만든 규칙 카드 초안을 보고 승인·기각한다. 발표 범위는 조회와 승인·기각까지다(backend_api_plan.md).
- * 관리자 API 계약은 아직 없다 — 모양은 rule_candidate 테이블을 따른 가정이다.
+ * 계약은 api.md 3.15 다.
  */
 export function Admin() {
   const { isAdmin } = useSession();
@@ -74,9 +76,7 @@ export function Admin() {
       const send = decision === 'approve' ? api.admin.ruleCandidates.approve : api.admin.ruleCandidates.reject;
       await send(candidate.id);
       setPending(null);
-      setNotice(
-        `${candidate.merchantCategory} · ${candidate.industryCode} 후보를 ${decision === 'approve' ? '승인' : '기각'}했습니다.`
-      );
+      setNotice(`${candidateName(candidate)} 후보를 ${decision === 'approve' ? '승인' : '기각'}했습니다.`);
       window.setTimeout(() => noticeRef.current?.focus(), 0);
       listQ.reload();
     } catch (caught) {
@@ -97,10 +97,7 @@ export function Admin() {
   return (
     <AppShell showSteps={false}>
       <div className="mx-auto max-w-3xl">
-        <SectionHeading
-          eyebrow="관리자"
-          title="규칙 후보"
-          description="여러 사용자에게서 판정할 규칙이 없던 카테고리·업종입니다. 초안과 근거를 보고 승인하거나 기각합니다. 처리하면 검토한 사람과 시각이 남습니다." />
+        <SectionHeading size="page" title="관리자" />
 
         <FilterBar
           className="mt-6"
@@ -112,12 +109,6 @@ export function Admin() {
             setNotice('');
           }}
           options={FILTERS} />
-
-        {filter === 'ON_HOLD' &&
-        <p className="mt-3 text-small text-muted">
-            보류는 초안을 만들지 못했거나 근거가 모자란 후보입니다. 보류 사유는 아직 저장되지 않습니다.
-          </p>
-        }
 
         <p
           ref={noticeRef}
@@ -138,9 +129,9 @@ export function Admin() {
         listQ.error ?
         <Empty
           className="mt-4"
+          tone="error"
           icon={<InboxIcon className="h-5 w-5" />}
           title="후보를 불러오지 못했습니다"
-          description="잠시 후 다시 시도해 주세요."
           action={
           <Button size="sm" variant="secondary" onClick={listQ.reload}>
                 다시 시도
@@ -180,8 +171,7 @@ export function Admin() {
           tone={pending?.decision === 'reject' ? 'danger' : 'neutral'}
           title={
           pending ?
-          `${pending.candidate.merchantCategory} · ${pending.candidate.industryCode} 후보를 ${
-          pending.decision === 'approve' ? '승인' : '기각'}할까요?` :
+          `${candidateName(pending.candidate)} 후보를 ${pending.decision === 'approve' ? '승인' : '기각'}할까요?` :
           ''
           }
           description="처리한 후보는 다시 대기로 돌릴 수 없습니다."
@@ -208,7 +198,7 @@ export function Admin() {
           }
         </Modal>
         {error && pending === null &&
-        <p role="alert" className="mt-3 rounded-xl border border-deny-line bg-deny-bg px-4 py-3 text-small text-deny">
+        <p role="alert" className="mt-3 text-small text-deny">
             {error}
           </p>
         }
@@ -226,17 +216,16 @@ interface CandidateCardProps {
 function CandidateCard({ candidate, disabled, onDecide }: CandidateCardProps) {
   const open = candidate.status.code === 'PENDING' || candidate.status.code === 'ON_HOLD';
   return (
-    <section className="overflow-hidden rounded-2xl border border-line bg-surface">
+    <section className="overflow-hidden rounded-2xl border border-line bg-canvas">
       <header className="flex flex-wrap items-start justify-between gap-3 border-b border-line2 px-5 py-4">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge tone={STATUS_TONE[candidate.status.code]}>{candidate.status.label}</Badge>
+            <Badge>{candidate.status.label}</Badge>
             <span className="text-caption tabular-nums text-muted">업종 {candidate.industryCode}</span>
           </div>
-          <h2 className="mt-2 text-h4 font-semibold text-ink">{candidate.merchantCategory}</h2>
+          <h2 className="mt-2 text-h4 font-bold text-ink">{candidate.merchantCategory}</h2>
           <p className="mt-0.5 text-caption tabular-nums text-muted">
-            사용자 {formatNumber(candidate.distinctUsers)}명 · {formatNumber(candidate.occurrenceCount)}건 · 만든 시각{' '}
-            {formatDateTime(candidate.createdAt)}
+            사용자 {formatNumber(candidate.distinctUsers)}명, {formatNumber(candidate.occurrenceCount)}건
           </p>
         </div>
         {open &&
@@ -253,40 +242,38 @@ function CandidateCard({ candidate, disabled, onDecide }: CandidateCardProps) {
 
       <div className="space-y-3 px-5 py-4">
         <div>
-          <h3 className="text-small font-semibold text-ink">
-            근거{candidate.searchedTier && <span className="ml-1.5 font-normal text-muted">가장 위 위계 {candidate.searchedTier}</span>}
-          </h3>
+          <h3 className="text-small font-bold text-ink">근거</h3>
           {candidate.suggestedDocs.length > 0 ?
           <ul className="mt-2 space-y-2">
               {candidate.suggestedDocs.map((doc) =>
-            <li key={doc.statuteId} className="rounded-xl border border-line bg-canvas px-3.5 py-3">
-                  <p className="text-caption tabular-nums text-muted">
-                    {doc.statuteId}
-                    {doc.tier && ` · ${doc.tier}`}
+            <li key={doc.statuteId} className="rounded-xl border border-line px-3.5 py-3">
+                  <p className="text-small">
+                    <span className="font-bold text-ink">{docTitle(doc.statuteId)}</span>
+                    {doc.tier && <span className="ml-2 text-caption text-muted">{doc.tier}</span>}
                   </p>
                   <blockquote className="mt-1 text-small leading-6 text-ink2">{doc.quote}</blockquote>
                 </li>
             )}
             </ul> :
 
-          <p className="mt-1.5 text-small text-muted">붙은 근거가 없습니다.</p>
+          <p className="mt-1.5 text-small text-ink2">붙은 근거가 없습니다.</p>
           }
         </div>
 
         {candidate.draftYaml ?
         <details>
-            <summary className="cursor-pointer text-small font-semibold text-ink">규칙 카드 초안</summary>
-            <pre className="mt-2 overflow-x-auto rounded-xl border border-line bg-canvas p-3.5 text-caption leading-5 text-ink2">
+            <summary className="cursor-pointer text-small font-bold text-ink">규칙 카드 초안</summary>
+            <pre className="mt-2 overflow-x-auto rounded-xl border border-line p-3.5 text-caption leading-5 text-ink2">
               {candidate.draftYaml}
             </pre>
           </details> :
 
-        <p className="text-small text-muted">초안을 만들지 못했습니다. 승인할 수 없고 기각만 할 수 있습니다.</p>
+        <p className="text-small text-ink2">초안을 만들지 못했습니다. 승인할 수 없고 기각만 할 수 있습니다.</p>
         }
 
         {candidate.reviewedAt &&
         <p className="text-caption tabular-nums text-muted">
-            {candidate.reviewedBy ?? '알 수 없음'} · {formatDateTime(candidate.reviewedAt)} 처리
+            {candidate.reviewedBy ?? '알 수 없음'}, {formatDateTime(candidate.reviewedAt)} 처리
           </p>
         }
       </div>

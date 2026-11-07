@@ -5,7 +5,7 @@ import com.ktc4.pusan4.judgment.domain.JudgmentOrigin;
 import com.ktc4.pusan4.judgment.domain.JudgmentOriginType;
 import com.ktc4.pusan4.judgment.persistence.JudgmentExecutor;
 import com.ktc4.pusan4.judgment.persistence.QuestionAnswerService;
-import com.ktc4.pusan4.shared.auth.FixedUser;
+import com.ktc4.pusan4.auth.TestUser;
 import com.ktc4.pusan4.user.domain.BusinessContext;
 import com.ktc4.pusan4.user.persistence.BusinessContextService;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,7 +39,7 @@ class ProgressIntegrationTest {
     @ServiceConnection
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17-alpine");
 
-    private static final UUID USER_ID = FixedUser.ID;
+    private static final UUID USER_ID = TestUser.ID;
 
     @Autowired
     private MockMvc mockMvc;
@@ -115,6 +115,20 @@ class ProgressIntegrationTest {
             .andExpect(jsonPath("$.questions.fillableFromPrevious").value(1))
             .andExpect(jsonPath("$.next.step").value("CLASSIFY"))
             .andExpect(jsonPath("$.next.route").value("/preview"));
+    }
+
+    @Test
+    void classification_pending_leaves_out_excluded_transactions() throws Exception {
+        UUID batch = insertBatch(USER_ID, "2025-10-01", "2025-10-31");
+        UUID excluded = insertTransaction(batch, "미분류", "가맹점A", 30_000L);
+        insertReview(excluded);
+        insertReview(insertTransaction(batch, "미분류", "가맹점B", 67_000L));
+        jdbcTemplate.update("update transaction set user_inclusion = 'EXCLUDED' where id = ?", excluded);
+
+        mockMvc.perform(get("/api/v1/progress").param("batchId", batch.toString()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.classification.pendingCount").value(1))
+            .andExpect(jsonPath("$.classification.pendingAmount").value(67_000));
     }
 
     @Test

@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "npx vite",
-    "build": "npm run check:categories && npm run typecheck && npx vite build",
+    "build": "npm run check:categories && npm run typecheck && npx vite build && npm run prerender",
+    "prerender": "npx vite build --ssr src/entry-server.tsx --outDir dist-ssr && node scripts/prerender.mjs",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "preview": "npx vite preview",
     "check:categories": "node scripts/check-categories.mjs",

@@ -31,11 +31,17 @@ def test_어긋난_기대마다_사유를_준다():
     assert len(fails) == 5   # 정해 둔 문구 · 제안 불일치 · 금지 제안 · 미호출 · 문구 없음
 
 
+def test_no_tools_면_도구를_부를_때만_실패한다():
+    case = {"expect": {"no_tools": True}}
+    assert grade(case, out()) == []
+    assert grade(case, out(calls=["get_help"])) == ["도구를 부름 ['get_help']"]
+
+
 def test_평가_셋이_가짜_백엔드와_도구에_맞는다():
     cases = load_cases()
     qids = {q[0] for q in QUESTIONS}
     assert len({c["id"] for c in cases}) == len(cases)
     for c in cases:
-        assert set(c["expect"]) <= {"proposals", "not_proposed", "called", "contains", "not_matches"}
+        assert set(c["expect"]) <= {"proposals", "not_proposed", "called", "no_tools", "contains", "not_matches"}
         assert set(c["expect"].get("called", [])) <= set(TOOL_DEFS)
         assert set(c.get("keep_questions", [])) <= qids

@@ -11,10 +11,16 @@ const STATUS: Record<ParserStatus, SourceStatus> = {
 
 const ISSUER = { kb: '국민', ibk: '기업' } as const;
 
-/** 서버(UploadRequestValidator)가 배치 전체를 거절하게 만드는 행인지 본다. 먼저 걸린 사유 하나만 돌려준다 */
+/**
+ * 보내지 않는 행인지 본다. 먼저 걸린 사유 하나만 돌려준다.
+ * 외화 전용 · 0원은 서버가 받기는 하지만 판정할 금액이 없어 보내지 않는다. 나머지는 서버(UploadRequestValidator)가
+ * 배치 전체를 거절하게 만드는 행이다
+ */
 export function unsendableOf(row: ParsedRow): UnsendableCode | null {
+  if (row.foreignAmount !== null) return 'FOREIGN_ONLY';
   if (row.approvedAt === '') return 'NO_DATE';
   if (row.amount === null) return 'NO_AMOUNT';
+  if (row.amount === 0) return 'ZERO_AMOUNT';
   if (row.rawMerchant === '') return 'BLANK_MERCHANT';
   if (row.approvalNo.length > MAX_APPROVAL_NO) return 'APPROVAL_TOO_LONG';
   return null;

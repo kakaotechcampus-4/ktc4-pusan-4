@@ -4,7 +4,10 @@ import { cn } from './cn';
 export type BadgeTone = 'ok' | 'warn' | 'deny' | 'neutral' | 'ink' | 'inverse';
 export type BadgeSize = 'sm' | 'md';
 
-/** 상태색은 배경·테두리·글자를 항상 세트로 쓴다 (DESIGN.md 상태색 규칙) */
+/**
+ * ok·warn·deny 는 판정(가능·확인 필요·불가)에만 쓴다. 판정 배지는 VerdictBadge 가 고른다.
+ * 업로드 상태, 처리 상태, 「보는 중」처럼 판정이 아닌 것은 neutral 이다 (DESIGN.md 판정색 규칙)
+ */
 const TONE: Record<BadgeTone, string> = {
   ok: 'border-ok-line bg-ok-bg text-ok',
   warn: 'border-warn-line bg-warn-bg text-warn',

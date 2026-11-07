@@ -60,6 +60,8 @@ def grade(case: dict, out: dict) -> list[str]:
         fails.append(f"제안 {got} (기대 {sorted(exp['proposals'])})")
     fails += [f"나오면 안 되는 제안 {k}" for k in got if any(k.startswith(b) for b in exp.get("not_proposed", []))]
     fails += [f"{n} 를 부르지 않음" for n in exp.get("called", []) if n not in called]
+    if exp.get("no_tools") and called:
+        fails.append(f"도구를 부름 {sorted(called)}")
     fails += [f"답에 '{c}' 없음" for c in exp.get("contains", []) if str(c).replace(",", "") not in answer]
     fails += [f"답에 /{r}/ 있음" for r in exp.get("not_matches", []) if re.search(r, out["answer"])]
     return fails

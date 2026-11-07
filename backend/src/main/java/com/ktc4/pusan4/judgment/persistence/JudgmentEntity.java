@@ -9,16 +9,19 @@ import com.ktc4.pusan4.judgment.domain.JudgmentRevision.CitedStatute;
 import com.ktc4.pusan4.judgment.domain.JudgmentRevision.JudgedTransaction;
 import com.ktc4.pusan4.judgment.domain.JudgmentSummary;
 import com.ktc4.pusan4.judgment.domain.UnmatchedReason;
-import com.ktc4.pusan4.judgment.domain.UserFact;
 import com.ktc4.pusan4.judgment.domain.Verdict;
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -76,9 +79,11 @@ class JudgmentEntity extends AssignedIdEntity<UUID> {
     @Column(name = "applied_rule_ids", nullable = false, columnDefinition = "jsonb")
     private List<String> appliedRuleIds;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "input_facts", nullable = false, columnDefinition = "jsonb")
-    private List<UserFact> inputFacts;
+    // 판정이 질문을 푸는 데 쓴 답(user_fact). 목록·요약은 읽지 않아 LAZY 로 둔다.
+    @ElementCollection
+    @CollectionTable(name = "judgment_input_fact", joinColumns = @JoinColumn(name = "judgment_id"))
+    @Column(name = "user_fact_id")
+    private List<UUID> inputFactIds = new ArrayList<>();
 
     // 안분·상각까지 반영한 인정 금액(AmountCalculator). 한도는 limit_bucket_entry 에 따로 둔다.
     @Column(name = "final_amount")
@@ -125,7 +130,7 @@ class JudgmentEntity extends AssignedIdEntity<UUID> {
         this.account = judgment.account();
         this.attributes = judgment.attributes();
         this.appliedRuleIds = judgment.appliedRuleIds();
-        this.inputFacts = command.inputFacts();
+        this.inputFactIds = new ArrayList<>(command.inputFactIds());
         this.finalAmount = command.finalAmount();
         JudgmentOrigin origin = command.origin();
         switch (origin.type()) {
@@ -161,7 +166,7 @@ class JudgmentEntity extends AssignedIdEntity<UUID> {
         revision.account = account;
         revision.attributes = attributes;
         revision.appliedRuleIds = appliedRuleIds;
-        revision.inputFacts = inputFacts;
+        revision.inputFactIds = new ArrayList<>(inputFactIds);
         revision.finalAmount = recalculatedAmount;
         revision.judgmentOverrideId = overrideId;
         return revision;

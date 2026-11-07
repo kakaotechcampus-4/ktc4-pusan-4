@@ -19,16 +19,18 @@ describe('parseCardBytes — KB 샘플', () => {
 
     expect(outcome.issuer).toBe('kb');
     expect(outcome.stats).toEqual({
-      sourceRows: 14,
-      foreignOnlySkipped: 1,
-      kept: 13,
-      byStatus: { 판정대상: 9, 취소상계: 2, 대상제외: 2 },
+      sourceRows: 15,
+      foreignOnly: 1,
+      kept: 15,
+      byStatus: { 판정대상: 10, 취소상계: 2, 대상제외: 3 },
       nonTransaction: 1,
       cancels: 1,
       cancelsPaired: 1,
       cancelsAmbiguous: 0,
       cancelsUnpaired: 0,
+      cancelsOutOfWindow: 0,
       noAmount: 1,
+      zeroAmount: 1,
       noDate: 1,
       aggregated: 1,
       medicalMasked: 3,
@@ -77,15 +79,26 @@ describe('parseCardBytes — KB 샘플', () => {
       status: '대상제외',
       reviewReason: '비거래 항목 (카드사 정산 행)'
     });
+    expect(byApproval('20000010')).toMatchObject({
+      status: '대상제외',
+      amount: null,
+      foreignAmount: 12.5,
+      reviewReason: '해외 결제 (원화 금액 없음)'
+    });
     expect(byApproval('30000006')).toMatchObject({
       status: '대상제외',
-      reviewReason: '금액 파싱 불가'
+      amount: 0,
+      reviewReason: '0원 승인'
     });
 
+    // 해외 결제 · 날짜 없음 · 0원 · 가맹점명 없음은 보내지 않고 이유와 함께 보인다 (C34, C38)
     expect(outcome.unsendable.map((u) => [u.code, u.row.approvalNo])).toEqual([
+      ['FOREIGN_ONLY', '20000010'],
       ['NO_DATE', '30000004'],
-      ['NO_AMOUNT', '30000006']
+      ['ZERO_AMOUNT', '30000006'],
+      ['BLANK_MERCHANT', '30000007']
     ]);
+    expect(outcome.rows).toHaveLength((outcome.request?.transactions.length ?? 0) + outcome.unsendable.length);
 
     expect(outcome.request).not.toBeNull();
     if (!outcome.request) return;
@@ -139,7 +152,7 @@ describe('parseCardBytes — IBK 샘플', () => {
     expect(outcome.issuer).toBe('ibk');
     expect(outcome.stats).toEqual({
       sourceRows: 22,
-      foreignOnlySkipped: 0,
+      foreignOnly: 0,
       kept: 22,
       byStatus: { 판정대상: 11, 취소상계: 9, 대상제외: 2 },
       nonTransaction: 1,
@@ -147,11 +160,21 @@ describe('parseCardBytes — IBK 샘플', () => {
       cancelsPaired: 2,
       cancelsAmbiguous: 1,
       cancelsUnpaired: 4,
+      cancelsOutOfWindow: 1,
       noAmount: 1,
+      zeroAmount: 0,
       noDate: 1,
       aggregated: 2,
       medicalMasked: 2,
-      needsReview: 2
+      needsReview: 3
+    });
+
+    // 알라딘은 취소가 63일 뒤라 상계하지 않고, 같은 파일의 원 결제에 표시를 남긴다 (C33)
+    expect(outcome.rows[13]).toMatchObject({
+      rawMerchant: '알라딘',
+      status: '판정대상',
+      needsReview: true,
+      reviewReason: '같은 상호·금액 취소가 63일 떨어져 있음 — 62일 밖이라 상계하지 않음'
     });
 
     expect(outcome.rows[0]).toMatchObject({

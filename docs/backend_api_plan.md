@@ -193,7 +193,7 @@ flowchart LR
   - 에이전트가 코드를 작성하고, 사람은 리뷰와 merge를 담당한다.
   - PR을 올리기 전에 에이전트 리뷰를 먼저 실행한다. 사람 리뷰는 에이전트의 지적사항과 스키마, 도메인 규칙(세법, api.md 계약)에 집중한다.
   - 직렬 사슬(A1a → A1b → A2a → A2b, B3a → B3b → B4 → B5 → B6)은 하루가 밀리면 뒤 작업도 모두 밀린다. 지연은 4주차 버퍼로 흡수한다.
-- 목 교체 절차: `backend/README.md`의 "목 응답" 절차를 따른다.
+- 목 교체 절차(11/2 모든 목 교체를 마쳤다):
   1. 컨트롤러에 주입된 `*MockData`를 서비스 코드로 교체한다.
   2. 해당 메서드의 `@MockResponse`를 삭제한다.
   3. 사용하지 않는 mock 메서드를 삭제한다.
@@ -272,15 +272,15 @@ flowchart LR
 | A7 | A | 10/29 | `POST /questions/bulk-answer`를 구현한다. 단건 답변 로직을 반복해서 호출하되, 같은 거래는 한 번만 재판정한다. 소명 대기 거래(Override를 뺀 최신 자동 판정이 불가인데 대기 질문이 남은 거래)의 질문은 대상과 `answer.value` 허용 검사에서 빼고 `excludedCount`로 센다(api.md 3.11, #103). |
 | B8 | B | 10/26 → 10/18 (#156, #158) | `GET /classification-reviews`와 `POST /classification-responses`를 구현한다. 사용자 응답은 개인 scope의 `merchant_dict`에 저장한다. 해당 batch에 완료된 run이 없으면 분류만 확정하고 `judgedCount=0`으로 응답한다. 완료된 run이 있으면 최근 run의 Context로 `rejudge`한다(api.md "판정 처리" 절). |
 | B9a | B | 10/27 | Redis 인프라를 추가한다. 로컬 `compose.yaml`, `deploy/compose.yaml`(`maxmemory` 128MB, AOF 켜기), `deploy/deploy.sh` 헬스체크, `spring-boot-starter-data-redis`, Testcontainers Redis 설정을 포함한다. |
-| B9b | B | 10/28, 일부 10/18 (#154, #155) | 인증을 도입한다. 확정한 인증 API 계약에 따라 로그인과 액세스 토큰(JWT) 발급을 구현한다. `CurrentUser` 리졸버 구현체는 Bearer 토큰 검증 방식으로 교체한다. **중간 발표(10/22) 때문에 일부를 먼저 올렸다(#154, #155, 머지 대기)**: 계약(api.md 1.1), 액세스 토큰, Bearer 검증, 로그인·재발급·로그아웃 API 를 구현했고, 고정 사용자 하나만 로그인한다. 남은 일은 `CredentialVerifier` 를 실제 계정·카카오 구현으로 바꾸고 `FixedUser`·`TemporaryUserSeeder` 를 지우는 것이다. |
-| B9c | B | 10/29, 일부 10/18 (#155) | 리프레시 토큰 재발급과 로그아웃을 구현한다. 저장 규칙은 [저장소 결정](#저장소-결정)을 따른다. 탈퇴하면 해당 사용자의 토큰을 모두 삭제한다. 재발급·로그아웃 API 는 B9b 와 함께 먼저 올렸다(#155, 머지 대기). 지금 `StatelessRefreshTokenStore` 는 서명만 확인해 `revoke`·`revokeAll` 이 아무것도 하지 않는다. 남은 일은 `RefreshTokenStore` 의 Redis 구현(교체 시 이전 토큰 폐기, 로그아웃 폐기, 탈퇴 시 `revokeAll`)을 빈으로 바꿔 끼우는 것이다. |
+| B9b | B | 10/28 → 11/1 (#154, #155, #176, #177, #193) | 인증을 도입한다. 확정한 인증 API 계약(api.md 1.1)에 따라 로그인과 액세스 토큰(JWT) 발급을 구현한다. `CurrentUser` 리졸버 구현체는 Bearer 토큰 검증 방식으로 교체한다. 중간 발표(10/22) 때문에 액세스 토큰·Bearer 검증·로그인·재발급·로그아웃 API 를 고정 사용자로 먼저 올렸고(#154, #155), 이메일 가입·로그인(#177), 카카오 로그인(#176), 메일 인증(#193)으로 실제 계정을 붙였다. `FixedUser`·`TemporaryUserSeeder` 는 지웠다. |
+| B9c | B | 10/29 → 11/1 (#155, #178) | 리프레시 토큰 재발급과 로그아웃을 구현한다. 저장 규칙은 `docs/architecture.md` "저장소 결정"을 따른다. 재발급·로그아웃 API 는 B9b 와 함께 먼저 올렸고(#155), `RefreshTokenStore` 의 Redis 구현(교체 시 이전 토큰 폐기, 로그아웃 폐기, 탈퇴 시 `revokeAll`)으로 바꿔 끼웠다(#178). |
 | M1 | B | 10/30 | 규칙 후보 관리자 API. [발표 준비](#발표-준비)를 참고한다. B10보다 먼저 진행한다. 버퍼가 줄어서 발표에 필요한 M1을 먼저 확보한다. |
 
 ### 4주차 (11/2~11/5): 발표 기능과 버퍼
 
 | PR | 트랙 | 날짜 | 내용 |
 | --- | --- | --- | --- |
-| B10 | B | 11/2 | 분류 AI를 연동한다. B3b 분류기에서 사전과 키워드로 분류하지 못한 가맹점만 모아 분류 API를 한 번에 호출한다. 분류 API의 위치와 담당은 [미리 정해야 할 것](#미리-정해야-할-것)에서 정한다. 호출은 DB 트랜잭션을 열기 전에 수행한다. 타임아웃(3초 안팎)이 발생하거나 호출이 실패하면 해당 거래를 `미분류`로 둔다. 모델 결과는 전역 `merchant_dict`에 저장하지 않는다(`CONTEXT.md` 흔한 실수 #18). 분류 API는 처음에 모두 `null`을 반환하는 stub으로 시작하고, 모델이 준비되면 API 쪽만 교체한다. |
+| B10 | B | 11/2 | 분류 AI를 연동한다. B3b 분류기에서 사전과 키워드로 분류하지 못한 가맹점(`UNCLASSIFIED`, 취소상계만 있는 가맹점 제외, 요청당 200개까지)만 모아 AI 서버 `POST /classify/merchants`를 한 번 호출한다(계약은 아래 10/16 결정). 호출은 DB 트랜잭션 밖(`UploadFacade`)에서 한다. 재전송·중복 파일이면 부르지 않는다. 시간 초과(read 10초 = AI 마감 8초 + 여유)나 실패, 기능 꺼짐(`CLASSIFY_ENABLED`, 기본 false)이면 모델 없이 지금처럼 `미분류` + 분류 확인이다. 모델 답으로 확정하지 않는다. 모델이 답한 가맹점도 `미분류` + 분류 확인이고, 후보 최대 3개(`suggestedCategories`)를 붙인다. 모델 결과는 `merchant_dict`(개인·전역)에 저장하지 않고(`CONTEXT.md` 흔한 실수 #18) `merchant_model_decision`(V20)에 남긴다. |
 | 버퍼 | A·B | 11/3~11/5 | 밀린 PR, 회귀 수정, 누적 시나리오 테스트 보강, 데모 데이터(`CONTEXT.md` §15 히어로 시나리오) 준비 |
 
 ## 미리 정해야 할 것
@@ -291,27 +291,14 @@ flowchart LR
 | --- | --- | --- |
 | 10/6 | 공휴일 목록을 가져오는 방식과 연도 범위. 회의에서는 공휴일을 공공 API로 판단하기로 했다(`worklog/be/2026-09-30-holiday-flag.md`). 판정할 때마다 API를 호출할지, API 결과를 DB나 YAML에 저장해 두고 읽을지, 정적 YAML만 둘지 정한다. 판정할 때마다 호출하면 임시공휴일이 추가된 뒤 재판정 결과가 달라질 수 있고, API 장애가 판정 실패로 이어진다. | A2a |
 | 10/16 | 인증 방식(카카오 OAuth, 자체 JWT 등)과 인증 API 계약. 로그인·재발급·로그아웃 엔드포인트, 토큰 전달 위치(헤더 또는 쿠키), 액세스·리프레시 토큰 만료 기간, 로그아웃 범위를 api.md에 먼저 작성한다. 리프레시 토큰 저장소는 Redis로 확정했다. **결정(10/18)**: 자체 JWT. 액세스 토큰은 `Authorization` 헤더(15분), 리프레시 토큰은 httpOnly 쿠키(14일, `Path=/api/v1/auth`). 프론트 #142 의 가정(#139)과 같다. 카카오 로그인은 B9b 에서 `CredentialVerifier` 구현으로 붙인다. | B9b, B9c |
-| 10/16 | 분류 단계 배치, 담당, 분류 API 계약(분류 실험 담당·AI 담당과 협의). 어느 분류 단계부터 AI 서버로 넘길지 먼저 정한다. `CONTEXT.md` §12는 분류를 AI 서버에 두지만, 단계별로 나눈 기록은 없고 서비스 구현도 아직 없다. 사전과 `keyword_rules.yaml`은 백엔드(B3b)에서 처리하고, 모델과 웹 검색만 AI 서버에 두는 것을 추천한다. 해외 SaaS 사전(PR #73)과 상권정보 매칭(PR #61)을 어느 쪽에 둘지, 분류 API를 누가 구현할지도 함께 정한다. AI 서버에 두는 경우 배치 요청 `[{ merchantNorm, merchantRaw, bizNo? }]`, 응답 `[{ category 또는 null, confidence }]` 형태를 제안한다. cutoff 미만이면 `null`이다. stub은 10/30까지 필요하다. | B10 |
+| 10/16 | 분류 단계 배치, 담당, 분류 API 계약(분류 실험 담당·AI 담당과 협의). 어느 분류 단계부터 AI 서버로 넘길지 먼저 정한다. `CONTEXT.md` §12는 분류를 AI 서버에 두지만, 단계별로 나눈 기록은 없고 서비스 구현도 아직 없다. 사전과 `keyword_rules.yaml`은 백엔드(B3b)에서 처리하고, 모델과 웹 검색만 AI 서버에 두는 것을 추천한다. 해외 SaaS 사전(PR #73)과 상권정보 매칭(PR #61)을 어느 쪽에 둘지, 분류 API를 누가 구현할지도 함께 정한다. AI 서버에 두는 경우 배치 요청 `[{ merchantNorm, merchantRaw, bizNo? }]`, 응답 `[{ category 또는 null, confidence }]` 형태를 제안한다. cutoff 미만이면 `null`이다. stub은 10/30까지 필요하다. **결정(10/19, 이슈 #145)**: 사전과 키워드는 백엔드, 모델만 AI 서버에 둔다. AI 서버는 GPT-6 Luna `/decisions`로 답한다. 계약은 `POST /classify/merchants` 요청 `{items: [{merchantNorm, merchantRaw}]}`(1~200개), 응답 `{model, results: [{merchantNorm, category 또는 null, confidence, known 또는 null, suggestions(3개), refused} 또는 null]}`(요청 순서, `null` = 실패·AI 마감 8초 초과), `timedOut`(마감을 넘긴 merchantNorm 목록, 나중에 다시 물을 몫. 백엔드는 아직 쓰지 않는다), AI 서버 미설정이면 503 `CLASSIFY_UNAVAILABLE`이다. **실험(10/30, `docs/category_decision_eval.md`)**: 가장 엄격한 기준(`known ≥ 0.99` 그리고 `confidence = 1.00`)에서도 정밀도가 91%(하한 82%)였다. **결정(10/31, PR #196 리뷰)**: 자동 확정 없이 모든 답을 분류 확인 후보 3개로만 쓴다. | B10 |
 | 10/16 | 금액 계산 규칙. 안분과 부가세 중 무엇을 먼저 적용할지(`CONTEXT.md` 미결정 #6), 자산 판단과 상각방법 기본값을 정한다. **결정(10/28)**: 안분 먼저, 부가세는 그 다음(`CONTEXT.md` §4 금액 산정). 현재 페르소나는 면세라 부가세 단계는 꺼 둔다. | A6a |
 | 10/16 | 휴일 소명 질문의 bulk-answer 처리. **결정(10/7, #103)**: fact_type은 그대로 두고, 휴일 카드(R-311~314)와 생활용품(R-207)을 포함한 소명 대기 거래의 질문을 일괄 응답 대상에서 뺀다. 뺀 수는 `skippedCount`와 별도인 `excludedCount`로 센다(api.md 3.11). 별도 fact_type 안은 그 fact_type으로 일괄 응답하면 같은 문제가 남고 R-207을 놓쳐 쓰지 않았다. | A7 |
 | 10/26 | 관리자 페이지 범위와 담당. 화면 담당(프론트), 관리자 판별 방식, 승인 후 처리 범위를 정한다. 발표에는 후보 큐 조회와 승인·반려까지만 포함하고, GitHub PR 자동 생성은 제외하는 것을 추천한다. | M1 |
 
 ## 저장소 결정
 
-| 데이터 | 저장소 | 이유 |
-| --- | --- | --- |
-| Idempotency-Key와 최초 응답 | Postgres (`idempotency_key` 테이블) | 업로드의 부작용(batch·거래 저장)은 같은 Postgres 안에서 발생한다. 키 기록을 같은 트랜잭션으로 묶으면 "키는 남았는데 batch는 없다"와 같은 불일치가 생기지 않는다. batch를 삭제할 때 키를 `DELETED`로 변경하는 작업도 같은 트랜잭션에서 처리한다. |
-| 리프레시 토큰 | Redis | 업무 데이터와 트랜잭션으로 묶을 필요가 없다. TTL로 만료된 토큰을 자동 정리하므로 별도 삭제 작업이 필요 없다. 데이터가 유실되어도 재로그인으로 해결할 수 있어 Redis를 처음 도입할 때의 위험이 작다. |
-
-리프레시 토큰 저장 규칙:
-
-- 리프레시 토큰은 userId와 로그인 세션 식별자(familyId)를 담은 JWT로 발급한다. Redis에서 키가 삭제된 뒤에도 누구의 토큰인지 알 수 있어야 하기 때문이다.
-- 키 구조
-  - `refresh:{familyId}` → `{ userId, tokenHash }`. TTL은 리프레시 토큰 만료 기간과 같다.
-  - `user:{userId}:families` → 해당 사용자의 familyId Set. 탈퇴(`DELETE /users/me`)나 전체 로그아웃 시 한 번에 삭제하는 데 사용한다. 로그인할 때마다 Set의 TTL을 리프레시 토큰 만료 기간으로 갱신해 오래된 Set이 남지 않도록 한다.
-- 토큰 원문 대신 해시를 저장한다.
-- 재발급(rotation)은 Lua 스크립트 하나로 원자적으로 처리한다. 저장된 tokenHash와 전달된 토큰이 같으면 새 토큰의 해시로 변경한다. 다르면 이미 사용된 토큰을 재사용한 것으로 판단해 해당 family를 삭제한다(해당 기기만 로그아웃).
-- AOF를 켜서 재배포 시 모든 사용자가 로그아웃되지 않도록 한다. EC2 메모리가 4GB이므로 `maxmemory`를 128MB로 제한한다.
+`docs/architecture.md` "저장소 결정"으로 옮겼다.
 
 ## 발표 준비
 
@@ -364,7 +351,7 @@ gantt
   - `backend/README.md` "단위 테스트 NO-SOURCE"
   - `docs/deployment.md` "501"
 - 설계 맥락을 설명해야 하는 비자명한 결정은 해당 PR에서 `docs/`에 기록한다.
-  - 저장소 결정(위 절의 내용을 `docs/architecture.md`로 옮긴다)
+  - 저장소 결정(`docs/architecture.md`로 옮겼다)
   - run 비동기 방식
   - 삭제 정책
   - 금액 계산 규칙
