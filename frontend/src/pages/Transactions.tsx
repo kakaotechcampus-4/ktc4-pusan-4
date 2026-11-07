@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { SearchXIcon } from 'lucide-react';
+import { ChevronDownIcon, SearchXIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { api, ApiRequestError, useApi } from '../api';
 import { useSession } from '../contexts/SessionContext';
@@ -10,12 +10,10 @@ import {
   Empty,
   FilterBar,
   Pagination,
-  Select,
   Table,
-  cn,
   type Column } from
 '../components/ui';
-import type { EffectiveStatus, Transaction } from '../types/domain';
+import type { EffectiveStatus, Transaction, UploadBatch } from '../types/domain';
 import { formatFullDate, formatWon } from '../utils/format';
 
 type StatusFilter = 'ALL' | EffectiveStatus;
@@ -27,7 +25,40 @@ const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
 { value: 'CANCELED_OFFSET', label: '취소상계' }];
 
 
-const MONTHS = ['전체', '1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
+/** 고른 달. 빈 문자열은 전체 기간, 아니면 「2026-01」 */
+type MonthKey = string;
+const ALL_MONTHS: MonthKey = '';
+
+/** 이만큼 이하의 달이면 상태 필터와 같은 버튼 묶음으로, 넘으면 펼침 목록으로 고른다 */
+const MONTH_BUTTONS_MAX = 4;
+
+/** 업로드 기간에 든 달. 해를 넘기면 해도 적는다. 기간을 모르면 한 해 열두 달 */
+const monthsOf = (batch: UploadBatch | null): { value: MonthKey; label: string }[] => {
+  if (!batch)
+  return Array.from({ length: 12 }, (_, index) => ({ value: `-${index + 1}`, label: `${index + 1}월` }));
+  const [startYear, startMonth] = batch.periodStart.split('-').map(Number);
+  const [endYear, endMonth] = batch.periodEnd.split('-').map(Number);
+  const months: { value: MonthKey; label: string }[] = [];
+  for (let year = startYear, month = startMonth; year < endYear || year === endYear && month <= endMonth;) {
+    months.push({
+      value: `${year}-${month}`,
+      label: startYear === endYear ? `${month}월` : `${year}년 ${month}월`
+    });
+    month += 1;
+    if (month > 12) {
+      month = 1;
+      year += 1;
+    }
+  }
+  return months;
+};
+
+/** 「2026-1」은 그해 1월, 「-1」은 해를 모르는 1월 */
+const monthQuery = (key: MonthKey) => {
+  if (key === ALL_MONTHS) return {};
+  const [year, month] = key.split('-');
+  return { ...(year ? { year: Number(year) } : {}), month: Number(month) };
+};
 
 /** 탭 건수를 서버에 묻는 상태. 전체는 셋을 더한다 — 거래마다 effectiveStatus 는 하나다 */
 const COUNTED: EffectiveStatus[] = ['JUDGEABLE', 'EXCLUDED', 'CANCELED_OFFSET'];
@@ -46,7 +77,7 @@ row.classificationStatus.code === 'NEEDS_REVIEW' && row.effectiveStatus.code ===
 export function Transactions() {
   const { batchId, batchStatus, reloadBatch } = useSession();
   const [status, setStatus] = useState<StatusFilter>('ALL');
-  const [month, setMonth] = useState(0);
+  const [month, setMonth] = useState<MonthKey>(ALL_MONTHS);
   const [page, setPage] = useState(0);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +86,13 @@ export function Transactions() {
   // 미분류 거래는 판정에 넘기지 않으므로 분류 확인이 먼저다. 다시 넣으면 서버가 분류 확인 항목을 만든다(#148)
   const [rerunNeeded, setRerunNeeded] = useState<'run' | 'classify' | null>(null);
 
+  // 달 고르기는 업로드 기간에 든 달만 보인다. 못 읽으면 열두 달을 다 보인다
+  const batchQ = useApi(
+    () => batchId ? api.uploads.get(batchId) : Promise.resolve(null),
+    [batchId]
+  );
+  const months = monthsOf(batchQ.error ? null : batchQ.data);
+
   // 보던 업로드가 없으면 묻지 않는다. batchId 없이 부르면 모든 업로드의 거래가 온다
   const listQ = useApi(
     () =>
@@ -62,7 +100,7 @@ export function Transactions() {
     api.transactions.list({
       batchId,
       status: status === 'ALL' ? undefined : status,
-      month: month === 0 ? undefined : month,
+      ...monthQuery(month),
       page,
       size: 20
     }) :
@@ -77,7 +115,7 @@ export function Transactions() {
     Promise.all(
       COUNTED.map((code) =>
       api.transactions.
-      list({ batchId, status: code, month: month === 0 ? undefined : month, size: 1 }).
+      list({ batchId, status: code, ...monthQuery(month), size: 1 }).
       then((result) => result.page.totalElements)
       )
     ) :
@@ -95,7 +133,7 @@ export function Transactions() {
     counts[COUNTED.indexOf(option.value)] :
     undefined
   }));
-  const filtered = status !== 'ALL' || month !== 0;
+  const filtered = status !== 'ALL' || month !== ALL_MONTHS;
 
   // 마지막 행을 제외하면 그 페이지가 비는데 Pagination 이 사라져 되돌아갈 수 없다
   useEffect(() => {
@@ -104,7 +142,7 @@ export function Transactions() {
 
   const resetFilters = () => {
     setStatus('ALL');
-    setMonth(0);
+    setMonth(ALL_MONTHS);
     setPage(0);
     setError(null);
   };
@@ -133,20 +171,31 @@ export function Transactions() {
     }
   };
 
-  /** 판정 대상 칸. 좁은 화면에서는 가맹점 칸 아래로 옮긴다(stacked). 그때 글자 버튼은 여백만큼 당겨 가맹점명과 줄을 맞춘다 */
-  const inclusion = (row: Transaction, stacked = false) => {
-    if (row.sourceStatus.code === 'CANCELED_OFFSET') return <Badge>{row.sourceStatus.label}</Badge>;
+  /**
+   * 판정 대상 칸. 상태는 늘 같은 배지로, 바꾸는 동작은 늘 같은 버튼으로 보인다.
+   * 취소상계는 바꿀 수 없어 버튼 자리를 비워 두고, 배지가 다른 행과 같은 줄에 서게 한다.
+   * 좁은 화면에서는 가맹점 칸 아래로 옮긴다
+   */
+  const inclusion = (row: Transaction) => {
+    const canceled = row.sourceStatus.code === 'CANCELED_OFFSET';
     const excluded = row.effectiveStatus.code === 'EXCLUDED';
     return (
-      <Button
-        variant={excluded ? 'secondary' : 'ghost'}
-        size="sm"
-        className={cn('whitespace-nowrap', stacked && !excluded && '-ml-4')}
-        disabled={busyId === row.id}
-        onClick={() => void change(row, excluded ? 'INCLUDED' : 'EXCLUDED')}>
+      <span className="inline-flex items-center gap-3">
+        <Badge>{row.effectiveStatus.label}</Badge>
+        {canceled ?
+        <span aria-hidden="true" className="w-[6.5rem]" /> :
 
-        {excluded ? '다시 포함' : '제외하기'}
-      </Button>);
+        <Button
+          variant="secondary"
+          size="sm"
+          className="w-[6.5rem] px-0"
+          disabled={busyId === row.id}
+          onClick={() => void change(row, excluded ? 'INCLUDED' : 'EXCLUDED')}>
+
+            {excluded ? '다시 넣기' : '빼기'}
+          </Button>
+        }
+      </span>);
 
   };
 
@@ -180,7 +229,7 @@ export function Transactions() {
       row.classificationStatus.code === 'CLASSIFIED' &&
       <span className="block truncate text-small text-ink2 md:hidden">{categoryLabel(row.merchantCategory)}</span>
       }
-          <span className="mt-2 block sm:hidden">{inclusion(row, true)}</span>
+          <span className="mt-2 block sm:hidden">{inclusion(row)}</span>
         </span>
 
   },
@@ -214,7 +263,7 @@ export function Transactions() {
   {
     header: '판정 대상',
     align: 'right',
-    width: 'w-40',
+    width: 'w-56',
     hideBelow: 'sm',
     cell: (row) => inclusion(row)
   }];
@@ -237,22 +286,36 @@ export function Transactions() {
           }}
           options={filters} />
 
-        <div className="w-32">
-          <Select
-            aria-label="월 선택"
-            value={String(month)}
-            onChange={(event) => {
-              setMonth(Number(event.target.value));
-              setPage(0);
-            }}>
+        {months.length <= MONTH_BUTTONS_MAX ?
+        <FilterBar
+          name="달"
+          value={month}
+          onChange={(next) => {
+            setMonth(next);
+            setPage(0);
+          }}
+          options={[{ value: ALL_MONTHS, label: '전체 기간' }, ...months]} /> :
 
-            {MONTHS.map((label, index) =>
-            <option key={label} value={index}>
-                {label}
-              </option>
+        // 달이 많으면 버튼 대신 펼침 목록이다. 모양은 위 필터 버튼과 같은 크기, 같은 글자다
+        <label className="relative inline-flex items-center">
+            <span className="sr-only">달</span>
+            <select
+            value={month}
+            onChange={(event) => {
+              setMonth(event.target.value);
+              setPage(0);
+            }}
+            className="h-9 cursor-pointer appearance-none rounded-lg border border-edge bg-canvas pl-3 pr-8 text-small font-bold text-ink transition-colors duration-150 ease-snap hover:bg-surface">
+              <option value={ALL_MONTHS}>전체 기간</option>
+              {months.map((option) =>
+            <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
             )}
-          </Select>
-        </div>
+            </select>
+            <ChevronDownIcon className="pointer-events-none absolute right-2.5 h-4 w-4 text-ink2" aria-hidden="true" />
+          </label>
+        }
       </div>
 
       {/* 아래쪽 행에서 바꾸면 안내가 화면 밖에 생겨 보이지 않으므로 머리말 아래에 붙여 둔다.
@@ -328,6 +391,7 @@ export function Transactions() {
 
           filtered ?
           <Empty
+            inTable
             icon={<SearchXIcon className="h-5 w-5" />}
             title="이 조건에 맞는 거래가 없습니다"
             action={

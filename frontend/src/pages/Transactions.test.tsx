@@ -8,13 +8,14 @@ import type { BatchStatus } from '../contexts/SessionContext';
 import type { ClassificationStatus, EffectiveStatus, Transaction } from '../types/domain';
 import { Transactions } from './Transactions';
 
-const { session, transactions } = vi.hoisted(() => ({
+const { session, transactions, uploads } = vi.hoisted(() => ({
   session: {
     batchId: null as string | null,
     batchStatus: 'ready' as BatchStatus,
     reloadBatch: vi.fn()
   },
-  transactions: { list: vi.fn(), include: vi.fn(), exclude: vi.fn() }
+  transactions: { list: vi.fn(), include: vi.fn(), exclude: vi.fn() },
+  uploads: { get: vi.fn() }
 }));
 
 vi.mock('../contexts/SessionContext', () => ({ useSession: () => session }));
@@ -22,7 +23,7 @@ vi.mock('../components/AppShell', () => ({
   AppShell: ({ children }: {children: React.ReactNode;}) => <>{children}</>
 }));
 vi.mock('../api', async () => ({
-  api: { transactions },
+  api: { transactions, uploads },
   useApi: (await import('../api/hooks')).useApi,
   ApiRequestError: (await import('../api/contract')).ApiRequestError
 }));
@@ -108,6 +109,7 @@ beforeEach(() => {
   session.reloadBatch.mockReset();
   transactions.list.mockReset();
   transactions.list.mockImplementation(serve);
+  uploads.get.mockResolvedValue({ id: 'kb', periodStart: '2026-01-01', periodEnd: '2026-02-28' });
 });
 
 afterEach(() => {
@@ -118,7 +120,7 @@ afterEach(() => {
 describe('거래', () => {
   it('탭마다 서버가 센 건수를 붙인다 (C97)', async () => {
     await render();
-    const tabs = [...container.querySelectorAll('[role="group"] button')].map((button) => button.textContent);
+    const tabs = [...container.querySelectorAll('[aria-label="판정 대상 상태"] button')].map((button) => button.textContent);
     expect(tabs).toEqual(['전체3', '판정대상2', '대상제외1', '취소상계0']);
   });
 
@@ -137,7 +139,23 @@ describe('거래', () => {
 
     await click('필터 초기화');
     expect(rowOf('스타벅스')).toBeDefined();
-    expect(container.querySelector('[aria-pressed="true"]')?.textContent).toBe('전체3');
+    expect(container.querySelector('[aria-label="판정 대상 상태"] [aria-pressed="true"]')?.textContent).toBe('전체3');
+  });
+
+  it('달은 업로드 기간에 든 달만 고르고, 고르면 그 해와 달로 묻는다', async () => {
+    await render();
+    const months = [...container.querySelectorAll('[aria-label="달"] button')].map((button) => button.textContent);
+    expect(months).toEqual(['전체 기간', '1월', '2월']);
+    await click('2월');
+    expect(transactions.list).toHaveBeenLastCalledWith(expect.objectContaining({ year: 2026, month: 2 }));
+  });
+
+  it('판정 대상 칸은 상태 배지와 같은 모양의 버튼으로 맞춘다', async () => {
+    await render();
+    expect(rowOf('스타벅스')?.textContent).toContain('판정대상');
+    expect(rowOf('스타벅스')?.textContent).toContain('빼기');
+    expect(rowOf('포인트사용')?.textContent).toContain('대상제외');
+    expect(rowOf('포인트사용')?.textContent).toContain('다시 넣기');
   });
 
   it('올린 파일이 없으면 올리기를 권하고 거래를 묻지 않는다', async () => {
