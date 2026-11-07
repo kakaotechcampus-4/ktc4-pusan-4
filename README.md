@@ -104,7 +104,7 @@
 > **프롬프트 인젝션 방어**
 > 6가지 공격 유형을 직접 시험해 막았습니다 ([보고서](docs/really-prompt-injection-report.md))
 
-<p align="center"><img src="./docs/img/readme/really.gif" width="80%" alt="Really" /></p>
+<p align="center"><img src="./docs/img/readme/really-v2.gif" width="80%" alt="Really" /></p>
 
 <br/>
 
@@ -117,10 +117,7 @@
 
 ## 아키텍처
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./docs/img/readme/architecture-v2-dark.gif" />
-  <img src="./docs/img/readme/architecture-v2.gif" alt="PreeT 시스템 아키텍처" />
-</picture>
+<p align="center"><img src="./docs/img/readme/architecture.png" alt="PreeT 시스템 아키텍처" /></p>
 
 > **판정 흐름**
 > 카드내역 → 정규화 → AI 업종 분류(판정 전 단계) → 규칙 엔진 `judge()` → 판정 + 조문 근거
