@@ -3,7 +3,8 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { MessageCircleIcon } from 'lucide-react';
 import { useSession } from '../contexts/SessionContext';
 import { ApiRequestError, isMock, mockPassword } from '../api';
-import { AUTH_FIELD_ERROR, AUTH_INPUT, AUTH_LABEL, AUTH_PRIMARY, AUTH_SECONDARY, AuthLayout } from '../components/AuthLayout';
+import { AUTH_FIELD_ERROR, AUTH_INPUT, AUTH_LABEL, AuthLayout } from '../components/AuthLayout';
+import { Button } from '../components/ui';
 import { beginKakaoLogin, kakaoAvailable } from '../auth/kakao';
 import type { SessionEndReason } from '../auth/session';
 
@@ -177,9 +178,9 @@ export function Login() {
           </p>
         }
 
-        <button type="submit" disabled={busy} className={`mt-5 ${AUTH_PRIMARY}`}>
+        <Button type="submit" disabled={busy} className="mt-5 w-full">
           {busy ? '로그인 중…' : '로그인'}
-        </button>
+        </Button>
       </form>
 
       <p className="mt-4 text-center text-[13px] text-ink2">
@@ -194,14 +195,14 @@ export function Login() {
       </p>
 
       {isMock &&
-      <button
-        type="button"
+      <Button
+        variant="secondary"
         disabled={busy}
         onClick={() => void complete('demo@expense-verdict.kr', mockPassword ?? '')}
-        className={`mt-3 ${AUTH_SECONDARY}`}>
+        className="mt-3 w-full">
 
           샘플 계정으로 둘러보기
-        </button>
+        </Button>
       }
 
       {isMock &&

@@ -4,7 +4,7 @@ import { DISCLAIMER } from '../copy';
 import { Logo } from './Logo';
 
 const PRINCIPLES = [
-'판정마다 조문의 시행 버전을 붙입니다',
+'판정마다 근거 조문과 시행일을 붙입니다',
 '근거를 못 붙이면 가능이나 불가로 저장하지 않습니다',
 '카드내역 원본은 서버로 올라가지 않습니다'];
 
@@ -64,9 +64,13 @@ export function AuthLayout({ title, children }: {title: string;children: React.R
 export const AUTH_INPUT =
 'mt-1.5 w-full rounded-xl border border-edge bg-canvas px-3.5 py-2.5 text-[14px] text-ink placeholder:text-muted aria-[invalid=true]:border-deny disabled:bg-surface disabled:text-ink2';
 export const AUTH_LABEL = 'block text-[13px] font-normal text-ink2';
+/**
+ * 로그인·가입의 버튼은 ui Button(size md, w-full)이다 (C90). 아래 둘은 아직 Button 으로 옮기지 않은
+ * 카카오 콜백 화면만 쓴다. 모양은 Button md 와 같다
+ */
 export const AUTH_PRIMARY =
-'w-full rounded-xl bg-accent px-4 py-3 text-[15px] font-bold text-white transition-colors duration-150 ease-snap hover:bg-accent-hover disabled:opacity-60';
+'inline-flex h-12 w-full items-center justify-center whitespace-nowrap rounded-full bg-accent px-6 text-body-lg font-bold text-white transition-colors duration-150 ease-snap hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40';
 export const AUTH_SECONDARY =
-'w-full rounded-xl border border-accent-line px-4 py-3 text-[14px] font-bold text-ink transition-colors duration-150 ease-snap hover:border-ink disabled:opacity-60';
+'inline-flex h-12 w-full items-center justify-center whitespace-nowrap rounded-full border border-accent-line bg-sheet px-6 text-body-lg font-bold text-ink transition-colors duration-150 ease-snap hover:border-ink disabled:cursor-not-allowed disabled:opacity-40';
 /** 칸 바로 아래의 오류 한 줄. 칸에는 aria-describedby 로 잇는다 */
 export const AUTH_FIELD_ERROR = 'mt-1.5 text-[13px] text-deny';

@@ -7,8 +7,6 @@ import {
   AUTH_FIELD_ERROR,
   AUTH_INPUT,
   AUTH_LABEL,
-  AUTH_PRIMARY,
-  AUTH_SECONDARY,
   AuthLayout } from
 '../components/AuthLayout';
 import { Button, Modal } from '../components/ui';
@@ -368,9 +366,9 @@ export function Signup() {
         <>
             {errorAt('email')}
             {errorAt(null)}
-            <button type="submit" disabled={busy} className={`mt-4 ${AUTH_PRIMARY}`}>
+            <Button type="submit" disabled={busy} className="mt-4 w-full">
               {busy ? '보내는 중…' : '인증 코드 받기'}
-            </button>
+            </Button>
           </> :
 
         <button
@@ -417,17 +415,17 @@ export function Signup() {
               목업 인증 코드는 {mockVerificationCode} 입니다.
             </p>
         }
-          <button type="submit" disabled={busy} className={`mt-4 ${AUTH_PRIMARY}`}>
+          <Button type="submit" disabled={busy} className="mt-4 w-full">
             {busy ? '확인 중…' : '코드 확인'}
-          </button>
-          <button
-          type="button"
+          </Button>
+          <Button
+          variant="secondary"
           disabled={busy || cooldown > 0}
           onClick={() => sentTo && void requestCode(sentTo)}
-          className={`mt-2 ${AUTH_SECONDARY}`}>
+          className="mt-2 w-full">
 
             {cooldown > 0 ? `코드 다시 받기 (${cooldown}초)` : '코드 다시 받기'}
-          </button>
+          </Button>
           <p className="mt-2 text-[12px] leading-6 text-ink2">메일이 오지 않으면 스팸함을 확인해 주세요.</p>
         </form>
       }
@@ -535,9 +533,9 @@ export function Signup() {
           </Modal>
 
           {errorAt(null)}
-          <button type="submit" disabled={busy} className={`mt-5 ${AUTH_PRIMARY}`}>
+          <Button type="submit" disabled={busy} className="mt-5 w-full">
             {busy ? '가입하는 중…' : '가입하기'}
-          </button>
+          </Button>
         </form>
       }
 
