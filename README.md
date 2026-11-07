@@ -67,7 +67,6 @@
 > **AI 분류 후보**
 > 규칙으로 업종을 정하지 못한 가맹점은 AI가 후보를 최대 3개 추천하고, 확정은 사용자가 합니다
 
-<!-- TODO: 스크린샷/GIF -->
 <p align="center"><img src="./docs/img/readme/upload.gif" width="80%" alt="업로드" /></p>
 
 <br/>
@@ -117,7 +116,7 @@
 
 ## 아키텍처
 
-<p align="center"><img src="./docs/img/readme/architecture.png" alt="PreeT 시스템 아키텍처" /></p>
+<p align="center"><img src="./docs/img/readme/architecture-hd.png" alt="PreeT 시스템 아키텍처" /></p>
 
 > **판정 흐름**
 > 카드내역 → 정규화 → AI 업종 분류(판정 전 단계) → 규칙 엔진 `judge()` → 판정 + 조문 근거
