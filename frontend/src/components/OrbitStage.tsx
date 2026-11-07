@@ -94,30 +94,35 @@ const INNER: Spot[] = [
 { angle: 300, radius: 34, size: 56, Icon: Statute }];
 
 
+/**
+ * scale: 그림 크기 배수. 좁은 화면은 판이 작아 그대로 두면 그림끼리 붙는다
+ * pull: 반지름 배수. 두 테가 가까우면 안팎 그림이 겹쳐 보여, 좁은 화면에서는 안쪽을 당긴다
+ */
 function Ring({
   spots,
   spin,
-  counter
+  counter,
+  scale = 1,
+  pull = 1
 
-
-
-
-}: {spots: Spot[];spin: string;counter: string;}) {
+}: {spots: Spot[];spin: string;counter: string;scale?: number;pull?: number;}) {
   return (
     <div className={`absolute inset-0 ${spin} motion-reduce:animate-none`}>
       {spots.map((spot) => {
         const rad = (spot.angle - 90) * Math.PI / 180;
+        const size = spot.size * scale;
+        const radius = spot.radius * pull;
         return (
           <span
             key={spot.angle}
             className="absolute"
             style={{
-              left: `${50 + spot.radius * Math.cos(rad)}%`,
-              top: `${50 + spot.radius * Math.sin(rad)}%`,
-              width: spot.size,
-              height: spot.size,
-              marginLeft: -spot.size / 2,
-              marginTop: -spot.size / 2
+              left: `${50 + radius * Math.cos(rad)}%`,
+              top: `${50 + radius * Math.sin(rad)}%`,
+              width: size,
+              height: size,
+              marginLeft: -size / 2,
+              marginTop: -size / 2
             }}>
 
             <span
@@ -154,13 +159,32 @@ export function OrbitStage({ intro = false, full = false }: {intro?: boolean; fu
 
   return (
     <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
-      {/* 좁은 화면에서는 테만 남긴다 — 전체화면은 아래 판을 그대로 쓴다 */}
+      {/*
+        좁은 화면용 판. 아래 lg 판과 중심·크기가 달라 따로 둔다 — 제목 아래 빈 자리에
+        들어가야 해서 오른쪽 아래로 비켜 두고, 판이 작은 만큼 그림도 줄인다.
+        전에는 여기에 테만 두고 그림을 껐는데, 인트로(full)에서는 그림이 다 나와서
+        메인으로 넘어오면 그림이 사라진 것처럼 보였다
+      */}
       <div
         className={`absolute inset-0 ${full ? 'hidden' : 'lg:hidden'} ${
         intro ? DRAW : ''}`
         }>
         <span className="absolute left-[72%] top-[62%] aspect-square w-[90%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20" />
         <span className="absolute left-[72%] top-[62%] aspect-square w-[58%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20" />
+      </div>
+      <div
+        className={`absolute left-[60%] top-[63%] aspect-square w-[46%] -translate-x-1/2 -translate-y-1/2 ${
+        full ? 'hidden' : 'lg:hidden'} ${
+        intro ? SPREAD : ''}`
+        }>
+        <Ring spots={OUTER} spin="animate-orbit" counter="animate-orbit-back" scale={0.5} />
+        <Ring
+          spots={INNER}
+          spin="animate-orbit-slow"
+          counter="animate-orbit-slow-back"
+          scale={0.5}
+          pull={0.6} />
+
       </div>
       {/*
         궤도는 정사각 판 안에서만 돈다. 가로·세로 %를 따로 쓰면 원이 아니라
