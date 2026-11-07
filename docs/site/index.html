@@ -44,8 +44,15 @@
   .crumb a:hover { color:var(--blue); }
   /* 왼쪽 페이지 목록 */
   .side { position:sticky; top:96px; align-self:start; max-height:calc(100vh - 120px); overflow-y:auto; font-size:14px; }
-  .side-g { margin-bottom:20px; }
-  .side-g p { margin:0 0 6px 10px; font-size:12px; font-weight:700; color:var(--muted); }
+  .side-g { margin-bottom:12px; }
+  .side-h { display:flex; align-items:center; justify-content:space-between; width:100%; margin:0 0 4px; padding:6px 10px; border:0; border-radius:10px; background:none; font:inherit; font-size:12px; font-weight:700; color:var(--muted); cursor:pointer; text-align:left; }
+  .side-h:hover { background:var(--surface); color:var(--text); }
+  .side-h i { font-style:normal; transition:transform .25s cubic-bezier(.23,1,.32,1); }
+  .side-g:not(.open) .side-h i { transform:rotate(-90deg); }
+  .side-l { display:grid; grid-template-rows:0fr; transition:grid-template-rows .25s cubic-bezier(.23,1,.32,1); }
+  .side-g.open .side-l { grid-template-rows:1fr; }
+  .side-l > div { overflow:hidden; }
+  @media (prefers-reduced-motion:reduce) { .side-l, .side-h i { transition:none; } }
   .side a { display:block; padding:7px 10px; border-radius:10px; color:var(--ink2); text-decoration:none; transition:background-color .15s; }
   .side a:hover { background:var(--surface); color:var(--text); }
   .side a.on { background:var(--blue-l); color:var(--blue-d); font-weight:700; }
@@ -846,8 +853,11 @@ function home() {
 function doc(i) {
   const d = flat[i], prev = flat[i - 1], next = flat[i + 1];
   // 왼쪽 목록: 그룹마다 페이지를 나열하고 지금 페이지를 표시
-  const side = DOCS.map(([g]) => `<div class="side-g"><p>${g}</p>${
-    flat.filter(x => x.g === g).map(x => `<a href="#${x.id}" class="${x.id === d.id ? 'on' : ''}">${x.t}</a>`).join('')}</div>`).join('');
+  // 그룹은 접을 수 있다. 지금 페이지의 그룹은 항상 펼친다
+  const side = DOCS.map(([g]) => `<div class="side-g${g === d.g || !sideClosed.has(g) ? ' open' : ''}" data-g="${g}">
+    <button type="button" class="side-h" aria-expanded="${g === d.g || !sideClosed.has(g)}">${g}<i aria-hidden="true">▾</i></button>
+    <div class="side-l"><div>${flat.filter(x => x.g === g).map(x => `<a href="#${x.id}" class="${x.id === d.id ? 'on' : ''}">${x.t}</a>`).join('')}</div></div></div>`).join('');
+  sideClosed.delete(d.g);
   view.innerHTML = `<div class="page"><nav class="side">${side}</nav><article>
       <div class="crumb"><a href="#">홈</a> / ${d.g}</div>
       <h1>${d.t}</h1>
@@ -866,6 +876,18 @@ function doc(i) {
     return [h, a];
   });
 }
+
+// 왼쪽 목록에서 접어 둔 그룹 (이 브라우저에만 기억)
+const sideClosed = new Set((() => { try { return JSON.parse(localStorage.getItem('side-closed') || '[]'); } catch { return []; } })());
+document.addEventListener('click', e => {
+  const h = e.target.closest('.side-h');
+  if (!h) return;
+  const box = h.parentElement, g = box.dataset.g, open = !box.classList.contains('open');
+  box.classList.toggle('open', open);
+  h.setAttribute('aria-expanded', open);
+  open ? sideClosed.delete(g) : sideClosed.add(g);
+  try { localStorage.setItem('side-closed', JSON.stringify([...sideClosed])); } catch {}
+});
 
 // 목차에서 지금 읽고 있는 항목 표시: 화면 위쪽을 지난 마지막 제목, 맨 아래면 마지막 항목
 let spy = [];
