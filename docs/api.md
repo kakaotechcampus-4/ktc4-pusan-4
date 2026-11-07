@@ -750,6 +750,28 @@ G6
 `email` 은 카카오 계정이면 `null` 이다.
 `role` 은 `USER` 또는 `ADMIN` 이다. `ADMIN` 이면 관리자 API(3.15)를 쓸 수 있다.
 
+### `PUT /api/v1/users/me/password`
+
+```
+{
+  "currentPassword": "...",
+  "newPassword": "..."
+}
+```
+
+현재 비밀번호를 확인하고 바꾼 뒤, 지금 기기를 포함한 모든 로그인(리프레시 토큰)을 끊는다. 화면은 `POST /auth/logout`으로 쿠키를 지우고 로그인으로 보낸다. 이미 받은 액세스 토큰은 만료(15분)까지 남는다.
+
+`newPassword` 규칙은 가입과 같다(1.1 `password`).
+
+응답:
+
+```
+204
+400 INVALID_CURRENT_PASSWORD   현재 비밀번호가 맞지 않음
+400 VALIDATION_ERROR           새 비밀번호가 규칙에 맞지 않음. message 에 이유가 있다
+409 PASSWORD_NOT_SET           비밀번호가 없는 계정(카카오 가입)
+```
+
 ### `DELETE /api/v1/users/me`
 
 그 사용자의 모든 로그인(리프레시 토큰)을 끊고 지운다. 이미 받은 액세스 토큰은 만료(15분)까지 남는다.

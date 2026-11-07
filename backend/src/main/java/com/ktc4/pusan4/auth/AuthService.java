@@ -53,6 +53,22 @@ public class AuthService {
         return issue(userId);
     }
 
+    /**
+     * 현재 비밀번호를 확인하고 새 비밀번호로 바꾼 뒤 모든 기기의 로그인을 끊는다(지금 기기도 다시 로그인한다).
+     * 로그인을 먼저 끊는다. 탈퇴와 같은 이유로, Redis 가 실패하면 비밀번호도 바꾸지 않아 옛 로그인이 남지 않는다.
+     */
+    public void changePassword(UUID userId, String currentPassword, String newPassword) {
+        String hash = users.findPasswordHash(userId).orElseThrow(() -> new ApiException(HttpStatus.CONFLICT,
+            "PASSWORD_NOT_SET", "비밀번호로 로그인하는 계정이 아닙니다."));
+        // 72바이트를 넘는 값은 BCrypt 가 비교하지 못하고, 그런 비밀번호로 가입할 수도 없었다
+        if (!Passwords.fitsBcrypt(currentPassword) || !passwordEncoder.matches(currentPassword, hash)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_CURRENT_PASSWORD", "현재 비밀번호가 맞지 않습니다.");
+        }
+        Passwords.requireValid(newPassword);
+        refreshTokens.revokeAll(userId);
+        users.changePasswordHash(userId, passwordEncoder.encode(newPassword));
+    }
+
     public IssuedTokens login(String email, String password) {
         return credentials.verify(email, password)
             .map(this::issue)

@@ -81,6 +81,20 @@ public class UserService {
         return userRepository.findByEmail(Emails.normalize(email)).flatMap(AppUserEntity::emailCredential);
     }
 
+    /** 비밀번호 변경용. 비밀번호가 없는 계정(카카오 가입, 예전 고정 사용자)이면 empty 다. */
+    @Transactional(readOnly = true)
+    public Optional<String> findPasswordHash(UUID userId) {
+        return userRepository.findById(userId).flatMap(AppUserEntity::emailCredential).map(EmailCredential::passwordHash);
+    }
+
+    /** @param passwordHash BCrypt 해시. 원문을 넘기지 않는다 */
+    @Transactional
+    public void changePasswordHash(UUID userId, String passwordHash) {
+        if (userRepository.updatePasswordHash(userId, passwordHash) == 0) {
+            throw userNotFound();
+        }
+    }
+
     static ApiException userNotFound() {
         return new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "사용자를 찾을 수 없습니다.");
     }

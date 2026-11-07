@@ -2,6 +2,7 @@ package com.ktc4.pusan4.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ktc4.pusan4.auth.RecordingVerificationMailSender;
+import com.ktc4.pusan4.auth.AccessTokens;
 import com.ktc4.pusan4.auth.TestUser;
 import com.ktc4.pusan4.user.persistence.UserService;
 import jakarta.servlet.http.Cookie;
@@ -23,12 +24,14 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -62,6 +65,9 @@ class AuthIntegrationTest {
 
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private AccessTokens accessTokens;
 
     private MockMvc mockMvc;
 
@@ -344,6 +350,65 @@ class AuthIntegrationTest {
     }
 
     @Test
+    void changing_password_logs_out_everywhere_and_only_new_password_works() throws Exception {
+        // given: 두 기기에서 로그인했다
+        MvcResult first = signup("changer@example.com", "old-password1");
+        MvcResult second = login(loginBody("changer@example.com", "old-password1"));
+
+        // when
+        changePassword(accessToken(first), "old-password1", "new-password2!")
+            .andExpect(status().isNoContent());
+
+        // then: 두 기기 모두 재발급이 안 되고, 새 비밀번호로만 들어온다
+        for (MvcResult device : List.of(first, second)) {
+            mockMvc.perform(post("/api/v1/auth/refresh").cookie(refreshCookie(device)))
+                .andExpect(status().isUnauthorized());
+        }
+        assertThat(login(loginBody("changer@example.com", "old-password1")).getResponse().getStatus()).isEqualTo(401);
+        assertThat(login(loginBody("changer@example.com", "new-password2!")).getResponse().getStatus()).isEqualTo(200);
+    }
+
+    @Test
+    void changing_password_with_wrong_current_password_keeps_it() throws Exception {
+        MvcResult signedUp = signup("wrong-current@example.com", "old-password1");
+
+        changePassword(accessToken(signedUp), "not-my-password1", "new-password2!")
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("INVALID_CURRENT_PASSWORD"));
+
+        // 로그인은 끊기지 않는다
+        mockMvc.perform(post("/api/v1/auth/refresh").cookie(refreshCookie(signedUp)))
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    void changing_to_weak_password_is_rejected_with_reason() throws Exception {
+        MvcResult signedUp = signup("weak-new@example.com", "old-password1");
+
+        changePassword(accessToken(signedUp), "old-password1", "onlyletters")
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("영문, 숫자, 기호")));
+
+        assertThat(login(loginBody("weak-new@example.com", "old-password1")).getResponse().getStatus()).isEqualTo(200);
+    }
+
+    @Test
+    void account_without_password_cannot_change_it() throws Exception {
+        // 비밀번호가 없는 계정(카카오로 가입, 예전 고정 사용자)이다
+        changePassword(accessTokens.issue(TestUser.ID), "anything-1!", "new-password2!")
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("PASSWORD_NOT_SET"));
+    }
+
+    @Test
+    void changing_password_requires_login() throws Exception {
+        mockMvc.perform(put("/api/v1/users/me/password").contentType(MediaType.APPLICATION_JSON)
+                .content(passwordChangeBody("old-password1", "new-password2!")))
+            .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void health_stays_public() throws Exception {
         mockMvc.perform(get("/actuator/health")).andExpect(status().isOk());
     }
@@ -384,6 +449,23 @@ class AuthIntegrationTest {
         throws Exception {
         return mockMvc.perform(post("/api/v1/auth/email-verification/confirm").contentType(MediaType.APPLICATION_JSON)
             .content(objectMapper.writeValueAsString(Map.of("email", email, "code", code))));
+    }
+
+    private ResultActions changePassword(String accessToken, String currentPassword, String newPassword)
+        throws Exception {
+        return mockMvc.perform(put("/api/v1/users/me/password")
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(passwordChangeBody(currentPassword, newPassword)));
+    }
+
+    private String passwordChangeBody(String currentPassword, String newPassword) throws Exception {
+        return objectMapper.writeValueAsString(
+            Map.of("currentPassword", currentPassword, "newPassword", newPassword));
+    }
+
+    private String loginBody(String email, String password) throws Exception {
+        return objectMapper.writeValueAsString(Map.of("email", email, "password", password));
     }
 
     private MvcResult login(String body) throws Exception {
