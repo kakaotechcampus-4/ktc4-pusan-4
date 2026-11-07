@@ -1,3 +1,4 @@
+import { merchantTitle } from '../components/results/display';
 import type { Judgment, JudgmentExportRow, LimitYear } from '../types/domain';
 import { formatWon } from './format';
 import { limitsOf } from './limit';
@@ -30,7 +31,8 @@ const HEADER = [
 
 
 /**
- * 근거 조문 칸 (C42). 내보내기는 statuteId 만 주므로 법령 이름도 id 에서 읽는다(소득세법시행령 → 소득세법 시행령).
+ * 근거 조문 칸 (C42). 내보내기의 Citation 은 statuteVersionId 와 statuteId 뿐이고 제목이 없다(docs/api.md).
+ * 행마다 조문을 따로 읽지 않고 법령 이름도 id 에서 읽는다(소득세법시행령 → 소득세법 시행령).
  * 조를 읽지 못하는 id(심판례 등)는 그대로 둔다
  */
 const citationTitle = (statuteId: string) => {
@@ -60,7 +62,8 @@ export function judgmentsCsv(rows: JudgmentExportRow[], limits: LimitYear[]): st
   const body = ordered.map(({ judgment, allowedAmount, answers }) => [
   // 스프레드시트가 날짜로 읽도록 ISO 날짜로 쓴다
   judgment.transaction.approvedAt.slice(0, 10),
-  judgment.transaction.merchantNorm,
+  // 화면과 같은 이름이다. 붙여 쓴 정규화 이름은 사람이 읽을 이름이 아니고, 가린 의료기관은 가린 채로 쓴다 (Q7, C32)
+  merchantTitle(judgment.transaction),
   judgment.transaction.merchantRaw,
   judgment.transaction.merchantCategory,
   judgment.transaction.amount,

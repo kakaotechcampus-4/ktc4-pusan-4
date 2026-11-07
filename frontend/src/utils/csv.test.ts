@@ -43,7 +43,26 @@ describe('judgmentsCsv', () => {
       '\uFEFF승인일,가맹점,원래 가맹점명,카테고리,금액,할부 개월,판정,계정과목,경비 가능 금액,직접 수정,세무사에게 넘김,근거 조문,사용 목적 등 답한 내용'
     );
     // 경비 가능 금액은 finalAmount 가 아니라 한도까지 반영한 allowedAmount 다
-    expect(text.split('\r\n')[1]).toBe('2026-01-31,가게,가게 본점,식비,1000,0,가능,소모품비,800,,,소득세법 제27조 제1항,용도는? → 업무미팅');
+    expect(text.split('\r\n')[1]).toBe('2026-01-31,가게 본점,가게 본점,식비,1000,0,가능,소모품비,800,,,소득세법 제27조 제1항,용도는? → 업무미팅');
+  });
+
+  it('가맹점은 카드에 찍힌 이름으로 쓰고, 가린 의료기관은 가린 채로 쓴다', async () => {
+    const { judgmentsCsv } = await import('./csv');
+    const row = (merchantRaw: string, merchantNorm: string) => ({
+      judgment: {
+        transaction: { approvedAt: '2026-01-31', merchantNorm, merchantRaw, merchantCategory: '', amount: 1, installmentMonths: 0 },
+        verdict: { code: 'AVAILABLE', label: '가능' },
+        finalAmount: 1,
+        origin: { type: 'RUN', id: 'r' },
+        outOfScope: false,
+        citations: []
+      } as unknown as import('../types/domain').Judgment,
+      allowedAmount: 1,
+      answers: []
+    });
+    const [, figma, medical] = judgmentsCsv([row('FIGMA.COM', 'FIGMACOM'), row('의료_마스킹_01', '의료_마스킹_01')], []).split('\r\n');
+    expect(figma.split(',')[1]).toBe('FIGMA.COM');
+    expect(medical.split(',')[1]).toBe('의료기관 (이름 가림)');
   });
 
   it('근거 조문은 조·항·호를 붙인 제목으로 쓰고, 조를 읽지 못하는 id 는 그대로 둔다', async () => {
