@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { InboxIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
-import { Badge, Button, Empty, FilterBar, Modal, Pagination, SectionHeading } from '../components/ui';
+import { Badge, Button, Empty, FilterBar, Modal, Pagination } from '../components/ui';
 import type { BadgeTone } from '../components/ui';
 import { useSession } from '../contexts/SessionContext';
 import { api, ApiRequestError, useApi } from '../api';
@@ -97,10 +97,14 @@ export function Admin() {
   return (
     <AppShell showSteps={false}>
       <div className="mx-auto max-w-3xl">
-        <SectionHeading
-          eyebrow="관리자"
-          title="규칙 후보"
-          description="여러 사용자에게서 판정할 규칙이 없던 카테고리·업종입니다. 초안과 근거를 보고 승인하거나 기각합니다. 처리하면 검토한 사람과 시각이 남습니다." />
+        <header>
+          <p className="text-small font-bold text-accent">관리자</p>
+          <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">규칙 후보</h1>
+          <p className="mt-2 text-body leading-6 text-ink2">
+            여러 사용자에게서 판정할 규칙이 없던 카테고리·업종입니다. 초안과 근거를 보고 승인하거나
+            기각합니다. 처리하면 검토한 사람과 시각이 남습니다.
+          </p>
+        </header>
 
         <FilterBar
           className="mt-6"

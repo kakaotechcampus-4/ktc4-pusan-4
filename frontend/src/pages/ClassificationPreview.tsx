@@ -16,7 +16,7 @@ import { formatFullDate, formatNumber, formatWon } from '../utils/format';
  */
 export function ClassificationPreview() {
   const navigate = useNavigate();
-  const { batchId } = useSession();
+  const { batchId, context } = useSession();
   const [resolving, setResolving] = useState<Record<string, true>>({});
 
   const groupsQ = useApi(
@@ -160,7 +160,7 @@ export function ClassificationPreview() {
           className="mt-8"
           icon={<UploadIcon className="h-5 w-5" />}
           title="아직 올린 카드내역이 없습니다"
-          description="국민·기업카드 이용내역을 올리면 분류 결과를 여기서 확인합니다."
+          description="KB국민카드·IBK기업은행 카드의 승인내역을 올리면 분류 결과를 여기서 확인합니다."
           action={
           <Button to="/upload" size="md">
                 카드내역 올리기
@@ -222,10 +222,14 @@ export function ClassificationPreview() {
             tone="ok"
             icon={<CheckIcon className="h-5 w-5" strokeWidth={2.5} />}
             title="확인할 가맹점이 없습니다"
-            description="모든 거래에 업종이 붙었습니다. 이제 사업자 문진을 마치면 판정을 시작할 수 있습니다."
+            description={
+            context ?
+            '모든 거래에 업종이 붙었습니다. 이제 판정을 시작할 수 있습니다.' :
+            '모든 거래에 업종이 붙었습니다. 이제 사업자 문진을 마치면 판정을 시작할 수 있습니다.'
+            }
             action={
-            <Button to="/interview" size="md">
-                  사업자 문진으로
+            <Button to={context ? '/confirm' : '/interview'} size="md">
+                  {context ? '판정 전 확인으로' : '사업자 문진으로'}
                   <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
                 </Button>
             } /> :
@@ -373,12 +377,12 @@ export function ClassificationPreview() {
               <Button
               variant="ghost"
               size="inline"
-              onClick={() => navigate('/interview')}>
+              onClick={() => navigate(context ? '/confirm' : '/interview')}>
 
-                건너뛰고 문진으로
+                {context ? '건너뛰고 판정으로' : '건너뛰고 문진으로'}
               </Button>
               <Button variant="secondary" size="md" to="/upload">
-                업로드 다시
+                카드내역 다시 올리기
               </Button>
             </div>
           </div>

@@ -101,7 +101,6 @@ export function StatuteCitation({
           시행 {statute.effectiveFrom}
           {statute.effectiveTo ? ` – ${statute.effectiveTo}` : ' – 현행'}
         </span>
-        <span>버전 #{statute.statuteVersionId}</span>
         <a
           href={statute.sourceUrl}
           target="_blank"

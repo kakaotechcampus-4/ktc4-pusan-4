@@ -94,30 +94,44 @@ const INNER: Spot[] = [
 { angle: 300, radius: 34, size: 56, Icon: Statute }];
 
 
+/**
+ * 좁은 화면용. 테 하나에 다섯을 고르게 올린다 — 판이 작으면 안팎 테의 반지름 차이가
+ * 17px 밖에 안 되어 그림끼리 겹쳐 보인다. 크기 순서는 바깥 테를 따른다
+ */
+const NARROW: Spot[] = [
+{ angle: 0, radius: 44, size: 76, Icon: Store },
+{ angle: 72, radius: 44, size: 72, Icon: Bubble },
+{ angle: 144, radius: 44, size: 66, Icon: Receipt },
+{ angle: 216, radius: 44, size: 62, Icon: Card },
+{ angle: 288, radius: 44, size: 56, Icon: Statute }];
+
+
+/** scale: 그림 크기 배수. 좁은 화면은 판이 작아 그대로 두면 그림끼리 붙는다 */
 function Ring({
   spots,
   spin,
-  counter
+  counter,
+  scale = 1
 
 
-
-
-}: {spots: Spot[];spin: string;counter: string;}) {
+}: {spots: Spot[];spin: string;counter: string;scale?: number;}) {
   return (
     <div className={`absolute inset-0 ${spin} motion-reduce:animate-none`}>
       {spots.map((spot) => {
         const rad = (spot.angle - 90) * Math.PI / 180;
+        const size = spot.size * scale;
+        const radius = spot.radius;
         return (
           <span
             key={spot.angle}
             className="absolute"
             style={{
-              left: `${50 + spot.radius * Math.cos(rad)}%`,
-              top: `${50 + spot.radius * Math.sin(rad)}%`,
-              width: spot.size,
-              height: spot.size,
-              marginLeft: -spot.size / 2,
-              marginTop: -spot.size / 2
+              left: `${50 + radius * Math.cos(rad)}%`,
+              top: `${50 + radius * Math.sin(rad)}%`,
+              width: size,
+              height: size,
+              marginLeft: -size / 2,
+              marginTop: -size / 2
             }}>
 
             <span
@@ -154,13 +168,27 @@ export function OrbitStage({ intro = false, full = false }: {intro?: boolean; fu
 
   return (
     <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
-      {/* 좁은 화면에서는 테만 남긴다 — 전체화면은 아래 판을 그대로 쓴다 */}
+      {/*
+        좁은 화면용 판. 아래 lg 판과 중심·크기가 달라 따로 둔다. 전에는 여기에 테만 두고
+        그림을 껐는데, 인트로(full)에서는 그림이 다 나와서 메인으로 넘어오면 그림이
+        사라진 것처럼 보였다.
+
+        판 크기는 제목 아랫줄과 「무료로 판정해보기」 사이(170px)에 맞춘 것이다 —
+        더 키우면 그림이 글자나 버튼에 걸린다. 바깥 테를 그림이 도는 자리에 바로 두어,
+        그림이 테에 올라타 보이게 한다. 안쪽 테는 그림 없이 깊이만 준다
+      */}
       <div
-        className={`absolute inset-0 ${full ? 'hidden' : 'lg:hidden'} ${
-        intro ? DRAW : ''}`
+        className={`absolute left-[60%] top-[53%] aspect-square w-[37%] -translate-x-1/2 -translate-y-1/2 ${
+        full ? 'hidden' : 'lg:hidden'}`
         }>
-        <span className="absolute left-[72%] top-[62%] aspect-square w-[90%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20" />
-        <span className="absolute left-[72%] top-[62%] aspect-square w-[58%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20" />
+        <div className={`absolute inset-0 ${intro ? DRAW : ''}`}>
+          <span className="absolute left-1/2 top-1/2 aspect-square w-[88%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20" />
+          <span className="absolute left-1/2 top-1/2 aspect-square w-[44%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20" />
+        </div>
+
+        <div className={`absolute inset-0 ${intro ? SPREAD : ''}`}>
+          <Ring spots={NARROW} spin="animate-orbit" counter="animate-orbit-back" scale={0.5} />
+        </div>
       </div>
       {/*
         궤도는 정사각 판 안에서만 돈다. 가로·세로 %를 따로 쓰면 원이 아니라

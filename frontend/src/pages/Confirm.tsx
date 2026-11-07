@@ -5,7 +5,7 @@ import { AppShell } from '../components/AppShell';
 import { StepEyebrow } from '../components/StepEyebrow';
 import { useSession } from '../contexts/SessionContext';
 import { api, ApiRequestError, useApi } from '../api';
-import { formatNumber, formatPeriod } from '../utils/format';
+import { formatNumber, formatPeriod, issuerLabel } from '../utils/format';
 import { contextRows, isJudgedIndustry } from '../utils/context';
 
 export function Confirm() {
@@ -60,7 +60,7 @@ export function Confirm() {
   // 올린 내역이 없으면 비워 둔다. 없는 파일 이름과 건수를 지어내지 않는다
   const batchRows = batch ?
   [
-  { term: '카드사', value: `${batch.cardIssuer}카드 · ${batch.sourceType}` },
+  { term: '카드사', value: `${issuerLabel(batch.cardIssuer)} · ${batch.sourceType}` },
   {
     term: '거래',
     value: `${formatNumber(batch.transactionCount)}건${
@@ -146,7 +146,7 @@ export function Confirm() {
               to="/interview"
               className="text-small font-bold text-accent transition-colors duration-150 hover:text-accent-hover">
               
-              문진 수정하기
+              문진 고치기
             </Link>
           </div>
         </section>

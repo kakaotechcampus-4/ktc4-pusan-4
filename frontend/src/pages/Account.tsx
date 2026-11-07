@@ -5,7 +5,7 @@ import { AppShell } from '../components/AppShell';
 import { BugReportButton } from '../components/BugReport';
 import { api, ApiRequestError, useApi } from '../api';
 import { useSession } from '../contexts/SessionContext';
-import { Button, Card, Modal, SectionHeading } from '../components/ui';
+import { Button, Card, Modal } from '../components/ui';
 import { formatFullDate, formatNumber, toKst } from '../utils/format';
 import { accountLabel } from '../utils/account';
 import { contextRows } from '../utils/context';
@@ -62,10 +62,13 @@ export function Account() {
     // 고지 막대를 내린다. 여기엔 세무대리로 오인할 판정 내용이 없다 (#242 리뷰)
     <AppShell disclaimer={false}>
       <div className="mx-auto max-w-2xl">
-        <SectionHeading
-          eyebrow="설정"
-          title="내 정보"
-          description="계정과 사업자 문진을 확인하고, 탈퇴할 수 있습니다." />
+        <header>
+          <p className="text-small font-bold text-accent">설정</p>
+          <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">내 정보</h1>
+          <p className="mt-2 text-body leading-6 text-ink2">
+            계정과 사업자 문진을 확인하고, 탈퇴할 수 있습니다.
+          </p>
+        </header>
 
         <section className={`mt-6 ${SECTION}`}>
           <div className={SECTION_TITLE}>

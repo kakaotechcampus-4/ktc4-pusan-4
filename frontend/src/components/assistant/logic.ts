@@ -126,14 +126,14 @@ export const chatErrorText = (caught: unknown): string => {
     // 0 초는 「0초 뒤」로 읽혀 기다릴 것이 없는 것처럼 보인다. 기다릴 시간을 모를 때와 같게 적는다
     return seconds !== undefined && seconds > 0 ?
     `${formatNumber(seconds)}초 뒤에 다시 물어봐 주세요.` :
-    '지금은 더 받을 수 없습니다. 잠시 뒤 다시 물어봐 주세요.';
+    '지금은 더 받을 수 없습니다. 잠시 후 다시 물어봐 주세요.';
   }
   if (code === 'BATCH_NOT_FOUND')
   return '보던 업로드를 찾을 수 없습니다. 지워졌을 수 있어 업로드 없이 다시 물어봅니다. 다시 보내 주세요.';
   if (code === 'TRANSACTION_NOT_FOUND') return '보던 거래를 찾을 수 없습니다. 거래를 빼고 다시 물어봅니다. 다시 보내 주세요.';
   if (status === 400) return '보낸 내용을 받지 못했습니다. 질문을 짧게 다시 적어 주세요.';
-  if (status === 0) return '서버에 연결하지 못했습니다. 잠시 뒤 다시 물어봐 주세요.';
-  return '지금은 답하지 못했습니다. 잠시 뒤 다시 물어봐 주세요. 화면 안내는 그대로 쓸 수 있습니다.';
+  if (status === 0) return '서버에 연결하지 못했습니다. 잠시 후 다시 물어봐 주세요.';
+  return '지금은 답하지 못했습니다. 잠시 후 다시 물어봐 주세요. 화면 안내는 그대로 쓸 수 있습니다.';
 };
 
 export const applyErrorText = (caught: unknown): string =>
@@ -141,7 +141,7 @@ caught instanceof ApiRequestError && caught.status === 409 ?
 '그사이 바뀌어 적용하지 못했습니다. 화면을 다시 불러왔습니다.' :
 caught instanceof ApiRequestError && (caught.status === 400 || caught.status === 422) ?
 '지금 상태에서는 적용할 수 없습니다. 화면에서 직접 확인해 주세요.' :
-'적용하지 못했습니다. 잠시 뒤 다시 눌러 주세요.';
+'적용하지 못했습니다. 잠시 후 다시 눌러 주세요.';
 
 /** 질문 카드에 붙이는 지난번 답 (명세 3.1) */
 export type PreviousAnswer =

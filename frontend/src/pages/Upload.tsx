@@ -19,12 +19,11 @@ import type {
   ParsedOutcome,
   ParsedRow,
   SampleFile,
-  SourceCard,
   UnsendableCode,
   UnsendableRow } from
 '../parser';
 import type { UploadBatchCreated } from '../types/domain';
-import { formatNumber, formatPeriod, formatWon } from '../utils/format';
+import { formatNumber, formatPeriod, formatWon, issuerLabel } from '../utils/format';
 import {
   APPROVAL_EXPORT_STEPS,
   ASSISTANT_DESTINATION,
@@ -41,8 +40,6 @@ const PICK_ERROR = {
   empty: '빈 파일입니다. 카드사에서 다시 내려받아 주세요.',
   unreadable: '파일을 읽지 못했습니다. 손상됐을 수 있으니 카드사에서 다시 내려받아 주세요.'
 };
-
-const ISSUER: Record<SourceCard, string> = { kb: 'KB국민', ibk: 'IBK기업' };
 
 /** 파서의 판별 근거(Python 문구)는 대조용이라 화면에는 코드별 문구를 쓴다 */
 const BLOCKED_REASON: Record<BlockedCode, string> = {
@@ -311,7 +308,7 @@ function DropZone({ onFiles }: {onFiles: (files: ArrayLike<File>) => void;}) {
       <p className="mt-3 text-body-lg font-bold text-ink">
         승인내역 파일을 여기에 끌어다 놓으세요
       </p>
-      <p className="mt-1 text-small text-muted">KB국민 · IBK기업 승인내역 .xls · 최대 5MB</p>
+      <p className="mt-1 text-small text-muted">KB국민카드 · IBK기업은행 카드 승인내역 .xls · 최대 5MB</p>
       <Button className="mt-5" onClick={() => input.current?.click()}>
         파일 선택
       </Button>
@@ -421,8 +418,8 @@ function BlockedCard({
           </h2>
           <p className="mt-2 max-w-xl text-small text-ink2">
             {billing ?
-            '청구내역은 할부가 회차별로 쪼개져 있어, 350만원 자산 1건이 29만원 12건으로 보입니다. 이대로 판정하면 자산 판정을 빠져나가 실제 불가를 가능으로 내보낼 수 있어 업로드를 막았습니다.' :
-            'KB국민카드 · IBK기업은행 승인내역 .xls 파일만 읽을 수 있습니다. 카드사에서 내려받은 파일을 고치지 말고 그대로 올려 주세요.'}
+            '청구내역은 할부가 회차별로 쪼개져 있어, 350만 원 자산 1건이 29만 원 12건으로 보입니다. 이대로 판정하면 자산 판정을 빠져나가 실제 불가를 가능으로 내보낼 수 있어 업로드를 막았습니다.' :
+            'KB국민카드 · IBK기업은행 카드 승인내역 .xls 파일만 읽을 수 있습니다. 카드사에서 내려받은 파일을 고치지 말고 그대로 올려 주세요.'}
           </p>
           <p className="mt-2 text-small text-ink2">판별 근거: {BLOCKED_REASON[outcome.code]}</p>
           {billing &&
@@ -517,7 +514,7 @@ function PreviewCard({
     <section className="animate-rise rounded-2xl border border-line bg-surface p-6">
       <p className="break-all text-caption text-muted">{file.name}</p>
       <h2 className="mt-0.5 text-h4 font-bold text-ink">
-        {ISSUER[outcome.issuer]} 승인내역
+        {issuerLabel(outcome.issuer)} 승인내역
         {request && ` · ${formatPeriod(request.periodStart, request.periodEnd)}`}
       </h2>
 
@@ -619,6 +616,7 @@ function ReadyCard({
 
 }: {outcome: ParsedOutcome;created: UploadBatchCreated;onReset: () => void;}) {
   const { request } = outcome;
+  const { context } = useSession();
 
   if (created.transactionCount === 0) {
     return (
@@ -646,7 +644,7 @@ function ReadyCard({
       </h2>
       {request &&
       <p className="mt-1 text-small text-muted">
-          {ISSUER[outcome.issuer]} 승인내역 · {formatPeriod(request.periodStart, request.periodEnd)}
+          {issuerLabel(outcome.issuer)} 승인내역 · {formatPeriod(request.periodStart, request.periodEnd)}
         </p>
       }
       {(created.skippedDuplicateCount > 0 || pending > 0) &&
@@ -661,9 +659,9 @@ function ReadyCard({
         </ul>
       }
       <div className="mt-6 flex flex-wrap items-center gap-3">
-        {/* 미분류 거래는 판정되지 않으므로 분류 확인이 먼저다 */}
-        <Button to={pending > 0 ? '/preview' : '/interview'}>
-          {pending > 0 ? '다음: 분류 확인' : '다음: 사업자 문진'}
+        {/* 미분류 거래는 판정되지 않으므로 분류 확인이 먼저다. 문진은 한 번 하면 다시 하지 않는다 */}
+        <Button to={pending > 0 ? '/preview' : context ? '/confirm' : '/interview'}>
+          {pending > 0 ? '다음: 분류 확인' : context ? '다음: 판정 전 확인' : '다음: 사업자 문진'}
           <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
         </Button>
         <Button variant="secondary" onClick={onReset}>
@@ -703,7 +701,7 @@ function DataBoundary() {
         <div className="h-px bg-line2" />
         <div>
           {/* QR-7. 비서 도구가 모델에 넘기는 필드에서 뽑았다. 목록은 AI 쪽이 확정한다(agent-secretary.md 10장) */}
-          <p className="font-bold text-ink">비서 Really 에게 물을 때 외부 모델로 보내는 것</p>
+          <p className="font-bold text-ink">비서 Really에게 물을 때 외부 모델로 보내는 것</p>
           <p className="mt-0.5 text-muted">{ASSISTANT_SENDS}</p>
           <p className="mt-1.5 text-caption text-muted">{ASSISTANT_DOES_NOT_SEND} 묻지 않으면 보내지 않습니다.</p>
           <p className="mt-1.5 text-caption text-muted">

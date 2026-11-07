@@ -214,7 +214,7 @@ export function Questions() {
         </p>
       </div>
       <Button to="/results" variant="secondary" size="sm">
-        결과로 돌아가기
+        판정 결과 보기
       </Button>
     </header>;
 

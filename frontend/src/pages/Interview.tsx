@@ -138,7 +138,7 @@ export function Interview() {
   home === 'no' ?
   '자택에서 일하지 않아 월세·관리비·공과금을 나누어 보지 않습니다.' :
   home === 'yes' && ratioValid ?
-  `작업 공간이 따로 나뉜 자택의 월세·관리비·공과금은 ${ratio}%만 경비로 봅니다. 나뉘지 않으면 세무사 확인으로 넘깁니다.` :
+  `작업 공간이 따로 나뉜 자택의 월세·관리비·공과금은 ${ratio}%만 경비로 봅니다. 나뉘지 않으면 세무대리인 확인으로 넘깁니다.` :
   '작업 공간 면적 비율을 적으면 자택의 월세·관리비·공과금을 그 비율만큼 경비로 봅니다.'];
 
 
@@ -314,7 +314,7 @@ export function Interview() {
                   setHome(value);
                 }}
                 options={[
-                { value: 'no', label: '아니오', hint: '자택에서 일하지 않음' },
+                { value: 'no', label: '아니요', hint: '자택에서 일하지 않음' },
                 { value: 'yes', label: '예', hint: '작업 공간 면적 비율을 적습니다' }]
                 } />
               

@@ -371,7 +371,7 @@ export function Styleguide() {
           <div className="grid gap-4 lg:grid-cols-2">
             <Empty
               title="아직 올린 파일이 없습니다"
-              description="국민·기업카드 이용내역을 올리면 여기에 쌓입니다."
+              description="KB국민카드·IBK기업은행 카드의 승인내역을 올리면 여기에 쌓입니다."
               action={<Button size="sm" variant="secondary">카드내역 올리기</Button>} />
             
             <Empty

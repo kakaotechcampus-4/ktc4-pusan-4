@@ -64,3 +64,17 @@ export const ro = (word: string): '로' | '으로' => {
   const coda = last >= 0 && last < 11172 ? last % 28 : 0;
   return coda === 0 || coda === 8 ? '로' : '으로';
 };
+
+/**
+ * 카드사 이름. 서버는 '국민'·'기업'만 주고 화면마다 뒤에 「카드」를 붙여 써서
+ * 「기업카드」가 법인카드처럼 읽혔다(치오 UX 감사 C92). 파서 코드(kb·ibk)도 같은 이름으로 모은다.
+ * 사용자가 카드사 홈페이지에서 찾을 이름과 같아야 해서 줄이지 않는다
+ */
+const ISSUER_LABEL: Record<string, string> = {
+  국민: 'KB국민카드',
+  kb: 'KB국민카드',
+  기업: 'IBK기업은행 카드',
+  ibk: 'IBK기업은행 카드'
+};
+
+export const issuerLabel = (issuer: string): string => ISSUER_LABEL[issuer] ?? `${issuer}카드`;

@@ -43,7 +43,7 @@ context: StoredBusinessContext | null | undefined) =>
   // 사용자가 직접 바꾼 판정도 섞여 있으므로 「규칙으로 판정했다」고 쓰지 않는다
   const lines = [
   `${period ? `${period} ` : ''}카드내역 중 판정한 ${formatNumber(summary.totalCount)}건의 결과입니다. 직접 수정한 판정은 수정한 값으로 셉니다.`,
-  `필요경비로 볼 수 있는 것 ${formatNumber(AVAILABLE.count)}건(${formatWon(AVAILABLE.finalAmount)}), 볼 수 없는 것 ${formatNumber(UNAVAILABLE.count)}건, 근거를 확정하지 못한 것 ${formatNumber(NEEDS_REVIEW.count)}건입니다.`];
+  `가능 ${formatNumber(AVAILABLE.count)}건(${formatWon(AVAILABLE.finalAmount)}), 불가 ${formatNumber(UNAVAILABLE.count)}건, 확인 필요 ${formatNumber(NEEDS_REVIEW.count)}건입니다.`];
   const limited = summary.byAccount.find((row) => row.account === LIMITED_ACCOUNT);
   const limits = limitsOf(summary.limits);
   if (limited)
@@ -66,7 +66,8 @@ context: StoredBusinessContext | null | undefined) =>
   // 판정에 쓴 문진 버전이 이와 다를 수 있다. 지금 응답임을 밝힌다
   if (context)
   lines.push(
-    `현재 문진(v${context.version}) 응답: 업종코드 ${context.industryCode}, ${context.bookkeepingDuty} 대상, 직원 ${
+    `현재 문진(버전 ${context.version}) 응답: 업종코드 ${context.industryCode}, ${
+    context.bookkeepingDuty === '복식부기' ? '복식부기 의무자' : `${context.bookkeepingDuty} 대상자`}, 직원 ${
     context.hasEmployee ? '있음' : '없음'}, 작업 공간 면적 비율 ${
     context.homeOfficeRatio === null ?
     '입력 안 함' :
@@ -137,7 +138,7 @@ export function Summary() {
   const header =
   <header className="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <StepEyebrow>요약</StepEyebrow>
+        <StepEyebrow>전달 요약</StepEyebrow>
         <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
           {period ? `${period} 요약` : '판정 요약'}
         </h1>
@@ -290,7 +291,7 @@ export function Summary() {
       {header}
 
       <section className="mt-6 rounded-2xl border border-line bg-surface p-6">
-        <p className="text-small text-muted">현재까지 인정된 필요경비</p>
+        <p className="text-small text-muted">현재까지 인정된 금액</p>
         {summary ?
         <p className="mt-1.5 text-stat font-bold tabular-nums text-ink">
             {formatWon(summary.byVerdict.AVAILABLE.finalAmount)}
@@ -369,15 +370,15 @@ export function Summary() {
       {/* 소득세법 §160의2①, 시행령 §208의2④⑤. 승인내역으로는 보관 여부를 알 수 없어 거래마다 묻지 않고 안내한다 */}
       <p className="mt-4 rounded-xl border border-line bg-surface px-4 py-3 text-small text-ink2">
         <strong className="font-bold text-ink">증빙 보관 안내</strong> — 카드 결제 증빙은 카드사에서 받은
-        월별이용대금명세서를 확정신고기간 종료일부터 5년간 보관해 주세요. 올린 이용내역 파일은 명세서로 인정되지 않을 수
+        월별이용대금명세서를 확정신고기간 종료일부터 5년간 보관해 주세요. 올린 승인내역 파일은 명세서로 인정되지 않을 수
         있습니다. 국세청 현금영수증 홈페이지에 사업용 신용카드로 등록한 카드의 매출전표는 보관하지 않아도 됩니다.
       </p>
 
       <section className="mt-4">
-        <h2 className="text-body font-bold text-ink">계정과목별 인정 경비</h2>
+        <h2 className="text-body font-bold text-ink">계정과목별 인정 금액</h2>
         <Table
           className="mt-3"
-          caption="계정과목별 인정 경비"
+          caption="계정과목별 인정 금액"
           columns={accountColumns}
           rows={accountRows}
           rowKey={(row) => row.account}
@@ -423,7 +424,7 @@ export function Summary() {
             </Button>
           }
           <Button to="/results" variant="ghost" size="sm">
-            판정 목록 보기
+            판정 결과 보기
             <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
           </Button>
         </div>

@@ -102,7 +102,8 @@
 <Button href="#system" variant="ghost" size="inline">보기 →</Button>  // 앵커
 <Button type="submit" variant="secondary" size="md">저장</Button>   // 버튼
 ```
-- `variant`: `primary`(검정 알약) · `secondary`(테두리 알약) · `soft`(연회색) · `ghost`(밑줄 친 텍스트 링크) · `danger`(빨강)
+- `variant`: `primary`(파랑 알약 `accent`) · `secondary`(테두리 알약) · `soft`(연회색) · `ghost`(밑줄 친 텍스트 링크) · `danger`(빨강)
+  - 랜딩 큰 판의 CTA 만 검정이다. 파란 판 위에서는 파란 알약이 안 보인다
 - `danger` 는 **되돌릴 수 없는 동작에만**, 한 화면에 하나. 그런 동작은 항상 `Modal` 로 한 번 더 묻는다.
 - `size`: `sm` 헤더·표 안 · `md` 폼 · `lg` 랜딩 CTA · `inline` 문장 속 링크(ghost 전용)
 - 한 뷰포트 안에 `primary`는 하나. 나머지 행동은 `secondary`/`soft`. 예외: 랜딩 끝의 CTA가 히어로 CTA와 같은 목적지를 반복하는 것은 허용 (스크롤로 떨어져 있고 행동이 하나이므로).
