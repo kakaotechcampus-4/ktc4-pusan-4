@@ -30,7 +30,7 @@ export function MarketingFooter() {
 
         <div className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t border-line2 pt-6 text-caption text-muted">
           <p>© 2026 PreeT</p>
-          <ul className="flex flex-wrap items-center gap-5">
+          <ul className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
             <li>
               <Link to="/faq" className="transition-colors hover:text-ink">
                 자주 묻는 질문
@@ -47,7 +47,7 @@ export function MarketingFooter() {
               </Link>
             </li>
             <li>
-              <Link to="/privacy" className="font-bold transition-colors hover:text-ink">
+              <Link to="/privacy" className="transition-colors hover:text-ink">
                 개인정보처리방침
               </Link>
             </li>

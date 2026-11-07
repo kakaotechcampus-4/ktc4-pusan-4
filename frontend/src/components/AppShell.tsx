@@ -7,6 +7,7 @@ import { Button } from './ui';
 import { BugReportButton } from './BugReport';
 import { Logo } from './Logo';
 import { STEPS, STEP_ALIAS, doneSteps, under } from './steps';
+import { DISCLAIMER } from '../copy';
 
 import { useSession } from '../contexts/SessionContext';
 import { api, useApi } from '../api';
@@ -50,6 +51,9 @@ const REFS: NavRef[] = [
 /** 관리자에게만 보인다 (M1) */
 const ADMIN_REF: NavRef = { path: '/admin', label: '관리자' };
 
+/** 꼬리말 링크. 넷 다 같은 크기, 같은 굵기다. 버그 신고도 아이콘 없이 같은 모양이다 */
+const FOOTER_LINK = 'transition-colors duration-150 ease-snap hover:text-ink hover:underline underline-offset-4';
+
 
 
 interface AppShellProps {
@@ -57,7 +61,7 @@ interface AppShellProps {
   /** 판정 진행 화면처럼 흐름 표시가 방해되는 경우 숨긴다 */
   showSteps?: boolean;
   /**
-   * 세무대리 오인 방지 고지(DisclaimerBar). 기본은 켠다.
+   * 세무대리 오인 방지 고지(위의 DisclaimerBar 와 꼬리말의 같은 문장). 기본은 켠다.
    * 판정을 보여주지 않는 화면(내 정보)에서만 내린다 — 거기엔 오인할 판정 내용이 없다 (#242 리뷰)
    */
   disclaimer?: boolean;
@@ -91,7 +95,7 @@ export function AppShell({ children, showSteps = true, disclaimer = true }: AppS
       <header className="sticky top-0 z-30 border-b border-line bg-canvas/95 shadow-header backdrop-blur print:hidden">
         {/*
           한 줄을 넘기면 한글이 음절 단위로 꺾인다. 줄바꿈을 막고, 폭이 모자라면 덜 중요한 것부터 접는다:
-          xl 미만 — 지금 단계가 아닌 단계 이름 · lg 미만 — 이메일(아이콘으로) · md 미만 — 단계 표시
+          lg 미만 — 이메일(「내 정보」로) · md 미만 — 단계 표시
         */}
         <div className="mx-auto flex h-[72px] max-w-page items-center justify-between gap-3 whitespace-nowrap px-6">
           <Logo
@@ -140,7 +144,7 @@ export function AppShell({ children, showSteps = true, disclaimer = true }: AppS
             </nav>
           }
 
-          {/* 360px 에서도 로고·자료·내 정보·로그아웃이 한 줄에 들어가도록 좁은 폭에서는 간격과 이름을 줄인다.
+          {/* 360px 에서도 로고·자료·내 정보·로그아웃이 한 줄에 들어가도록 좁은 폭에서는 간격과 여백을 줄인다.
               그래도 넘치면(관리자 메뉴까지 있을 때) 자료 메뉴만 옆으로 밀리고 화면은 가로로 늘지 않는다 */}
           <div className="flex min-w-0 items-center gap-2 text-small text-ink2 sm:gap-3">
             <nav
@@ -238,16 +242,22 @@ export function AppShell({ children, showSteps = true, disclaimer = true }: AppS
       </main>
 
       {/* 링크 순서는 공개 화면의 꼬리말(MarketingFooter)과 같다 (C96) */}
-      <footer className="mt-10 border-t border-line print:hidden">
+      <footer className="mt-10 border-t border-line">
         {/* 좁은 화면에서는 오른쪽을 비울 폭이 없어 비서 버튼 높이만큼 아래를 비운다 */}
-        <nav aria-label="도움말과 약관" className="mx-auto max-w-page px-6 pb-24 pt-8 text-caption text-ink2 sm:pb-8 sm:pr-24">
-          <ul className="flex flex-wrap items-center gap-x-5 gap-y-2">
-            <li><Link to="/faq" className="hover:text-ink hover:underline underline-offset-4">자주 묻는 질문</Link></li>
-            <li><BugReportButton /></li>
-            <li><Link to="/terms" className="hover:text-ink hover:underline underline-offset-4">이용약관</Link></li>
-            <li><Link to="/privacy" className="font-bold hover:text-ink hover:underline underline-offset-4">개인정보처리방침</Link></li>
-          </ul>
-        </nav>
+        <div className="mx-auto max-w-page px-6 pb-24 pt-8 text-caption text-ink2 sm:pb-8 sm:pr-24 print:p-0">
+          <nav aria-label="도움말과 약관" className="print:hidden">
+            <ul className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
+              <li><Link to="/faq" className={FOOTER_LINK}>자주 묻는 질문</Link></li>
+              <li><BugReportButton icon={false} className={FOOTER_LINK} /></li>
+              <li><Link to="/terms" className={FOOTER_LINK}>이용약관</Link></li>
+              <li><Link to="/privacy" className={FOOTER_LINK}>개인정보처리방침</Link></li>
+            </ul>
+          </nav>
+          {/* 위의 고지 띠를 닫아도 고지는 여기 남는다. 인쇄(PDF)에도 들어간다 */}
+          {disclaimer &&
+          <p className="mt-4 max-w-3xl text-muted [word-break:keep-all] print:mt-6">{DISCLAIMER}</p>
+          }
+        </div>
       </footer>
     </div>);
 
