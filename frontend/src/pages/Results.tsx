@@ -21,8 +21,8 @@ import { useAssistantSubject } from '../components/assistant/context';
 import { api, ApiRequestError, useApi } from '../api';
 import type { Judgment, Verdict } from '../types/domain';
 import { formatFullDate, formatNumber, formatPeriod, formatWon } from '../utils/format';
-import { AWAITING_ANSWER } from '../utils/verdict';
-import { readAll, readUnavailableSplit } from '../api/readAll';
+import { AWAITING_ANSWER, awaitingOf } from '../utils/verdict';
+import { readAll } from '../api/readAll';
 import { download, exportRowOf, judgmentsCsv } from '../utils/csv';
 import { exceededLimitOf, excessNote } from '../utils/limit';
 import { useMediaQuery } from '../hooks/useMediaQuery';
@@ -95,18 +95,6 @@ export function Results() {
     () => batchId ? api.judgments.summary({ batchId }) : Promise.resolve(null),
     [batchId]
   );
-  const judgmentsQ = useApi(
-    () =>
-    batchId ?
-    api.judgments.list({
-      batchId,
-      verdict: filter === 'ALL' || filter === 'AWAITING' ? undefined : filter,
-      page,
-      size: PAGE_SIZE
-    }) :
-    Promise.resolve(null),
-    [batchId, filter, page]
-  );
   // 답할 질문 안내의 집계(unresolved). 집계는 쪽과 상관없이 오므로 한 개만 읽는다
   const questionsQ = useApi(
     () =>
@@ -115,16 +103,28 @@ export function Results() {
     Promise.resolve(null),
     [batchId]
   );
-  // 불가와 답변 대기를 가른다 (C12). 둘 다 끝까지 읽으므로 거래가 몇 건이어도 건수와 목록이 맞는다
-  const unavailableQ = useApi(
-    () => batchId ? readUnavailableSplit(api, { batchId }, batchId) : Promise.resolve(null),
-    [batchId]
-  );
-  // 경비 가능 금액이 판정한 결제 가운데 얼마만큼인지. 집계에는 결제 합계가 없어 현재 판정 전부에서 더한다
-  const spendQ = useApi(
+  /**
+   * 현재 판정을 끝까지 읽어 화면에서 거르고 쪽을 나눈다. 서버는 판정한 시각 순으로 주므로 답하거나 고친 행이
+   * 맨 위로 올라온다. 여기서 승인일 순으로 다시 세운다. 경비 가능 금액의 바탕인 결제 합계도 여기서 더한다
+   */
+  const allQ = useApi(
     () =>
     batchId ?
-    readExport(batchId).then(({ items }) => items.reduce((sum, row) => sum + row.judgment.transaction.amount, 0)) :
+    readAllJudgments(batchId).then((items) =>
+    [...items].sort((a, b) =>
+    b.transaction.approvedAt.localeCompare(a.transaction.approvedAt) || b.id.localeCompare(a.id)
+    )
+    ) :
+    Promise.resolve(null),
+    [batchId]
+  );
+  // 불가와 답변 대기를 가른다 (C12). 답을 기다리는 질문을 끝까지 읽는다. 못 읽으면 답변 대기 표지만 빠진다
+  const pendingQ = useApi(
+    () =>
+    batchId ?
+    readAll((page, size) => api.questions.list({ batchId, status: 'PENDING', page, size })).then(
+      (pending) => new Set(pending.map((question) => question.transactionId))
+    ) :
     Promise.resolve(null),
     [batchId]
   );
@@ -145,25 +145,31 @@ export function Results() {
     [batchId]
   );
 
-  const split = unavailableQ.data;
-  const awaiting = split?.pendingTransactionIds ?? new Set<string>();
-  const awaitingCount = split?.awaiting.length ?? 0;
-  /** 불가와 답변 대기는 다 읽어 둔 목록을 화면에서 쪽으로 나눈다 */
-  const splitUnavailable = filter === 'UNAVAILABLE' || filter === 'AWAITING';
-  const splitRows = filter === 'AWAITING' ? split?.awaiting ?? [] : split?.confirmed ?? [];
-  const splitPage = {
+  const all = allQ.data;
+  const awaiting = pendingQ.data ?? new Set<string>();
+  const unavailable = all?.filter((judgment) => judgment.verdict.code === 'UNAVAILABLE') ?? [];
+  const awaitingRows = awaitingOf(unavailable, awaiting);
+  const awaitingCount = awaitingRows.length;
+  const spend = all ? all.reduce((sum, judgment) => sum + judgment.transaction.amount, 0) : null;
+  const filtered =
+  filter === 'ALL' ?
+  all ?? [] :
+  filter === 'AWAITING' ?
+  awaitingRows :
+  filter === 'UNAVAILABLE' ?
+  unavailable.filter((judgment) => !awaiting.has(judgment.transactionId)) :
+  all?.filter((judgment) => judgment.verdict.code === filter) ?? [];
+  const listPage = {
     number: page,
     size: PAGE_SIZE,
-    totalElements: splitRows.length,
-    totalPages: Math.max(1, Math.ceil(splitRows.length / PAGE_SIZE)),
-    hasNext: (page + 1) * PAGE_SIZE < splitRows.length
+    totalElements: filtered.length,
+    totalPages: Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)),
+    hasNext: (page + 1) * PAGE_SIZE < filtered.length
   };
-  const judgments: Judgment[] = splitUnavailable ?
-  splitRows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE) :
-  judgmentsQ.data?.items ?? [];
+  const judgments: Judgment[] = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
-  // 패널은 고른 거래의 현재 판정을 따로 읽는다(거래 요약이 함께 온다). 수정하면 그 행이 목록 맨 위로
-  // 올라가도(computedAt DESC) 패널은 그 거래에 머문다
+  // 패널은 고른 거래의 현재 판정을 따로 읽는다(거래 요약이 함께 온다). 수정하면 그 행이 다른 판정으로
+  // 옮겨 가도 패널은 그 거래에 머문다
   // 응답과 실패 모두에 어느 거래의 것인지 붙인다. 다른 행을 고른 직후 이전 행의 응답·실패가
   // 남아 있어도, 고른 거래의 것일 때만 그린다
   const panelQ = useApi(
@@ -197,9 +203,7 @@ export function Results() {
   }, [wide]);
 
   // 마지막 행이 다른 분류로 빠지면 그 페이지가 빈다. Pagination 이 사라지므로 첫 페이지로
-  const pageEmpty = splitUnavailable ?
-  Boolean(split) && judgments.length === 0 :
-  Boolean(judgmentsQ.data) && judgmentsQ.data?.items.length === 0;
+  const pageEmpty = Boolean(all) && judgments.length === 0;
   useEffect(() => {
     if (page > 0 && pageEmpty) setPage(0);
   }, [page, pageEmpty]);
@@ -212,10 +216,9 @@ export function Results() {
 
   // 판정 대상에서 빼면 그 거래의 질문도 집계에서 빠진다(3.9). 질문 안내도 다시 읽는다
   const changed = () => {
-    judgmentsQ.reload();
-    unavailableQ.reload();
+    allQ.reload();
+    pendingQ.reload();
     summaryQ.reload();
-    spendQ.reload();
     panelQ.reload();
     questionsQ.reload();
   };
@@ -224,9 +227,8 @@ export function Results() {
   const reloadAll = () => {
     batchQ.reload();
     summaryQ.reload();
-    spendQ.reload();
-    judgmentsQ.reload();
-    unavailableQ.reload();
+    allQ.reload();
+    pendingQ.reload();
     questionsQ.reload();
     answeredQ.reload();
     unclassifiedQ.reload();
@@ -267,7 +269,7 @@ export function Results() {
   {
     value: 'UNAVAILABLE' as const,
     label: '불가',
-    count: summary && split ? summary.byVerdict.UNAVAILABLE.count - awaitingCount : undefined
+    count: summary && all && (pendingQ.data || pendingQ.error) ? summary.byVerdict.UNAVAILABLE.count - awaitingCount : undefined
   },
   // 답을 기다리는 거래가 있을 때만 둔다. 고른 채로 다 답했으면 빈 목록이 보이도록 남긴다
   ...(awaitingCount > 0 || filter === 'AWAITING' ?
@@ -283,7 +285,7 @@ export function Results() {
    * 처음 읽는 동안. 머리글 줄, 질문 안내, 분류 안내, 표를 다 받은 뒤 한 번에 그린다.
    * 따로 그리면 늦게 온 줄이 이미 그린 표를 밀어 내린다 (C66). 실패한 것은 기다리지 않는다
    */
-  const firstLoad = [batchQ, summaryQ, spendQ, questionsQ, unavailableQ, unclassifiedQ].some(
+  const firstLoad = [batchQ, summaryQ, allQ, questionsQ, pendingQ, unclassifiedQ].some(
     (query) => query.loading && !query.data && !query.error
   );
 
@@ -378,7 +380,7 @@ export function Results() {
       <AmountHero
         className="mt-5"
         amount={summary.byVerdict.AVAILABLE.finalAmount}
-        spend={spendQ.error ? null : spendQ.data} /> :
+        spend={allQ.error ? null : spend} /> :
 
       // 높이를 미리 잡아 둔다. 늦게 들어와도 아래를 밀지 않는다 (C66)
       batchId && firstLoad &&
@@ -474,7 +476,8 @@ export function Results() {
 
   }
 
-  const failed = Boolean(judgmentsQ.error || summaryQ.error || unavailableQ.error);
+  // 답을 기다리는 질문을 못 읽으면 답변 대기 목록만 실패로 보인다. 다른 목록은 표지만 빠진 채 그린다
+  const failed = Boolean(allQ.error || summaryQ.error || filter === 'AWAITING' && pendingQ.error);
   const nothingJudged = summary?.totalCount === 0;
 
   const empty = failed ?
@@ -608,16 +611,12 @@ export function Results() {
             columns={columns}
             rows={failed || firstLoad ? [] : judgments}
             rowKey={(row) => row.id}
-            loading={(splitUnavailable ? unavailableQ.loading : judgmentsQ.loading) || firstLoad}
+            loading={allQ.loading || firstLoad}
             selectedKey={judgments.find((row) => row.transactionId === selectedId)?.id}
             onRowClick={(row) => select(row.transactionId)}
             empty={empty} />
 
-          {!failed && !firstLoad && judgments.length > 0 && (
-          splitUnavailable ?
-          <Pagination page={splitPage} onChange={setPage} /> :
-          judgmentsQ.data && <Pagination page={judgmentsQ.data.page} onChange={setPage} />)
-          }
+          {!failed && !firstLoad && judgments.length > 0 && <Pagination page={listPage} onChange={setPage} />}
         </section>
 
         {wide && selectedId && !failed && !nothingJudged && !firstLoad &&
