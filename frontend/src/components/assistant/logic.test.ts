@@ -149,7 +149,7 @@ describe('previousAnswer (명세 3.1)', () => {
     expect(previousAnswer(group(), suggestion({ value: '전용', sourceLabel: '9월 업로드(국민)' }))).toEqual({
       kind: 'apply',
       value: '전용',
-      text: "9월 업로드(국민)에서 '전용'으로 답했습니다."
+      text: '9월 업로드(국민)에서 업무 전용으로 답했습니다.'
     });
   });
 
@@ -160,7 +160,7 @@ describe('previousAnswer (명세 3.1)', () => {
         group(),
         suggestion({ value: null, conflict: true, history: [{ value: '전용', sourceLabel: '9월' }, { value: '없는 값', sourceLabel: '8월' }] })
       )
-    ).toEqual({ kind: 'history', text: "지난 답이 서로 다릅니다: 9월 '전용'" });
+    ).toEqual({ kind: 'history', text: '지난 답이 서로 다릅니다: 9월 업무 전용' });
   });
 
   it('가장 최근 답이 일괄 응답이면 「서로 다르다」고 하지 않고 그 사정을 적는다', () => {
@@ -168,7 +168,7 @@ describe('previousAnswer (명세 3.1)', () => {
       previousAnswer(group(), suggestion({ value: null, history: [{ value: '전용', sourceLabel: '9월 업로드(국민)', bulk: true }] }))
     ).toEqual({
       kind: 'history',
-      text: "9월 업로드(국민)에서는 한 번에 답하기로 '전용'으로 답했습니다. 이번에는 직접 골라 주세요."
+      text: '9월 업로드(국민)에서는 한 번에 답하기로 업무 전용으로 답했습니다. 이번에는 직접 골라 주세요.'
     });
   });
 
@@ -179,7 +179,7 @@ describe('previousAnswer (명세 3.1)', () => {
   it('B 는 미리 고르지 않고 이력만, C 는 아무것도 보이지 않는다', () => {
     expect(previousAnswer(group(), suggestion({ tier: 'B', historyCounts: { 전용: 6, 개인: 1 } }))).toEqual({
       kind: 'history',
-      text: '이 가맹점 지난 답: 전용 6건, 개인 1건'
+      text: '이 가맹점 지난 답: 업무 전용 6건, 개인 용도 1건'
     });
     expect(previousAnswer(group(), suggestion({ tier: 'C', reason: '소명 대기' }))).toBeNull();
   });

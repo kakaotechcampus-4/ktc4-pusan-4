@@ -20,7 +20,7 @@ const TAX_YEAR = 2026;
 export function AssistantProvider({ children }: {children: React.ReactNode;}) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const { batchId, setBatchId } = useSession();
+  const { batchId, setBatchId, reloadBatch } = useSession();
   const [open, setOpen] = useState(false);
   const [entries, setEntries] = useState<ChatEntry[]>([]);
   const [pending, setPending] = useState(false);
@@ -64,13 +64,16 @@ export function AssistantProvider({ children }: {children: React.ReactNode;}) {
       setEntries((prev) => prev.filter((entry) => entry.id !== mine.id));
       setDraft(message);
       setError(chatErrorText(caught));
-      // 세션이 가리키는 업로드·거래가 지워졌으면 매번 404 다. 빼고 다시 보낼 수 있게 한다
-      if (caught instanceof ApiRequestError && caught.code === 'BATCH_NOT_FOUND') setBatchId(null);
+      // 세션이 가리키는 업로드·거래가 지워졌으면 매번 404 다. 빼고 남은 업로드에서 다시 고른다
+      if (caught instanceof ApiRequestError && caught.code === 'BATCH_NOT_FOUND') {
+        setBatchId(null);
+        reloadBatch();
+      }
       if (caught instanceof ApiRequestError && caught.code === 'TRANSACTION_NOT_FOUND') setSubject(null);
     } finally {
       setPending(false);
     }
-  }, [pending, pathname, batchId, subject, setBatchId]);
+  }, [pending, pathname, batchId, subject, setBatchId, reloadBatch]);
 
   // 비서의 답을 기다리는 동안에는 받지 않는다. 그사이 넣은 문답이 먼저 붙어 질문과 답이 엇갈린다
   const showHelp = useCallback((topicId: string) => {
@@ -115,6 +118,7 @@ export function AssistantProvider({ children }: {children: React.ReactNode;}) {
       const flow = HELP_TOPICS.find((topic) => topic.id === 'flow');
       if (caught instanceof ApiRequestError && caught.code === 'BATCH_NOT_FOUND') {
         setBatchId(null);
+        reloadBatch();
         answer('보던 업로드를 찾을 수 없습니다. 업로드 이력에서 볼 업로드를 골라 주세요.', '/uploads');
         return;
       }
@@ -122,7 +126,7 @@ export function AssistantProvider({ children }: {children: React.ReactNode;}) {
     } finally {
       setPending(false);
     }
-  }, [pending, batchId, setBatchId, pathname]);
+  }, [pending, batchId, setBatchId, reloadBatch, pathname]);
 
   const updateProposal = (id: string, index: number, patch: Partial<ProposalEntry>) =>
   setEntries((prev) =>

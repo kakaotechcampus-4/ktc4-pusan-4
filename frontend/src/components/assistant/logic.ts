@@ -9,6 +9,7 @@ import type {
   QuestionSuggestion } from
 '../../types/domain';
 import { formatNumber, ro } from '../../utils/format';
+import { answerLabel } from '../questions/logic';
 
 /** 9장 요청 규칙 */
 export const MESSAGE_CHARS = 1000;
@@ -151,7 +152,7 @@ export const chatErrorText = (caught: unknown): string => {
     '지금은 더 받을 수 없습니다. 잠시 뒤 다시 물어봐 주세요.';
   }
   if (code === 'BATCH_NOT_FOUND')
-  return '보던 업로드를 찾을 수 없습니다. 지워졌을 수 있어 업로드 없이 다시 물어봅니다. 다시 보내 주세요.';
+  return '보던 업로드를 찾을 수 없습니다. 지워졌을 수 있어 남은 업로드에서 다시 고릅니다. 다시 보내 주세요.';
   if (code === 'TRANSACTION_NOT_FOUND') return '보던 거래를 찾을 수 없습니다. 거래를 빼고 다시 물어봅니다. 다시 보내 주세요.';
   if (status === 400) return '보낸 내용을 받지 못했습니다. 질문을 짧게 다시 적어 주세요.';
   if (status === 0) return '서버에 연결하지 못했습니다. 잠시 뒤 다시 물어봐 주세요.';
@@ -191,24 +192,24 @@ suggestion: QuestionSuggestion | undefined)
     return {
       kind: 'apply',
       value: suggestion.value,
-      text: `${suggestion.sourceLabel}에서 '${suggestion.value}'${ro(suggestion.value)} 답했습니다.`
+      text: `${suggestion.sourceLabel}에서 ${answerLabel(suggestion.value)}${ro(answerLabel(suggestion.value))} 답했습니다.`
     };
     const history = (suggestion.history ?? []).filter((item) => allowed(item.value));
     // 충돌이 아니라 가장 최근 답이 일괄 응답이라 값을 주지 않은 경우다. 「서로 다르다」고 하면 틀린 말이 된다
     if (!suggestion.conflict && history[0]?.bulk)
     return {
       kind: 'history',
-      text: `${history[0].sourceLabel}에서는 한 번에 답하기로 '${history[0].value}'${ro(history[0].value)} 답했습니다. 이번에는 직접 골라 주세요.`
+      text: `${history[0].sourceLabel}에서는 한 번에 답하기로 ${answerLabel(history[0].value)}${ro(answerLabel(history[0].value))} 답했습니다. 이번에는 직접 골라 주세요.`
     };
     return history.length > 0 ?
     {
       kind: 'history',
-      text: `지난 답이 서로 다릅니다: ${history.map((item) => `${item.sourceLabel} '${item.value}'`).join(', ')}`
+      text: `지난 답이 서로 다릅니다: ${history.map((item) => `${item.sourceLabel} ${answerLabel(item.value)}`).join(', ')}`
     } :
     null;
   }
   const counts = Object.entries(suggestion.historyCounts ?? {}).filter(([value]) => allowed(value));
   return counts.length > 0 ?
-  { kind: 'history', text: `이 가맹점 지난 답: ${counts.map(([value, n]) => `${value} ${formatNumber(n)}건`).join(', ')}` } :
+  { kind: 'history', text: `이 가맹점 지난 답: ${counts.map(([value, n]) => `${answerLabel(value)} ${formatNumber(n)}건`).join(', ')}` } :
   null;
 }
