@@ -262,13 +262,7 @@ export function Results() {
       const { transaction } = row;
       return (
         <span className="block min-w-0">
-            <span className="flex items-center gap-1.5 font-normal text-ink">
-              {/* 고른 행은 옅은 바탕만으로는 잘 안 보여 점을 붙인다 */}
-              {row.transactionId === selectedId &&
-          <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-accent" />
-          }
-              <span className="truncate">{merchantTitle(transaction)}</span>
-            </span>
+            <span className="block truncate font-normal text-ink">{merchantTitle(transaction)}</span>
             {/* 승인일 열은 좁은 화면에서 숨기므로 여기로 옮긴다. 가맹점명 줄에 붙이면 말줄임에 같이 잘린다 */}
             <span className="block whitespace-nowrap text-small tabular-nums text-muted sm:hidden">
               {formatFullDate(transaction.approvedAt)}
@@ -412,6 +406,7 @@ export function Results() {
         batchStatus === 'error' ?
         <Empty
           className="mt-6"
+          tone="error"
           icon={<SearchXIcon className="h-5 w-5" />}
           title="올린 카드내역을 불러오지 못했습니다"
           action={
@@ -441,6 +436,7 @@ export function Results() {
 
   const empty = failed ?
   <Empty
+    tone="error"
     icon={<SearchXIcon className="h-5 w-5" />}
     title="판정 결과를 불러오지 못했습니다"
     action={
