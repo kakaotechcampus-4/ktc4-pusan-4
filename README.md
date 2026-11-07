@@ -150,8 +150,8 @@
 | --- | --- |
 | **Frontend** | ![React](https://img.shields.io/badge/React_18-61DAFB?style=for-the-badge&logo=react&logoColor=black) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white) ![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white) ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white) ![React Router](https://img.shields.io/badge/React_Router-CA4245?style=for-the-badge&logo=reactrouter&logoColor=white) |
 | **Backend** | ![Java](https://img.shields.io/badge/Java_21-007396?style=for-the-badge&logo=openjdk&logoColor=white) ![Spring Boot](https://img.shields.io/badge/Spring_Boot_3.5-6DB33F?style=for-the-badge&logo=springboot&logoColor=white) ![Flyway](https://img.shields.io/badge/Flyway-CC0200?style=for-the-badge&logo=flyway&logoColor=white) |
-| **AI** | ![Python](https://img.shields.io/badge/Python_3.12-3776AB?style=for-the-badge&logo=python&logoColor=white) ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white) ![uv](https://img.shields.io/badge/uv-DE5FE9?style=for-the-badge&logo=uv&logoColor=white) |
-| **DB** | ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white) ![Redis](https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white) |
+| **AI** | ![Python](https://img.shields.io/badge/Python_3.12-3776AB?style=for-the-badge&logo=python&logoColor=white) ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white) ![uv](https://img.shields.io/badge/uv-DE5FE9?style=for-the-badge&logo=uv&logoColor=white) ![Pydantic](https://img.shields.io/badge/Pydantic-E92063?style=for-the-badge&logo=pydantic&logoColor=white) ![GPT-6 Luna](https://img.shields.io/badge/GPT--6_Luna-412991?style=for-the-badge&logo=openai&logoColor=white) ![Langfuse](https://img.shields.io/badge/Langfuse-0A0A0A?style=for-the-badge&logoColor=white) |
+| **DB** | ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white) ![pgvector](https://img.shields.io/badge/pgvector-336791?style=for-the-badge&logo=postgresql&logoColor=white) ![pg_bigm](https://img.shields.io/badge/pg__bigm-336791?style=for-the-badge&logo=postgresql&logoColor=white) ![Redis](https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white) |
 | **Infra** | ![AWS](https://img.shields.io/badge/AWS_EC2-FF9900?style=for-the-badge&logo=amazonec2&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white) ![Caddy](https://img.shields.io/badge/Caddy-1F88C0?style=for-the-badge&logo=caddy&logoColor=white) ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white) |
 
 ---
@@ -251,10 +251,17 @@ fix: 카드사 CSV 헤더 공백 처리
 
 ## 실행 · 배포
 
-### 빠른 시작 (전체 실행)
+### 빠른 시작
 
-<!-- TODO(@RainDrop3): clone → .env 준비 → docker compose 로 전체를 띄우는 순서 -->
-> ✏️ 작성 필요
+루트 `compose.yaml` 은 PostgreSQL · Redis · AI 서버를 띄웁니다. Backend · Frontend 는 [파트별 실행](#파트별-실행)으로 따로 띄웁니다.
+
+```bash
+git clone https://github.com/kakaotechcampus-4/ktc4-pusan-4.git && cd ktc4-pusan-4
+cp .env.example .env    # LLM 키는 비워도 서버는 뜹니다
+docker compose up -d    # PostgreSQL(15432) · Redis(16379) · AI 서버(8000)
+```
+
+> compose 로 띄운 AI 서버에는 `CLASSIFY_*` 가 넘어가지 않아 업종 분류가 503 으로 답합니다. 분류까지 보려면 AI 서버를 아래처럼 직접 띄웁니다
 
 ### 환경 변수
 
@@ -275,8 +282,23 @@ fix: 카드사 CSV 헤더 공백 처리
 
 #### AI
 
-<!-- TODO(@RainDrop3): AI 서버 실행 명령 -->
-> ✏️ 작성 필요
+루트 `.env` 를 읽습니다. 키가 없는 기능은 꺼진 채로 뜹니다.
+
+```bash
+cd ai
+uv sync
+uv run uvicorn app.main:app --reload --port 8000   # 확인: curl localhost:8000/health
+uv run ruff check . && uv run pytest               # CI 와 같은 검사
+```
+
+| 환경 변수 | 기능 | 비우면 |
+| --- | --- | --- |
+| `ASSISTANT_*` | AI 비서 Really | 안내 문구로만 답함 |
+| `CLASSIFY_*` | 가맹점 업종 분류 | 503 |
+| `AGENT_*` · `EMBEDDING_*` · `LAW_API_OC` | 규칙 후보 파이프라인 · 조문 검색 | 배치 실패 |
+| `LANGFUSE_*` | LLM 호출 추적 | 꺼짐 |
+
+주간 배치는 직접 돌려 볼 수 있습니다: `uv run python -m pipeline.candidates --dry-run`, `uv run python -m pipeline.promote --dry-run`
 
 ### 배포
 
