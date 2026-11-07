@@ -115,6 +115,8 @@
 - **표 칸과 버튼의 글자는 줄을 바꾸지 않는다.** `Table` 칸과 `Button` 에 `whitespace-nowrap` 이 들어 있다. 긴 가맹점명은 그 칸에서 `truncate` 로 말줄임한다(열에 `width: 'w-full max-w-0'`).
 - 전환: `transition-colors duration-150 ease-snap`. 등장 애니메이션은 `animate-rise` 하나.
 - **움직임은 첫 화면 큰 판에서만** (`OrbitStage`). 앱 화면은 차분하게 둔다 — 세금 판정 화면에서 화려한 연출은 신뢰를 깎는다.
+  - 예외는 판정(`/run`)이 끝나는 순간 하나다(11/7 치오). 진행 막대가 끝까지 찬 뒤 판정별 몫으로 갈리고, 판정 칸이 차례로 올라오며 건수가 0 에서 센다. 한 번만 움직이고 반복하지 않는다. `framer-motion` 을 쓴다.
+  - 동작 줄이기를 켰거나 `matchMedia` 가 없으면(테스트) 끝난 모습을 바로 그린다.
 - 궤도 애니메이션은 `animate-orbit`(52초) / `animate-orbit-slow`(78초)와 짝이 되는 역회전(`-back`)을 함께 건다. 역회전을 빼면 그림이 뒤집힌다.
 - 움직이는 것에는 `motion-reduce:animate-none` 을 붙이고, 타이머는 `prefers-reduced-motion` 을 보고 멈춘다.
 

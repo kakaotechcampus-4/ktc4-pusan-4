@@ -54,6 +54,12 @@ const summary = {
   }
 } as unknown as JudgmentSummary;
 
+/** 한 쪽짜리 목록 응답 */
+const onePage = <T,>(items: T[]) => ({
+  items,
+  page: { number: 0, size: 100, totalElements: items.length, totalPages: 1, hasNext: false }
+});
+
 let container: HTMLDivElement;
 let root: Root;
 
@@ -87,8 +93,8 @@ beforeEach(() => {
   vi.resetAllMocks();
   session.batchId = 'batch-run';
   api.progress.get.mockResolvedValue({ questions: { fillableFromPrevious: 0 } });
-  api.judgments.list.mockResolvedValue({ items: [] });
-  api.questions.list.mockResolvedValue({ items: [] });
+  api.judgments.list.mockResolvedValue(onePage([]));
+  api.questions.list.mockResolvedValue(onePage([]));
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -119,15 +125,38 @@ describe('Run', () => {
   it('답을 기다리는 불가는 불가와 따로 센다 (C12)', async () => {
     api.runs.get.mockResolvedValue(run('COMPLETED'));
     api.judgments.summary.mockResolvedValue(summary);
-    api.judgments.list.mockResolvedValue({
-      items: ['t1', 't2', 't3', 't4'].map((transactionId) => ({ transactionId, verdict: { code: 'UNAVAILABLE' } }))
-    });
-    api.questions.list.mockResolvedValue({ items: [{ transactionId: 't1' }, { transactionId: 't9' }] });
+    api.judgments.list.mockResolvedValue(
+      onePage(['t1', 't2', 't3', 't4'].map((transactionId) => ({ transactionId, verdict: { code: 'UNAVAILABLE' } })))
+    );
+    api.questions.list.mockResolvedValue(onePage([{ transactionId: 't1' }, { transactionId: 't9' }]));
     await mount();
 
     const counts = [...container.querySelectorAll('dl > div')].map((el) => el.textContent);
     expect(counts).toEqual(['✓가능3건', '?확인 필요2건', '✕불가3건', '답변 대기1건']);
-    expect(api.questions.list).toHaveBeenCalledWith({ batchId: 'batch-run', status: 'PENDING', size: 100 });
+    expect(api.questions.list).toHaveBeenCalledWith({ batchId: 'batch-run', status: 'PENDING', page: 0, size: 100 });
+  });
+
+  it('답변 대기는 질문과 불가가 100개를 넘어도 끝까지 읽어 센다', async () => {
+    const ids = Array.from({ length: 150 }, (_, index) => `t${index}`);
+    const pageOf = <T,>(items: T[], page: number) => ({
+      items: items.slice(page * 100, page * 100 + 100),
+      page: { number: page, size: 100, totalElements: items.length, totalPages: 2, hasNext: page === 0 }
+    });
+    api.runs.get.mockResolvedValue(run('COMPLETED'));
+    api.judgments.summary.mockResolvedValue({
+      byVerdict: { AVAILABLE: { count: 0 }, NEEDS_REVIEW: { count: 0 }, UNAVAILABLE: { count: 150 } }
+    });
+    api.judgments.list.mockImplementation(({ page }: { page: number }) =>
+    Promise.resolve(pageOf(ids.map((transactionId) => ({ transactionId, verdict: { code: 'UNAVAILABLE' } })), page))
+    );
+    // 질문은 뒤쪽 거래(t20 부터)에 걸려 있다. 첫 쪽만 읽으면 t120 이후가 빠진다
+    api.questions.list.mockImplementation(({ page }: { page: number }) =>
+    Promise.resolve(pageOf(ids.slice(20).map((transactionId) => ({ transactionId })), page))
+    );
+    await mount();
+
+    const counts = [...container.querySelectorAll('dl > div')].map((el) => el.textContent);
+    expect(counts).toEqual(['✓가능0건', '?확인 필요0건', '✕불가20건', '답변 대기130건']);
   });
 
   it('진행 중 조회가 한 번 실패해도 진행 화면을 두고, 다시 올리라고 하지 않는다 (C63)', async () => {

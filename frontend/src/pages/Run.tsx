@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { ArrowRightIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
@@ -16,7 +17,8 @@ import type {
 '../types/domain';
 import { Badge, Button, cn } from '../components/ui';
 import { formatNumber, formatWon } from '../utils/format';
-import { AWAITING_ANSWER, VERDICT_LABEL, VERDICT_META, awaitingOf } from '../utils/verdict';
+import { AWAITING_ANSWER, VERDICT_LABEL, VERDICT_META } from '../utils/verdict';
+import { readUnavailableSplit } from '../api/readAll';
 import { pollErrorOf, runPhase, type PollError } from './runPhase';
 
 /**
@@ -42,6 +44,57 @@ const GONE_TEXT: Record<Exclude<PollError, 'transient'>, string> = {
   '업로드가 지워졌을 수 있습니다.',
   badAddress: '주소가 잘못됐습니다.'
 };
+
+/** 판정색 막대의 채움색. 답변 대기는 판정이 아니라 불가에 붙는 표지라 판정 색을 쓰지 않는다 */
+const VERDICT_BAR: Record<Verdict, string> = {
+  AVAILABLE: 'bg-ok-bar',
+  NEEDS_REVIEW: 'bg-warn-bar',
+  UNAVAILABLE: 'bg-deny-bar'
+};
+const AWAITING_BAR = 'bg-edge';
+
+/** 끝난 화면의 움직임. 진행 막대가 끝까지 찬 뒤 판정별로 갈리고, 칸이 차례로 올라오며 숫자가 센다 */
+const EASE = [0.23, 1, 0.32, 1] as const;
+const FILL_SECONDS = 0.5;
+const STAGGER_SECONDS = 0.08;
+const COUNT_MS = 700;
+
+/**
+ * 움직임을 줘도 되는가. 사용자가 동작 줄이기를 켰으면 끝난 모습을 바로 그린다.
+ * matchMedia 가 없는 환경(테스트, 서버 렌더)도 움직이지 않는다
+ */
+function usePrefersMotion() {
+  const [prefers] = useState(
+    () =>
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
+  return prefers;
+}
+
+/** 0 에서 value 까지 센다. start 가 켜진 뒤 delay 초 기다렸다가 센다 */
+function CountUp({ value, start, delay, animate }: {value: number;start: boolean;delay: number;animate: boolean;}) {
+  const [shown, setShown] = useState(animate ? 0 : value);
+  useEffect(() => {
+    if (!animate) {
+      setShown(value);
+      return;
+    }
+    if (!start) return;
+    let frame = 0;
+    let begin: number | null = null;
+    const step = (now: number) => {
+      begin ??= now + delay * 1000;
+      const t = Math.min(1, Math.max(0, (now - begin) / COUNT_MS));
+      setShown(Math.round(value * (1 - (1 - t) ** 3)));
+      if (t < 1) frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [value, start, delay, animate]);
+  return <>{formatNumber(shown)}</>;
+}
 
 /** runId 없이 들어오면 확인 화면으로 보낸다. 판정 실행은 확인 화면에서만 만든다 (#187) */
 export function RunEntry() {
@@ -134,13 +187,12 @@ function RunProgress() {
     setCountsFailed(false);
     void Promise.all([
     api.judgments.summary({ runId }),
-    api.judgments.list({ runId, verdict: 'UNAVAILABLE', size: 100 }),
-    api.questions.list({ batchId: runBatchId, status: 'PENDING', size: 100 })]
+    readUnavailableSplit(api, { runId }, runBatchId)]
     ).
     then(
-      ([summary, unavailable, questions]) => {
+      ([summary, split]) => {
         if (cancelled) return;
-        setAwaitingCount(awaitingOf(unavailable.items, questions.items.map((question) => question.transactionId)).length);
+        setAwaitingCount(split.awaiting.length);
         setByVerdict(summary.byVerdict);
       },
       () => {
@@ -245,9 +297,29 @@ function RunProgress() {
     }
   };
 
+  const animate = usePrefersMotion();
   const total = run?.totalCount ?? 0;
   const processed = run?.processedCount ?? 0;
-  const progress = total ? Math.round(processed / total * 100) : 0;
+  const progress = judged ? 100 : total ? Math.round(processed / total * 100) : 0;
+  /** 끝난 칸. 판정별 건수를 다 받았을 때만 움직임을 시작한다 */
+  const tiles = byVerdict ?
+  [
+  ...VERDICTS.map((verdict) => ({
+    key: verdict,
+    badge:
+    <Badge tone={VERDICT_META[verdict].tone} symbol={VERDICT_META[verdict].symbol}>
+            {VERDICT_LABEL[verdict]}
+          </Badge>,
+    count: byVerdict[verdict].count - (verdict === 'UNAVAILABLE' ? awaitingCount : 0),
+    bar: VERDICT_BAR[verdict]
+  })),
+  ...(awaitingCount > 0 ? [{ key: 'AWAITING', badge: <Badge>{AWAITING_ANSWER}</Badge>, count: awaitingCount, bar: AWAITING_BAR }] : [])] :
+  null;
+  const tileTotal = tiles?.reduce((sum, tile) => sum + tile.count, 0) ?? 0;
+  /** 막대가 다 찬 뒤 칸이 올라온다 */
+  const settleDelay = animate ? FILL_SECONDS : 0;
+  const motionOf = (delay: number, seconds = 0.32) =>
+  animate ? { duration: seconds, delay, ease: EASE } : { duration: 0 };
   const goneText =
   pollError === 'missing' || pollError === 'badAddress' ? GONE_TEXT[pollError] : null;
 
@@ -281,26 +353,41 @@ function RunProgress() {
           </div>
         }
 
-        {!goneText && !finished &&
+        {!goneText && (!finished || judged) &&
         <div className="mt-8">
             <p aria-live="polite" className="text-stat font-bold leading-none tabular-nums text-ink">
               {run ?
               <>
-                  {formatNumber(processed)}
+                  {formatNumber(judged ? total : processed)}
                   <span className="text-lead font-normal text-ink2"> / {formatNumber(total)}건</span>
                 </> :
               <span className="invisible">0</span>}
             </p>
+            {/* 진행 중에는 파랗게 차고, 끝나면 끝까지 찬 뒤 판정별 몫으로 갈린다 */}
             <div
-            className="mt-4 h-2 overflow-hidden rounded-full bg-line2"
-            role="progressbar"
-            aria-valuenow={progress}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-label="판정 진행률">
-              <div
-              className="h-full rounded-full bg-accent transition-[width] duration-200 ease-out"
-              style={{ width: `${progress}%` }} />
+            className="relative mt-4 h-2.5 overflow-hidden rounded-full bg-line2"
+            role={judged ? undefined : 'progressbar'}
+            aria-hidden={judged ? true : undefined}
+            aria-valuenow={judged ? undefined : progress}
+            aria-valuemin={judged ? undefined : 0}
+            aria-valuemax={judged ? undefined : 100}
+            aria-label={judged ? undefined : '판정 진행률'}>
+              <motion.div
+              className="h-full rounded-full bg-accent"
+              initial={{ width: 0 }}
+              animate={{ width: `${progress}%` }}
+              transition={animate ? { duration: judged ? FILL_SECONDS : 0.3, ease: EASE } : { duration: 0 }} />
+              {tiles && tileTotal > 0 &&
+            <motion.div
+              className="absolute inset-0 flex gap-0.5"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={motionOf(settleDelay, 0.24)}>
+                  {tiles.filter((tile) => tile.count > 0).map((tile) =>
+              <span key={tile.key} className={tile.bar} style={{ width: `${tile.count / tileTotal * 100}%` }} />
+              )}
+                </motion.div>
+            }
             </div>
             {pollError === 'transient' &&
             <p role="status" className="mt-4 text-small text-ink2">
@@ -320,7 +407,7 @@ function RunProgress() {
         }
 
         {judged &&
-        <section className="mt-8 animate-rise motion-reduce:animate-none">
+        <section className="mt-8">
             {countsFailed ?
             <div className="flex flex-wrap items-center gap-3">
                 <p role="alert" className="text-body text-deny">결과 건수를 불러오지 못했습니다.</p>
@@ -331,38 +418,36 @@ function RunProgress() {
                   다시 시도
                 </Button>
               </div> :
-            <dl className={cn('grid gap-6', awaitingCount > 0 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3')}>
-                {VERDICTS.map((verdict) =>
-              <div key={verdict}>
-                    <dt>
-                      <Badge tone={VERDICT_META[verdict].tone} symbol={VERDICT_META[verdict].symbol}>
-                        {VERDICT_LABEL[verdict]}
-                      </Badge>
-                    </dt>
-                    <dd
-                  className={cn(
-                    'mt-2 text-h3 font-bold tabular-nums text-ink',
-                    !byVerdict && 'invisible'
-                  )}>
-                      {formatNumber((byVerdict?.[verdict].count ?? 0) - (verdict === 'UNAVAILABLE' ? awaitingCount : 0))}건
+            <dl className={cn('grid gap-3', tiles && tiles.length > 3 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3')}>
+                {(tiles ?? VERDICTS.map((verdict) => ({ key: verdict, badge: null, count: 0, bar: '' }))).map((tile, index) =>
+              <motion.div
+                key={tile.key}
+                className={cn('rounded-2xl border border-line px-4 py-4 sm:px-5', !tiles && 'invisible')}
+                initial={animate ? { opacity: 0, y: 8 } : false}
+                animate={tiles ? { opacity: 1, y: 0 } : undefined}
+                transition={motionOf(settleDelay + index * STAGGER_SECONDS)}>
+                    <dt>{tile.badge}</dt>
+                    <dd className="mt-3 text-h3 font-bold tabular-nums text-ink">
+                      <CountUp
+                    value={tile.count}
+                    start={Boolean(tiles)}
+                    delay={settleDelay + index * STAGGER_SECONDS}
+                    animate={animate} />
+                      건
                     </dd>
-                  </div>
+                  </motion.div>
               )}
-                {/* 판정이 아니라 불가에 붙는 표지라 판정 색을 쓰지 않는다 */}
-                {awaitingCount > 0 &&
-              <div>
-                    <dt>
-                      <Badge>{AWAITING_ANSWER}</Badge>
-                    </dt>
-                    <dd className="mt-2 text-h3 font-bold tabular-nums text-ink">{formatNumber(awaitingCount)}건</dd>
-                  </div>
-              }
               </dl>
             }
-            <Button className="mt-8" onClick={openResults}>
-              결과 보기
-              <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
-            </Button>
+            <motion.div
+            initial={animate ? { opacity: 0 } : false}
+            animate={tiles || countsFailed ? { opacity: 1 } : undefined}
+            transition={motionOf(settleDelay + (tiles?.length ?? 3) * STAGGER_SECONDS + 0.1)}>
+              <Button className="mt-8" onClick={openResults}>
+                결과 보기
+                <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
+              </Button>
+            </motion.div>
           </section>
         }
 
