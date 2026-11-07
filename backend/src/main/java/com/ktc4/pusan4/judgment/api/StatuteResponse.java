@@ -21,8 +21,8 @@ public record StatuteResponse(
 
     /** 법령 동기화(ai/pipeline/parse.py parse_law)가 법령에 붙이는 위계. 행정규칙·판례·해석례는 statuteId 모양이 다르다. */
     private static final Set<String> LAW_HIERARCHIES = Set.of("법률", "시행령", "시행규칙");
-    /** 법령 statuteId: 법령명(공백 없음)-조[-항[-호]]. 조와 호는 가지번호(의N)가 붙을 수 있다. */
-    private static final Pattern LAW_ID = Pattern.compile("[^-#]+-(\\d+(?:의\\d+)?)(?:-(\\d+)(?:-(\\d+(?:의\\d+)?))?)?");
+    /** 법령 statuteId: 법령명(공백 없음)-조[-항[-호]]. 조는 가지번호(의N) 하나, 호는 여러 단(의N의M)까지 붙는다(parse.py _HO_NO). */
+    private static final Pattern LAW_ID = Pattern.compile("[^-#]+-(\\d+(?:의\\d+)?)(?:-(\\d+)(?:-(\\d+(?:의\\d+)*))?)?");
     private static final Pattern ARTICLE_IN_TITLE = Pattern.compile("제\\d+조");
     private static final Pattern BRANCH_ARTICLE_IN_URL = Pattern.compile("제(\\d+)의(\\d+)조");
 
@@ -53,7 +53,7 @@ public record StatuteResponse(
         return name.toString();
     }
 
-    /** '208의2' → '제208조의2' */
+    /** '208의2' → '제208조의2', '2의2의3' → '제2호의2의3' */
     private static String numbered(String number, String unit) {
         int branch = number.indexOf('의');
         return branch < 0
