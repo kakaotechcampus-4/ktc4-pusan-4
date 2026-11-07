@@ -261,7 +261,7 @@ export function Transactions() {
 
   },
   {
-    header: '판정 대상',
+    header: '판정대상',
     align: 'right',
     width: 'w-56',
     hideBelow: 'sm',
@@ -277,7 +277,7 @@ export function Transactions() {
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <FilterBar
-          name="판정 대상 상태"
+          name="판정대상 상태"
           value={status}
           onChange={(next) => {
             setStatus(next);

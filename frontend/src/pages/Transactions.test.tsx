@@ -120,7 +120,7 @@ afterEach(() => {
 describe('거래', () => {
   it('탭마다 서버가 센 건수를 붙인다 (C97)', async () => {
     await render();
-    const tabs = [...container.querySelectorAll('[aria-label="판정 대상 상태"] button')].map((button) => button.textContent);
+    const tabs = [...container.querySelectorAll('[aria-label="판정대상 상태"] button')].map((button) => button.textContent);
     expect(tabs).toEqual(['전체3', '판정대상2', '대상제외1', '취소상계0']);
   });
 
@@ -139,7 +139,7 @@ describe('거래', () => {
 
     await click('필터 초기화');
     expect(rowOf('스타벅스')).toBeDefined();
-    expect(container.querySelector('[aria-label="판정 대상 상태"] [aria-pressed="true"]')?.textContent).toBe('전체3');
+    expect(container.querySelector('[aria-label="판정대상 상태"] [aria-pressed="true"]')?.textContent).toBe('전체3');
   });
 
   it('달은 업로드 기간에 든 달만 고르고, 고르면 그 해와 달로 묻는다', async () => {
