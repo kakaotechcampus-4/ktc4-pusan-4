@@ -298,13 +298,15 @@ refresh_token={token}; Path=/api/v1/auth; Max-Age=1209600; HttpOnly; Secure; Sam
 | 필드 | 제약 |
 | --- | --- |
 | email | 이메일 형식, 최대 320자. 인증한 이메일과 같아야 한다(대소문자·앞뒤 공백 무시) |
-| password | 8자 이상, UTF-8 72바이트 이하 |
+| password | 영문자, 숫자, 기호를 각각 하나 이상 넣은 8자 이상, UTF-8 72바이트 이하. 기호는 영문자와 숫자가 아닌 출력 가능한 ASCII 문자(`!`부터 `~`까지, 공백 제외)다. 공백과 한글은 막지 않지만 어느 종류로도 세지 않는다. 대문자는 필수가 아니다 |
 | verificationToken | `email-verification/confirm` 응답의 값 |
 
 가입하고 바로 로그인한다. 응답은 로그인과 같고 상태만 `201` 이다. 가입하면 인증 토큰은 더 쓸 수 없다.
 
+비밀번호 규칙은 새 비밀번호를 정할 때만 본다. 로그인은 보지 않아, 규칙이 생기기 전에 가입한 사용자도 그대로 로그인한다.
+
 ```
-400 VALIDATION_ERROR       형식·길이가 맞지 않음
+400 VALIDATION_ERROR       형식·길이가 맞지 않음. 비밀번호 규칙을 어기면 message 에 이유가 있다
 400 EMAIL_NOT_VERIFIED     인증 토큰이 없거나, 다른 이메일 것이거나, 만료됨 → 인증부터 다시
 409 EMAIL_ALREADY_EXISTS   이미 가입한 이메일
 ```

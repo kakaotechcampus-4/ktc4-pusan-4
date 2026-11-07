@@ -48,7 +48,7 @@ class AuthIntegrationTest {
 
     private static final String MEMBER_EMAIL = "member@example.com";
     private static final String LOGIN_BODY = """
-        {"email": "member@example.com", "password": "test-password"}
+        {"email": "member@example.com", "password": "test-password1"}
         """;
 
     @Autowired
@@ -69,7 +69,7 @@ class AuthIntegrationTest {
     void setUp() throws Exception {
         mockMvc = MockMvcBuilders.webAppContextSetup(context).build();
         // 로그인 테스트가 쓸 계정. 컨텍스트를 같이 쓰는 다른 테스트가 먼저 만들었으면 409 다
-        int status = signup(MEMBER_EMAIL, "test-password").getResponse().getStatus();
+        int status = signup(MEMBER_EMAIL, "test-password1").getResponse().getStatus();
         assertThat(status).isIn(201, 409);
     }
 
@@ -137,7 +137,7 @@ class AuthIntegrationTest {
 
     @Test
     void signup_without_verification_returns_email_not_verified() throws Exception {
-        MvcResult result = signupWithToken("unverified@example.com", "new-password", "not-a-token");
+        MvcResult result = signupWithToken("unverified@example.com", "new-password1", "not-a-token");
 
         assertThat(result.getResponse().getStatus()).isEqualTo(400);
         assertThat(result.getResponse().getContentAsString()).contains("EMAIL_NOT_VERIFIED");
@@ -148,19 +148,19 @@ class AuthIntegrationTest {
         String token = verificationToken("owner@example.com");
 
         // 다른 이메일에는 쓸 수 없다
-        assertThat(signupWithToken("other@example.com", "new-password", token).getResponse().getStatus())
+        assertThat(signupWithToken("other@example.com", "new-password1", token).getResponse().getStatus())
             .isEqualTo(400);
         // 가입하면 토큰은 지워진다
-        assertThat(signupWithToken("owner@example.com", "new-password", token).getResponse().getStatus())
+        assertThat(signupWithToken("owner@example.com", "new-password1", token).getResponse().getStatus())
             .isEqualTo(201);
-        assertThat(signupWithToken("owner@example.com", "new-password", token).getResponse().getContentAsString())
+        assertThat(signupWithToken("owner@example.com", "new-password1", token).getResponse().getContentAsString())
             .contains("EMAIL_NOT_VERIFIED");
     }
 
     @Test
     void signup_creates_account_and_logs_in() throws Exception {
         // when
-        MvcResult result = signup("New@Example.com", "new-password");
+        MvcResult result = signup("New@Example.com", "new-password1");
 
         // then: 로그인과 같은 응답이고, 이메일은 소문자로 저장된다
         assertThat(result.getResponse().getStatus()).isEqualTo(201);
@@ -176,7 +176,7 @@ class AuthIntegrationTest {
         String token = verificationToken("late@example.com");
         assertThat(userService.registerEmailAccount("late@example.com", "already-hashed")).isPresent();
 
-        MvcResult result = signupWithToken("LATE@example.com", "other-password", token);
+        MvcResult result = signupWithToken("LATE@example.com", "other-password1", token);
 
         assertThat(result.getResponse().getStatus()).isEqualTo(409);
         assertThat(result.getResponse().getContentAsString()).contains("EMAIL_ALREADY_EXISTS");
@@ -184,16 +184,30 @@ class AuthIntegrationTest {
 
     @Test
     void signup_rejects_short_or_too_long_password() throws Exception {
-        assertThat(signup("short@example.com", "1234567").getResponse().getStatus()).isEqualTo(400);
-        // 25자지만 UTF-8 75바이트라 BCrypt 한계(72바이트)를 넘는다
-        assertThat(signup("long@example.com", "가나다라마바사아자차카타파하가나다라마바사아자차카")
-            .getResponse().getStatus()).isEqualTo(400);
+        assertThat(signup("short@example.com", "pw-123!").getResponse().getStatus()).isEqualTo(400);
+        // 영문, 숫자, 기호가 다 있고 27자지만 UTF-8 73바이트라 BCrypt 한계(72바이트)를 넘는다
+        MvcResult tooLong = signup("long@example.com", "pw1!가나다라마바사아자차카타파하가나다라마바사아자");
+        assertThat(tooLong.getResponse().getStatus()).isEqualTo(400);
+        assertThat(tooLong.getResponse().getContentAsString()).contains("72바이트");
+    }
+
+    @Test
+    void signup_rejects_password_without_letter_digit_and_symbol() throws Exception {
+        // when: 숫자가 없다
+        MvcResult result = signup("weak@example.com", "password-only");
+
+        // then: 이유를 알려 주고 계정은 생기지 않는다
+        assertThat(result.getResponse().getStatus()).isEqualTo(400);
+        assertThat(result.getResponse().getContentAsString())
+            .contains("VALIDATION_ERROR")
+            .contains("영문, 숫자, 기호");
+        assertThat(userService.isEmailRegistered("weak@example.com")).isFalse();
     }
 
     @Test
     void login_finds_email_regardless_of_case() throws Exception {
         assertThat(login("""
-            {"email": "MEMBER@EXAMPLE.COM", "password": "test-password"}
+            {"email": "MEMBER@EXAMPLE.COM", "password": "test-password1"}
             """).getResponse().getStatus()).isEqualTo(200);
     }
 

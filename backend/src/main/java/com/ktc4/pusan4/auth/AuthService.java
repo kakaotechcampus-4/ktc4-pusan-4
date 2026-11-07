@@ -45,9 +45,7 @@ public class AuthService {
      * 같은 토큰으로 동시에 가입해도 UNIQUE(email) 때문에 하나만 남는다.
      */
     public IssuedTokens signup(String email, String password, String verificationToken) {
-        if (!Passwords.fitsBcrypt(password)) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "비밀번호는 72바이트를 넘을 수 없습니다.");
-        }
+        Passwords.requireValid(password);
         emailVerification.requireVerified(email, verificationToken);
         UUID userId = users.registerEmailAccount(email, passwordEncoder.encode(password))
             .orElseThrow(AuthService::emailAlreadyExists);
