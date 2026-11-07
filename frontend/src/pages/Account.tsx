@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRightIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
-import { StepEyebrow } from '../components/StepEyebrow';
 import { InfoPanel, InfoRows, PANEL_LINK, PanelFailed, PanelNote } from '../components/InfoPanel';
 import { api, ApiRequestError, useApi } from '../api';
 import { useSession } from '../contexts/SessionContext';
@@ -55,10 +54,9 @@ export function Account() {
   return (
     // 고지 막대를 내린다. 여기엔 세무대리로 오인할 판정 내용이 없다 (#242 리뷰)
     <AppShell disclaimer={false}>
-      <div className="mx-auto max-w-2xl">
+      <div className="max-w-2xl">
         <header>
-          <StepEyebrow prefix="설정">내 정보</StepEyebrow>
-          <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">내 정보</h1>
+          <h1 className="text-h2 font-bold tracking-tight text-ink">내 정보</h1>
         </header>
 
         <InfoPanel title="계정">

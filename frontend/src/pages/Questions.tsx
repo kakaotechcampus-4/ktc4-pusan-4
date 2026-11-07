@@ -312,7 +312,7 @@ export function Questions() {
   const header =
   <header className="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <StepEyebrow>질문</StepEyebrow>
+        <StepEyebrow />
         {/* 판정 이름(확인 필요)을 제목에 다시 쓰지 않는다. 화면 이름 그대로다 (C12) */}
         <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">질문</h1>
       </div>
@@ -326,7 +326,7 @@ export function Questions() {
   if (batchStatus === 'error') {
     return (
       <AppShell>
-        <div className="mx-auto max-w-3xl">
+        <div className="max-w-3xl">
           {header}
           <Empty
             className="mt-6"
@@ -346,7 +346,7 @@ export function Questions() {
   if ((batchStatus === 'ready' && !batchId) || pendingQ.error) {
     return (
       <AppShell>
-        <div className="mx-auto max-w-3xl">
+        <div className="max-w-3xl">
           {header}
           {!batchId ?
           <Empty
@@ -379,7 +379,7 @@ export function Questions() {
 
   return (
     <AppShell>
-      <div className="mx-auto max-w-3xl">
+      <div className="max-w-3xl">
         {header}
 
         {/* 읽기 전에는 숫자 대신 자리만 둔다. 「—」나 0 을 보이면 실제 값처럼 읽힌다 (C66) */}

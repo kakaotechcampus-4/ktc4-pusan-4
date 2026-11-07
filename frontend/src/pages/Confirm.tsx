@@ -89,9 +89,9 @@ export function Confirm() {
 
   return (
     <AppShell>
-      <div className="mx-auto max-w-3xl">
+      <div className="max-w-3xl">
         <header>
-          <StepEyebrow>판정 전 확인</StepEyebrow>
+          <StepEyebrow />
           <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">판정 전 확인</h1>
         </header>
 

@@ -246,9 +246,9 @@ function RunProgress() {
 
   return (
     <AppShell>
-      <div className="mx-auto max-w-3xl">
+      <div className="max-w-3xl">
         <header>
-          <StepEyebrow>판정</StepEyebrow>
+          <StepEyebrow />
           <h1 aria-live="polite" className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
             {goneText ?
             '판정을 찾을 수 없습니다' :

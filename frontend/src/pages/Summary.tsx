@@ -181,7 +181,7 @@ export function Summary() {
   const header =
   <header className="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <StepEyebrow>요약</StepEyebrow>
+        <StepEyebrow />
         <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">요약</h1>
       </div>
       {/* PDF 는 서버에서 만들지 않는다. 인쇄용 스타일(index.css)로 화면 틀을 빼고 브라우저 인쇄로 저장한다 */}

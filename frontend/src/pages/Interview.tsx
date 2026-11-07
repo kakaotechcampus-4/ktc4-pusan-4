@@ -1,7 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
-import { StepEyebrow } from '../components/StepEyebrow';
 import { useSession } from '../contexts/SessionContext';
 import { api, ApiRequestError } from '../api';
 import type { BookkeepingDuty } from '../types/domain';
@@ -71,8 +70,7 @@ export function Interview() {
     // 진행 단계에 없는 화면이다. 띠를 띄우면 어느 칸도 켜지지 않아 고장난 것처럼 보인다
     <AppShell showSteps={false}>
       <header>
-        <StepEyebrow prefix="설정">사업자 문진</StepEyebrow>
-        <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">사업자 문진</h1>
+        <h1 className="text-h2 font-bold tracking-tight text-ink">사업자 문진</h1>
       </header>
 
       {/*
