@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom';
 import { ArrowRightIcon, CopyCheckIcon, CopyIcon, PrinterIcon, SearchXIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { StepEyebrow } from '../components/StepEyebrow';
-import { Badge, Button, Empty, Table, type Column } from '../components/ui';
+import { Button, Card, Empty } from '../components/ui';
 import { AmountHero } from '../components/results/AmountHero';
+import type { Share } from '../utils/shares';
 import { useSession } from '../contexts/SessionContext';
 import { api, useApi } from '../api';
 import { readAll } from '../api/readAll';
@@ -15,31 +16,14 @@ import type {
   JudgmentSummary,
   StoredBusinessContext,
   UploadBatch,
-  UnresolvedSummary,
-  Verdict } from
+  UnresolvedSummary } from
 '../types/domain';
 import { formatNumber, formatPeriod, formatWon } from '../utils/format';
 import { excessNote, LIMITED_ACCOUNT, limitLine, limitsOf, PROVISIONAL_NOTE } from '../utils/limit';
-import { AWAITING_ANSWER, VERDICT_LABEL, VERDICT_META, awaitingOf } from '../utils/verdict';
+import { AWAITING_ANSWER, awaitingOf } from '../utils/verdict';
 import { industryName } from '../utils/context';
 
 type AccountRow = JudgmentSummary['byAccount'][number];
-
-/** 판정별 몫 한 줄. amount 는 그 판정이 난 거래의 결제 금액 합이고, 못 읽었으면 null */
-interface Share {
-  key: Verdict | 'AWAITING';
-  count: number;
-  amount: number | null;
-  bar: string;
-}
-
-/** 판정색 채움. 답변 대기는 판정이 아니라 불가에 붙는 표지라 판정 색을 쓰지 않는다 */
-const SHARE_BAR: Record<Share['key'], string> = {
-  AVAILABLE: 'bg-ok-bar',
-  NEEDS_REVIEW: 'bg-warn-bar',
-  UNAVAILABLE: 'bg-deny-bar',
-  AWAITING: 'bg-edge'
-};
 
 const spendOf = (judgments: Judgment[]) => judgments.reduce((sum, judgment) => sum + judgment.transaction.amount, 0);
 
@@ -310,15 +294,11 @@ export function Summary() {
   ...(['AVAILABLE', 'NEEDS_REVIEW', 'UNAVAILABLE'] as const).map((key) => ({
     key,
     count: (summary?.byVerdict[key].count ?? 0) - (key === 'UNAVAILABLE' ? awaitingCount : 0),
-    amount: amountBy(key),
-    bar: SHARE_BAR[key]
+    amount: amountBy(key)
   })),
-  ...(awaitingCount > 0 ? [{ key: 'AWAITING' as const, count: awaitingCount, amount: amountBy('AWAITING'), bar: SHARE_BAR.AWAITING }] : [])];
+  ...(awaitingCount > 0 ? [{ key: 'AWAITING' as const, count: awaitingCount, amount: amountBy('AWAITING') }] : [])];
 
   const spend = judgments ? spendOf(judgments) : null;
-  /** 막대는 금액으로 나눈다. 금액을 못 읽었으면 건수로 나눈다 */
-  const byAmount = spend !== null && spend > 0 && shares.every((share) => share.amount !== null);
-  const shareTotal = shares.reduce((sum, share) => sum + (byAmount ? share.amount ?? 0 : share.count), 0);
 
   // 신고는 해마다 따로 한다. 두 해에 걸친 업로드는 합계를 해마다 나눠 보인다 (C20)
   const years = batch ? yearsOf(batch) : [];
@@ -356,34 +336,7 @@ export function Summary() {
     });
   }
   accountRows.sort((a, b) => b.finalAmount - a.finalAmount);
-  const accountMax = accountRows[0]?.finalAmount ?? 0;
-
-  const shareColumns: Column<Share>[] = [
-  {
-    header: '판정',
-    cell: (row) =>
-    row.key === 'AWAITING' ?
-    <Badge>{AWAITING_ANSWER}</Badge> :
-    <Badge tone={VERDICT_META[row.key].tone} symbol={VERDICT_META[row.key].symbol}>
-            {VERDICT_LABEL[row.key]}
-          </Badge>
-
-  },
-  {
-    header: '건수',
-    align: 'right',
-    width: 'w-24',
-    cell: (row) => <span className="text-ink">{formatNumber(row.count)}건</span>
-  },
-  {
-    header: '결제 금액',
-    align: 'right',
-    width: 'w-40',
-    cell: (row) =>
-    <span className="font-bold text-ink">{row.amount === null ? '—' : formatWon(row.amount)}</span>
-
-  }];
-
+  const accountTotal = accountRows.reduce((sum, row) => sum + row.finalAmount, 0);
 
   const answeredGroups = answeredQ.data?.page.totalElements ?? 0;
   // 문장에 들어갈 건수를 아직 다 읽지 못했으면 복사하지 않는다. 빠진 채로 넘기면 「남은 것 없음」으로 읽힌다
@@ -423,102 +376,80 @@ export function Summary() {
     <AppShell>
       {header}
 
-      <section className="mt-8">
-        {summary ?
-        <AmountHero
-          label="이 업로드의 경비 가능 금액"
-          amount={summary.byVerdict.AVAILABLE.finalAmount}
-          spend={spend} /> :
+      {summary ?
+      <AmountHero
+        className="mt-8"
+        label="이 업로드의 경비 가능 금액"
+        amount={summary.byVerdict.AVAILABLE.finalAmount}
+        spend={spend}
+        shares={shares}>
 
-        <span className="block h-[6.5rem] w-72 max-w-full animate-pulse rounded bg-line2" />
+          {spanLine && <p className="tabular-nums">{spanLine}</p>}
+          {/* 초과액은 그해 사용자 전체 기준이라 이 업로드 몫을 정할 수 없다(#15). 합계에서 빼지 않고 따로 알린다 */}
+          {excess && <p>{excess}</p>}
+          {unresolved && unresolved.count > 0 &&
+        <p>답하지 않은 질문이 {formatNumber(unresolved.count)}개 있습니다. 답하면 위 금액이 바뀔 수 있습니다.</p>
         }
-        {spanLine && <p className="mt-2 text-small tabular-nums text-ink2">{spanLine}</p>}
-        {/* 초과액은 그해 사용자 전체 기준이라 이 업로드 몫을 정할 수 없다(#15). 합계에서 빼지 않고 따로 알린다 */}
-        {excess && <p className="mt-4 max-w-2xl text-small text-ink2">{excess}</p>}
-
-        {unresolved && unresolved.count > 0 &&
-        <p className="mt-4 text-small text-ink2">
-            답하지 않은 질문이 {formatNumber(unresolved.count)}개 있습니다. 답하면 위 금액이 바뀔 수 있습니다.
-          </p>
-        }
-        {questionsQ.error &&
-        <p className="mt-4 text-small text-deny">
-            답하지 않은 질문 수를 불러오지 못했습니다. 새로고침해 주세요.
-          </p>
-        }
-        {unclassified > 0 &&
-        <p className="mt-3 flex flex-wrap items-center gap-x-2 text-small text-ink2">
-            가맹점을 분류하지 못한 {formatNumber(unclassified)}건은 아직 판정하지 않았습니다.
-            <Link
+          {questionsQ.error && <p className="text-deny">답하지 않은 질문 수를 불러오지 못했습니다. 새로고침해 주세요.</p>}
+          {unclassified > 0 &&
+        <p className="flex flex-wrap items-center gap-x-2">
+              가맹점을 분류하지 못한 {formatNumber(unclassified)}건은 아직 판정하지 않았습니다.
+              <Link
             to="/preview"
             className="inline-flex items-center gap-1 whitespace-nowrap font-bold text-accent hover:underline">
 
-              분류 확인하기
-              <ArrowRightIcon className="h-3.5 w-3.5" aria-hidden="true" />
-            </Link>
-          </p>
+                분류 확인하기
+                <ArrowRightIcon className="h-3.5 w-3.5" aria-hidden="true" />
+              </Link>
+            </p>
         }
-      </section>
+        </AmountHero> :
 
-      <section className="mt-10 max-w-xl">
-        <h2 className="text-body font-bold text-ink">판정 결과</h2>
-        {/* 판정별 몫. 금액으로 나누고, 아래 표가 같은 순서로 건수와 금액을 적는다 */}
-        <div
-          className={`mt-4 flex h-3 gap-0.5 overflow-hidden rounded-full ${summary && shareTotal > 0 ? '' : 'bg-line2'}`}
-          aria-hidden="true">
-          {summary && shareTotal > 0 &&
-          shares.map((share) => {
-            const value = byAmount ? share.amount ?? 0 : share.count;
-            return value > 0 &&
-            <span key={share.key} className={share.bar} style={{ flex: `${value} 1 0` }} />;
-          })}
-        </div>
-        <Table
-          className="mt-5"
-          caption="판정별 건수와 결제 금액"
-          columns={shareColumns}
-          rows={summary ? shares.filter((share) => share.count > 0) : []}
-          rowKey={(row) => row.key}
-          loading={!summary} />
-      </section>
+      <span className="mt-8 block h-64 animate-pulse rounded-2xl bg-surface" />
+      }
 
-      <section className="mt-10">
-        <h2 className="text-body font-bold text-ink">계정과목별 경비 가능 금액</h2>
+      {/* 넓은 화면은 두 칸이다. 계정과목과 넘길 문장은 서로 기대지 않아 나란히 둔다 */}
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+      <Card as="section" padding="sm">
+        <h2 className="text-body-lg font-bold text-ink">계정과목별 경비 가능 금액</h2>
         {summaryQ.loading && !summary ?
-        <span className="mt-4 block h-24 animate-pulse rounded bg-line2" /> :
+        <span className="mt-5 block h-24 animate-pulse rounded bg-line2" /> :
         accountRows.length === 0 ?
         <Empty className="mt-4" inTable title="가능으로 판정한 거래가 아직 없습니다" /> :
 
-        // 행마다 열을 따로 잡으면 금액이 긴 행의 막대가 짧아진다. 열은 목록이 잡고 행은 그 열을 나눠 쓴다
-        <ul
-          aria-label="계정과목별 경비 가능 금액"
-          className="mt-4 grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 divide-y divide-line2 border-t-2 border-rule sm:grid-cols-[minmax(0,10rem)_minmax(0,1fr)_auto]">
-            {accountRows.map((row) =>
-          <li
-            key={row.account}
-            className="col-span-full grid grid-cols-subgrid items-center gap-y-2 py-3.5">
-                <span className="truncate text-body text-ink">{row.account}</span>
-                {/* 가장 큰 계정과목을 꽉 채운 길이로 놓고 나머지를 견준다 */}
-                <span
-              aria-hidden="true"
-              className="order-last col-span-2 h-2 overflow-hidden rounded-full bg-line2 sm:order-none sm:col-span-1">
-                  <span
-                className="block h-full rounded-full bg-ink"
-                style={{ width: `${accountMax > 0 ? row.finalAmount / accountMax * 100 : 0}%` }} />
-                </span>
-                <span className="whitespace-nowrap text-right tabular-nums">
-                  <span className="text-body font-bold text-ink">{formatWon(row.finalAmount)}</span>
-                  <span className="ml-2 inline-block w-12 text-small text-ink2">{formatNumber(row.count)}건</span>
-                </span>
-              </li>
-          )}
+        <ul aria-label="계정과목별 경비 가능 금액" className="mt-5 space-y-5">
+            {accountRows.map((row) => {
+            /** 경비 가능 금액 가운데 이 계정과목의 몫. 막대도 같은 몫만큼 찬다 */
+            const share = accountTotal > 0 ? row.finalAmount / accountTotal : 0;
+            return (
+              <li key={row.account}>
+                  <div className="flex items-baseline gap-3">
+                    <span className="min-w-0 flex-1 truncate text-body text-ink">{row.account}</span>
+                    <span className="whitespace-nowrap text-small tabular-nums text-ink2">
+                      {formatNumber(row.count)}건
+                    </span>
+                    <span className="w-28 whitespace-nowrap text-right text-body font-bold tabular-nums text-ink">
+                      {formatWon(row.finalAmount)}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex items-center gap-3">
+                    <span aria-hidden="true" className="h-2 flex-1 overflow-hidden rounded-full bg-surface">
+                      <span className="block h-full rounded-full bg-ink" style={{ width: `${share * 100}%` }} />
+                    </span>
+                    <span className="w-10 text-right text-caption tabular-nums text-ink2">
+                      {Math.round(share * 100)}%
+                    </span>
+                  </div>
+                </li>);
+
+          })}
           </ul>
         }
-      </section>
+      </Card>
 
-      <section className="mt-10">
-        <h2 className="text-body font-bold text-ink">세무사에게 넘길 문장</h2>
-        <blockquote className="mt-3 rounded-xl border border-line p-4 text-small leading-6 text-ink">
+      <Card as="section" padding="sm">
+        <h2 className="text-body-lg font-bold text-ink">세무사에게 넘길 문장</h2>
+        <blockquote className="mt-4 rounded-xl bg-surface p-4 text-small leading-6 text-ink">
           {text}
         </blockquote>
         {omitted.length > 0 &&
@@ -556,10 +487,11 @@ export function Summary() {
             복사하지 못했습니다. 문장을 직접 선택해 복사해 주세요.
           </p>
         }
-      </section>
+      </Card>
+      </div>
 
       {/* 소득세법 §160의2①, 시행령 §208의2④⑤. 승인내역으로는 보관 여부를 알 수 없어 거래마다 묻지 않고 안내한다 */}
-      <section className="mt-10">
+      <section className="mt-10 border-t border-line pt-8">
         <h2 className="text-body font-bold text-ink">증빙 보관</h2>
         <p className="mt-2 max-w-3xl text-small leading-6 text-ink2">
           카드 결제 증빙은 카드사에서 받은 월별이용대금명세서를 확정신고기간 종료일부터 5년간 보관해 주세요. 올린

@@ -5,6 +5,7 @@ import { AppShell } from '../components/AppShell';
 import { StepEyebrow } from '../components/StepEyebrow';
 import { JudgmentDetailPanel } from '../components/results/JudgmentDetailPanel';
 import { AmountHero } from '../components/results/AmountHero';
+import { sharesOf } from '../utils/shares';
 import { categoryLabel, merchantTitle, verdictNote } from '../components/results/display';
 import { VerdictBadge } from '../components/VerdictBadge';
 import {
@@ -375,32 +376,6 @@ export function Results() {
             {formatPeriod(batchQ.data.periodStart, batchQ.data.periodEnd)}
           </p>
       }
-        {/* 건수는 아래 필터마다 있다. 머리에는 경비 가능 금액 하나만 크게 둔다 */}
-        {summary && !firstLoad && summary.totalCount > 0 ?
-      <AmountHero
-        className="mt-5"
-        amount={summary.byVerdict.AVAILABLE.finalAmount}
-        spend={allQ.error ? null : spend} /> :
-
-      // 높이를 미리 잡아 둔다. 늦게 들어와도 아래를 밀지 않는다 (C66)
-      batchId && firstLoad &&
-      <span className="mt-5 block h-[6.5rem] w-72 max-w-full animate-pulse rounded bg-line2" />
-      }
-        {excess && !firstLoad &&
-      <p className="mt-1 max-w-2xl text-small text-ink2">{excess}</p>
-      }
-        {unclassified > 0 && !firstLoad &&
-      <p className="mt-1 flex flex-wrap items-center gap-x-2 text-small text-ink2">
-            분류가 필요한 거래 {formatNumber(unclassified)}건은 판정하지 않았습니다.
-            <Link
-          to="/preview"
-          className="inline-flex items-center gap-1 py-1 font-bold text-accent hover:underline">
-
-              분류 확인하기
-              <ArrowRightIcon className="h-3.5 w-3.5" aria-hidden="true" />
-            </Link>
-          </p>
-      }
       </div>
       <div className="flex flex-col items-end gap-1">
         <div className="flex flex-wrap items-center gap-2">
@@ -541,6 +516,34 @@ export function Results() {
   return (
     <AppShell>
       {header}
+
+      {/* 건수는 아래 필터마다 있다. 판에는 경비 가능 금액과 판정별 결제 금액만 둔다 */}
+      {summary && !firstLoad && summary.totalCount > 0 ?
+      <AmountHero
+        className="mt-6"
+        amount={summary.byVerdict.AVAILABLE.finalAmount}
+        spend={allQ.error ? null : spend}
+        shares={all && !allQ.error ? sharesOf(all, pendingQ.error ? null : awaitingRows) : null}
+        counts={false}>
+
+          {excess && <p>{excess}</p>}
+          {unclassified > 0 &&
+        <p className="flex flex-wrap items-center gap-x-2">
+              분류가 필요한 거래 {formatNumber(unclassified)}건은 판정하지 않았습니다.
+              <Link
+            to="/preview"
+            className="inline-flex items-center gap-1 py-1 font-bold text-accent hover:underline">
+
+                분류 확인하기
+                <ArrowRightIcon className="h-3.5 w-3.5" aria-hidden="true" />
+              </Link>
+            </p>
+        }
+        </AmountHero> :
+
+      // 높이를 미리 잡아 둔다. 늦게 들어와도 아래를 밀지 않는다 (C66)
+      batchId && firstLoad && <span className="mt-6 block h-64 animate-pulse rounded-2xl bg-surface" />
+      }
 
       {excludedName &&
       <p

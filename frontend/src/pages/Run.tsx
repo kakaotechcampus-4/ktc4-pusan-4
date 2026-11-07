@@ -325,7 +325,7 @@ function RunProgress() {
   pollError === 'missing' || pollError === 'badAddress' ? GONE_TEXT[pollError] : null;
 
   return (
-    <AppShell>
+    <AppShell narrow>
       <div className="max-w-3xl">
         <header>
           <StepEyebrow />
@@ -354,8 +354,9 @@ function RunProgress() {
           </div>
         }
 
+        {/* 진행과 끝난 칸을 한 판에 둔다. 결과와 요약 머리의 판과 같은 모양이다 */}
         {!goneText && (!finished || judged) &&
-        <div className="mt-8">
+        <div className="mt-8 rounded-2xl bg-surface p-6 sm:p-8">
             <p aria-live="polite" className="text-stat font-bold leading-none tabular-nums text-ink">
               {run ?
               <>
@@ -366,7 +367,7 @@ function RunProgress() {
             </p>
             {/* 진행 중에는 파랗게 차고, 끝나면 끝까지 찬 뒤 판정별 몫으로 갈린다 */}
             <div
-            className="relative mt-4 h-2.5 overflow-hidden rounded-full bg-line2"
+            className="relative mt-5 h-3 overflow-hidden rounded-full bg-line"
             role={judged ? undefined : 'progressbar'}
             aria-hidden={judged ? true : undefined}
             aria-valuenow={judged ? undefined : progress}
@@ -380,7 +381,7 @@ function RunProgress() {
               transition={animate ? { duration: judged ? FILL_SECONDS : 0.3, ease: EASE } : { duration: 0 }} />
               {tiles && tileTotal > 0 &&
             <motion.div
-              className="absolute inset-y-0 left-0 flex gap-0.5 bg-canvas"
+              className="absolute inset-y-0 left-0 flex gap-0.5 bg-surface"
               style={{ width: `${progress}%` }}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -391,6 +392,39 @@ function RunProgress() {
                 </motion.div>
             }
             </div>
+            {judged && <div className="mt-6">
+            {countsFailed ?
+            <div className="flex flex-wrap items-center gap-3">
+                <p role="alert" className="text-body text-deny">결과 건수를 불러오지 못했습니다.</p>
+                <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setCountsAttempt((attempt) => attempt + 1)}>
+                  다시 시도
+                </Button>
+              </div> :
+            <dl className={cn('grid gap-3', tiles && tiles.length > 3 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3')}>
+                {(tiles ?? VERDICTS.map((verdict) => ({ key: verdict, badge: null, count: 0, bar: '' }))).map((tile, index) =>
+              <motion.div
+                key={tile.key}
+                className={cn('rounded-xl bg-canvas px-4 py-4 sm:px-5', !tiles && 'invisible')}
+                initial={animate ? { opacity: 0, y: 8 } : false}
+                animate={tiles ? { opacity: 1, y: 0 } : undefined}
+                transition={motionOf(settleDelay + index * STAGGER_SECONDS)}>
+                    <dt>{tile.badge}</dt>
+                    <dd className="mt-3 text-h3 font-bold tabular-nums text-ink">
+                      <CountUp
+                    value={tile.count}
+                    start={Boolean(tiles)}
+                    delay={settleDelay + index * STAGGER_SECONDS}
+                    animate={animate} />
+                      건
+                    </dd>
+                  </motion.div>
+              )}
+              </dl>
+            }
+            </div>}
             {pollError === 'transient' &&
             <p role="status" className="mt-4 text-small text-ink2">
                 연결이 불안정해 다시 확인하고 있습니다.
@@ -409,38 +443,7 @@ function RunProgress() {
         }
 
         {judged &&
-        <section className="mt-8">
-            {countsFailed ?
-            <div className="flex flex-wrap items-center gap-3">
-                <p role="alert" className="text-body text-deny">결과 건수를 불러오지 못했습니다.</p>
-                <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setCountsAttempt((attempt) => attempt + 1)}>
-                  다시 시도
-                </Button>
-              </div> :
-            <dl className={cn('grid gap-3', tiles && tiles.length > 3 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3')}>
-                {(tiles ?? VERDICTS.map((verdict) => ({ key: verdict, badge: null, count: 0, bar: '' }))).map((tile, index) =>
-              <motion.div
-                key={tile.key}
-                className={cn('rounded-2xl border border-line px-4 py-4 sm:px-5', !tiles && 'invisible')}
-                initial={animate ? { opacity: 0, y: 8 } : false}
-                animate={tiles ? { opacity: 1, y: 0 } : undefined}
-                transition={motionOf(settleDelay + index * STAGGER_SECONDS)}>
-                    <dt>{tile.badge}</dt>
-                    <dd className="mt-3 text-h3 font-bold tabular-nums text-ink">
-                      <CountUp
-                    value={tile.count}
-                    start={Boolean(tiles)}
-                    delay={settleDelay + index * STAGGER_SECONDS}
-                    animate={animate} />
-                      건
-                    </dd>
-                  </motion.div>
-              )}
-              </dl>
-            }
+        <section>
             {/* 보이기 전에는 visibility 로 숨겨 투명한 채로 초점이 가거나 눌리지 않게 한다 */}
             <div
             className={cn(

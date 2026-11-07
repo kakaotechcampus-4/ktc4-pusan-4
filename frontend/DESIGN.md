@@ -23,7 +23,7 @@
 | 이름 | 값 | 용도 |
 |---|---|---|
 | `canvas` | #FFFFFF | 페이지 바탕, 카드·패널 바탕 |
-| `surface` | #F2F4F6 | hover, 고른 상태. 카드·패널·구역을 칠하지 않는다 |
+| `surface` | #F2F4F6 | hover, 고른 상태, 결과 머리판(`AmountHero`, 판정 진행판). 그 밖의 카드·패널·구역을 칠하지 않는다 |
 | `surface2` | #2C6AE8 | 첫 화면 큰 판과 그 옆 숫자 카드. 위에 올리는 글자·그림은 흰색 |
 | `sheet` | #FFFFFF | 표, 떠 있는 시트 (canvas 와 같은 흰색) |
 | `line` / `line2` | #E5E8EB / #EDEFF2 | 카드 테두리·행 괘선 / 약한 구분선. `line2` 는 `surface` 위에서도 보여야 해서 `surface` 보다 진하다 |
@@ -41,6 +41,8 @@
 **회색 규칙**
 - 내용은 흰 바탕에 두고 간격으로 가른다. `bg-surface` 로 카드·패널·구역을 칠하지 않는다. 경계가 꼭 필요한 덩어리만 흰 상자 + `border border-line` + `rounded-2xl`(= `Card`).
 - `surface` 는 hover 와 고른 상태의 바탕에만 쓴다. 고른 것이 hover 와 같아 보이면 안 되므로 고른 행·고른 선택지는 `accent-soft` 다.
+  - 예외는 결과 머리판 하나다(11/7 치오). 판정(`/run`)의 진행판, 결과와 요약의 `AmountHero` 를 `surface` 로 칠한다. 회색을 다 걷어 내니 숫자가 바탕에 떠서 화면의 중심이 없었다. 한 화면에 이 판 하나뿐이고, 판 안의 칸(판정별 건수)은 흰 바탕이다.
+  - 넘길 문장처럼 읽기만 하는 인용 상자도 `surface` 다. 흰 카드 안에서 고칠 수 없는 글임을 보인다.
 - 글자는 `ink`(내용), `ink2`(읽어야 하는 보조 글), `muted`(날짜·건수 같은 작은 메타 정보) 셋이다. 메타 정보도 대부분은 빼는 것이 낫다(아래 문구 규칙).
 - 입력칸·select·고르지 않은 선택지의 테두리는 `edge` 다. `line` 은 흰 바탕 1.23 이라 칸이 어디서 끝나는지 안 보인다.
 
@@ -104,6 +106,7 @@
 ### 간격·형태
 
 - 페이지 폭 `max-w-page`(1440px). 좌우 여백은 `px-6 lg:px-gutter`(62px) — 레퍼런스에서 잰 값이다.
+- **한 줄로 읽어 내려가는 흐름 화면은 가운데 한 단이다.** 사업자 문진, 분류 확인, 판정 전 확인, 판정, 질문은 `<AppShell narrow>` 로 빵부스러기와 내용을 `max-w-3xl` 한 단에 두고 가운데 놓는다. 1440px 바탕의 왼쪽에 붙이면 오른쪽 절반이 비어 화면이 기운다(11/7 치오). 표와 상세 패널이 나란한 결과, 거래, 업로드 이력과 두 칸인 요약은 넓게 쓴다.
 - 섹션 세로 여백: 랜딩 `pt-28`, 구분 띠(숫자) `py-16`.
 - 라운드: 패널·카드 `rounded-2xl`(24px), 큰 판 `rounded-[20px]`, 중간 `rounded-xl`(16px)·`rounded-lg`(12px), **버튼·알약은 `rounded-full`**.
 - 초점 테(`:focus-visible`, index.css)는 모서리를 건드리지 않는다. 요소의 `rounded-*` 를 따라 그려지므로 버튼마다 `focus-visible:rounded-*` 를 덧붙이지 않는다. `html` 의 `scroll-padding-top` 이 sticky 머리띠(72px)만큼 띄워서 Tab 으로 옮긴 초점이 머리띠 밑에 숨지 않는다.
@@ -262,4 +265,5 @@ Toast/알림, 파일 드롭존, Drawer, StatTile, Timeline.
 - 파일 드롭존은 `/upload` 한 곳에서만 쓰여 그 화면 안에 두었다(`Upload.tsx` 의 `DropZone`). 두 번째로 필요해지면 `ui/` 로 뽑는다.
 - Tabs 는 만들지 않았다. 목록 필터는 `FilterBar`(버튼 묶음)로 하고, 보여줄 패널이 갈리는 진짜 탭이 필요해지면 그때 만든다.
 - 진행 표시는 `AppShell` 의 단계 표시와, `Run`·`ClassificationPreview` 가 각자 그리는 진척 바가 있다. 같은 모양이 세 번째로 필요해지면 `Progress` 로 뽑는다.
+- 막대 그래프(요약의 계정과목별 금액)는 흰 카드 안에서 줄마다 이름, 건수, 금액을 한 줄에 쓰고 그 아래에 경비 가능 금액 가운데 몫(%)만큼 찬 `ink` 막대를 둔다. 막대가 카드 폭을 다 쓰고, 칸마다 다른 길이의 열을 잡지 않는다.
 - `Interview` 는 아직 옛 클래스(생 px)가 남아 있다. `Upload`·`Confirm`·`Run`·`Transactions`·`Uploads`·`ClassificationPreview`·`AppShell`·`Results`·`Summary`·`Questions` 는 토큰으로 옮겼다.
