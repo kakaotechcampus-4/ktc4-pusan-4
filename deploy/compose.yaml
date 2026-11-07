@@ -7,6 +7,90 @@ x-logging: &rotated-logging
     max-size: 10m
     max-file: "5"
 
+# 백엔드와 AI 는 blue·green 두 쌍으로 둔다(docs/deployment.md 4절). 배포는 쉬고 있는 색만 새 이미지로 띄우고,
+# Caddy 가 /api/v1 을 그 색으로 돌린 뒤 옛 색을 내린다. 같은 색끼리만 서로 부르므로 전환 중에도 옛 버전과 새 버전이 섞이지 않는다.
+# 두 색은 profile 로 묶어 서비스 이름 없이 docker compose up 하면 뜨지 않는다. 어느 색이 받는지는 deploy.sh 가 deploy/caddy/upstream.caddy 에 쓴다.
+# 그 파일이 없으면 Caddy 가 뜨지 않으므로 서버를 처음 띄울 때도 deploy.sh 로만 띄운다(docker compose up 을 직접 쓰지 않는다).
+x-backend: &backend
+  image: ${ECR_REPOSITORY}:backend-${IMAGE_TAG}
+  restart: unless-stopped
+  environment: &backend-env
+    SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME}
+    SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+    SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+    SPRING_DATA_REDIS_HOST: redis
+    SPRING_DATA_REDIS_PORT: "6379"
+    CLASSIFY_ENABLED: ${CLASSIFY_ENABLED:-false}
+    HOLIDAY_API_KEY: ${HOLIDAY_API_KEY:-}
+    APP_AUTH_JWT_SECRET: ${APP_AUTH_JWT_SECRET:-}
+    APP_AUTH_KAKAO_REST_API_KEY: ${APP_AUTH_KAKAO_REST_API_KEY:-}
+    APP_AUTH_KAKAO_CLIENT_SECRET: ${APP_AUTH_KAKAO_CLIENT_SECRET:-}
+    APP_AUTH_KAKAO_REDIRECT_URI: ${APP_AUTH_KAKAO_REDIRECT_URI:-}
+    APP_MAIL_USERNAME: ${APP_MAIL_USERNAME:-}
+    APP_MAIL_PASSWORD: ${APP_MAIL_PASSWORD:-}
+    JAVA_TOOL_OPTIONS: -Xms128m -Xmx768m
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  healthcheck:
+    test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
+    interval: 15s
+    timeout: 5s
+    retries: 12
+    start_period: 30s
+  mem_limit: 1200m
+  # 로그는 CloudWatch Logs /ktc4/backend 로 간다(docs/deployment.md 13절). Docker 데몬이 호스트에서 인스턴스 역할로 보내므로
+  # 컨테이너에 자격 증명이 없어도 된다. 그룹은 모니터링 스택이 보존 기간과 함께 만든다. 자동으로 만들면 보존이 무기한이라 끈다.
+  # 그래서 그룹이 없으면 컨테이너가 뜨지 않는다. non-blocking 은 CloudWatch 가 느려도 앱 로그 쓰기가 멈추지 않게 한다.
+  logging:
+    driver: awslogs
+    options:
+      awslogs-region: ap-northeast-2
+      awslogs-group: /ktc4/backend
+      awslogs-create-group: "false"
+      mode: non-blocking
+  # 종료할 때 판정 run 을 app.judgment-run.await-termination(60s)까지 기다린다(application.yml).
+  # Docker 기본값(10s)이면 그 전에 SIGKILL 로 꺼진다. 웹 요청 종료 대기(최대 30s) 뒤에 이어지므로 합 90s 에 10s 를 더 둔다.
+  stop_grace_period: 100s
+
+x-ai: &ai
+  image: ${ECR_REPOSITORY}:ai-${IMAGE_TAG}
+  restart: unless-stopped
+  environment: &ai-env
+    DATABASE_URL: postgresql://${DB_USERNAME}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+    AGENT_API_KEY: ${AGENT_API_KEY:-}
+    AGENT_BASE_URL: ${AGENT_BASE_URL:-}
+    AGENT_MODEL: ${AGENT_MODEL:-}
+    AGENT_REASONING_EFFORT: ${AGENT_REASONING_EFFORT:-}
+    ASSISTANT_API_KEY: ${ASSISTANT_API_KEY:-}
+    ASSISTANT_BASE_URL: ${ASSISTANT_BASE_URL:-}
+    ASSISTANT_MODEL: ${ASSISTANT_MODEL:-}
+    ASSISTANT_REASONING_EFFORT: ${ASSISTANT_REASONING_EFFORT:-}
+    CLASSIFY_API_KEY: ${CLASSIFY_API_KEY:-}
+    CLASSIFY_BASE_URL: ${CLASSIFY_BASE_URL:-}
+    CLASSIFY_MODEL: ${CLASSIFY_MODEL:-}
+    EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+    EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-}
+    LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+    LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+    LAW_API_OC: ${LAW_API_OC:-test}
+    TEAM_DISCORD_WEBHOOK: ${TEAM_DISCORD_WEBHOOK:-}
+  depends_on:
+    postgres:
+      condition: service_healthy
+  healthcheck:
+    test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/db', timeout=3)"]
+    interval: 15s
+    timeout: 5s
+    retries: 8
+    start_period: 10s
+  mem_limit: 512m
+  logging: *rotated-logging
+  # 옛 쌍을 내릴 때 백엔드가 기다리는 비서 턴(최대 30s)을 마저 끝낸다. Docker 기본값 10s 면 그 전에 꺼진다.
+  stop_grace_period: 40s
+
 services:
   postgres:
     image: ${ECR_REPOSITORY}:postgres-${POSTGRES_TAG}
@@ -43,89 +127,45 @@ services:
     mem_limit: 192m
     logging: *rotated-logging
 
-  backend:
-    image: ${ECR_REPOSITORY}:backend-${IMAGE_TAG}
-    restart: unless-stopped
+  # 호스트의 CloudWatch Agent 가 /actuator/prometheus 를 긁는다. 127.0.0.1 에만 열어 밖에서는 닿지 않는다. 두 색이 같이 뜨므로 포트를 나눈다.
+  backend-blue:
+    <<: *backend
+    profiles: [blue]
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME}
-      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
-      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
-      SPRING_DATA_REDIS_HOST: redis
-      SPRING_DATA_REDIS_PORT: "6379"
-      ASSISTANT_SERVER_URL: http://ai:8000
-      CLASSIFY_ENABLED: ${CLASSIFY_ENABLED:-false}
-      CLASSIFY_SERVER_URL: http://ai:8000
-      HOLIDAY_API_KEY: ${HOLIDAY_API_KEY:-}
-      APP_AUTH_JWT_SECRET: ${APP_AUTH_JWT_SECRET:-}
-      APP_AUTH_KAKAO_REST_API_KEY: ${APP_AUTH_KAKAO_REST_API_KEY:-}
-      APP_AUTH_KAKAO_CLIENT_SECRET: ${APP_AUTH_KAKAO_CLIENT_SECRET:-}
-      APP_AUTH_KAKAO_REDIRECT_URI: ${APP_AUTH_KAKAO_REDIRECT_URI:-}
-      APP_MAIL_USERNAME: ${APP_MAIL_USERNAME:-}
-      APP_MAIL_PASSWORD: ${APP_MAIL_PASSWORD:-}
-      JAVA_TOOL_OPTIONS: -Xms128m -Xmx768m
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
-      interval: 15s
-      timeout: 5s
-      retries: 12
-      start_period: 30s
-    mem_limit: 1200m
-    # 호스트의 CloudWatch Agent 가 /actuator/prometheus 를 긁는다. 127.0.0.1 에만 열어 밖에서는 닿지 않는다.
+      <<: *backend-env
+      ASSISTANT_SERVER_URL: http://ai-blue:8000
+      CLASSIFY_SERVER_URL: http://ai-blue:8000
     ports:
       - "127.0.0.1:8080:8080"
-    # 로그는 CloudWatch Logs /ktc4/backend 로 간다(docs/deployment.md 13절). Docker 데몬이 호스트에서 인스턴스 역할로 보내므로
-    # 컨테이너에 자격 증명이 없어도 된다. 그룹은 모니터링 스택이 보존 기간과 함께 만든다. 자동으로 만들면 보존이 무기한이라 끈다.
-    # 그래서 그룹이 없으면 컨테이너가 뜨지 않는다. non-blocking 은 CloudWatch 가 느려도 앱 로그 쓰기가 멈추지 않게 한다.
-    logging:
-      driver: awslogs
-      options:
-        awslogs-region: ap-northeast-2
-        awslogs-group: /ktc4/backend
-        awslogs-create-group: "false"
-        mode: non-blocking
-    # 종료할 때 판정 run 을 app.judgment-run.await-termination(60s)까지 기다린다(application.yml).
-    # Docker 기본값(10s)이면 그 전에 SIGKILL 로 꺼진다. 웹 요청 종료 대기(최대 30s) 뒤에 이어지므로 합 90s 에 10s 를 더 둔다.
-    stop_grace_period: 100s
 
-  ai:
-    image: ${ECR_REPOSITORY}:ai-${IMAGE_TAG}
-    restart: unless-stopped
+  backend-green:
+    <<: *backend
+    profiles: [green]
     environment:
-      DATABASE_URL: postgresql://${DB_USERNAME}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
-      AGENT_API_KEY: ${AGENT_API_KEY:-}
-      AGENT_BASE_URL: ${AGENT_BASE_URL:-}
-      AGENT_MODEL: ${AGENT_MODEL:-}
-      AGENT_REASONING_EFFORT: ${AGENT_REASONING_EFFORT:-}
-      ASSISTANT_API_KEY: ${ASSISTANT_API_KEY:-}
-      ASSISTANT_BASE_URL: ${ASSISTANT_BASE_URL:-}
-      ASSISTANT_MODEL: ${ASSISTANT_MODEL:-}
-      ASSISTANT_REASONING_EFFORT: ${ASSISTANT_REASONING_EFFORT:-}
-      CLASSIFY_API_KEY: ${CLASSIFY_API_KEY:-}
-      CLASSIFY_BASE_URL: ${CLASSIFY_BASE_URL:-}
-      CLASSIFY_MODEL: ${CLASSIFY_MODEL:-}
-      BACKEND_BASE_URL: http://backend:8080/api/v1
-      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
-      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-}
-      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
-      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
-      LAW_API_OC: ${LAW_API_OC:-test}
-      TEAM_DISCORD_WEBHOOK: ${TEAM_DISCORD_WEBHOOK:-}
-    depends_on:
-      postgres:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/db', timeout=3)"]
-      interval: 15s
-      timeout: 5s
-      retries: 8
-      start_period: 10s
-    mem_limit: 512m
-    logging: *rotated-logging
+      <<: *backend-env
+      ASSISTANT_SERVER_URL: http://ai-green:8000
+      CLASSIFY_SERVER_URL: http://ai-green:8000
+    ports:
+      - "127.0.0.1:8081:8080"
+
+  ai-blue:
+    <<: *ai
+    profiles: [blue]
+    environment:
+      <<: *ai-env
+      BACKEND_BASE_URL: http://backend-blue:8080/api/v1
+
+  ai-green:
+    <<: *ai
+    profiles: [green]
+    environment:
+      <<: *ai-env
+      BACKEND_BASE_URL: http://backend-green:8080/api/v1
+
+  # 주간 배치(corpus-sync.sh, rule-candidates.sh)가 run 으로 띄우는 일회용 ai. 비서 도구를 쓰지 않아 백엔드 주소가 없다.
+  ai-job:
+    <<: *ai
+    profiles: [job]
 
   # 이미지가 커밋과 무관해 배포해도 다시 뜨지 않는다. 화면 파일은 web-dist 볼륨에서, 설정은 서버 repo 의 deploy/caddy/ 에서 읽는다.
   # Caddyfile 변경은 deploy.sh 가 caddy reload 로 반영한다. 디렉터리째 붙이는 이유: 파일 하나만 붙이면 git checkout 이 새로 쓴 파일이 컨테이너에 보이지 않는다.
@@ -143,22 +183,14 @@ services:
       - web-dist:/srv:ro
       - caddy-data:/data
       - caddy-config:/config
-    depends_on:
-      web-files:
-        condition: service_completed_successfully
     mem_limit: 256m
     logging: *rotated-logging
 
-  # 커밋의 화면 파일을 web-dist 볼륨에 옮기고 끝난다(deploy/web-publish.sh). 새 화면이 옛 API 를 부르지 않게 새 backend 가 healthy 가 된 뒤 돈다.
-  # deploy.sh 가 아니라 up 안에 두는 이유: 배포 때 도는 deploy.sh 는 직전 배포의 것이라(docs/deployment.md 4절), 이 단계를 스크립트에 넣으면
-  # 처음 배포할 때 옛 스크립트가 빈 볼륨으로 Caddy 만 띄운다.
+  # 커밋의 화면 파일을 web-dist 볼륨에 옮기고 끝난다(deploy/web-publish.sh). deploy.sh 가 /api/v1 을 새 색으로 돌린 뒤 run 으로 부른다.
   web-files:
     image: ${ECR_REPOSITORY}:web-${IMAGE_TAG}
     volumes:
       - web-dist:/srv
-    depends_on:
-      backend:
-        condition: service_healthy
 
 volumes:
   postgres-data:
