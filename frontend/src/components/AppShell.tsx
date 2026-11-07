@@ -97,7 +97,7 @@ export function AppShell({ children, showSteps = true, disclaimer = true }: AppS
           한 줄을 넘기면 한글이 음절 단위로 꺾인다. 줄바꿈을 막고, 폭이 모자라면 덜 중요한 것부터 접는다:
           lg 미만 — 이메일(「내 정보」로) · md 미만 — 단계 표시
         */}
-        <div className="mx-auto flex h-[72px] max-w-page items-center justify-between gap-3 whitespace-nowrap px-6">
+        <div className="mx-auto flex h-[72px] max-w-page items-center justify-between gap-3 whitespace-nowrap px-4 sm:px-6">
           <Logo
             suffix={
             <>
@@ -144,9 +144,9 @@ export function AppShell({ children, showSteps = true, disclaimer = true }: AppS
             </nav>
           }
 
-          {/* 360px 에서도 로고·자료·내 정보·로그아웃이 한 줄에 들어가도록 좁은 폭에서는 간격과 여백을 줄인다.
+          {/* 390px 에서도 로고·자료·내 정보·로그아웃이 한 줄에 들어가도록 좁은 폭에서는 간격과 여백, 머리말 좌우 여백(16px)을 줄인다.
               그래도 넘치면(관리자 메뉴까지 있을 때) 자료 메뉴만 옆으로 밀리고 화면은 가로로 늘지 않는다 */}
-          <div className="flex min-w-0 items-center gap-2 text-small text-ink2 sm:gap-3">
+          <div className="flex min-w-0 items-center gap-1.5 text-small text-ink2 sm:gap-3">
             <nav
               aria-label="자료"
               className="flex min-w-0 items-center gap-1 overflow-x-auto [scrollbar-width:none] sm:shrink-0 sm:gap-1.5 sm:overflow-visible">
@@ -157,7 +157,7 @@ export function AppShell({ children, showSteps = true, disclaimer = true }: AppS
                     key={ref.path}
                     to={ref.path}
                     aria-current={active ? 'page' : undefined}
-                    className={`shrink-0 whitespace-nowrap rounded-full px-2.5 py-1.5 font-bold transition-colors duration-150 ease-snap sm:px-3 ${
+                    className={`shrink-0 whitespace-nowrap rounded-full px-2 py-1.5 font-bold transition-colors duration-150 ease-snap sm:px-3 ${
                     active ? 'bg-accent text-white' : 'text-ink2 hover:bg-surface'}`
                     }>
 
@@ -183,7 +183,7 @@ export function AppShell({ children, showSteps = true, disclaimer = true }: AppS
               to="/account"
               aria-current={pathname.startsWith('/account') ? 'page' : undefined}
               title={accountLabel(email)}
-              className={`shrink-0 whitespace-nowrap rounded-full px-2.5 py-1.5 font-bold transition-colors duration-150 ease-snap sm:px-3 lg:hidden ${
+              className={`shrink-0 whitespace-nowrap rounded-full px-2 py-1.5 font-bold transition-colors duration-150 ease-snap sm:px-3 lg:hidden ${
               pathname.startsWith('/account') ?
               'bg-accent text-white' :
               'hover:bg-surface hover:text-ink'}`
@@ -195,7 +195,7 @@ export function AppShell({ children, showSteps = true, disclaimer = true }: AppS
             <Button
               variant="secondary"
               size="sm"
-              className="shrink-0 max-sm:px-3"
+              className="shrink-0 max-sm:px-2.5 max-sm:text-small"
               onClick={() => {
                 signOut();
                 navigate('/');
@@ -241,11 +241,11 @@ export function AppShell({ children, showSteps = true, disclaimer = true }: AppS
         {children}
       </main>
 
-      {/* 링크 순서는 공개 화면의 꼬리말(MarketingFooter)과 같다 (C96) */}
+      {/* 링크 순서와 색은 공개 화면의 꼬리말(MarketingFooter)과 같다 (C96) */}
       <footer className="mt-10 border-t border-line">
         {/* 좁은 화면에서는 오른쪽을 비울 폭이 없어 비서 버튼 높이만큼 아래를 비운다 */}
         <div className="mx-auto max-w-page px-6 pb-24 pt-8 text-caption text-ink2 sm:pb-8 sm:pr-24 print:p-0">
-          <nav aria-label="도움말과 약관" className="print:hidden">
+          <nav aria-label="도움말과 약관" className="text-muted print:hidden">
             <ul className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
               <li><Link to="/faq" className={FOOTER_LINK}>자주 묻는 질문</Link></li>
               <li><BugReportButton icon={false} className={FOOTER_LINK} /></li>
