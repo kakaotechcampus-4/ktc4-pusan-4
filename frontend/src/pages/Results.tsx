@@ -4,6 +4,7 @@ import { ArrowRightIcon, CircleHelpIcon, DownloadIcon, SearchXIcon } from 'lucid
 import { AppShell } from '../components/AppShell';
 import { StepEyebrow } from '../components/StepEyebrow';
 import { JudgmentDetailPanel } from '../components/results/JudgmentDetailPanel';
+import { AmountHero } from '../components/results/AmountHero';
 import { categoryLabel, merchantTitle, verdictNote } from '../components/results/display';
 import { VerdictBadge } from '../components/VerdictBadge';
 import {
@@ -20,7 +21,8 @@ import { useAssistantSubject } from '../components/assistant/context';
 import { api, ApiRequestError, useApi } from '../api';
 import type { Judgment, Verdict } from '../types/domain';
 import { formatFullDate, formatNumber, formatPeriod, formatWon } from '../utils/format';
-import { AWAITING_ANSWER, awaitingOf } from '../utils/verdict';
+import { AWAITING_ANSWER } from '../utils/verdict';
+import { readAll, readUnavailableSplit } from '../api/readAll';
 import { download, exportRowOf, judgmentsCsv } from '../utils/csv';
 import { exceededLimitOf, excessNote } from '../utils/limit';
 import { useMediaQuery } from '../hooks/useMediaQuery';
@@ -29,14 +31,10 @@ import { useMediaQuery } from '../hooks/useMediaQuery';
 type Filter = 'ALL' | Verdict | 'AWAITING';
 
 /** 내보내기 API(#214)가 아직 없는 서버는 판정 목록을 끝까지 읽어 같은 모양을 만든다 */
-const readAllJudgments = async (batchId: string) => {
-  const all: Judgment[] = [];
-  for (let page = 0;; page += 1) {
-    const result = await api.judgments.list({ batchId, page, size: 100 });
-    all.push(...result.items);
-    if (!result.page.hasNext || page + 1 >= result.page.totalPages) return all;
-  }
-};
+const readAllJudgments = (batchId: string) => readAll((page, size) => api.judgments.list({ batchId, page, size }));
+
+/** 표 한 쪽의 행 수. 서버 목록의 기본 크기와 같다 */
+const PAGE_SIZE = 20;
 
 /**
  * 세무사에게 넘길 내보내기. 인정 금액, 답한 내용, 연도별 접대비 한도(#226)가 함께 온다.
@@ -104,24 +102,29 @@ export function Results() {
       batchId,
       verdict: filter === 'ALL' || filter === 'AWAITING' ? undefined : filter,
       page,
-      size: 20
+      size: PAGE_SIZE
     }) :
     Promise.resolve(null),
     [batchId, filter, page]
   );
-  // 답을 기다리는 질문. 걸린 거래가 불가면 행에 답변 대기를 붙인다 (C12). 한 번에 100개까지라 그 밖의 거래는 표지가 빠질 수 있다
+  // 답할 질문 안내의 집계(unresolved). 집계는 쪽과 상관없이 오므로 한 개만 읽는다
   const questionsQ = useApi(
     () =>
     batchId ?
-    api.questions.list({ batchId, status: 'PENDING', size: 100 }) :
+    api.questions.list({ batchId, status: 'PENDING', size: 1 }) :
     Promise.resolve(null),
     [batchId]
   );
-  // 불가 가운데 답변 대기를 따로 세고 거른다 (C12). 질문 목록처럼 100건까지다
+  // 불가와 답변 대기를 가른다 (C12). 둘 다 끝까지 읽으므로 거래가 몇 건이어도 건수와 목록이 맞는다
   const unavailableQ = useApi(
+    () => batchId ? readUnavailableSplit(api, { batchId }, batchId) : Promise.resolve(null),
+    [batchId]
+  );
+  // 경비 가능 금액이 판정한 결제 가운데 얼마만큼인지. 집계에는 결제 합계가 없어 현재 판정 전부에서 더한다
+  const spendQ = useApi(
     () =>
     batchId ?
-    api.judgments.list({ batchId, verdict: 'UNAVAILABLE', size: 100 }) :
+    readExport(batchId).then(({ items }) => items.reduce((sum, row) => sum + row.judgment.transaction.amount, 0)) :
     Promise.resolve(null),
     [batchId]
   );
@@ -142,15 +145,21 @@ export function Results() {
     [batchId]
   );
 
-  const awaiting = new Set(questionsQ.data?.items.map((question) => question.transactionId));
-  /** 불가와 답변 대기는 불가를 한 번에 읽어 화면에서 가르고, 쪽을 나누지 않는다 */
+  const split = unavailableQ.data;
+  const awaiting = split?.pendingTransactionIds ?? new Set<string>();
+  const awaitingCount = split?.awaiting.length ?? 0;
+  /** 불가와 답변 대기는 다 읽어 둔 목록을 화면에서 쪽으로 나눈다 */
   const splitUnavailable = filter === 'UNAVAILABLE' || filter === 'AWAITING';
-  const awaitingRows = awaitingOf(unavailableQ.data?.items ?? [], awaiting);
-  const judgments: Judgment[] =
-  filter === 'AWAITING' ?
-  awaitingRows :
-  filter === 'UNAVAILABLE' ?
-  (unavailableQ.data?.items ?? []).filter((row) => !awaitingRows.includes(row)) :
+  const splitRows = filter === 'AWAITING' ? split?.awaiting ?? [] : split?.confirmed ?? [];
+  const splitPage = {
+    number: page,
+    size: PAGE_SIZE,
+    totalElements: splitRows.length,
+    totalPages: Math.max(1, Math.ceil(splitRows.length / PAGE_SIZE)),
+    hasNext: (page + 1) * PAGE_SIZE < splitRows.length
+  };
+  const judgments: Judgment[] = splitUnavailable ?
+  splitRows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE) :
   judgmentsQ.data?.items ?? [];
 
   // 패널은 고른 거래의 현재 판정을 따로 읽는다(거래 요약이 함께 온다). 수정하면 그 행이 목록 맨 위로
@@ -188,9 +197,12 @@ export function Results() {
   }, [wide]);
 
   // 마지막 행이 다른 분류로 빠지면 그 페이지가 빈다. Pagination 이 사라지므로 첫 페이지로
+  const pageEmpty = splitUnavailable ?
+  Boolean(split) && judgments.length === 0 :
+  Boolean(judgmentsQ.data) && judgmentsQ.data?.items.length === 0;
   useEffect(() => {
-    if (page > 0 && judgmentsQ.data && judgmentsQ.data.items.length === 0) setPage(0);
-  }, [page, judgmentsQ.data]);
+    if (page > 0 && pageEmpty) setPage(0);
+  }, [page, pageEmpty]);
 
   // 패널은 열릴 때 제목으로 초점을 옮긴다. 좁은 화면에서는 아래에서 올라오는 창으로 연다
   const select = (transactionId: string) => {
@@ -203,6 +215,7 @@ export function Results() {
     judgmentsQ.reload();
     unavailableQ.reload();
     summaryQ.reload();
+    spendQ.reload();
     panelQ.reload();
     questionsQ.reload();
   };
@@ -211,6 +224,7 @@ export function Results() {
   const reloadAll = () => {
     batchQ.reload();
     summaryQ.reload();
+    spendQ.reload();
     judgmentsQ.reload();
     unavailableQ.reload();
     questionsQ.reload();
@@ -253,11 +267,11 @@ export function Results() {
   {
     value: 'UNAVAILABLE' as const,
     label: '불가',
-    count: summary && unavailableQ.data ? summary.byVerdict.UNAVAILABLE.count - awaitingRows.length : undefined
+    count: summary && split ? summary.byVerdict.UNAVAILABLE.count - awaitingCount : undefined
   },
   // 답을 기다리는 거래가 있을 때만 둔다. 고른 채로 다 답했으면 빈 목록이 보이도록 남긴다
-  ...(awaitingRows.length > 0 || filter === 'AWAITING' ?
-  [{ value: 'AWAITING' as const, label: AWAITING_ANSWER, count: awaitingRows.length }] :
+  ...(awaitingCount > 0 || filter === 'AWAITING' ?
+  [{ value: 'AWAITING' as const, label: AWAITING_ANSWER, count: awaitingCount }] :
   [])];
 
   const unresolved = questionsQ.data?.unresolved;
@@ -269,7 +283,7 @@ export function Results() {
    * 처음 읽는 동안. 머리글 줄, 질문 안내, 분류 안내, 표를 다 받은 뒤 한 번에 그린다.
    * 따로 그리면 늦게 온 줄이 이미 그린 표를 밀어 내린다 (C66). 실패한 것은 기다리지 않는다
    */
-  const firstLoad = [batchQ, summaryQ, questionsQ, unavailableQ, unclassifiedQ].some(
+  const firstLoad = [batchQ, summaryQ, spendQ, questionsQ, unavailableQ, unclassifiedQ].some(
     (query) => query.loading && !query.data && !query.error
   );
 
@@ -354,22 +368,21 @@ export function Results() {
       <div className="min-w-0">
         <StepEyebrow />
         <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">결과</h1>
-        {summary && !firstLoad ?
-      <p className="mt-2 flex flex-wrap gap-x-4 text-body tabular-nums text-ink2">
-            {batchQ.data &&
-        <span>{formatPeriod(batchQ.data.periodStart, batchQ.data.periodEnd)}</span>
-        }
-            <span>{formatNumber(summary.totalCount)}건</span>
-            <span>
-              경비 가능 금액{' '}
-              <strong className="font-bold text-ink">
-                {formatWon(summary.byVerdict.AVAILABLE.finalAmount)}
-              </strong>
-            </span>
-          </p> :
-      // 줄 높이를 미리 잡아 둔다. 늦게 들어와도 아래를 밀지 않는다 (C66)
+        {batchQ.data &&
+      <p className="mt-1 text-small tabular-nums text-ink2">
+            {formatPeriod(batchQ.data.periodStart, batchQ.data.periodEnd)}
+          </p>
+      }
+        {/* 건수는 아래 필터마다 있다. 머리에는 경비 가능 금액 하나만 크게 둔다 */}
+        {summary && !firstLoad && summary.totalCount > 0 ?
+      <AmountHero
+        className="mt-5"
+        amount={summary.byVerdict.AVAILABLE.finalAmount}
+        spend={spendQ.error ? null : spendQ.data} /> :
+
+      // 높이를 미리 잡아 둔다. 늦게 들어와도 아래를 밀지 않는다 (C66)
       batchId && firstLoad &&
-      <span className="mt-2 block h-6 w-72 max-w-full animate-pulse rounded bg-line2" />
+      <span className="mt-5 block h-[6.5rem] w-72 max-w-full animate-pulse rounded bg-line2" />
       }
         {excess && !firstLoad &&
       <p className="mt-1 max-w-2xl text-small text-ink2">{excess}</p>
@@ -486,12 +499,12 @@ export function Results() {
     } /> :
 
   filter === 'NEEDS_REVIEW' ?
-  <Empty icon={<SearchXIcon className="h-5 w-5" />} title="확인이 필요한 거래가 없습니다" /> :
+  <Empty icon={<SearchXIcon className="h-5 w-5" />} inTable title="확인이 필요한 거래가 없습니다" /> :
 
   filter === 'AWAITING' ?
-  <Empty icon={<SearchXIcon className="h-5 w-5" />} title="답을 기다리는 거래가 없습니다" /> :
+  <Empty icon={<SearchXIcon className="h-5 w-5" />} inTable title="답을 기다리는 거래가 없습니다" /> :
 
-  <Empty icon={<SearchXIcon className="h-5 w-5" />} title="이 판정에 해당하는 거래가 없습니다" />;
+  <Empty icon={<SearchXIcon className="h-5 w-5" />} inTable title="이 판정에 해당하는 거래가 없습니다" />;
 
 
   const panel =
@@ -600,8 +613,10 @@ export function Results() {
             onRowClick={(row) => select(row.transactionId)}
             empty={empty} />
 
-          {!failed && !firstLoad && !splitUnavailable && judgmentsQ.data && judgments.length > 0 &&
-          <Pagination page={judgmentsQ.data.page} onChange={setPage} />
+          {!failed && !firstLoad && judgments.length > 0 && (
+          splitUnavailable ?
+          <Pagination page={splitPage} onChange={setPage} /> :
+          judgmentsQ.data && <Pagination page={judgmentsQ.data.page} onChange={setPage} />)
           }
         </section>
 
