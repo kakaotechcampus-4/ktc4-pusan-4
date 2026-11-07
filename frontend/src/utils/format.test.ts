@@ -36,6 +36,6 @@ describe('formatFullDate', () => {
 
 describe('formatDateTime', () => {
   it('KST 날짜와 시:분을 잇는다', () => {
-    expect(formatDateTime('2026-10-16T05:01:02Z')).toBe('2026-10-16 14:01');
+    expect(formatDateTime('2026-10-16T05:01:02Z')).toBe('2026. 10. 16 14:01');
   });
 });

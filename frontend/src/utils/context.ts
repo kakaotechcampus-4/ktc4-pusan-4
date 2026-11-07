@@ -16,7 +16,7 @@ export const contextRows = (context: BusinessContext | StoredBusinessContext) =>
 {
   term: '업종',
   value: INDUSTRY_NAME[context.industryCode] ?
-  `${context.industryCode} · ${INDUSTRY_NAME[context.industryCode]}` :
+  `${context.industryCode} ${INDUSTRY_NAME[context.industryCode]}` :
   context.industryCode
 },
 { term: '직전연도 수입금액', value: `${formatNumber(context.prevYearRevenue)}원` },

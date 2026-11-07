@@ -19,7 +19,7 @@ describe('bugReportMailto', () => {
     expect(text).toContain('무엇을 하려다:');
     expect(text).toContain('무엇을 기대했는지:');
     expect(text).toContain('화면: /results');
-    expect(text).toContain('시각: 2026-10-31 20:40 (KST)');
+    expect(text).toContain('시각: 2026. 10. 31 20:40 (KST)');
     expect(text).toContain('계정 id: u-1');
     expect(text).not.toMatch(/@/);
   });

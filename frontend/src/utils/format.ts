@@ -47,9 +47,10 @@ export const toKst = (iso: string): { date: string; time: string } => {
   };
 };
 
+/** 다른 날짜와 같은 꼴(2026. 11. 05)에 시:분을 붙인다 (C86) */
 export const formatDateTime = (iso: string): string => {
   const { date, time } = toKst(iso);
-  return `${date} ${time}`;
+  return `${formatFullDate(date)} ${time}`;
 };
 
 /** 숫자는 읽는 소리로 정한다. 영·삼·육은 받침이 있고, 일·칠·팔은 ㄹ 받침이라 「로」 */
