@@ -20,3 +20,9 @@
 ## 남은 것 · 아는 문제
 
 - `docs/deployment.md` 27행은 "지금 web 이미지는 목업 빌드"라고 하는데 `deploy/web.Dockerfile` 은 이미 `VITE_API=http` 로 빌드한다. 이 PR 범위 밖이라 고치지 않았다.
+
+## 00:48 항목별 설명 안내에 Frontend 절 추가
+
+- 커밋: 9def336f
+- 마지막 문장을 "[Backend], [Frontend], [AI] 절에 정리되어 있습니다" 로 바꿨다. Frontend 실행 칸도 곧 채워질 예정이라 함께 가리킨다.
+- Frontend 칸에 표가 들어올지 몰라 "표" 대신 "절" 이라고 썼다.
