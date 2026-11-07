@@ -17,6 +17,8 @@ export const ANSWER_LABEL: Record<string, string> = {
   // 통신(R-205)의 「업무 전용인가요?」에 대한 답
   전용: '업무 전용',
   공용: '업무와 개인 둘 다',
+  // 여비교통·숙박(R-208·R-310·R-314)의 용도
+  업무출장: '업무 출장',
   '고의·중대한 과실': '고의 또는 중대한 과실',
   // 보험(R-213). 사업장 화재·배상책임 보험이다
   '사업장 재산·배상책임': '사업장 재산 또는 배상책임',
@@ -56,18 +58,25 @@ export async function respondOnce(api: Api, group: QuestionGroup, value: string,
 export interface VerdictTally {
   verdict: Coded<Verdict>;
   count: number;
-  /** 그 판정을 받은 결제 금액의 합 */
-  amount: number;
+  /**
+   * 가능이면 경비 가능 금액(finalAmount)의 합이다. 결제 금액이 아니다 — 자산은 그해 넣을 수 있는 만큼만 가능이다.
+   * 확인 필요와 불가는 경비로 넣을 금액이 없어 null 이다
+   */
+  amount: number | null;
 }
 
 const VERDICT_ORDER: Verdict[] = ['AVAILABLE', 'NEEDS_REVIEW', 'UNAVAILABLE'];
 
-export const tallyVerdicts = (judgments: Pick<Judgment, 'verdict' | 'transaction'>[]): VerdictTally[] =>
+export const tallyVerdicts = (judgments: Pick<Judgment, 'verdict' | 'finalAmount'>[]): VerdictTally[] =>
 VERDICT_ORDER.flatMap((code) => {
   const rows = judgments.filter((judgment) => judgment.verdict.code === code);
   return rows.length === 0 ?
   [] :
-  [{ verdict: rows[0].verdict, count: rows.length, amount: rows.reduce((sum, row) => sum + row.transaction.amount, 0) }];
+  [{
+    verdict: rows[0].verdict,
+    count: rows.length,
+    amount: code === 'AVAILABLE' ? rows.reduce((sum, row) => sum + (row.finalAmount ?? 0), 0) : null
+  }];
 });
 
 /**

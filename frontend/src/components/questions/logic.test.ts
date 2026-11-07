@@ -55,8 +55,8 @@ const group = (patch: Partial<QuestionGroup> = {}): QuestionGroup => ({
   ...patch
 });
 
-const judgment = (code: Judgment['verdict']['code'], label: string, amount: number) =>
-({ verdict: { code, label }, transaction: transaction('x', amount) }) as unknown as Judgment;
+const judgment = (code: Judgment['verdict']['code'], label: string, amount: number, finalAmount = amount) =>
+({ verdict: { code, label }, transaction: transaction('x', amount), finalAmount }) as unknown as Judgment;
 
 const NETWORK = new ApiRequestError(0, 'NETWORK_ERROR', '서버에 연결하지 못했습니다.');
 
@@ -73,7 +73,8 @@ describe('answerLabel', () => {
     expect(answerLabel('혼자작업')).toBe('혼자 일함');
     expect(answerLabel('개인')).toBe('개인 용도');
     expect(answerLabel('업무미팅')).toBe('거래처 접대');
-    expect(answerLabel('업무출장')).toBe('업무출장');
+    expect(answerLabel('업무출장')).toBe('업무 출장');
+    expect(answerLabel('카드에 없는 값')).toBe('카드에 없는 값');
   });
 
   it('룰카드의 어떤 선택지도 화면에서 가운뎃점, 낫표, 해요체로 보이지 않는다', () => {
@@ -141,16 +142,17 @@ describe('respondOnce', () => {
 });
 
 describe('tallyVerdicts', () => {
-  it('판정별로 건수와 결제 금액을 더하고 가능, 확인 필요, 불가 순으로 둔다', () => {
+  it('판정별로 건수를 세고 가능은 경비 가능 금액을 더한다. 가능, 확인 필요, 불가 순이다', () => {
     expect(
       tallyVerdicts([
-      judgment('UNAVAILABLE', '불가', 5000),
+      judgment('UNAVAILABLE', '불가', 5000, 0),
       judgment('AVAILABLE', '가능', 240000),
-      judgment('AVAILABLE', '가능', 60000)]
+      // 자산은 결제 금액이 아니라 그해 넣을 수 있는 만큼이다
+      judgment('AVAILABLE', '가능', 1200000, 496100)]
       )
     ).toEqual([
-    { verdict: { code: 'AVAILABLE', label: '가능' }, count: 2, amount: 300000 },
-    { verdict: { code: 'UNAVAILABLE', label: '불가' }, count: 1, amount: 5000 }]
+    { verdict: { code: 'AVAILABLE', label: '가능' }, count: 2, amount: 736100 },
+    { verdict: { code: 'UNAVAILABLE', label: '불가' }, count: 1, amount: null }]
     );
   });
 });

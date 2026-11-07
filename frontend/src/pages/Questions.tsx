@@ -12,7 +12,7 @@ import { merchantTitle } from '../components/results/display';
 import { answerLabel, respondOnce, UNCONFIRMED_CODE, verdictsAfter, withHeld } from '../components/questions/logic';
 import type { VerdictTally } from '../components/questions/logic';
 import type { AnswerSource, QuestionGroup } from '../types/domain';
-import { formatDate, formatNumber, formatWon, ro } from '../utils/format';
+import { formatFullDate, formatNumber, formatWon, ro } from '../utils/format';
 
 /** F1-a. 한 번에 보여주는 질문 수(잠정). 다 답하면 다음 질문이 이어서 나온다 */
 const BATCH_SIZE = 15;
@@ -45,7 +45,7 @@ groups[0].options.filter((option) => groups.every((group) => group.options.inclu
 /** 선택지는 룰카드 값을 보내고 화면 이름으로 보여 준다 */
 const choicesOf = (group: QuestionGroup) => group.options.map((option) => ({ value: option, label: answerLabel(option) }));
 
-/** 「답했습니다」 앞에 붙는 답. 조사까지 화면 이름에 맞춘다 */
+/** 한 번에 답하기의 「…으로 답했습니다」 앞에 붙는 답. 조사까지 화면 이름에 맞춘다 */
 const answeredAs = (value: string) => {
   const label = answerLabel(value);
   return `${label}${ro(label)}`;
@@ -59,6 +59,8 @@ const merchantsOf = (groups: QuestionGroup[]) =>
 interface Outcome {
   value: string;
   tally: VerdictTally[] | null;
+  /** 다른 질문의 답이 같은 거래의 판정을 바꾸면 이 그룹의 결과를 다시 읽는다 */
+  group: QuestionGroup;
 }
 
 /**
@@ -192,8 +194,20 @@ export function Questions() {
       );
       return;
     }
-    const tally = await verdictsAfter(api, group);
-    setOutcomes((prev) => ({ ...prev, [key]: { value, tally } }));
+    // 같은 거래에 걸린 다른 질문(비품의 용도와 자산 등재 등)의 결과도 지금 판정으로 다시 읽는다
+    const ids = new Set(group.transactions.map((row) => row.transactionId));
+    const related = Object.entries(outcomes).filter(
+      ([other, outcome]) => other !== key && outcome.group.transactions.some((row) => ids.has(row.transactionId))
+    );
+    const [tally, ...refreshed] = await Promise.all([
+    verdictsAfter(api, group),
+    ...related.map(([, outcome]) => verdictsAfter(api, outcome.group))]
+    );
+    setOutcomes((prev) => ({
+      ...prev,
+      ...Object.fromEntries(related.map(([other], index) => [other, { ...prev[other], tally: refreshed[index] }])),
+      [key]: { value, tally, group }
+    }));
     if (index !== undefined)
     setHeld((prev) =>
     prev.some(({ item }) => groupId(item) === key) ?
@@ -249,7 +263,8 @@ export function Questions() {
     let saved = 0;
     for (const { group, value } of carryChosen) {
       try {
-        await api.questions.respond({ questionIds: group.questionIds, answer: { value }, source: 'PREVIOUS_ANSWER' });
+        // 하나씩 답할 때와 같이, 응답을 잃으면 저장됐는지 먼저 본다 (C49)
+        await respondOnce(api, group, value, 'PREVIOUS_ANSWER');
         saved += 1;
       } catch {
         // 남은 것도 보낸다. 몇 개를 못 했는지 알린다
@@ -297,12 +312,18 @@ export function Questions() {
         tabIndex={-1}
         className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-small text-ink2 outline-none">
 
-        <span>{answeredAs(outcome.value)} 답했습니다.</span>
+        <span>
+          답 <strong className="font-bold text-ink">{answerLabel(outcome.value)}</strong>
+        </span>
         {outcome.tally?.map(({ verdict, count, amount }) =>
         <span key={verdict.code} className="inline-flex items-center gap-1.5 whitespace-nowrap tabular-nums">
             <VerdictBadge verdict={verdict} />
             {count > 1 && <span>{formatNumber(count)}건</span>}
-            <span className="font-bold text-ink">{formatWon(amount)}</span>
+            {amount !== null &&
+          <span>
+                경비 가능 <strong className="font-bold text-ink">{formatWon(amount)}</strong>
+              </span>
+          }
           </span>
         )}
       </p>);
@@ -511,20 +532,27 @@ export function Questions() {
                                 </span>
                               </Badge>
                           }
-                            <span className="flex items-center gap-1.5 whitespace-nowrap text-caption tabular-nums text-muted">
-                              <LayersIcon className="h-3 w-3" aria-hidden="true" />
-                              <span>{formatNumber(group.count)}건</span>
+                            <span className="flex items-center gap-1.5 whitespace-nowrap text-caption tabular-nums text-ink2">
+                              {group.count > 1 &&
+                            <>
+                                  <LayersIcon className="h-3 w-3" aria-hidden="true" />
+                                  <span>{formatNumber(group.count)}건</span>
+                                </>
+                            }
                               <span>{formatWon(group.totalAmount)}</span>
                             </span>
                           </div>
                           <h2 className="mt-2 text-h4 font-bold text-ink">{group.questionText}</h2>
                           {rows.length > 0 &&
                         <ul className="mt-2 space-y-0.5 text-small tabular-nums text-ink2">
+                              {/* 위 이름표와 같은 가맹점, 한 건뿐일 때의 금액은 다시 적지 않는다 */}
                               {rows.slice(0, SHOWN_TRANSACTIONS).map((row) =>
                           <li key={row.questionId} className="flex gap-3">
-                                  <span className="shrink-0 text-muted">{formatDate(row.approvedAt)}</span>
-                                  <span className="min-w-0 flex-1 truncate">{merchantTitle(row)}</span>
-                                  <span className="shrink-0">{formatWon(row.amount)}</span>
+                                  <span className="shrink-0">{formatFullDate(row.approvedAt)}</span>
+                                  <span className="min-w-0 flex-1 truncate">
+                                    {merchantTitle(row) === merchantTitle(rows[0]) ? '' : merchantTitle(row)}
+                                  </span>
+                                  {group.count > 1 && <span className="shrink-0">{formatWon(row.amount)}</span>}
                                 </li>
                           )}
                               {group.count > SHOWN_TRANSACTIONS &&
@@ -670,7 +698,7 @@ export function Questions() {
                       <div className="min-w-0 flex-1">
                         <p className="text-small text-ink">{group.questionText}</p>
                         <p className="mt-0.5 flex flex-wrap gap-x-3 text-caption tabular-nums text-ink2">
-                          <span>{value ? `${answeredAs(value)} 답함` : '답함'}</span>
+                          <span>{value ? `답 ${answerLabel(value)}` : '답함'}</span>
                           <span className="text-muted">{formatNumber(group.count)}건</span>
                           <span className="text-muted">{formatWon(group.totalAmount)}</span>
                         </p>
@@ -713,7 +741,6 @@ export function Questions() {
               요약으로
               <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
             </Button>
-            {pendingTotal > 0 && <p className="text-small text-ink2">모르는 질문은 건너뛰어도 됩니다.</p>}
           </div>
         }
       </div>
