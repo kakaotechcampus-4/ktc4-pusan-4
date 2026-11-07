@@ -38,13 +38,18 @@
   .card b { display:block; font-size:16px; margin-bottom:6px; }
   .card small { color:var(--muted); font-size:13px; line-height:1.6; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   /* 문서 */
-  .page { max-width:1080px; margin:0 auto; padding:40px 32px 72px; display:grid; grid-template-columns:minmax(0,1fr) 220px; gap:56px; }
+  .page { max-width:1320px; margin:0 auto; padding:40px 32px 72px; display:grid; grid-template-columns:210px minmax(0,1fr) 200px; gap:48px; }
   .crumb { font-size:13px; color:var(--muted); }
   .crumb a { color:var(--muted); text-decoration:none; }
   .crumb a:hover { color:var(--blue); }
-  .sib { display:flex; flex-wrap:wrap; gap:8px; margin:18px 0 8px; }
-  .sib a { font-size:13px; font-weight:600; padding:6px 12px; border-radius:999px; background:var(--blue-l); color:var(--blue-d); text-decoration:none; }
-  .sib a.on { background:var(--blue); color:#fff; }
+  /* 왼쪽 페이지 목록 */
+  .side { position:sticky; top:96px; align-self:start; max-height:calc(100vh - 120px); overflow-y:auto; font-size:14px; }
+  .side-g { margin-bottom:20px; }
+  .side-g p { margin:0 0 6px 10px; font-size:12px; font-weight:700; color:var(--muted); }
+  .side a { display:block; padding:7px 10px; border-radius:10px; color:var(--ink2); text-decoration:none; transition:background-color .15s; }
+  .side a:hover { background:var(--surface); color:var(--text); }
+  .side a.on { background:var(--blue-l); color:var(--blue-d); font-weight:700; }
+  article h1 + * { margin-top:20px; }
   article h1 { font-size:34px; letter-spacing:-.8px; margin:10px 0 8px; }
   article h2 { font-size:21px; margin:44px 0 12px; scroll-margin-top:84px; }
   article h3 { font-size:16px; margin-top:28px; color:var(--blue-d); }
@@ -78,7 +83,8 @@
   .pager a small { display:block; color:var(--muted); font-weight:500; font-size:12px; margin-bottom:4px; }
   .pager a:hover { background:var(--blue-l); color:var(--blue-d); }
   .pager .n { text-align:right; grid-column:2; }
-  @media (max-width:860px) { .page { grid-template-columns:1fr; } .toc { display:none; } .top { gap:12px; padding:0 16px; } .tabs a { padding:0 8px; font-size:14px; white-space:nowrap; } .gh { display:none; } .hero h1 { font-size:32px; } }
+  @media (max-width:1100px) { .page { grid-template-columns:200px minmax(0,1fr); } .toc { display:none; } }
+  @media (max-width:860px) { .page { grid-template-columns:1fr; } .side { display:none; } .toc { display:none; } .top { gap:12px; padding:0 16px; } .tabs a { padding:0 8px; font-size:14px; white-space:nowrap; } .gh { display:none; } .hero h1 { font-size:32px; } }
   /* 오른쪽 아래 홈 버튼 (Really 코 클로즈업, 색은 frontend/src/assets/brand/really-fab 기준) */
   .fab { position:fixed; right:28px; bottom:28px; z-index:20; width:64px; height:64px; border-radius:50%; border:3px solid #fff; box-shadow:0 4px 0 rgba(217,81,140,.25); transition:transform .15s; }
   .fab:hover { transform:translateY(-3px) scale(1.05); }
@@ -348,8 +354,8 @@ const DOCS = [
   <li>PR이 올라오면 <b>24시간 안에</b> 리뷰합니다.</li>
   <li>주중 <b>오후 5시 전</b>에 올라온 PR은 <b>그날 안에</b>, 오후 5시 이후에 올라온 PR은 <b>다음 날 오후 5시까지</b> 봅니다.</li>
   <li>주말에 올라온 PR은 언제 올렸든 <b>하루 안에</b> 보고 답합니다.</li>
-  <li>팀원 1명 이상이 리뷰한 뒤 <b>PM이 머지</b>합니다. 각자 머지하지 않습니다.
-    <p class="why"><span class="why-label">참고</span> 승인 1명 이상은 GitHub 룰셋이 강제합니다. 머지 버튼을 PM이 누르는 것은 팀 약속입니다 (<a href="#06b-Automation">협업 자동화</a>).</p></li>
+  <li>팀원 <b>1명 이상이 리뷰(승인)</b>하면 PR을 올린 사람이 <b>각자 머지</b>합니다.
+    <p class="why"><span class="why-label">참고</span> 승인 1명 이상은 GitHub 룰셋이 강제합니다. 승인이 없으면 머지 버튼이 열리지 않습니다 (<a href="#06b-Automation">협업 자동화</a>).</p></li>
   <li>매주 <b>수요일 오후 4시까지</b> 파트별로 한 내용을 정리해 PM에게 보내고, PM이 확인한 뒤 오후 6시 전에 develop에 머지합니다. 주간 일정은 <a href="#06-PR">PR · 리뷰 규칙</a>에 있습니다.</li>
 </ul>
 <p class="why"><span class="why-label">자동 알림</span> 리뷰 요청 후 24시간 동안 리뷰가 없으면 디스코드에서 리뷰어를 멘션하고, 그 뒤 12시간마다 다시 알립니다 (<code>.github/workflows/pr-review-reminder.yml</code>).</p>
@@ -421,7 +427,7 @@ docs: 커밋 컨벤션 추가</code></pre>
 <tr><td>지난 리뷰 반영</td><td>재리뷰 요청일 때만</td></tr></table>
 <h2>머지</h2>
 <ul>
-  <li>팀원 <b>1명 이상 승인</b>해야 머지 버튼이 열립니다 (GitHub 룰셋). 머지는 <b>PM</b>이 합니다.</li>
+  <li>팀원 <b>1명 이상 승인</b>해야 머지 버튼이 열립니다 (GitHub 룰셋). 승인을 받으면 PR을 올린 사람이 <b>각자 머지</b>합니다.</li>
   <li>리뷰 기한은 24시간. 주중 오후 5시 전 PR은 그날 안에, 이후는 다음 날 오후 5시까지. 주말 PR은 하루 안에.</li>
   <li>멘토 리뷰용 PR은 base가 <code>main</code>인지 꼭 확인 (기본값이 <code>develop</code>).</li>
 </ul>
@@ -441,7 +447,7 @@ docs: 커밋 컨벤션 추가</code></pre>
 
 <h2>한눈에 보기</h2>
 <p>할 일 하나가 노션에서 시작해 <code>develop</code>에 머지되기까지의 흐름입니다. <em class="auto-key">자동</em> 표시는 사람이 챙기지 않아도 도구가 처리하는 단계입니다.</p>
-<ol class="flow"><li><small>Notion</small><b>할 일 등록</b><span>파트 보드에 할 일 추가, 시작하면 "진행 중"</span></li><li><small>Git</small><b>브랜치에서 작업<em>자동</em></b><span><code>feature/…</code> 브랜치, push 때 worklog 자동 작성</span></li><li><small>GitHub</small><b>PR 올리기</b><span>PR 템플릿 4칸 채우기</span></li><li><small>Discord</small><b>바로 알림<em>자동</em></b><span>새 PR · 리뷰어 멘션, 24시간 지나면 다시 알림</span></li><li><small>GitHub</small><b>리뷰 · 승인<em>자동</em></b><span>1명 이상 승인해야 머지 버튼이 열림</span></li><li><small>GitHub</small><b>PM이 머지</b><span><code>develop</code>에 합쳐지고 노션은 "완료"</span></li></ol>
+<ol class="flow"><li><small>Notion</small><b>할 일 등록</b><span>파트 보드에 할 일 추가, 시작하면 "진행 중"</span></li><li><small>Git</small><b>브랜치에서 작업<em>자동</em></b><span><code>feature/…</code> 브랜치, push 때 worklog 자동 작성</span></li><li><small>GitHub</small><b>PR 올리기</b><span>PR 템플릿 4칸 채우기</span></li><li><small>Discord</small><b>바로 알림<em>자동</em></b><span>새 PR · 리뷰어 멘션, 24시간 지나면 다시 알림</span></li><li><small>GitHub</small><b>리뷰 · 승인<em>자동</em></b><span>1명 이상 승인해야 머지 버튼이 열림</span></li><li><small>GitHub</small><b>각자 머지</b><span><code>develop</code>에 합쳐지고 노션은 "완료"</span></li></ol>
 <p class="board-sub">그리고 매주 멘토 리뷰로</p>
 <ol class="week"><li><b>수 16:00</b><span>파트별 정리 → PM</span></li><li><b>수 18:00</b><span>develop → main PR</span></li><li><b>목 22:00</b><span>멘토 리뷰</span></li><li><b>토 10:00</b><span>재리뷰 요청</span></li><li><b>일 23:59</b><span>main 머지</span></li></ol>
 <h2>PR · 리뷰 알림 (AI 도구로 직접 만든 디스코드 봇)</h2>
@@ -460,7 +466,7 @@ docs: 커밋 컨벤션 추가</code></pre>
 <tr><td><code>develop</code></td><td>PR로만 머지, <b>승인 1명 이상</b>, 강제 push 금지</td></tr>
 <tr><td><code>main</code></td><td>PR로만 머지, <b>승인 1명 이상</b> + 코드 오너(멘토) 리뷰, 강제 push · 삭제 금지</td></tr>
 <tr><td><code>release</code></td><td><b>승인 1명 이상</b> + 백엔드 · AI · 웹 검사 통과, <code>develop</code>에서 온 PR만 허용, 강제 push · 삭제 금지</td></tr></table>
-<p class="why"><span class="why-label">참고</span> 누가 머지 버튼을 누르는지까지는 막지 않습니다. "PM이 머지"는 팀 약속입니다.</p>
+<p class="why"><span class="why-label">참고</span> 승인을 받으면 PR을 올린 사람이 각자 머지합니다. <code>develop → main</code> 주간 PR 은 PM 이 올리고 머지합니다.</p>
 
 <h2>push 할 때마다 작업 기록 (Claude Code 활용)</h2>
 <p>코드를 바꾼 push에는 작업 기록(<code>worklog/</code>)이 반드시 함께 올라가야 합니다. 기록이 없으면 push가 막히고, Claude Code가 이번 push 분량의 변경을 읽어 기록을 대신 작성합니다.</p>
@@ -839,11 +845,12 @@ function home() {
 
 function doc(i) {
   const d = flat[i], prev = flat[i - 1], next = flat[i + 1];
-  const sib = flat.filter(x => x.g === d.g);
-  view.innerHTML = `<div class="page"><article>
+  // 왼쪽 목록: 그룹마다 페이지를 나열하고 지금 페이지를 표시
+  const side = DOCS.map(([g]) => `<div class="side-g"><p>${g}</p>${
+    flat.filter(x => x.g === g).map(x => `<a href="#${x.id}" class="${x.id === d.id ? 'on' : ''}">${x.t}</a>`).join('')}</div>`).join('');
+  view.innerHTML = `<div class="page"><nav class="side">${side}</nav><article>
       <div class="crumb"><a href="#">홈</a> / ${d.g}</div>
       <h1>${d.t}</h1>
-      <div class="sib">${sib.map(x => `<a href="#${x.id}" class="${x.id === d.id ? 'on' : ''}">${x.t}</a>`).join('')}</div>
       ${repoLink(d.html)}
       ${RELATED[d.id] ? `<div class="rel"><p>함께 보면 좋은 문서</p>${RELATED[d.id].map(r => flat.find(x => x.id === r)).map(x => `<a href="#${x.id}"><b>${x.t}</b><small>${DESC[x.id]}</small></a>`).join('')}</div>` : ''}
       <div class="pager">${prev ? `<a href="#${prev.id}"><small>← 이전</small>${prev.t}</a>` : ''}${next ? `<a class="n" href="#${next.id}"><small>다음 →</small>${next.t}</a>` : ''}</div>
