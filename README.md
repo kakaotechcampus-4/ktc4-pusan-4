@@ -267,8 +267,31 @@ docker compose up -d    # PostgreSQL(15432) · Redis(16379) · AI 서버(8000)
 
 ### 환경 변수
 
-<!-- TODO(@yuyeol3): 필요한 .env 항목과 예시 파일 위치 -->
-> ✏️ 작성 필요
+로컬과 운영(EC2)은 서로 다른 파일을 읽습니다.
+
+| | 로컬 | 운영 (EC2) |
+| --- | --- | --- |
+| 예시 파일 | `.env.example` | `deploy/production.env.example` |
+| 실제 파일 | 루트 `.env` | `/etc/ktc4/production.env` |
+| 읽는 쪽 | 루트 compose(PostgreSQL · Redis · AI), 직접 실행한 AI 서버 | `deploy/deploy.sh` 가 `deploy/compose.yaml` 에 값을 넘겨 모든 컨테이너에서 사용 |
+
+로컬 compose 는 `.env` 가 비어 있으면 아래 기본값으로 PostgreSQL · Redis 를 실행합니다.
+
+| 환경 변수 | 기본값 |
+| --- | --- |
+| `DB_NAME` · `DB_USERNAME` | `ktc4` |
+| `DB_PASSWORD` | `ktc4-local` |
+| `DB_PORT` | `15432` |
+| `REDIS_PORT` | `16379` |
+| `AI_PORT` | `8000` |
+
+환경 변수를 설정하는 방식은 파트마다 다릅니다.
+
+- **Backend**: 로컬에서 `bootRun` 으로 실행하면 `.env` 를 읽지 않습니다. `application-local.yml` 에 위 표와 같은 DB · Redis 값이 들어 있어 별도 설정 없이 연결됩니다. `.env` 에서 `DB_*` · `REDIS_PORT` 를 바꿨다면 백엔드의 셸 환경 변수나 IDE 실행 설정에도 같은 값을 넣습니다. 운영에서는 compose 가 `production.env` 의 값을 전달합니다
+- **AI**: 로컬에서는 루트 `.env` 를, 운영에서는 `production.env` 를 읽습니다
+- **Frontend**: 빌드할 때 넘긴 `VITE_*` 만 사용합니다. 로컬에서는 `frontend/.env.local` 에 적거나 실행 명령 앞에 붙입니다. `VITE_API=http` 로 설정하면 목업 대신 실제 API 를 사용합니다. `VITE_API_TARGET` 은 개발 프록시의 대상이며 기본값은 배포 서버입니다. 운영에서는 `deploy/web.Dockerfile` 이 `VITE_API=http` 로 빌드합니다. 카카오 키는 GitHub variable `KAKAO_REST_API_KEY` 로 관리합니다
+
+항목별 설명은 [Backend](#backend) 와 [AI](#ai) 표에 정리되어 있습니다. GitHub Actions 의 secret 과 variable 은 [docs/deployment.md](docs/deployment.md) 에서 확인합니다.
 
 ### 파트별 실행
 
