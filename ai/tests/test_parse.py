@@ -56,6 +56,7 @@ def test_unnumbered_hang(units):
 
 def test_article_branch_number(units):
     assert "소득세법-33의2" in units
+    assert units["소득세법-33의2"].source_url.endswith("/제33조의2")
 
 
 def test_metadata(units):
