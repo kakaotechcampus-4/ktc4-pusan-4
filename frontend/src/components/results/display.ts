@@ -1,6 +1,6 @@
 import type { Judgment, TransactionSummary } from '../../types/domain';
 import { MEDICAL_PREFIX } from '../../parser/primitives';
-import { formatFullDate, toKst } from '../../utils/format';
+import { formatFullDate, ro, toKst } from '../../utils/format';
 import { AWAITING_ANSWER } from '../../utils/verdict';
 
 /** 의료 업종은 올릴 때 상호를 가린다(의료_마스킹_01 …). 번호는 업로드마다 새로 매겨서 보여 주지 않는다 (C32) */
@@ -30,6 +30,55 @@ const CATEGORY_LABEL: Record<string, string> = {
 };
 
 export const categoryLabel = (category: string) => CATEGORY_LABEL[category] ?? category.replace(/_/g, ' ');
+
+/**
+ * 카테고리마다 대표 가맹점 둘. 분류 확인에서 추천한 업종이 어떤 곳인지 보인다(11/8 회의).
+ * docs/categories.md 의 포함 예시에서 옮겼다. 거기가 바뀌면 같이 고친다.
+ * PG_미상과 기타는 추천에 나오지 않아(api.md 3.5) 두지 않는다
+ */
+const CATEGORY_EXAMPLES: Record<string, string> = {
+  카페: '스타벅스, 컴포즈커피',
+  음식점: '롯데리아, 한솥도시락',
+  편의점: 'GS25, 세븐일레븐',
+  온라인쇼핑: '쿠팡, 11번가',
+  음식배달: '배달의민족, 쿠팡이츠',
+  해외SaaS: 'AWS, GitHub',
+  국내SW: '한글과컴퓨터, 네이버클라우드',
+  통신: 'SKT, 아이즈비전',
+  수도광열: '한국전력, 도시가스',
+  여비교통: '코레일, 대한항공',
+  차량: 'GS칼텍스, 하이패스',
+  도서: '교보문고, 예스24',
+  교육: '인프런, 패스트캠퍼스',
+  광고: '구글애즈, 카카오모먼트',
+  사무용품: '오피스디포, 모나미',
+  의료: '병원, 약국',
+  금융: '은행 수수료, 카드 연회비',
+  지자체_과태료: '주정차위반 과태료',
+  경찰청_범칙금: '교통 범칙금',
+  조세: '소득세, 지방소득세',
+  게임: 'Steam, 닌텐도',
+  구독서비스: 'Netflix, Spotify',
+  여가: '노래연습장, 볼링장',
+  미용: '미용실, 헤어살롱',
+  생활용품: '다이소, 생활용품점',
+  임차료: '위워크, 공유오피스',
+  전자기기: '애플스토어, 하이마트',
+  전문가수수료: '세무사, 법무사',
+  보험: '삼성화재, 손해보험',
+  수리비: '컴퓨터 수리, AS센터'
+};
+
+/**
+ * 분류 확인에서 추천이 왜 나왔는지 한 줄. 모델은 가맹점 이름만 받고 이유 문장은 주지 않아서
+ * 무엇을 보고 골랐는지와 그 업종이 어떤 곳인지만 말한다. 추천이 없으면 없는 까닭이다
+ */
+export const suggestionReason = (category: string | undefined) => {
+  if (!category) return '가맹점 이름만으로는 업종을 고르지 못했습니다.';
+  const label = categoryLabel(category);
+  const examples = CATEGORY_EXAMPLES[category];
+  return `가맹점 이름으로 보아 ${label}${ro(label)} 추천합니다.${examples ? ` ${examples} 같은 곳입니다.` : ''}`;
+};
 
 /**
  * 판정 배지 아래에 붙는 한 마디. 같은 배지라도 사용자가 할 일이 달라서 표와 상세에 같이 쓴다.

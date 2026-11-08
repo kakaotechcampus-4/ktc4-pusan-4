@@ -6,7 +6,7 @@ import { api, ApiRequestError, useApi } from '../api';
 import { useSession } from '../contexts/SessionContext';
 import { Button, Empty, cn } from '../components/ui';
 import { MERCHANT_CATEGORIES } from '../types/domain';
-import { categoryLabel, merchantName } from '../components/results/display';
+import { categoryLabel, merchantName, suggestionReason } from '../components/results/display';
 import type { ClassificationReviewGroup } from '../types/domain';
 import { uploadName } from '../copy';
 import { formatFullDate, formatNumber, formatPeriod, formatWon } from '../utils/format';
@@ -407,6 +407,8 @@ function ReviewCard({
       <p className="mt-5 text-body font-bold text-ink">
         {group.count > 1 ? `이 ${formatNumber(group.count)}건은 어떤 지출인가요?` : '어떤 지출인가요?'}
       </p>
+      {/* 추천의 근거(11/8 회의). 모델은 가맹점 이름만 받는다. 이유 문장은 주지 않아 지어내지 않는다 */}
+      <p className="mt-1 text-small text-ink2">{suggestionReason(suggested[0])}</p>
       {suggested.length > 0 &&
       <div role="group" aria-label={`${title} 카테고리`} className="mt-3 flex flex-wrap gap-2">
           {suggested.map((category, index) => choice(category, index === 0))}

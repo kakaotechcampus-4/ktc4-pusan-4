@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Judgment, Verdict } from '../../types/domain';
+import { MERCHANT_CATEGORIES, type Judgment, type Verdict } from '../../types/domain';
 import {
   MASKED_MEDICAL,
   attributeRows,
@@ -9,6 +9,7 @@ import {
   merchantName,
   merchantTitle,
   plainLaw,
+  suggestionReason,
   unavailableReason,
   verdictNote } from
 './display';
@@ -58,6 +59,27 @@ describe('categoryLabel', () => {
     expect(categoryLabel('PG_미상')).toBe('결제대행 (가맹점 모름)');
     expect(categoryLabel('경찰청_범칙금')).toBe('경찰청 범칙금');
     expect(categoryLabel('음식점')).toBe('음식점');
+  });
+});
+
+describe('suggestionReason', () => {
+  it('추천한 업종과 그 업종의 대표 가맹점을 말한다', () => {
+    expect(suggestionReason('카페')).toBe('가맹점 이름으로 보아 카페로 추천합니다. 스타벅스, 컴포즈커피 같은 곳입니다.');
+    expect(suggestionReason('구독서비스')).toBe(
+      '가맹점 이름으로 보아 구독서비스로 추천합니다. Netflix, Spotify 같은 곳입니다.'
+    );
+    expect(suggestionReason('통신')).toContain('통신으로 추천합니다');
+  });
+
+  it('추천이 없으면 없는 까닭을 말한다', () => {
+    expect(suggestionReason(undefined)).toBe('가맹점 이름만으로는 업종을 고르지 못했습니다.');
+  });
+
+  it('추천에 나올 수 있는 업종은 모두 대표 가맹점이 있다', () => {
+    const missing = MERCHANT_CATEGORIES.filter(
+      (category) => category !== 'PG_미상' && category !== '기타' && !suggestionReason(category).includes('같은 곳')
+    );
+    expect(missing).toEqual([]);
   });
 });
 
