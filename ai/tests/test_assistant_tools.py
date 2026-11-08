@@ -294,3 +294,12 @@ def test_화면별_도구는_9개_이하이고_모두_정의돼_있다():
 def test_화면에_없는_도구는_부를_수_없다():
     t = Turn(FakeBackend(), {"batchId": BATCH}, ["공용이야"], tools.tools_for("/upload"))
     assert t.run("propose_answer", {"group": "g1", "value": "공용", "basis": "user_said", "quote": "공용이야"})["error"] == "UNKNOWN_TOOL"
+
+
+def test_card_shows_answer_label_not_stored_value():
+    from assistant.tools import shown
+    # 저장 값은 그대로 두고 카드에만 화면 이름을 쓴다
+    assert shown("업무·개인 혼용") == "업무와 개인 둘 다"
+    assert shown("PC·휴대폰·가구 같은 물건이에요") == "PC, 휴대폰, 가구 같은 물건"
+    assert shown("새·값") == "새, 값"
+    assert shown("공용") == "공용"

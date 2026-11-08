@@ -196,6 +196,21 @@ def target(transactions: list[dict], quote: str, presumed: bool = False) -> None
                                          "남은 질문을 한꺼번에 말했다면 propose_bulk_answer 를 쓰고, 아니면 어느 건인지 물어보세요.")
 
 
+# 저장되는 답 값에 가운뎃점이 든 것이 있다. 값은 이미 받은 답과 맞아야 해서 바꾸지 않고, 카드에만 화면과 같은
+# 이름으로 쓴다(frontend/src/components/questions/logic.ts 의 ANSWER_LABEL).
+ANSWER_LABEL = {
+    "업무·개인 혼용": "업무와 개인 둘 다",
+    "고의·중대한 과실": "고의 또는 중대한 과실",
+    "사업장 재산·배상책임": "사업장 재산 또는 배상책임",
+    "PC·휴대폰·가구 같은 물건이에요": "PC, 휴대폰, 가구 같은 물건",
+}
+
+
+def shown(value: str) -> str:
+    """카드에 쓰는 답 이름. 표에 없는 값도 가운뎃점은 쉼표로 바꾼다."""
+    return ANSWER_LABEL.get(value, value.replace("·", ", "))
+
+
 def what(transactions: list[dict], total: int) -> str:
     """카드에 쓰는 대상 요약. 한 건이면 날짜와 금액, 여러 건이면 건수와 합계."""
     t = transactions[0]
@@ -410,7 +425,7 @@ class Turn:
             raise Reject("NO_BASIS", "basis 는 user_said 나 previous_answer 여야 합니다.")
         return self._propose({"kind": "answer", "questionIds": g["questionIds"], "value": value,
                               "source": "PREVIOUS_ANSWER" if basis == "previous_answer" else "ASSISTANT",
-                              "card": f"{what(g['transactions'], g['totalAmount'])} 답변: '{value}'"})
+                              "card": f"{what(g['transactions'], g['totalAmount'])} 답변: '{shown(value)}'"})
 
     def propose_bulk_answer(self, fact_type: str, value: str, quote: str) -> dict:
         self._check_quote(quote)
@@ -433,7 +448,7 @@ class Turn:
             raise Reject("INVALID_OPTION", "이 종류의 질문 모두가 받는 선택지가 아닙니다.", allowed=common)
         count, amount = sum(g["count"] for g in targets), sum(g["totalAmount"] for g in targets)
         return self._propose({"kind": "bulk_answer", "batchId": self.batch, "factType": fact_type, "value": value,
-                              "card": f"남은 '{fact_type}' 질문 {count}건 {amount:,}원 답변: '{value}'"})
+                              "card": f"남은 '{fact_type}' 질문 {count}건 {amount:,}원 답변: '{shown(value)}'"})
 
     def propose_classification(self, group: str, category: str, basis: str, quote: str | None) -> dict:
         g = self._get(group, "c", "분류 그룹")
