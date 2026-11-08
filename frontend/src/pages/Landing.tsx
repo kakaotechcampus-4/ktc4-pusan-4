@@ -14,7 +14,6 @@ import {
   FLOW_STEPS,
   NOT_DOING,
   RULE_CARD_COUNT,
-  STATS,
   SYSTEM_FEATURES,
   VERDICTS } from
 '../mock/marketing';
@@ -261,15 +260,6 @@ export function Landing() {
             )}
           </ul>
 
-          <div className="mt-10 flex justify-center">
-            <Link
-              to={startTo}
-              className="inline-flex h-[79px] items-center gap-4 rounded-full bg-surface px-10 text-ir-lead font-normal tracking-ir-xs text-ink transition-colors hover:bg-accent-line">
-
-              판정 흐름 전체보기
-              <ArrowDot />
-            </Link>
-          </div>
         </section>
 
         {/* 지출 예시 — 가로로 넘겨 본다 */}
@@ -282,23 +272,6 @@ export function Landing() {
           <div className="mt-10">
             <ExampleCarousel />
           </div>
-        </section>
-
-        {/* 숫자 줄 — 위아래 괘선만 */}
-        <section id="evidence" className="mt-28 border-y border-line">
-          <dl className={`${SHELL} grid grid-cols-2 gap-10 py-16 md:grid-cols-3`}>
-            {STATS.map((stat) =>
-            <div key={stat.label}>
-                <dt className="sr-only">{stat.label}</dt>
-                <dd>
-                  <p className="text-h3 font-bold tracking-ir tabular-nums text-ink lg:text-ir-panel">
-                    {stat.value}
-                  </p>
-                  <p className="mt-2.5 text-small text-muted">{stat.label}</p>
-                </dd>
-              </div>
-            )}
-          </dl>
         </section>
 
         {/* 지키는 것 — 회색 패널 3장 */}

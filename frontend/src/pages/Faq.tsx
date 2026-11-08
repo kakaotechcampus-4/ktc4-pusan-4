@@ -1,6 +1,6 @@
 import { MarketingHeader } from '../components/MarketingHeader';
 import { MarketingFooter } from '../components/MarketingFooter';
-import { Button, MAIN_ID, SectionHeading } from '../components/ui';
+import { MAIN_ID, SectionHeading } from '../components/ui';
 import { FAQ_GROUPS } from '../mock/faq';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { PAGES } from '../seo';
@@ -53,15 +53,6 @@ export function Faq() {
               </ul>
             </section>
           )}
-        </div>
-
-        <div className="mt-20 border-t border-line pt-12">
-          <p className="text-h3 font-bold tracking-ir-sm text-ink [word-break:keep-all]">
-            여기에 없는 것은 직접 돌려 보는 편이 빠릅니다
-          </p>
-          <Button to="/login" size="md" className="mt-6">
-            판정해보기
-          </Button>
         </div>
       </main>
 

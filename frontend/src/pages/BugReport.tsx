@@ -43,9 +43,6 @@ export function BugReport() {
               </div>
             )}
           </dl>
-          <p className="mt-6 text-small leading-6 text-ink2 [word-break:keep-all]">
-            카드내역 원본 파일은 보내지 않으셔도 됩니다.
-          </p>
         </section>
       </main>
 

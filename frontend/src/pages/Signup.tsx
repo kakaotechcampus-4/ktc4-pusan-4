@@ -14,6 +14,7 @@ import { TERMS_EFFECTIVE, TermsBody } from './public/Terms';
 import { PRIVACY_EFFECTIVE, PrivacyBody } from './public/Privacy';
 import { PASSWORD_RULE, passwordProblem } from '../utils/password';
 import { PasswordCheck } from '../components/PasswordCheck';
+import { KakaoStart } from '../components/KakaoStart';
 
 /** 다시 받기 간격. 서버도 60초에 한 번만 보낸다 (#193) */
 const RESEND_SECONDS = 60;
@@ -309,7 +310,7 @@ export function Signup() {
 
   // 이미 로그인했으면 로그인 뒤에 갈 곳으로 보낸다 (C52). 이어 가는 중에는 폼을 그리지 않는다
   if (status === 'signedIn' && !signingUp.current) return <Navigate to={from ?? '/'} replace />;
-  if (status === 'restoring') return <AuthLayout title="이메일로 가입">{null}</AuthLayout>;
+  if (status === 'restoring') return <AuthLayout title="회원가입">{null}</AuthLayout>;
 
   const step = verificationToken ? 3 : sentTo ? 2 : 1;
   /** 그 칸 바로 아래 둘 오류. 칸이 정해지지 않은 오류는 field 를 null 로 불러 그 자리에 둔다 */
@@ -323,10 +324,12 @@ export function Signup() {
   error && errorField === field ? `signup-${field}-error` : undefined;
 
   return (
-    <AuthLayout title="이메일로 가입">
+    <AuthLayout title="회원가입">
       <h1 className="text-[26px] font-bold tracking-tight text-ink">
-        이메일로 가입
+        회원가입
       </h1>
+
+      <KakaoStart from={from ?? '/'} label="카카오로 시작하기" divider="또는 이메일로 가입" disabled={busy} />
 
       <ol className="mt-6 flex gap-2 text-[12px]" aria-label="가입 단계">
         {['이메일 인증', '코드 확인', '비밀번호'].map((label, index) =>

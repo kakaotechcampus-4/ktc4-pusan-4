@@ -31,6 +31,37 @@ body {
   outline: 2px solid #191F28;
   outline-offset: 2px;
 }
+/*
+  입력칸은 테 밖에 테를 하나 더 그리지 않고, 있던 테를 굵게 한다. 테 두께를 바꾸면 칸이 1px 밀리므로
+  안쪽 그림자로 1px 를 더한다. 잘못 넣은 칸(aria-invalid)은 빨간 테를 그대로 굵게 한다
+*/
+input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='range']):focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: #191F28;
+  box-shadow: inset 0 0 0 1px #191F28;
+}
+input[aria-invalid='true']:focus,
+textarea[aria-invalid='true']:focus {
+  border-color: #C5283D;
+  box-shadow: inset 0 0 0 1px #C5283D;
+}
+/* 끌어서 키우는 손잡이가 둥근 테에 걸리지 않게, 테는 감싼 상자가 그리고 손잡이는 그 안쪽에 둔다 (버그 신고) */
+.field-box:focus-within {
+  border-color: #191F28;
+  box-shadow: inset 0 0 0 1px #191F28;
+}
+.field-box:has([aria-invalid='true']) {
+  border-color: #C5283D;
+}
+.field-box:has([aria-invalid='true']):focus-within {
+  box-shadow: inset 0 0 0 1px #C5283D;
+}
+.field-box textarea:focus,
+.field-box textarea[aria-invalid='true']:focus {
+  box-shadow: none;
+}
 /* 팔레트에서 노랑을 뺐다. 핑크는 선택 바탕으로 쓰면 ink2 대비 2.46 · muted 1.59 라 글자가 묻힌다 */
 ::selection {
   background: #E4EDFB;

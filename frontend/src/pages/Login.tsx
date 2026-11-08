@@ -1,11 +1,11 @@
 import React, { useRef, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { MessageCircleIcon } from 'lucide-react';
 import { useSession } from '../contexts/SessionContext';
 import { ApiRequestError, isMock, mockPassword } from '../api';
 import { AUTH_FIELD_ERROR, AUTH_INPUT, AUTH_LABEL, AuthLayout } from '../components/AuthLayout';
 import { Button } from '../components/ui';
-import { beginKakaoLogin, kakaoAvailable } from '../auth/kakao';
+import { kakaoAvailable } from '../auth/kakao';
+import { KakaoStart } from '../components/KakaoStart';
 import type { SessionEndReason } from '../auth/session';
 
 interface LocationState {
@@ -93,15 +93,6 @@ export function Login() {
     void complete(email, password);
   };
 
-  const startKakao = () => {
-    const { url, external } = beginKakaoLogin(from);
-    if (external) {
-      window.location.assign(url);
-      return;
-    }
-    navigate(url);
-  };
-
   // 이미 로그인했으면 로그인 뒤에 갈 곳으로 보낸다 (C52). 이어 가는 중에는 폼을 그리지 않는다 — 그렸다가 바로 넘어가면 깜빡인다
   if (status === 'signedIn' && !signingIn.current) return <Navigate to={from} replace />;
   if (status === 'restoring') return <AuthLayout title="로그인">{null}</AuthLayout>;
@@ -124,25 +115,7 @@ export function Login() {
         </p>
       }
 
-      {kakaoAvailable &&
-      <>
-          <button
-          type="button"
-          disabled={busy}
-          onClick={startKakao}
-          className="mt-8 flex w-full items-center justify-center gap-2 rounded-xl bg-[#FEE500] px-4 py-3 text-[15px] font-bold text-[#191600] transition-opacity duration-150 ease-snap hover:opacity-90">
-
-            <MessageCircleIcon className="h-4 w-4" aria-hidden="true" />
-            카카오로 계속하기
-          </button>
-
-          <div className="my-6 flex items-center gap-3">
-            <span className="h-px flex-1 bg-line" />
-            <span className="text-[12px] text-ink2">또는 이메일로 로그인</span>
-            <span className="h-px flex-1 bg-line" />
-          </div>
-        </>
-      }
+      <KakaoStart from={from} label="카카오로 계속하기" divider="또는 이메일로 로그인" disabled={busy} />
 
       <form onSubmit={submit} noValidate className={kakaoAvailable ? undefined : 'mt-8'}>
         <div className="space-y-3">
