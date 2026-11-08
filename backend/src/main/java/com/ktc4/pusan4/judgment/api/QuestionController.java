@@ -77,21 +77,22 @@ public class QuestionController {
         @RequestParam(defaultValue = "0") @Min(0) int page,
         @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size
     ) {
-        List<Question> questions = queryService.find(currentUser.id(), batchId, transactionId);
         // 미해소 집계는 status·grouped·page 를 적용하기 전 목록으로 센다 (api.md 3.9)
-        PendingTotal pending = PendingTotal.of(questions);
-        Unresolved unresolved = new Unresolved(pending.count(), pending.amount());
-        List<Question> matched = questions.stream()
-            .filter(question -> status == null || question.status() == status)
-            .toList();
         if (grouped) {
+            // 그룹 순서(건수, 금액)는 질문 전부를 묶어야 정해져서 전부 읽는다
+            List<Question> questions = queryService.find(currentUser.id(), batchId, transactionId);
+            PendingTotal pending = PendingTotal.of(questions);
+            List<Question> matched = questions.stream()
+                .filter(question -> status == null || question.status() == status)
+                .toList();
             PageResponse<QuestionGroupResponse> groups =
                 PageResponse.of(slice(QuestionGroup.group(matched), page, size).map(QuestionGroupResponse::from));
-            return new QuestionGroupPage(groups.items(), unresolved, groups.page());
+            return new QuestionGroupPage(groups.items(), new Unresolved(pending.count(), pending.amount()), groups.page());
         }
-        PageResponse<QuestionResponse> items =
-            PageResponse.of(slice(matched, page, size).map(QuestionResponse::from));
-        return new QuestionPage(items.items(), unresolved, items.page());
+        PendingTotal pending = queryService.unresolved(currentUser.id(), batchId, transactionId);
+        PageResponse<QuestionResponse> items = PageResponse.of(
+            queryService.page(currentUser.id(), batchId, transactionId, status, page, size).map(QuestionResponse::from));
+        return new QuestionPage(items.items(), new Unresolved(pending.count(), pending.amount()), items.page());
     }
 
     private static <T> Page<T> slice(List<T> items, int page, int size) {

@@ -88,6 +88,19 @@ class QuestionQueryIntegrationTest {
                 .param("status", "ANSWERED"))
             .andExpect(jsonPath("$.items[*].id", contains(answered.toString())))
             .andExpect(jsonPath("$.unresolved.count").value(2));
+
+        // when / then: 쪽은 status 를 건 뒤에 나누고, 미해소 집계는 쪽과 상관없다
+        mockMvc.perform(get("/api/v1/questions")
+                .param("batchId", batchId.toString())
+                .param("status", "PENDING")
+                .param("page", "1")
+                .param("size", "1"))
+            .andExpect(jsonPath("$.items[*].id", contains(otherPending.toString())))
+            .andExpect(jsonPath("$.items[0].transactionId").value(second.toString()))
+            .andExpect(jsonPath("$.page.totalElements").value(2))
+            .andExpect(jsonPath("$.page.hasNext").value(false))
+            .andExpect(jsonPath("$.unresolved.count").value(2))
+            .andExpect(jsonPath("$.unresolved.amount").value(9_500));
     }
 
     @Test

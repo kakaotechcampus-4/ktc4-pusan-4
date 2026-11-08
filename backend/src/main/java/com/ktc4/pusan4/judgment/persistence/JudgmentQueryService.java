@@ -8,7 +8,9 @@ import com.ktc4.pusan4.judgment.domain.JudgmentSummary;
 import com.ktc4.pusan4.judgment.domain.LimitYearTotal;
 import com.ktc4.pusan4.judgment.domain.Question;
 import com.ktc4.pusan4.judgment.domain.QuestionStatus;
+import com.ktc4.pusan4.judgment.domain.Verdict;
 import com.ktc4.pusan4.judgment.limit.EntertainmentLimit;
+import com.ktc4.pusan4.judgment.persistence.JudgmentListQuery.Sort;
 import com.ktc4.pusan4.judgment.persistence.JudgmentCitationRepository.CitationRow;
 import com.ktc4.pusan4.judgment.persistence.LimitBucketEntryRepository.EntryAmount;
 import com.ktc4.pusan4.shared.api.ApiException;
@@ -21,7 +23,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -69,7 +71,7 @@ public class JudgmentQueryService {
 
     @Transactional(readOnly = true)
     public Page<JudgmentRevision> list(UUID userId, JudgmentListQuery query, int page, int size) {
-        Page<JudgmentEntity> judgments = find(userId, query, PageRequest.of(page, size));
+        Page<JudgmentEntity> judgments = judgmentRepository.findPage(userId, query, PageRequest.of(page, size));
         return new PageImpl<>(toDomain(judgments.getContent()), judgments.getPageable(), judgments.getTotalElements());
     }
 
@@ -83,11 +85,21 @@ public class JudgmentQueryService {
      */
     @Transactional(readOnly = true)
     public JudgmentSummary summary(UUID userId, UUID batchId, Integer year, UUID runId) {
-        JudgmentListQuery query = new JudgmentListQuery(null, batchId, year, null, true, runId);
+        JudgmentListQuery query = new JudgmentListQuery(null, batchId, year, null, true, runId, null, Sort.COMPUTED_AT);
         Map<UUID, Long> limitAllowed = year == null ? Map.of() : limitAllowedAmounts(userId);
-        return JudgmentSummary.of(find(userId, query, Pageable.unpaged()).stream()
-            .map(judgment -> judgment.toSummaryRow(limitAllowed.get(judgment.id())))
+        return JudgmentSummary.of(judgmentRepository.findSummaryRows(userId, query).stream()
+            .map(row -> new JudgmentSummary.Row(Verdict.valueOf(row.verdict()), row.account(),
+                limitAllowed.getOrDefault(row.judgmentId(), row.finalAmount()), row.spendAmount(), row.awaiting()))
             .toList());
+    }
+
+    /**
+     * 주어진 거래 가운데 답하지 않은 질문이 남은 거래. 판정 응답의 답변 대기 표지(awaitingAnswer)를 만든다.
+     * 거래 id 는 부르는 쪽이 이미 사용자 범위로 읽은 판정에서 온다.
+     */
+    @Transactional(readOnly = true)
+    public Set<UUID> pendingQuestionTransactionIds(Collection<UUID> transactionIds) {
+        return questionQueryService.pendingTransactionIds(transactionIds);
     }
 
     /**
@@ -98,8 +110,8 @@ public class JudgmentQueryService {
      */
     @Transactional(readOnly = true)
     public List<JudgmentExportRow> export(UUID userId, UUID batchId, Integer year) {
-        JudgmentListQuery query = new JudgmentListQuery(null, batchId, year, null, true, null);
-        List<JudgmentRevision> judgments = toDomain(find(userId, query, Pageable.unpaged()).getContent());
+        JudgmentListQuery query = new JudgmentListQuery(null, batchId, year, null, true, null, null, Sort.COMPUTED_AT);
+        List<JudgmentRevision> judgments = toDomain(judgmentRepository.findPage(userId, query, Pageable.unpaged()).getContent());
         List<EntryAmount> entries = entryRepository.findEntryAmounts(userId, EntertainmentLimit.BUCKET);
         Map<UUID, EntryAmount> entryByJudgment = entries.stream()
             .collect(Collectors.toMap(EntryAmount::judgmentId, Function.identity()));
@@ -110,11 +122,17 @@ public class JudgmentQueryService {
             .filter(yearExcess -> yearExcess.getValue() > 0)
             .map(Map.Entry::getKey)
             .collect(Collectors.toSet());
-        Map<UUID, List<Answer>> answers = answersByTransaction(questionQueryService.find(userId, batchId, null));
+        List<Question> questions = questionQueryService.find(userId, batchId, null);
+        Map<UUID, List<Answer>> answers = answersByTransaction(questions);
+        Set<UUID> pending = questions.stream()
+            .filter(question -> question.status() == QuestionStatus.PENDING)
+            .map(Question::transactionId)
+            .collect(Collectors.toSet());
         return judgments.stream()
             .map(judgment -> new JudgmentExportRow(judgment,
                 allowedAmount(judgment, entryByJudgment.get(judgment.id()), exceededYears),
-                answers.getOrDefault(judgment.transactionId(), List.of())))
+                answers.getOrDefault(judgment.transactionId(), List.of()),
+                pending.contains(judgment.transactionId())))
             .toList();
     }
 
@@ -177,14 +195,6 @@ public class JudgmentQueryService {
                 .put(question.factType(), new Answer(question.questionText(), question.answer())));
         return byTransaction.entrySet().stream()
             .collect(Collectors.toMap(Map.Entry::getKey, entry -> List.copyOf(entry.getValue().values())));
-    }
-
-    private Page<JudgmentEntity> find(UUID userId, JudgmentListQuery query, Pageable pageable) {
-        LocalDate yearStart = query.year() == null ? null : LocalDate.of(query.year(), 1, 1);
-        return judgmentRepository.findPage(userId, query.transactionId(), query.batchId(),
-            yearStart, yearStart == null ? null : yearStart.plusYears(1),
-            query.verdict() == null ? null : query.verdict().name(),
-            query.runId(), !query.latestOnly(), pageable);
     }
 
     /** 거래와 인용을 판정마다 따로 읽지 않도록 한 번에 읽어 붙인다. */

@@ -1,7 +1,10 @@
 package com.ktc4.pusan4.judgment.persistence;
 
 import com.ktc4.pusan4.judgment.persistence.QuestionQueueRepository.QuestionRow;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -12,4 +15,17 @@ interface QuestionQueueRepositoryCustom {
     // 지금 판정 대상인 거래의 질문만 남긴다. 질문은 지우지 않으므로 거래를 다시 포함하면 돌아온다.
     // 거래를 지정해도 거른다(api.md 3.9). 정렬: createdAt, id.
     List<QuestionRow> findRows(UUID userId, UUID batchId, UUID transactionId);
+
+    // findRows 와 같은 조건에 status 를 더해 한 쪽만 읽는다. status 가 비면 거르지 않는다.
+    Page<QuestionRow> findRowsPage(UUID userId, UUID batchId, UUID transactionId, String status, Pageable pageable);
+
+    // 미해소 집계(api.md 3.9): findRows 와 같은 조건의 PENDING 질문 수와, 그 질문이 걸린 거래의 결제 금액 합.
+    // 한 거래에 질문이 여럿이어도 금액은 한 번만 더한다.
+    PendingCount countPending(UUID userId, UUID batchId, UUID transactionId);
+
+    // 주어진 거래 가운데 PENDING 질문이 남은 거래. 질문은 revision 마다 생기므로 거래의 모든 판정에서 찾는다.
+    List<UUID> findPendingTransactionIds(Collection<UUID> transactionIds);
+
+    record PendingCount(long count, Long amount) {
+    }
 }

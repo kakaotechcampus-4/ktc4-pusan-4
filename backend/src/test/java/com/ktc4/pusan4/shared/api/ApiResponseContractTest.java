@@ -229,19 +229,23 @@ class ApiResponseContractTest {
         given(overrideService.override(any(), any(), any(), any())).willReturn(UUID.fromString(ID));
         given(judgmentQueryService.list(any(), any(), anyInt(), anyInt())).willReturn(new PageImpl<>(List.of(judgment)));
         given(judgmentQueryService.summary(any(), any(), any(), any())).willReturn(JudgmentSummary.of(List.of(
-            new JudgmentSummary.Row(Verdict.AVAILABLE, "소모품비", 12_800L))));
+            new JudgmentSummary.Row(Verdict.AVAILABLE, "소모품비", 12_800L, 0L, false))));
         given(judgmentQueryService.export(any(), any(), any())).willReturn(List.of(new JudgmentExportRow(judgment,
-            0L, List.of(new JudgmentExportRow.Answer("용도가 무엇인가요?", "혼용")))));
+            0L, List.of(new JudgmentExportRow.Answer("용도가 무엇인가요?", "혼용")), false)));
         HandoffNote note = new HandoffNote(UUID.fromString(ID), "휴대폰 요금의 업무 비중은?", List.of(UUID.fromString(ID)),
             OffsetDateTime.parse("2026-11-01T14:05:00+09:00"));
         given(handoffNoteService.list(any())).willReturn(List.of(note));
         given(handoffNoteService.create(any(), any(), any())).willReturn(note);
 
-        given(questionQueryService.find(any(), any(), any())).willReturn(List.of(new Question(UUID.fromString(ID),
+        Question question = new Question(UUID.fromString(ID),
             UUID.fromString(ID), UUID.fromString(ID), "merchant:스타벅스", "용도", "용도가 무엇인가요?",
             List.of("사업", "개인", "혼용"), QuestionStatus.PENDING, null, null,
             OffsetDateTime.parse("2026-09-12T14:05:30+09:00"), null, judgment.transaction(), false, false,
-            "CAFE_PURPOSE")));
+            "CAFE_PURPOSE");
+        given(questionQueryService.find(any(), any(), any())).willReturn(List.of(question));
+        given(questionQueryService.page(any(), any(), any(), any(), anyInt(), anyInt()))
+            .willReturn(new PageImpl<>(List.of(question)));
+        given(questionQueryService.unresolved(any(), any(), any())).willReturn(new PendingTotal(1, 11_000L));
         given(assistantRelayService.chat(any(), any(), any()))
             .willReturn(new ChatResponse("판정 근거를 확인했습니다.", List.of(), "trace-1"));
         given(progressService.progress(any(), any())).willReturn(new ProgressService.Progress(
@@ -384,7 +388,7 @@ class ApiResponseContractTest {
     private static final Set<String> TRANSACTION_SUMMARY_KEYS = Set.of("approvedAt", "merchantRaw", "merchantNorm",
         "merchantCategory", "amount", "installmentMonths");
     private static final Set<String> JUDGMENT_KEYS = Set.of("id", "transactionId", "transaction", "revision", "origin",
-        "verdict", "outOfScope", "blockedAtGate", "account", "accountLabel", "finalAmount", "isInference", "unmatchedReason", "attributes",
+        "verdict", "awaitingAnswer", "outOfScope", "blockedAtGate", "account", "accountLabel", "finalAmount", "isInference", "unmatchedReason", "attributes",
         "ruleCardId", "ruleCardVersion", "appliedRuleIds", "rulesCommitSha", "userContextVersion", "explanation",
         "computedAt", "citations");
     private static final Set<String> QUESTION_KEYS = Set.of("id", "batchId", "transactionId", "groupKey", "factType",
@@ -546,10 +550,10 @@ class ApiResponseContractTest {
         given(judgmentQueryService.list(any(), any(), anyInt(), anyInt()))
             .willReturn(new PageImpl<>(List.of(judgment("접대비"))));
         given(judgmentQueryService.export(any(), any(), any()))
-            .willReturn(List.of(new JudgmentExportRow(judgment("접대비"), 0L, List.of())));
+            .willReturn(List.of(new JudgmentExportRow(judgment("접대비"), 0L, List.of(), false)));
         given(judgmentQueryService.summary(any(), any(), any(), any())).willReturn(JudgmentSummary.of(List.of(
-            new JudgmentSummary.Row(Verdict.AVAILABLE, "접대비", 50_000L),
-            new JudgmentSummary.Row(Verdict.AVAILABLE, "소모품비", 12_800L))));
+            new JudgmentSummary.Row(Verdict.AVAILABLE, "접대비", 50_000L, 0L, false),
+            new JudgmentSummary.Row(Verdict.AVAILABLE, "소모품비", 12_800L, 0L, false))));
         given(judgmentQueryService.limits(any(), any(), any()))
             .willReturn(List.of(new LimitYearTotal("접대비", 2026, 12_246_000L, 50_000L, 0L)));
 

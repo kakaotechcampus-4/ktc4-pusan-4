@@ -16,7 +16,9 @@ public record JudgmentSummaryResponse(
     Map<Verdict, VerdictSummary> byVerdict,
     List<AccountSummary> byAccount,
     @Schema(description = "범위에 접대비 판정이 있는 과세연도마다 한도 합계와 초과액. 과세연도 순. runId 범위는 빈 배열")
-    List<LimitYearResponse> limits
+    List<LimitYearResponse> limits,
+    @Schema(description = "답변 대기(불가인데 답하지 않은 질문이 걸린 거래). 판정이 아니라 불가에 붙는 표지라 byVerdict.UNAVAILABLE 에도 들어 있다")
+    AwaitingSummary awaiting
 ) {
 
     static JudgmentSummaryResponse from(
@@ -24,11 +26,12 @@ public record JudgmentSummaryResponse(
     ) {
         Map<Verdict, VerdictSummary> byVerdict = new EnumMap<>(Verdict.class);
         summary.byVerdict().forEach((verdict, total) ->
-            byVerdict.put(verdict, new VerdictSummary(total.count(), total.finalAmount())));
+            byVerdict.put(verdict, new VerdictSummary(total.count(), total.finalAmount(), total.spendAmount())));
         return new JudgmentSummaryResponse(scope, summary.totalCount(), byVerdict, summary.byAccount().stream()
             .map(account -> new AccountSummary(account.account(), rules.accountLabel(account.account()),
                 account.count(), account.finalAmount()))
-            .toList(), LimitYearResponse.from(limits, rules));
+            .toList(), LimitYearResponse.from(limits, rules),
+            new AwaitingSummary(summary.awaiting().count(), summary.awaiting().spendAmount()));
     }
 
     public record Scope(
@@ -37,7 +40,14 @@ public record JudgmentSummaryResponse(
     ) {
     }
 
-    public record VerdictSummary(int count, long finalAmount) {
+    public record VerdictSummary(
+        int count,
+        long finalAmount,
+        @Schema(description = "그 판정이 난 거래의 결제 금액 합") long spendAmount
+    ) {
+    }
+
+    public record AwaitingSummary(int count, @Schema(description = "답변 대기 거래의 결제 금액 합") long spendAmount) {
     }
 
     public record AccountSummary(
