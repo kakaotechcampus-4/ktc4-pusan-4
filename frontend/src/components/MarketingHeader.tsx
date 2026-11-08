@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useSession } from '../contexts/SessionContext';
-import { Button, Container, cn } from './ui';
+import { Button, Container, SkipLink, cn } from './ui';
 import { Logo } from './Logo';
 import { BugReportButton } from './BugReport';
 
@@ -29,62 +29,65 @@ export function MarketingHeader() {
   const mine = batchStatus === 'ready' && batchId === null ? '/upload' : '/results';
 
   return (
-    <header className="sticky top-0 z-30 border-b border-line bg-canvas/95 shadow-header backdrop-blur">
-      <Container className="flex h-[72px] items-center gap-6 lg:gap-10">
-        <Logo />
+    <>
+      <SkipLink />
+      <header className="sticky top-0 z-30 border-b border-line bg-canvas/95 shadow-header backdrop-blur">
+        <Container className="flex h-[72px] items-center gap-6 lg:gap-10">
+          <Logo />
 
-        {/* 좁은 폭에서는 접는다. 같은 두 링크를 푸터에 두었다 */}
-        <nav aria-label="주요 메뉴" className="hidden sm:block">
-          <ul className="flex items-center gap-1.5">
-            {NAV.map((item) => {
-              const active = pathname === item.to;
-              return (
-                <li key={item.to}>
-                  <Link
-                    to={item.to}
-                    aria-current={active ? 'page' : undefined}
-                    className={cn(NAV_LINK, active ? NAV_ON : NAV_OFF)}>
+          {/* 좁은 폭에서는 접는다. 같은 두 링크를 푸터에 두었다 */}
+          <nav aria-label="주요 메뉴" className="hidden sm:block">
+            <ul className="flex items-center gap-1.5">
+              {NAV.map((item) => {
+                const active = pathname === item.to;
+                return (
+                  <li key={item.to}>
+                    <Link
+                      to={item.to}
+                      aria-current={active ? 'page' : undefined}
+                      className={cn(NAV_LINK, active ? NAV_ON : NAV_OFF)}>
 
-                    {item.label}
-                  </Link>
-                </li>);
+                      {item.label}
+                    </Link>
+                  </li>);
 
-            })}
-            {/* 페이지로 옮기지 않고 창으로 띄운다(#211). /bug-report 는 꼬리말 링크와 직접 들어올 때 쓴다 */}
-            <li>
-              <BugReportButton className={cn(NAV_LINK, NAV_OFF)} icon={false} />
-            </li>
-          </ul>
-        </nav>
+              })}
+              {/* 페이지로 옮기지 않고 창으로 띄운다(#211). /bug-report 는 꼬리말 링크와 직접 들어올 때 쓴다 */}
+              <li>
+                <BugReportButton className={cn(NAV_LINK, NAV_OFF)} icon={false} />
+              </li>
+            </ul>
+          </nav>
 
-        <div className="ml-auto flex shrink-0 items-center gap-2 whitespace-nowrap">
-          {status === 'restoring' ?
-          null :
-          status === 'signedIn' ?
-          <>
-              {/* 좁은 폭에서는 접는다. 바로 아래 히어로에 같은 자리로 가는 CTA 가 있다 */}
-              <Button to={mine} size="sm" className="hidden sm:inline-flex">
-                내 판정으로
-              </Button>
-              <Button to="/account" variant="secondary" size="sm">
-                내 정보
-              </Button>
-              <Button variant="secondary" size="sm" onClick={signOut}>
-                로그아웃
-              </Button>
-            </> :
+          <div className="ml-auto flex shrink-0 items-center gap-2 whitespace-nowrap">
+            {status === 'restoring' ?
+            null :
+            status === 'signedIn' ?
+            <>
+                {/* 좁은 폭에서는 접는다. 바로 아래 히어로에 같은 자리로 가는 CTA 가 있다 */}
+                <Button to={mine} size="sm" className="hidden sm:inline-flex">
+                  내 판정으로
+                </Button>
+                <Button to="/account" variant="secondary" size="sm">
+                  내 정보
+                </Button>
+                <Button variant="secondary" size="sm" onClick={signOut}>
+                  로그아웃
+                </Button>
+              </> :
 
-          <>
-              <Button to="/login" variant="secondary" size="sm">
-                로그인
-              </Button>
-              <Button to="/signup" variant="soft" size="sm">
-                회원가입
-              </Button>
-            </>
-          }
-        </div>
-      </Container>
-    </header>);
+            <>
+                <Button to="/login" variant="secondary" size="sm">
+                  로그인
+                </Button>
+                <Button to="/signup" variant="soft" size="sm">
+                  회원가입
+                </Button>
+              </>
+            }
+          </div>
+        </Container>
+      </header>
+    </>);
 
 }

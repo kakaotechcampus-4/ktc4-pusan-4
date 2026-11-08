@@ -1,6 +1,6 @@
 import { MarketingHeader } from '../components/MarketingHeader';
 import { MarketingFooter } from '../components/MarketingFooter';
-import { SectionHeading } from '../components/ui';
+import { MAIN_ID, SectionHeading } from '../components/ui';
 import { BugReportAddress, BugReportMailButton } from '../components/BugReport';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { WHAT_TO_WRITE } from '../utils/bugReport';
@@ -16,7 +16,7 @@ export function BugReport() {
     <div className="min-h-full bg-canvas">
       <MarketingHeader />
 
-      <main className="mx-auto w-full max-w-page px-6 pb-28 pt-16 lg:px-gutter">
+      <main id={MAIN_ID} tabIndex={-1} className="mx-auto w-full max-w-page px-6 pb-28 pt-16 outline-none lg:px-gutter">
         <SectionHeading as="h1" eyebrow="버그 신고" title="잘못 나온 것을 알려 주세요" />
 
         <div className="mt-12 max-w-2xl rounded-2xl border border-line px-8 py-10">

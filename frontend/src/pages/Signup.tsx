@@ -475,8 +475,9 @@ export function Signup() {
           }>
 
             <legend className="sr-only">약관 동의</legend>
-            <label className="flex items-center gap-2 font-bold text-ink">
+            <label htmlFor="agree-all" className="flex items-center gap-2 font-bold text-ink">
               <input
+              id="agree-all"
               type="checkbox"
               checked={agreeTerms && agreePrivacy}
               onChange={(event) => {
@@ -492,8 +493,8 @@ export function Signup() {
               읽어 보려다 동의한 것이 되면 안 된다 (#247 리뷰)
             */}
             <div className="flex items-center gap-2 text-ink2">
-              <label className="flex flex-1 items-center gap-2">
-                <input type="checkbox" checked={agreeTerms} onChange={(event) => setAgreeTerms(event.target.checked)} />
+              <label htmlFor="agree-terms" className="flex flex-1 items-center gap-2">
+                <input id="agree-terms" type="checkbox" checked={agreeTerms} onChange={(event) => setAgreeTerms(event.target.checked)} />
                 [필수] 이용약관 동의
               </label>
               <button type="button" onClick={() => setDoc('terms')} className={DOC_LINK}>
@@ -501,8 +502,9 @@ export function Signup() {
               </button>
             </div>
             <div className="flex items-center gap-2 text-ink2">
-              <label className="flex flex-1 items-center gap-2">
+              <label htmlFor="agree-privacy" className="flex flex-1 items-center gap-2">
                 <input
+                  id="agree-privacy"
                   type="checkbox"
                   checked={agreePrivacy}
                   onChange={(event) => setAgreePrivacy(event.target.checked)} />

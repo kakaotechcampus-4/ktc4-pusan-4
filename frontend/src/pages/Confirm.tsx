@@ -154,8 +154,9 @@ export function Confirm() {
             흰 바탕 대비 1.19 다. 셋 다 `sr-only` 로 진짜 입력을 숨기고 span 으로 흉내 낸 탓이다.
             Signup.tsx·Questions.tsx 가 이미 브라우저 네모를 쓰고 있어 관례도 이쪽이다
           */}
-          <label className="flex cursor-pointer items-start gap-2.5">
+          <label htmlFor="confirm-agree" className="flex cursor-pointer items-start gap-2.5">
             <input
+              id="confirm-agree"
               type="checkbox"
               checked={agreed}
               onChange={(event) => setAgreed(event.target.checked)}

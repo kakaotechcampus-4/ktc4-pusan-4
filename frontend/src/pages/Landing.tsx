@@ -19,6 +19,7 @@ import {
 '../mock/marketing';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { PAGES } from '../seo';
+import { MAIN_ID } from '../components/ui';
 
 /**
  * 인트로를 봤다는 표시. 처음 한 번만 띄운다 — 로고로 다녀와도 다시 뜨지 않는다.
@@ -142,7 +143,7 @@ export function Landing() {
 
       <MarketingHeader />
 
-      <main>
+      <main id={MAIN_ID} tabIndex={-1} className="outline-none">
         {/* 큰 패널 + 오른쪽 세로 띠 (레퍼런스 section_visual: 1094 / 206, 사이 16) */}
         <section className={`${SHELL} pt-10`}>
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_206px]">

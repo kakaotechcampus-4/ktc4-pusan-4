@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { cn } from './cn';
 
 export interface ChoiceOption<T extends string | boolean> {
@@ -42,22 +43,47 @@ export function ChoiceGroup<T extends string | boolean>({
   columns = 3,
   className
 }: ChoiceGroupProps<T>) {
+  const buttons = useRef<(HTMLButtonElement | null)[]>([]);
+  const enabled = options.flatMap((option, index) => option.disabled ? [] : [index]);
+  /*
+   * 라디오 묶음처럼 Tab 은 한 번만 선다. 고른 칸에, 아직 안 골랐으면 첫 칸에 선다.
+   * 칸 사이는 화살표로 옮기고 옮기면 바로 고른다 (WAI-ARIA radio group)
+   */
+  const selectedIndex = options.findIndex((option) => option.value === value && !option.disabled);
+  const tabStop = selectedIndex >= 0 ? selectedIndex : enabled[0];
+
+  const onKeyDown = (event: React.KeyboardEvent, index: number) => {
+    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
+    const edge = { Home: enabled[0], End: enabled[enabled.length - 1] }[event.key];
+    if (step === undefined && edge === undefined) return;
+    event.preventDefault();
+    const at = enabled.indexOf(index);
+    const next = edge ?? enabled[(at + step! + enabled.length) % enabled.length];
+    buttons.current[next]?.focus();
+    onChange(options[next].value);
+  };
+
   return (
     <div
       role="radiogroup"
       aria-label={name}
       className={cn('grid gap-2', COLUMNS[columns], className)}>
 
-      {options.map((option) => {
+      {options.map((option, index) => {
         const selected = option.value === value;
         return (
           <button
             key={String(option.value)}
+            ref={(el) => {
+              buttons.current[index] = el;
+            }}
             type="button"
             role="radio"
             aria-checked={selected}
             aria-disabled={option.disabled || undefined}
             disabled={option.disabled}
+            tabIndex={index === tabStop ? 0 : -1}
+            onKeyDown={(event) => onKeyDown(event, index)}
             onClick={() => onChange(option.value)}
             className={cn(
               'rounded-xl border px-3.5 py-3 text-left transition-colors duration-150 ease-snap',

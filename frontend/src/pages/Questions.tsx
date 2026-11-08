@@ -446,8 +446,9 @@ export function Questions() {
               const key = groupId(group);
               return (
                 <li key={key}>
-                    <label className="flex items-start gap-2.5 text-small text-ink2">
+                    <label htmlFor={`carry-${key}`} className="flex items-start gap-2.5 text-small text-ink2">
                       <input
+                      id={`carry-${key}`}
                       type="checkbox"
                       className="mt-1"
                       checked={!skipped[key]}
