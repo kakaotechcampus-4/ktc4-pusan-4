@@ -100,7 +100,7 @@ class ProgressIntegrationTest {
         mockMvc.perform(get("/api/v1/progress").param("batchId", october.toString()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.batch.id").value(october.toString()))
-            .andExpect(jsonPath("$.batch.label").value("국민 · 2025-10"))
+            .andExpect(jsonPath("$.batch.label").value("국민 2025-10"))
             .andExpect(jsonPath("$.batch.transactionCount").value(4))
             .andExpect(jsonPath("$.context.version").value(context.version()))
             .andExpect(jsonPath("$.context.bookkeeping").value("복식부기"))
