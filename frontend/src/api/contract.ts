@@ -190,6 +190,11 @@ export interface Api {
   runs: {
     create(body: {batchId: string;contextId: string;}): Promise<JudgmentRunCreated>;
     get(runId: string): Promise<JudgmentRun>;
+    /**
+     * 이 사용자의 진행 중인(QUEUED, RUNNING) 실행. 없으면 null(204).
+     * 진행 화면을 떠났다가 돌아오거나, 판정 시작을 막을 때 쓴다
+     */
+    active(): Promise<JudgmentRun | null>;
     /** 기술적 실패만. NEEDS_REVIEW 는 여기 오지 않는다 */
     failures(runId: string, query?: PageQuery): Promise<Page<JudgmentRunFailure>>;
   };

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { PlayIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { StepEyebrow } from '../components/StepEyebrow';
@@ -30,6 +30,12 @@ export function Confirm() {
     );
     return { batch, judgeable: classified.page.totalElements, unclassified: unclassified.page.totalElements };
   }, [batchId]);
+  /**
+   * 진행 중인 판정이 있으면 확인 화면 대신 그 진행 화면을 보인다. 진행 화면을 떠났다가 단계 표시나
+   * 다른 화면의 버튼으로 돌아와도 동의부터 다시 받지 않고, 판정 중에 또 시작하지 못한다.
+   * 못 읽으면 확인 화면을 그대로 보인다. 그래도 시작은 서버가 409 로 막는다
+   */
+  const activeQ = useApi(() => api.runs.active(), []);
   // 다른 업로드로 바꾼 직후에는 앞 업로드의 응답이 남아 있다
   const loaded = batchQ.data && batchQ.data.batch.id === batchId ? batchQ.data : null;
   const [agreed, setAgreed] = useState(false);
@@ -86,6 +92,10 @@ export function Confirm() {
       setStarting(false);
     }
   };
+
+  if (activeQ.data) return <Navigate to={`/run/${activeQ.data.id}`} replace />;
+  // 확인을 보였다가 진행 화면으로 넘어가며 깜빡이지 않게, 진행 중인지 알 때까지 그리지 않는다
+  if (activeQ.loading) return <AppShell narrow>{null}</AppShell>;
 
   return (
     <AppShell narrow>
