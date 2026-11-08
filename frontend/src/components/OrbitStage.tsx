@@ -150,21 +150,41 @@ function Ring({
  * intro: 첫 모션 중인가. 인트로 화면에서만 켠다 — 메인 배너에서는 돌기만 한다
  * full: 전체화면인가. 좁은 화면에서도 그림을 다 띄운다 — 440px 패널에서는 테만 남기지만
  *       844px 짜리 인트로에서 테만 두면 거의 빈 화면이 된다
+ * paused: 배너의 멈춤 버튼을 눌렀다. 가운데 문구도 바꾸지 않는다. 회전은 HeroBanner 가 멈춘다
  */
-export function OrbitStage({ intro = false, full = false }: {intro?: boolean; full?: boolean;}) {
+export function OrbitStage({ intro = false, full = false, paused = false }: {intro?: boolean; full?: boolean; paused?: boolean;}) {
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
     const reduce = window.matchMedia?.(
       '(prefers-reduced-motion: reduce)'
     ).matches;
-    if (reduce) return;
+    if (reduce || paused) return;
     const timer = window.setInterval(
       () => setIndex((n) => (n + 1) % CENTER_LINES.length),
       SWAP_MS
     );
     return () => window.clearInterval(timer);
-  }, []);
+  }, [paused]);
+
+  const centerText =
+  <p
+    className={`relative text-center text-h3 font-bold tracking-ir-sm text-white ${
+    full ? 'lg:text-ir-panel' : 'min-[1400px]:text-ir-panel'} ${intro ? CENTER_RISE : ''}`
+    }>
+
+      {CENTER_LINES.map((line, i) =>
+    <span
+      key={line}
+      className={`block transition-opacity duration-700 ${
+      i === index ? 'opacity-100' : 'absolute inset-0 opacity-0'}`
+      }>
+
+          {line}
+        </span>
+    )}
+    </p>;
+
 
   return (
     <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
@@ -192,12 +212,17 @@ export function OrbitStage({ intro = false, full = false }: {intro?: boolean; fu
       </div>
       {/*
         궤도는 정사각 판 안에서만 돈다. 가로·세로 %를 따로 쓰면 원이 아니라
-        타원이 되어 그림이 좌우 끝으로 밀린다. 중심을 오른쪽으로 비켜 두어
-        왼쪽 위 제목과 겹치지 않게 한다
+        타원이 되어 그림이 좌우 끝으로 밀린다.
+
+        배너에서는 판을 오른쪽 끝에 붙이고, 폭에서 제목 몫(lg 424px, xl 520px)을 뺀 만큼만
+        키운다. 전에는 중심을 66% 에 두고 판 높이에 맞춰 키워서 바깥 그림이 제목 둘째 줄
+        위를 지나갔다 (C81). 1024~1279 는 자리가 좁아 제목도 한 단계 작다(HeroBanner)
       */}
       <div
-        className={`absolute left-1/2 top-1/2 aspect-square w-[88%] -translate-x-1/2 -translate-y-1/2 lg:left-[66%] lg:h-[94%] lg:w-auto ${
-        full ? 'block' : 'hidden'} lg:block`
+        className={
+        full ?
+        'absolute left-1/2 top-1/2 aspect-square w-[88%] -translate-x-1/2 -translate-y-1/2 lg:left-[66%] lg:h-[94%] lg:w-auto' :
+        'absolute right-8 top-1/2 hidden aspect-square -translate-y-1/2 lg:block lg:w-[min(584px,calc(100%-424px))] xl:w-[min(584px,calc(100%-520px))]'
         }>
         <div className={`absolute inset-0 ${intro ? DRAW : ''}`}>
           <span className="absolute left-1/2 top-1/2 aspect-square w-[104%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20" />
@@ -213,30 +238,24 @@ export function OrbitStage({ intro = false, full = false }: {intro?: boolean; fu
             counter="animate-orbit-slow-back" />
 
         </div>
+
+        {/*
+          배너에서는 문구를 판 안에 둔다. 판이 오른쪽에 붙어 있어 판과 함께 움직여야 중심이 맞는다.
+          1280 아래는 판이 작아 문구가 안쪽 그림에 걸린다. 휴대폰처럼 그림만 둔다
+        */}
+        {!full &&
+        <div className="absolute left-1/2 top-1/2 hidden w-[150%] -translate-x-1/2 -translate-y-1/2 justify-center xl:flex">
+            {centerText}
+          </div>
+        }
       </div>
 
-      {/* 가운데 바뀌는 문구 — 궤도 중심에 맞춘다 */}
-      <div
-        className={`absolute inset-y-0 left-1/2 w-[80%] -translate-x-1/2 items-center justify-center px-8 lg:left-[66%] lg:w-[70%] ${
-        full ? 'flex' : 'hidden'} lg:flex`
-        }>
-        <p
-          className={`relative text-center text-h3 font-bold tracking-ir-sm text-white lg:text-ir-panel ${
-          intro ? CENTER_RISE : ''}`
-          }>
-
-          {CENTER_LINES.map((line, i) =>
-          <span
-            key={line}
-            className={`block transition-opacity duration-700 ${
-            i === index ? 'opacity-100' : 'absolute inset-0 opacity-0'}`
-            }>
-
-              {line}
-            </span>
-          )}
-        </p>
-      </div>
+      {/* 가운데 바뀌는 문구. 인트로는 궤도 중심에 맞춘다 */}
+      {full &&
+      <div className="absolute inset-y-0 left-1/2 flex w-[80%] -translate-x-1/2 items-center justify-center px-8 lg:left-[66%] lg:w-[70%]">
+          {centerText}
+        </div>
+      }
     </div>);
 
 }

@@ -15,7 +15,7 @@ export const DEV_EXPENSES = [
 {
   kind: '장비 구입',
   examples: '맥북 · 모니터 · 데스크체어',
-  point: '100만 원 기준으로 즉시 비용과 감가상각이 갈립니다.',
+  point: '물건 하나가 100만 원 이하이거나 PC, 휴대폰, 가구면 바로 비용입니다.',
   verdict: 'ask'
 },
 {

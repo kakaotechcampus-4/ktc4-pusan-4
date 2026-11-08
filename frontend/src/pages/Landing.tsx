@@ -132,9 +132,9 @@ export function Landing() {
     }
   }, []);
 
-  /* 로그인 뒤에는 메인으로 오므로, CTA 가 로그인 폼으로 되돌아가면 막힌다 */
+  /* 로그인 뒤에는 메인으로 오므로, CTA 가 로그인 폼으로 되돌아가면 막힌다. 처음 온 사람은 가입부터 한다 (C101) */
   const signedIn = status === 'signedIn';
-  const startTo = signedIn ? '/upload' : '/login';
+  const startTo = signedIn ? '/upload' : '/signup';
 
   return (
     <div className="min-h-full bg-canvas">
@@ -205,10 +205,10 @@ export function Landing() {
               <div className="flex-1 rounded-2xl bg-surface p-5">
                 <p className="text-caption text-muted">되돌릴 수 없는 동작</p>
                 <p className="mt-2 text-h4 font-bold tracking-ir-sm text-ink">
-                  없습니다
+                  만들지 않습니다
                 </p>
                 <p className="mt-2 text-small leading-6 text-ink2 [word-break:keep-all]">
-                  신고·제출·발송을 만들지 않습니다. 답을 고치면 그 자리에서 다시
+                  신고, 제출, 발송은 하지 않습니다. 답을 고치면 그 자리에서 다시
                   판정합니다.
                 </p>
               </div>

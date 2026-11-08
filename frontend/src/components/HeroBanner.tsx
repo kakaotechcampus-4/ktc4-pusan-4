@@ -351,7 +351,8 @@ export function HeroBanner({ autoplay = true }: {autoplay?: boolean;}) {
 
   return (
     <div
-      className="relative"
+      // 멈춤은 장면 넘김만이 아니라 궤도 회전도 멈춘다. 움직이는 것이 남아 있으면 멈춘 것이 아니다(WCAG 2.2.2)
+      className={`relative ${stopped ? '[&_*]:[animation-play-state:paused]' : ''}`}
       onPointerEnter={(e) => {
         // 터치는 손을 떼도 hover 가 남는다. 마우스만 본다
         if (e.pointerType === 'mouse') setHolding(true);
@@ -382,14 +383,14 @@ export function HeroBanner({ autoplay = true }: {autoplay?: boolean;}) {
         className="flex snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain rounded-[20px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 
         <Slide>
-          <OrbitStage />
+          <OrbitStage paused={stopped} />
           {/* 글은 궤도 위에 올린다 */}
           <div className="relative z-10 px-8 pt-12 sm:px-16 sm:pt-16">
             <p className="text-body text-white">
               1인 IT 개발 사업자를 위한 경비 판정
             </p>
             {/* 페이지의 h1. 프리렌더가 공개 페이지마다 h1 이 하나인지 본다(scripts/prerender.mjs) */}
-            <h1 className="mt-5 block text-h2 font-normal leading-tight tracking-ir text-white [word-break:keep-all] lg:text-ir-display">
+            <h1 className="mt-5 block text-h2 font-normal leading-tight tracking-ir text-white [word-break:keep-all] lg:text-h2-lg xl:text-ir-display">
               이 카드값이 경비인지,
               <br />
               조문까지 붙여 답합니다
