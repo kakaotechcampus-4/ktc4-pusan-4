@@ -28,3 +28,25 @@
 - 법령 원문(mock/statutes.ts, 조문 DB 본문)은 원문이라 그대로 둔다
 - 백엔드 integrationTest 는 Docker 가 없어 돌리지 못했다(ProgressIntegrationTest 기대값을 고쳤다)
 - PR #264 본문은 아직 옛 내용(C84~C96)이다
+
+## 13:46 감사와 재점검에서 나온 것을 고친다
+
+- 커밋: 898a7ff2..3b0eae0d (10개)
+
+### 한 일
+
+- 스플래시: 파란 판을 clip-path 로 자르지 않고 top, left, width, height 로 줄인다. 안의 궤도와 글은 시작할 때 화면 크기로 그린 채 transform scale 로 같이 줄인다. 걷기는 show 에서 앞으로만 가고, 줄어드는 동안 창 크기가 바뀌면 배너 자리를 다시 겨눈다
+- 스플래시는 로그아웃 상태로 홈을 열 때마다(새로고침 포함) 뜬다. 로그인 여부는 localStorage preet.signedIn(SessionContext 가 적는다)으로 Landing 과 index.html 덮개 스크립트가 같이 본다
+- 본문 바로가기는 로그인 화면 로고와 겹쳐 뒤로가기로 바꿨다가 뺐다. 로고를 누르면 된다. main id=main, tabIndex=-1 은 남긴다
+- ChoiceGroup: selectOnFocus 를 두고 질문 화면은 끈다. 화살표는 초점만 옮기고 Space, Enter 로 고른다. 화살표로 고르는 순간 서버에 답이 저장됐기 때문이다. Alt, Ctrl, Meta 조합은 건드리지 않는다
+- 배너 궤도: xl 아래는 고리 하나, 판 크기는 cqw 로 판 폭을 따른다. 360~1920 폭에서 그림이 제목, 1 / 3 알약, CTA, 판 끝에 닿지 않는 것을 쟀다
+- 판정 상세: 불가로 바꾸기, 판정 대상에서 빼기 버튼을 판 폭에 맞춰 같은 크기로, 경비가 아니면 불가로 바꾸라는 안내 문장을 뺐다
+- 거래 목록 좁은 화면 버튼 줄, 오류 화면 버그 신고 링크를 본문 줄에 맞췄다
+- 답 이름: LEGACY_ANSWER_LABEL(업무·개인 혼재, 섞임)을 따로 두고, 비서 카드도 저장 값 대신 화면 이름을 쓴다(tools.py shown, FE 표와 같은지 테스트)
+- V22 마이그레이션으로 이미 만든 question_queue.question_text 의 가운뎃점을 뺐다
+
+### 남은 것 · 아는 문제
+
+- 1280 이상에서 안쪽과 바깥 고리 그림이 가끔 서로 지나간다. 두 고리 설계 그대로다
+- 저장되는 답 값은 여전히 가운뎃점을 갖는다. 화면과 비서 카드만 고친 이름을 보인다
+- 백엔드 integrationTest 는 로컬에서 돌리지 못했다(Docker 없음). CI 에 맡긴다
