@@ -34,6 +34,7 @@ id: E-001
   가맹점: "부산광역시청 주정차위반과태료"
   금액: 50000
   merchant_category: 지자체_과태료   # fixture. rules/categories.yaml 안의 값만. 분류기는 평가 대상 아님
+  합산: false                        # 선택. 카드사 합산 행("지하철 40건")이면 true. 일자가 묶음 기준일이다
   비고: "..."                        # 사람용. 엔진 입력 아님
 응답:                                # 선택. 되묻기 답변 fixture
   - { 범위: transaction, fact_type: 용도, 값: 업무미팅 }   # 범위: transaction | merchant

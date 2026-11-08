@@ -1,8 +1,9 @@
 import { ApiRequestError } from './contract';
 import type { Api } from './contract';
+import type { SessionEndReason } from '../auth/session';
 
 /**
- * 실제 서버 구현. 배포에서 Caddy 가 `/api/v1/*` 를 백엔드로 넘기므로(deploy/Caddyfile)
+ * 실제 서버 구현. 배포에서 Caddy 가 `/api/v1/*` 를 백엔드로 넘기므로(deploy/caddy/Caddyfile)
  * 같은 오리진이고 CORS 가 없다. 개발 중에는 vite proxy 가 같은 경로를 넘긴다.
  */
 const BASE = '/api/v1';
@@ -28,15 +29,22 @@ interface Options {
 }
 
 /**
- * 인증 (#139 가정). 액세스 토큰은 메모리에만 두고 Authorization 헤더로 보낸다.
+ * 인증 (api.md 1.1). 액세스 토큰은 메모리에만 두고 Authorization 헤더로 보낸다.
  * 리프레시 토큰은 서버가 httpOnly 쿠키로 둔다 — 같은 오리진이라 fetch 가 그대로 실어 보낸다.
- * 경로와 응답 모양(`{accessToken}`)은 api.md 에 적히면 맞춘다.
  */
 let accessToken: string | null = null;
-const lostListeners = new Set<() => void>();
+/** 세션이 끝난 이유를 넘긴다(계약의 onLost). SessionContext 가 로그인 화면에 알린다 */
+const lostListeners = new Set<(reason: SessionEndReason) => void>();
 
-/** 로그인·재발급은 만료된 토큰을 싣지 않는다. 서버가 헤더의 토큰부터 검사하면 거기서 401 이 난다 */
-const NO_BEARER = new Set(['/auth/login', '/auth/refresh']);
+/** 로그인·가입·재발급은 만료된 토큰을 싣지 않는다. 서버가 헤더의 토큰부터 검사하면 거기서 401 이 난다 */
+const NO_BEARER = new Set([
+'/auth/login',
+'/auth/refresh',
+'/auth/signup',
+'/auth/kakao',
+'/auth/email-verification',
+'/auth/email-verification/confirm']
+);
 /** 이 경로의 401 은 재발급으로 풀리지 않는다 */
 const isAuthPath = (path: string) => path.startsWith('/auth/');
 
@@ -47,12 +55,66 @@ const isAuthPath = (path: string) => path.startsWith('/auth/');
 let generation = 0;
 
 /** 로그인이 풀렸다. 토큰이 있던 경우에만 한 번 알린다 — 동시에 실패한 요청이 여러 번 알리지 않게 */
-const lose = () => {
+const lose = (reason: SessionEndReason) => {
   if (accessToken === null) return;
   accessToken = null;
   generation += 1;
-  lostListeners.forEach((listener) => listener());
+  lostListeners.forEach((listener) => listener(reason));
 };
+
+/** JWT 의 sub(사용자 id). JWT 모양이 아니면 null 이다 */
+const subjectOf = (token: string): string | null => {
+  try {
+    const payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const { sub } = JSON.parse(atob(payload)) as { sub?: unknown };
+    return typeof sub === 'string' ? sub : null;
+  } catch {
+    return null;
+  }
+};
+/** 둘 다 읽혔고 서로 다를 때만 다른 계정으로 본다. 못 읽으면 비교하지 않는다 */
+const otherAccount = (a: string | null, b: string | null) => a !== null && b !== null && a !== b;
+
+type AuthMessage = {type: 'login';subject: string | null;} | {type: 'logout';};
+
+/**
+ * 다른 탭에 로그인·로그아웃을 알린다 (C44·C45). 리프레시 쿠키는 호스트마다 하나라, 다른 탭이 다른 계정으로
+ * 로그인하면 이 탭도 다음 재발급부터 그 계정이 된다. 알림을 받은 탭은 서버에 묻지 않고 자기 토큰만 버린다.
+ * 모듈을 읽을 때 열면 빌드 때 프리렌더(Node)가 이 모듈을 읽기만 해도 채널이 남아 프로세스가 끝나지 않는다.
+ * 그래서 토큰을 처음 쥘 때 연다. BroadcastChannel 이 없는 브라우저는 재발급 때 계정을 맞춰 보는 것(refresh)으로 막는다
+ */
+let channel: BroadcastChannel | null | undefined;
+const authChannel = () => {
+  if (channel === undefined) {
+    channel = typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('preet-auth');
+    channel?.addEventListener('message', ({ data }: MessageEvent<AuthMessage>) => {
+      if (accessToken === null) return;
+      if (data.type === 'logout') {
+        lose('signed-out');
+      } else if (otherAccount(data.subject, subjectOf(accessToken))) {
+        lose('account-changed');
+      }
+    });
+  }
+  return channel;
+};
+const announce = (message: AuthMessage) => authChannel()?.postMessage(message);
+
+const adopt = (token: string) => {
+  accessToken = token;
+  authChannel();
+};
+
+/**
+ * 다른 탭과도 재발급 줄을 세운다 (#195). 탭마다 같은 쿠키로 동시에 보내면 서버가 이미 쓴 리프레시 토큰으로 보고
+ * 로그인을 끊는다. 앞 탭의 응답이 쿠키를 바꾼 뒤에 다음 탭이 새 쿠키로 보낸다.
+ * Web Locks 가 없는 브라우저는 탭 안에서만 묶는다
+ */
+const refreshRequest = () => request<{ accessToken: string }>('POST', '/auth/refresh');
+const serializedRefresh = async (): Promise<{ accessToken: string }> =>
+typeof navigator !== 'undefined' && navigator.locks ?
+await navigator.locks.request('auth-refresh', refreshRequest) :
+refreshRequest();
 
 let refreshing: Promise<void> | null = null;
 /**
@@ -62,9 +124,15 @@ let refreshing: Promise<void> | null = null;
 const refresh = () => {
   if (!refreshing) {
     const startedAt = generation;
-    refreshing = request<{ accessToken: string }>('POST', '/auth/refresh').
+    refreshing = serializedRefresh().
     then((result) => {
-      if (generation === startedAt) accessToken = result.accessToken;
+      if (generation !== startedAt) return;
+      // 그사이 다른 탭이 다른 계정으로 로그인해 쿠키가 그 계정 것이 됐다. 받으면 이 화면이 남의 데이터를 읽는다 (C44)
+      if (accessToken !== null && otherAccount(subjectOf(accessToken), subjectOf(result.accessToken))) {
+        lose('account-changed');
+        return;
+      }
+      adopt(result.accessToken);
     }).
     finally(() => {
       refreshing = null;
@@ -106,7 +174,7 @@ retried = false)
     });
   } catch {
     // 네트워크가 끊겼거나 서버가 응답하지 않는다. 화면이 "데이터 없음"으로 읽지 않도록 상태 0 으로 구분한다
-    throw new ApiRequestError(0, 'NETWORK_ERROR', '서버에 연결하지 못했습니다.');
+    throw new ApiRequestError(0, 'NETWORK_ERROR', '서버에 연결하지 못했습니다. 인터넷 연결을 확인하고 다시 시도해 주세요.');
   }
 
   const text = await response.text();
@@ -134,20 +202,28 @@ retried = false)
     );
     if (generation === sentAt) {
       if (refreshed) return request<T>(method, path, options, true);
-      lose();
+      lose('expired');
     }
   }
 
   if (!response.ok) {
-    const error = (data ?? {}) as { code?: string; message?: string; traceId?: string };
+    const error = (data ?? {}) as {
+      code?: string;
+      message?: string;
+      traceId?: string;
+      runId?: string;
+    };
     // 초 단위만 읽는다. 날짜 형식이면 버린다
     const retryAfter = Number(response.headers.get('Retry-After'));
     throw new ApiRequestError(
       response.status,
       error.code ?? 'UNKNOWN',
-      error.message ?? `요청을 처리하지 못했습니다. (${response.status})`,
+      // 본문이 없거나(프록시의 502·504) 한글이 없는 서버 기본 문구(Spring 의 영어)면 화면에 올리지 않는다 (C65)
+      error.message && /[가-힣]/.test(error.message) ? error.message : '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.',
       error.traceId ?? '',
-      response.headers.has('Retry-After') && Number.isFinite(retryAfter) ? retryAfter : undefined
+      response.headers.has('Retry-After') && Number.isFinite(retryAfter) ? retryAfter : undefined,
+      // 409 RUN_ALREADY_ACTIVE 에만 붙는다 (#228). 문자열이 아니면 없는 것으로 둔다
+      typeof error.runId === 'string' ? error.runId : undefined
     );
   }
   return data as T;
@@ -164,18 +240,27 @@ const page = (query?: { page?: number; size?: number }): Query => ({
   size: query?.size
 });
 
+/** 로그인·가입·카카오 로그인. 응답은 모두 `{accessToken}` + 리프레시 쿠키다 (api.md 1.1) */
+const enter = async (path: string, body: unknown) => {
+  // 다른 계정으로 로그인하다 실패해도 앞 사람의 토큰이 남지 않게 먼저 버린다
+  accessToken = null;
+  generation += 1;
+  await settled();
+  const startedAt = generation;
+  const result = await post<{ accessToken: string }>(path, body);
+  // 그사이 로그아웃했거나 다시 로그인했으면 이 토큰은 쓰지 않는다
+  if (generation !== startedAt) return;
+  adopt(result.accessToken);
+  announce({ type: 'login', subject: subjectOf(result.accessToken) });
+};
+
 export const httpApi: Api = {
   auth: {
-    login: async (body) => {
-      // 다른 계정으로 로그인하다 실패해도 앞 사람의 토큰이 남지 않게 먼저 버린다
-      accessToken = null;
-      generation += 1;
-      await settled();
-      const startedAt = generation;
-      const result = await post<{ accessToken: string }>('/auth/login', body);
-      // 그사이 로그아웃했거나 다시 로그인했으면 이 토큰은 쓰지 않는다
-      if (generation === startedAt) accessToken = result.accessToken;
-    },
+    login: (body) => enter('/auth/login', body),
+    requestEmailVerification: (body) => post<void>('/auth/email-verification', body),
+    confirmEmailVerification: (body) => post('/auth/email-verification/confirm', body),
+    signup: (body) => enter('/auth/signup', body),
+    kakao: (body) => enter('/auth/kakao', body),
     // 아직 로그인 전이라 잃을 것이 없다. 어떤 이유로든 못 이어 가면 로그인 화면이다
     restore: () => {
       const startedAt = generation;
@@ -183,6 +268,7 @@ export const httpApi: Api = {
     },
     logout: async () => {
       generation += 1;
+      announce({ type: 'logout' });
       if (refreshing) {
         // 재발급이 끝난 뒤에 보낸다(settled). 토큰은 싣지 않는다 — /auth/* 는 토큰을 보지 않고 쿠키만 지운다
         accessToken = null;
@@ -284,6 +370,7 @@ export const httpApi: Api = {
       latestOnly: query?.latestOnly
     }),
     get: (judgmentId) => get(`/judgments/${judgmentId}`),
+    export: (scope) => get('/judgments/export', { batchId: scope.batchId, year: scope.year }),
     override: (judgmentId, body, idempotencyKey) =>
     post(`/judgments/${judgmentId}/override`, body, idempotencyKey),
     removeOverride: (overrideId) => del(`/judgment-overrides/${overrideId}`)
@@ -314,7 +401,7 @@ export const httpApi: Api = {
     suggestions: (batchId) => get('/questions/suggestions', { batchId })
   },
 
-  // 아래 경로는 명세 10장의 이름을 따른 가정이다. 백엔드가 정하면 맞춘다
+  // 경로는 api.md 와 같다
   assistant: {
     chat: (body) => post('/assistant/chat', body)
   },
@@ -324,7 +411,7 @@ export const httpApi: Api = {
   },
 
   handoffNotes: {
-    // 저장 API 가 아직 없는 서버(404)는 저장한 질문이 없는 것과 같다. 다른 실패는 요약이 「빠진 항목」으로 알린다
+    // #214 전 서버에는 저장 API 가 없었다(404). 그때는 저장한 질문이 없는 것과 같다. 다른 실패는 요약이 「빠진 항목」으로 알린다
     list: () =>
     get<Awaited<ReturnType<Api['handoffNotes']['list']>>>('/handoff-notes').catch((caught: unknown) => {
       if (caught instanceof ApiRequestError && caught.status === 404) return [];

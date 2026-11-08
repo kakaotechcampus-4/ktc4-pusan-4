@@ -15,16 +15,20 @@ const VARIANT: Record<ButtonVariant, string> = {
   danger: 'bg-deny text-white hover:brightness-95'
 };
 
-/** sm은 헤더·표 안, md는 폼, lg는 랜딩 CTA, inline은 문장 속 텍스트 링크(ghost 전용) */
+/**
+ * sm은 헤더·표 안, md는 폼과 화면의 주 버튼, lg는 랜딩 CTA, inline은 문장 속 텍스트 링크(ghost 전용).
+ * 모양은 알약 하나, 높이는 36·48·56 셋뿐이다. 화면에서 rounded-xl·h-* 로 버튼을 따로 만들지 않는다 (C90)
+ */
 const SIZE: Record<ButtonSize, string> = {
-  sm: 'rounded-full px-4 py-2 text-body',
-  md: 'rounded-full px-6 py-3 text-body-lg',
-  lg: 'rounded-full px-8 py-4 text-lead',
+  sm: 'h-9 rounded-full px-4 text-body',
+  md: 'h-12 rounded-full px-6 text-body-lg',
+  lg: 'h-14 rounded-full px-8 text-lead',
   inline: 'text-body-lg'
 };
 
+/** 버튼 글자는 줄을 바꾸지 않는다. 막힌 버튼은 모든 variant 가 opacity-40 하나로 흐려진다 */
 const BASE =
-'inline-flex items-center justify-center gap-2 font-bold leading-normal transition-colors duration-150 ease-snap disabled:cursor-not-allowed disabled:opacity-40';
+'inline-flex items-center justify-center gap-2 whitespace-nowrap font-bold leading-normal transition-colors duration-150 ease-snap disabled:cursor-not-allowed disabled:opacity-40';
 
 interface CommonProps {
   variant?: ButtonVariant;
@@ -44,6 +48,8 @@ type ButtonAsLink = CommonProps & {
   to: string;
   href?: undefined;
   replace?: boolean;
+  /** 이동할 화면에 넘길 location.state. 예: 문진에 돌아올 곳(from)을 넘긴다 */
+  state?: unknown;
 };
 
 type ButtonAsAnchor = CommonProps &
@@ -60,9 +66,9 @@ export function Button(props: ButtonProps) {
   const classes = cn(BASE, VARIANT[variant], SIZE[size], className);
 
   if (props.to !== undefined) {
-    const { to, replace } = props;
+    const { to, replace, state } = props;
     return (
-      <Link to={to} replace={replace} className={classes}>
+      <Link to={to} replace={replace} state={state} className={classes}>
         {children}
       </Link>);
 

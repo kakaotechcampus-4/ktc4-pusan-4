@@ -9,6 +9,7 @@ import com.ktc4.pusan4.judgment.persistence.UploadBatchRepository;
 import com.ktc4.pusan4.merchant.classify.ClassificationInput;
 import com.ktc4.pusan4.merchant.classify.ClassificationResult;
 import com.ktc4.pusan4.merchant.classify.MerchantClassifier;
+import com.ktc4.pusan4.merchant.classify.ModelDecision;
 import com.ktc4.pusan4.shared.UuidGenerator;
 import com.ktc4.pusan4.shared.api.ApiException;
 import com.ktc4.pusan4.transaction.api.ClassificationStatus;
@@ -16,7 +17,6 @@ import com.ktc4.pusan4.transaction.api.SourceStatus;
 import com.ktc4.pusan4.transaction.domain.NewTransaction;
 import com.ktc4.pusan4.transaction.domain.NewUploadBatch;
 import com.ktc4.pusan4.transaction.domain.UploadResult;
-import jakarta.persistence.EntityManager;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +33,7 @@ import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -44,6 +45,8 @@ import java.util.UUID;
  * 분류 실패는 업로드를 실패시키지 않고 미분류 + 분류 검토로 남긴다.
  * 판정에 들어가지 않는 거래(CANCELED_OFFSET·EXCLUDED)는 미분류여도 분류 검토를 만들지 않는다.
  * 사용자가 나중에 포함(B7)하면 그때 만든다.
+ * 규칙으로 미분류인 거래에 분류 모델 답({@link UploadFacade} 가 트랜잭션 밖에서 받아 온다)이 있으면 그 답을 남긴다.
+ * 모델 답은 분류 검토의 후보로만 쓰고 카테고리는 바꾸지 않는다.
  */
 @Service
 public class UploadService {
@@ -53,10 +56,11 @@ public class UploadService {
     private static final int KEY_LOOKUP_CHUNK = 1_000;
     private static final Duration IDEMPOTENCY_TTL = Duration.ofHours(24);
 
-    private final EntityManager entityManager;
     private final UploadBatchRepository batchRepository;
     private final TransactionRecordRepository transactionRepository;
     private final IdempotencyKeyRepository idempotencyKeyRepository;
+    private final ClassificationReviewRepository reviewRepository;
+    private final MerchantModelDecisionRepository decisionRepository;
     private final MerchantClassifier merchantClassifier;
     private final ObjectMapper objectMapper;
     private final UuidGenerator uuidGenerator;
@@ -64,20 +68,22 @@ public class UploadService {
     private final UserWriteLock userWriteLock;
 
     public UploadService(
-        EntityManager entityManager,
         UploadBatchRepository batchRepository,
         TransactionRecordRepository transactionRepository,
         IdempotencyKeyRepository idempotencyKeyRepository,
+        ClassificationReviewRepository reviewRepository,
+        MerchantModelDecisionRepository decisionRepository,
         MerchantClassifier merchantClassifier,
         ObjectMapper objectMapper,
         UuidGenerator uuidGenerator,
         Clock clock,
         UserWriteLock userWriteLock
     ) {
-        this.entityManager = entityManager;
         this.batchRepository = batchRepository;
         this.transactionRepository = transactionRepository;
         this.idempotencyKeyRepository = idempotencyKeyRepository;
+        this.reviewRepository = reviewRepository;
+        this.decisionRepository = decisionRepository;
         this.merchantClassifier = merchantClassifier;
         this.objectMapper = objectMapper;
         this.uuidGenerator = uuidGenerator;
@@ -85,11 +91,20 @@ public class UploadService {
         this.userWriteLock = userWriteLock;
     }
 
-    /**
-     * @param idempotencyKey 헤더 값. 빈 값 검사(400 IDEMPOTENCY_KEY_REQUIRED)는 컨트롤러가 먼저 한다
-     */
+    /** 분류 모델 없이 업로드한다. */
     @Transactional
     public UploadResult upload(UUID userId, String idempotencyKey, NewUploadBatch input) {
+        return upload(userId, idempotencyKey, input, Map.of());
+    }
+
+    /**
+     * @param idempotencyKey 헤더 값. 빈 값 검사(400 IDEMPOTENCY_KEY_REQUIRED)는 컨트롤러가 먼저 한다
+     * @param decisions      merchantNorm → 분류 모델 답. 규칙으로 미분류인 거래에만 쓴다
+     */
+    @Transactional
+    public UploadResult upload(
+        UUID userId, String idempotencyKey, NewUploadBatch input, Map<String, ModelDecision> decisions
+    ) {
         userWriteLock.lock(userId);
         // DB(timestamptz)가 마이크로초까지라 맞춰 자른다. 그래야 재전송 응답의 createdAt 이 최초 응답과 글자까지 같다.
         OffsetDateTime now = OffsetDateTime.now(clock.withZone(KST)).truncatedTo(ChronoUnit.MICROS);
@@ -109,20 +124,22 @@ public class UploadService {
             return key.replay();
         }
 
-        UploadResult result = store(userId, input, now);
+        UploadResult result = store(userId, input, decisions, now);
 
         // 만료된 키는 새 요청으로 처리한다(api.md 1.6). UNIQUE(user_id, key) 라 같은 행에 덮어쓴다.
         if (key == null) {
             key = new IdempotencyKeyEntity(uuidGenerator.generate(), userId, idempotencyKey);
             key.record(requestHash, result, now.plus(IDEMPOTENCY_TTL));
-            entityManager.persist(key);
+            idempotencyKeyRepository.save(key);
         } else {
             key.record(requestHash, result, now.plus(IDEMPOTENCY_TTL));
         }
         return result;
     }
 
-    private UploadResult store(UUID userId, NewUploadBatch input, OffsetDateTime now) {
+    private UploadResult store(
+        UUID userId, NewUploadBatch input, Map<String, ModelDecision> decisions, OffsetDateTime now
+    ) {
         if (batchRepository.existsByUserIdAndFileHash(userId, input.fileHash())) {
             throw new ApiException(HttpStatus.CONFLICT, "DUPLICATE_FILE", "이미 업로드한 파일입니다.");
         }
@@ -131,13 +148,16 @@ public class UploadService {
         int skipped = input.transactions().size() - fresh.size();
 
         UploadBatchEntity batch = new UploadBatchEntity(uuidGenerator.generate(), userId, input, skipped, now);
-        entityManager.persist(batch);
+        batchRepository.save(batch);
 
         List<ClassificationResult> results = merchantClassifier.classifyAll(userId, fresh.stream()
             .map(transaction -> new ClassificationInput(transaction.merchantRaw(), transaction.bizNo()))
             .toList());
 
-        int pending = 0;
+        // 분류 검토와 모델 답은 모아 두었다가 거래를 다 저장한 뒤 저장한다. 거래·검토 insert 가 번갈아 나가면
+        // JDBC 배치(hibernate.jdbc.batch_size)가 테이블이 바뀔 때마다 끊긴다. 부모(거래)가 먼저라 FK 순서도 지킨다.
+        List<ClassificationReviewEntity> reviews = new ArrayList<>();
+        List<MerchantModelDecisionEntity> modelDecisions = new ArrayList<>();
         for (int i = 0; i < fresh.size(); i++) {
             ClassificationResult result = results.get(i);
             ClassificationStatus status = result.classified()
@@ -146,14 +166,20 @@ public class UploadService {
             TransactionRecordEntity transaction = new TransactionRecordEntity(
                 uuidGenerator.generate(), batch.id(), userId, fresh.get(i),
                 result.merchantNorm(), result.merchantCategory(), status, now);
-            entityManager.persist(transaction);
+            transactionRepository.save(transaction);
+            // 모델을 부른 뒤 사전이 바뀌어 규칙으로 분류됐으면 모델 답은 남기지 않는다
+            ModelDecision decision = result.classified() ? null : decisions.get(result.merchantNorm());
+            if (decision != null) {
+                modelDecisions.add(new MerchantModelDecisionEntity(transaction.id(), decision, now));
+            }
             if (status == ClassificationStatus.NEEDS_REVIEW && fresh.get(i).status() == SourceStatus.JUDGEABLE) {
-                entityManager.persist(ClassificationReviewEntity.pending(uuidGenerator.generate(), transaction.id(), now));
-                pending++;
+                reviews.add(ClassificationReviewEntity.pending(uuidGenerator.generate(), transaction.id(), now));
             }
         }
+        reviewRepository.saveAll(reviews);
+        decisionRepository.saveAll(modelDecisions);
 
-        return new UploadResult(batch.id(), fresh.size(), skipped, pending, now);
+        return new UploadResult(batch.id(), fresh.size(), skipped, reviews.size(), now);
     }
 
     /**

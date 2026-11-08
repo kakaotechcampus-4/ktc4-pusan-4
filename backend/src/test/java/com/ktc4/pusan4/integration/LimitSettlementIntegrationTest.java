@@ -1,12 +1,16 @@
 package com.ktc4.pusan4.integration;
 
 import com.ktc4.pusan4.judgment.domain.JudgmentSummary;
+import com.ktc4.pusan4.judgment.domain.LimitYearTotal;
 import com.ktc4.pusan4.judgment.domain.Verdict;
+import com.ktc4.pusan4.judgment.persistence.BusinessContextRevisionService;
 import com.ktc4.pusan4.judgment.persistence.JudgmentOverrideService;
 import com.ktc4.pusan4.judgment.persistence.JudgmentQueryService;
 import com.ktc4.pusan4.judgment.persistence.LimitSettlementService;
 import com.ktc4.pusan4.transaction.persistence.TransactionService;
 import com.ktc4.pusan4.transaction.persistence.UploadBatchService;
+import com.ktc4.pusan4.user.domain.BookkeepingDuty;
+import com.ktc4.pusan4.user.domain.NewBusinessContext;
 import org.assertj.core.groups.Tuple;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,6 +23,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -59,6 +64,9 @@ class LimitSettlementIntegrationTest {
 
     @Autowired
     private UploadBatchService batchService;
+
+    @Autowired
+    private BusinessContextRevisionService contextRevisionService;
 
     private UUID userId;
     private UUID batchId;
@@ -181,6 +189,21 @@ class LimitSettlementIntegrationTest {
     }
 
     @Test
+    void unclassified_transactions_are_left_out_of_the_limit() {
+        // given: 분류 확인을 기다리는 거래의 판정은 지금 판정 대상이 아니다
+        UUID unclassified = transaction("2025-01-15", "AUTO");
+        judgment(unclassified, "AVAILABLE", ENTERTAINMENT, 10_000_000L);
+        jdbcTemplate.update("update transaction set classification_status = 'NEEDS_REVIEW' where id = ?", unclassified);
+        judgment(transaction("2025-03-02", "AUTO"), "AVAILABLE", ENTERTAINMENT, 5_000_000L);
+
+        // when
+        settlementService.settleProvisional(userId);
+
+        // then
+        assertThat(allowedByTagged()).containsExactly(tuple(5_000_000L, 5_000_000L));
+    }
+
+    @Test
     void excluding_and_including_a_transaction_settle_the_limit_again() {
         // given
         UUID january = transaction("2025-01-15", "AUTO");
@@ -227,8 +250,8 @@ class LimitSettlementIntegrationTest {
     }
 
     @Test
-    void current_summary_counts_entertainment_by_the_limit_allowed_amount() {
-        // given: 1월 1,000만원 + 3월 500만원 접대비, 한도 1,209만원이라 3월은 209만원만 인정된다
+    void only_the_year_summary_subtracts_the_entertainment_limit_excess() {
+        // given: 1월 1,000만원 + 3월 500만원 접대비, 한도 1,209만원이라 연간 291만원이 초과한다
         accounted(judgment(transaction("2025-01-15", "AUTO"), "AVAILABLE", ENTERTAINMENT, 10_000_000L), "접대비");
         accounted(judgment(transaction("2025-03-02", "AUTO"), "AVAILABLE", ENTERTAINMENT, 5_000_000L), "접대비");
         accounted(judgment(transaction("2025-02-01", "AUTO"), "AVAILABLE", "{}", 1_000_000L), "소모품비");
@@ -239,14 +262,93 @@ class LimitSettlementIntegrationTest {
         JudgmentSummary byYear = queryService.summary(userId, null, 2025, null);
         JudgmentSummary byRun = queryService.summary(userId, null, null, runId);
 
-        // then: 현재 결과는 한도 초과분 291만원을 빼고, 과거 Run 은 그 Run 의 finalAmount 합 그대로다
-        for (JudgmentSummary current : List.of(byBatch, byYear)) {
-            assertThat(current.byVerdict().get(Verdict.AVAILABLE).finalAmount()).isEqualTo(13_090_000L);
-            assertThat(current.byAccount())
-                .extracting(JudgmentSummary.AccountTotal::account, JudgmentSummary.AccountTotal::finalAmount)
-                .containsExactly(tuple("접대비", 12_090_000L), tuple("소모품비", 1_000_000L));
+        // then: 한도는 연간 총액이라 연도 요약만 초과분을 뺀다(#15). 배치 몫은 순서 없이 나눌 수 없어 finalAmount 합이다
+        assertThat(byYear.byVerdict().get(Verdict.AVAILABLE).finalAmount()).isEqualTo(13_090_000L);
+        assertThat(byYear.byAccount())
+            .extracting(JudgmentSummary.AccountTotal::account, JudgmentSummary.AccountTotal::finalAmount)
+            .containsExactly(tuple("접대비", 12_090_000L), tuple("소모품비", 1_000_000L));
+        for (JudgmentSummary preLimit : List.of(byBatch, byRun)) {
+            assertThat(preLimit.byVerdict().get(Verdict.AVAILABLE).finalAmount()).isEqualTo(16_000_000L);
         }
-        assertThat(byRun.byVerdict().get(Verdict.AVAILABLE).finalAmount()).isEqualTo(16_000_000L);
+    }
+
+    @Test
+    void limits_give_the_yearly_total_and_excess_of_the_years_in_scope() {
+        // given: 2025년 1,500만원(한도 1,209만원 → 291만원 초과), 2024년 5만원
+        judgment(transaction("2025-01-15", "AUTO"), "AVAILABLE", ENTERTAINMENT, 10_000_000L);
+        judgment(transaction("2025-03-02", "AUTO"), "AVAILABLE", ENTERTAINMENT, 5_000_000L);
+        judgment(transaction("2024-12-20", "AUTO"), "AVAILABLE", ENTERTAINMENT, 50_000L);
+        settlementService.settleProvisional(userId);
+
+        // when
+        List<LimitYearTotal> byBatch = queryService.limits(userId, batchId, null);
+        List<LimitYearTotal> byYear = queryService.limits(userId, null, 2025);
+
+        // then
+        assertThat(byBatch).containsExactly(
+            new LimitYearTotal("접대비", 2024, 50_000L, 0L),
+            new LimitYearTotal("접대비", 2025, 15_000_000L, 2_910_000L));
+        assertThat(byYear).containsExactly(new LimitYearTotal("접대비", 2025, 15_000_000L, 2_910_000L));
+    }
+
+    @Test
+    void revising_the_context_settles_the_limit_with_the_new_revenue() {
+        // given: 수입금액 3,000만원 → 한도 1,209만원, 2025년 1,500만원이라 291만원 초과
+        judgment(transaction("2025-01-15", "AUTO"), "AVAILABLE", ENTERTAINMENT, 10_000_000L);
+        judgment(transaction("2025-03-02", "AUTO"), "AVAILABLE", ENTERTAINMENT, 5_000_000L);
+        settlementService.settleProvisional(userId);
+
+        // when: 수입금액을 1억원으로 고친다 → 한도 1,230만원
+        contextRevisionService.create(userId, new NewBusinessContext(
+            "940909", 100_000_000L, LocalDate.parse("2023-01-01"), BookkeepingDuty.간편장부, false, null));
+
+        // then
+        assertThat(queryService.limits(userId, null, 2025))
+            .containsExactly(new LimitYearTotal("접대비", 2025, 15_000_000L, 2_700_000L));
+    }
+
+    @Test
+    void batch_limits_cover_only_its_years_but_total_the_whole_year() {
+        // given: 이 batch 는 2024·2025년, 다른 batch 는 2025년 접대비만 있다
+        judgment(transaction("2025-01-15", "AUTO"), "AVAILABLE", ENTERTAINMENT, 10_000_000L);
+        judgment(transaction("2024-12-20", "AUTO"), "AVAILABLE", ENTERTAINMENT, 50_000L);
+        UUID otherBatch = batch();
+        judgment(transaction(otherBatch, "2025-03-02", "AUTO"), "AVAILABLE", ENTERTAINMENT, 5_000_000L);
+        settlementService.settleProvisional(userId);
+
+        // when
+        List<LimitYearTotal> limits = queryService.limits(userId, otherBatch, null);
+
+        // then: 한도는 사용자의 한 해 전체라 2025년은 두 batch 를 합친 값이다
+        assertThat(limits).containsExactly(new LimitYearTotal("접대비", 2025, 15_000_000L, 2_910_000L));
+    }
+
+    @Test
+    void export_leaves_entertainment_allowed_amount_empty_only_in_years_over_the_limit() {
+        // given: 2025년 접대비는 한도를 넘고(1,500만원 > 1,209만원), 2024년 접대비는 넘지 않는다
+        UUID january = judgment(transaction("2025-01-15", "AUTO"), "AVAILABLE", ENTERTAINMENT, 10_000_000L);
+        UUID march = judgment(transaction("2025-03-02", "AUTO"), "AVAILABLE", ENTERTAINMENT, 5_000_000L);
+        UUID lastYear = judgment(transaction("2024-12-20", "AUTO"), "AVAILABLE", ENTERTAINMENT, 50_000L);
+        UUID supplies = judgment(transaction("2025-02-01", "AUTO"), "AVAILABLE", "{}", 1_000_000L);
+        settlementService.settleProvisional(userId);
+
+        // when
+        Map<UUID, Long> allowed = new java.util.HashMap<>();
+        queryService.export(userId, batchId, null)
+            .forEach(row -> allowed.put(row.judgment().id(), row.allowedAmount()));
+
+        // then: 넘은 해의 거래별 인정액은 배분 순서로만 정해져 비운다(#15). 넘지 않은 해와 다른 계정은 그대로다
+        assertThat(allowed).containsEntry(january, null).containsEntry(march, null)
+            .containsEntry(lastYear, 50_000L).containsEntry(supplies, 1_000_000L);
+    }
+
+    private UUID batch() {
+        UUID id = UUID.randomUUID();
+        jdbcTemplate.update("""
+            insert into upload_batch(id, user_id, source_type, card_issuer, period_start, period_end, file_hash)
+            values (?, ?, '승인내역', '국민', '2025-01-01', '2025-12-31', ?)
+            """, id, userId, id.toString());
+        return id;
     }
 
     private void accounted(UUID judgmentId, String account) {
@@ -262,6 +364,10 @@ class LimitSettlementIntegrationTest {
     }
 
     private UUID transaction(String approvedAt, String userInclusion) {
+        return transaction(batchId, approvedAt, userInclusion);
+    }
+
+    private UUID transaction(UUID batchId, String approvedAt, String userInclusion) {
         UUID id = UUID.randomUUID();
         jdbcTemplate.update("""
             insert into transaction(
@@ -282,6 +388,7 @@ class LimitSettlementIntegrationTest {
             ) values (?, ?, 1, 'R-301', 1, '["R-301"]', 'fixture', 1,
                 (select extract(year from approved_at)::int from transaction where id = ?), ?, false, ?, ?::jsonb, ?)
             """, id, transactionId, transactionId, verdict, runId, attributes, finalAmount);
+        CurrentJudgments.refresh(jdbcTemplate);
         return id;
     }
 }

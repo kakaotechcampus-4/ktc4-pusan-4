@@ -13,7 +13,7 @@ import org.springframework.data.domain.Persistable;
  * <p>이미 있는 id 로 새 객체를 만들어 save() 하면 덮어쓰지 않고 키 중복으로 실패한다.
  */
 @MappedSuperclass
-abstract class AssignedIdEntity<ID> implements Persistable<ID> {
+public abstract class AssignedIdEntity<ID> implements Persistable<ID> {
 
     @Transient
     private boolean persisted;

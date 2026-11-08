@@ -22,31 +22,55 @@
 
 | 이름 | 값 | 용도 |
 |---|---|---|
-| `canvas` | #FFFFFF | 페이지 바탕 |
-| `surface` | #F3F5F7 | 패널, 카드 |
-| `surface2` | #122E55 | 첫 화면 큰 판과 그 옆 숫자 카드. 위에 올리는 글자·그림은 흰색 |
-| `sheet` | #FFFFFF | 패널 위에서 흰 바탕이 필요할 때, 표 |
-| `line` / `line2` | #E8ECF0 / #F3F5F7 | 테두리·행 괘선 / 약한 구분선 |
-| `rule` | #16181D | 표 머리 위 굵은 괘선 |
-| `ink` / `ink2` / `muted` | #16181D / #30363F / #67707E | 제목·강조 / 본문 / 보조 |
-| `accent` | #16181D | 주된 동작, 지금 자리 알약 |
-| `accent-hover` / `accent-soft` / `accent-line` | #30363F / #F3F5F7 | primary hover / 연한 채움 / 테두리 버튼·패널 안 구분선 (#DCE1E8) |
-| `link` | #1B64DA | 문장 속 링크 |
-| `highlight` | #FFE600 | 한 화면에 한 번만 쓰는 강조 |
+| `canvas` | #FFFFFF | 페이지 바탕, 카드·패널 바탕 |
+| `surface` | #F2F4F6 | hover, 고른 상태, 결과 머리판(`AmountHero`, 판정 진행판). 그 밖의 카드·패널·구역을 칠하지 않는다 |
+| `surface2` | #2C6AE8 | 첫 화면 큰 판과 그 옆 숫자 카드. 위에 올리는 글자·그림은 흰색 |
+| `sheet` | #FFFFFF | 표, 떠 있는 시트 (canvas 와 같은 흰색) |
+| `line` / `line2` | #E5E8EB / #EDEFF2 | 카드 테두리·행 괘선 / 약한 구분선. `line2` 는 `surface` 위에서도 보여야 해서 `surface` 보다 진하다 |
+| `edge` | #838B96 | 입력칸·select·고르지 않은 선택지의 테두리. 흰 바탕 3.44, `surface` 3.12 (컨트롤 경계 3:1) |
+| `rule` | #191F28 | 표 머리 위 굵은 괘선 |
+| `ink` / `ink2` / `muted` | #191F28 / #4E5968 / #5F6B78 | 제목·내용 / 읽어야 하는 보조 글 / 날짜·건수 같은 작은 메타 정보 |
+| `accent` | #2C6AE8 | 주 버튼과 지금 고른 자리(현재 화면, 고른 필터, 진행 중 단계)에만 |
+| `accent-hover` / `accent-soft` / `accent-line` | #1C5FD4 / #E4EDFB | primary hover, `accent-soft` 위의 글자 / 고른 선택지·고른 행·진행 중 단계의 바탕 / 테두리 버튼 (#DCE3EB) |
+| `link` | #2C6AE8 | 문장 속 링크 |
+| `highlight` | #FF5C9A | 한 화면에 한 번만 쓰는 강조 |
 | `ok` / `ok-bg` / `ok-line` / `ok-bar` | #00703D / #E8F6F0 / #B2E3CE / #12B76A | 가능 |
 | `warn` / `warn-bg` / `warn-line` / `warn-bar` | #8A5A10 / #FDF3E3 / #EFD7A4 / #F7A51B | 확인 필요 |
 | `deny` / `deny-bg` / `deny-line` / `deny-bar` | #C5283D / #FDEDEF / #F7CDD4 / #FF5A5A | 불가 |
 
-**상태색 규칙**
-- `ok·warn·deny`는 `bg + line + text` 세 개를 항상 세트로 쓴다. 글자만 빨갛게 하지 않는다.
+**회색 규칙**
+- 내용은 흰 바탕에 두고 간격으로 가른다. `bg-surface` 로 카드·패널·구역을 칠하지 않는다. 경계가 꼭 필요한 덩어리만 흰 상자 + `border border-line` + `rounded-2xl`(= `Card`).
+- `surface` 는 hover 와 고른 상태의 바탕에만 쓴다. 고른 것이 hover 와 같아 보이면 안 되므로 고른 행·고른 선택지는 `accent-soft` 다.
+  - 예외는 결과 머리판 하나다(11/7 치오). 판정(`/run`)의 진행판, 결과와 요약의 `AmountHero` 를 `surface` 로 칠한다. 회색을 다 걷어 내니 숫자가 바탕에 떠서 화면의 중심이 없었다. 한 화면에 이 판 하나뿐이고, 판 안의 칸(판정별 건수)은 흰 바탕이다.
+  - 넘길 문장처럼 읽기만 하는 인용 상자도 `surface` 다. 흰 카드 안에서 고칠 수 없는 글임을 보인다.
+- 글자는 `ink`(내용), `ink2`(읽어야 하는 보조 글), `muted`(날짜·건수 같은 작은 메타 정보) 셋이다. 메타 정보도 대부분은 빼는 것이 낫다(아래 문구 규칙).
+- 입력칸·select·고르지 않은 선택지의 테두리는 `edge` 다. `line` 은 흰 바탕 1.23 이라 칸이 어디서 끝나는지 안 보인다.
+
+**판정색 규칙**
+- `ok·warn·deny` 는 **판정에만** 쓴다. 가능·확인 필요·불가 배지(`VerdictBadge`)와 판정 건수가 전부다.
+- 성공 체크, 진행, 완료, 안내, 업로드 상태, 처리 상태에는 쓰지 않는다. 그런 것은 `ink` 나 `accent` 로 말한다. 「다 처리했습니다」도 초록이 아니다(`Empty tone="ok"` 는 accent 아이콘이다).
+- 오류는 실패한 것 바로 옆의 `text-deny` 한 줄 + 잘못 넣은 칸의 `border-deny`(`Input` 에 `aria-invalid` 를 건다)로 알린다. `bg-deny-bg`·`bg-warn-bg`·`bg-ok-bg` 로 칠한 안내 상자·띠는 쓰지 않는다.
+  - 예외는 하나다. 화면 전체가 실패했을 때의 `Empty tone="error"`.
+  - 되돌릴 수 없는 동작의 `Modal` 제목과 `danger` 버튼은 `deny` 다.
 - 색만으로 상태를 말하지 않는다. 판정 배지에는 기호(✓ ? ✕)가 반드시 붙는다 → `VerdictBadge` 사용.
-- 상태색은 **판정 결과(verdict)·분류 상태(classificationStatus)** 와 **실패·막힘 안내**에만 쓴다.
-  - verdict·classificationStatus: 계약이 `NEEDS_REVIEW` 로 부르는 "사람 확인이 필요하다"는 둘 다 같은 뜻이다.
-  - 실패·막힘: API 오류 박스·판정 실패 카드는 `deny`, 진행을 막는 선행조건 안내는 `warn`. 되돌릴 수 없는 동작의 `Modal` 제목과 `danger` 버튼도 `deny`.
-  - "성공했습니다" 토스트에 `ok` 를 쓰지 않는다. 잘 된 것은 색으로 말하지 않는다.
-- `bg + line + text` 세트 규칙은 **박스**에 적용된다. 한 줄 문구나 버튼처럼 박스가 아닌 곳은 글자색(또는 버튼 배경)만 쓴다.
-- **글자색과 채움색을 섞지 않는다.** `ok·warn·deny` 는 글자용이라 대비(4.5:1) 때문에 어둡다. 막대·점처럼 글자가 안 올라가는 채움에는 `ok-bar·warn-bar·deny-bar` 를 쓴다. 글자색을 막대에 쓰면 `warn` 이 갈색 막대가 된다.
-- 색을 바꾸면 **대비를 다시 잰다.** 글자색은 자기 `-bg` 위에서 4.5:1 이상이어야 한다. 현재 값은 ok 5.63 · warn 5.22 · deny 4.83 · muted 5.39(패널 위)다.
+- **글자색과 채움색을 섞지 않는다.** `ok·warn·deny` 는 글자용이라 대비(4.5:1) 때문에 어둡다. 막대·점처럼 글자가 안 올라가는 채움에는 `ok-bar·warn-bar·deny-bar` 를 쓴다.
+- verdict·classificationStatus: 계약이 `NEEDS_REVIEW` 로 부르는 "사람 확인이 필요하다"는 판정의 확인 필요다. 분류 확인(/preview)에서 업종이 없는 가맹점은 **분류 필요**라 부르고 판정색을 쓰지 않는다.
+
+**accent 규칙**
+- 파랑은 주 버튼과 지금 고른 자리(현재 화면, 고른 필터·선택지·행, 진행 중 단계)에만 쓴다. 장식이나 강조로 쓰지 않는다.
+- `accent-soft` 위의 글자는 `accent-hover` 다. `accent` 는 그 위에서 4.11 이라 작은 글자에 모자란다.
+
+**대비** — 색을 바꾸면 다시 잰다. 글자는 4.5:1, 컨트롤 테두리는 3:1 이상이다. 지금 값(흰 바탕 / `surface` / `accent-soft`):
+
+| 색 | 흰 바탕 | `surface` | `accent-soft` |
+|---|---|---|---|
+| `ink2` | 7.11 | 6.45 | 6.03 |
+| `muted` | 5.44 | 4.93 | 4.61 |
+| `accent` | 4.85 | 4.39 | 4.11 |
+| `accent-hover` | 5.77 | 5.24 | 4.90 |
+| `edge` (테두리) | 3.44 | 3.12 | 2.92 |
+
+판정 글자는 자기 `-bg` 위에서 ok 5.58, warn 5.38, deny 4.95 다. `accent` 글자는 흰 바탕에서만 쓴다.
 
 ### 타이포
 
@@ -82,13 +106,20 @@
 ### 간격·형태
 
 - 페이지 폭 `max-w-page`(1440px). 좌우 여백은 `px-6 lg:px-gutter`(62px) — 레퍼런스에서 잰 값이다.
+- **한 줄로 읽어 내려가는 화면은 가운데 한 단이다.** 사업자 문진, 분류 확인, 판정 전 확인, 판정, 질문, 내 정보는 `<AppShell narrow>` 로 빵부스러기와 내용을 `max-w-3xl` 한 단에 두고 가운데 놓는다. 1440px 바탕의 왼쪽에 붙이면 오른쪽 절반이 비어 화면이 기운다(11/7 치오). 표와 상세 패널이 나란한 결과, 거래, 업로드 이력과 두 칸인 요약은 넓게 쓴다.
 - 섹션 세로 여백: 랜딩 `pt-28`, 구분 띠(숫자) `py-16`.
 - 라운드: 패널·카드 `rounded-2xl`(24px), 큰 판 `rounded-[20px]`, 중간 `rounded-xl`(16px)·`rounded-lg`(12px), **버튼·알약은 `rounded-full`**.
+- 초점 테(`:focus-visible`, index.css)는 모서리를 건드리지 않는다. 요소의 `rounded-*` 를 따라 그려지므로 버튼마다 `focus-visible:rounded-*` 를 덧붙이지 않는다. `html` 의 `scroll-padding-top` 이 sticky 머리띠(72px)만큼 띄워서 Tab 으로 옮긴 초점이 머리띠 밑에 숨지 않는다.
 - **그림자를 쓰지 않는다.** `shadow-card`·`shadow-panel` 은 `none` 이다. 겹침은 바탕색과 괘선으로만 가른다.
-- **패널에 테두리를 두르지 않는다.** 흰 바탕 위 `surface` 회색으로만 가른다. 테두리가 필요한 것은 표의 행 괘선과 `secondary` 버튼뿐이다.
+  - 예외는 머리띠 하나다. `shadow-header` 를 `border-b border-line` 과 같이 쓴다. 머리띠는 바탕과 같은 흰색이라
+    괘선만으로는 스크롤한 내용이 밑으로 지나가는 것이 안 보인다. 다른 곳에는 쓰지 않는다.
+- **회색 판으로 가르지 않는다.** 흰 바탕에 간격으로 가르고, 경계가 꼭 필요한 덩어리만 `Card`(흰 상자 + `border-line`)로 싼다. 위 「회색 규칙」.
 - 표는 패널에 넣지 않는다. 머리 위 굵은 괘선(`border-t-2 border-rule`) 하나, 행 사이 얇은 괘선, 숫자는 오른쪽 정렬.
+- **표 칸과 버튼의 글자는 줄을 바꾸지 않는다.** `Table` 칸과 `Button` 에 `whitespace-nowrap` 이 들어 있다. 긴 가맹점명은 그 칸에서 `truncate` 로 말줄임한다(열에 `width: 'w-full max-w-0'`).
 - 전환: `transition-colors duration-150 ease-snap`. 등장 애니메이션은 `animate-rise` 하나.
 - **움직임은 첫 화면 큰 판에서만** (`OrbitStage`). 앱 화면은 차분하게 둔다 — 세금 판정 화면에서 화려한 연출은 신뢰를 깎는다.
+  - 예외는 판정(`/run`)이 끝나는 순간 하나다(11/7 치오). 진행 막대가 끝까지 찬 뒤 판정별 몫으로 갈리고, 판정 칸이 차례로 올라오며 건수가 0 에서 센다. 한 번만 움직이고 반복하지 않는다. `framer-motion` 을 쓴다.
+  - 동작 줄이기를 켰거나 `matchMedia` 가 없으면(테스트) 끝난 모습을 바로 그린다.
 - 궤도 애니메이션은 `animate-orbit`(52초) / `animate-orbit-slow`(78초)와 짝이 되는 역회전(`-back`)을 함께 건다. 역회전을 빼면 그림이 뒤집힌다.
 - 움직이는 것에는 `motion-reduce:animate-none` 을 붙이고, 타이머는 `prefers-reduced-motion` 을 보고 멈춘다.
 
@@ -100,21 +131,25 @@
 <Button href="#system" variant="ghost" size="inline">보기 →</Button>  // 앵커
 <Button type="submit" variant="secondary" size="md">저장</Button>   // 버튼
 ```
-- `variant`: `primary`(검정 알약) · `secondary`(테두리 알약) · `soft`(연회색) · `ghost`(밑줄 친 텍스트 링크) · `danger`(빨강)
+- `variant`: `primary`(파란 알약) · `secondary`(테두리 알약) · `soft`(연회색) · `ghost`(밑줄 친 텍스트 링크) · `danger`(빨강)
 - `danger` 는 **되돌릴 수 없는 동작에만**, 한 화면에 하나. 그런 동작은 항상 `Modal` 로 한 번 더 묻는다.
-- `size`: `sm` 헤더·표 안 · `md` 폼 · `lg` 랜딩 CTA · `inline` 문장 속 링크(ghost 전용)
+- `size`: `sm` 헤더·표 안(36px) · `md` 폼과 화면의 주 버튼(48px) · `lg` 랜딩 CTA(56px) · `inline` 문장 속 링크(ghost 전용)
+- **모양은 알약 하나, 높이는 이 셋뿐이다.** 화면에서 `rounded-xl`·`h-*`·`disabled:bg-line` 으로 버튼을 따로 만들지 않는다. 폼 제출은 `<Button type="submit">`, 꽉 채우려면 `className="w-full"`.
+- 막힌 버튼은 모든 variant 가 `opacity-40` 하나다. 회색으로 바꾸거나 다른 불투명도를 쓰지 않는다.
+- 둘을 나란히 둘 때는 `[secondary][primary]` 순서로 오른쪽에 붙인다(`justify-end`).
 - 한 뷰포트 안에 `primary`는 하나. 나머지 행동은 `secondary`/`soft`. 예외: 랜딩 끝의 CTA가 히어로 CTA와 같은 목적지를 반복하는 것은 허용 (스크롤로 떨어져 있고 행동이 하나이므로).
 - 되돌릴 수 없는 동작은 현재 **업로드 배치 삭제 하나뿐**이다(`/uploads`). 지우면 그 배치에서 나온 거래·판정·되묻기 답변·사용자 수정까지 함께 사라진다(api.md 3.3). 그래서 `Modal` 로 한 번 더 묻고, 무엇이 함께 사라지는지 `description` 에 적는다.
 - 제출·외부 발송처럼 돌이킬 수 없는 동작은 아직 없다. 새로 생기면 **이 문서를 먼저 고치고** 버튼을 만든다.
 
 ### Card
-`tone` surface(회색 패널, 기본)·canvas(테두리 친 흰 바탕)·ink(검정), `padding` sm(28)·md(32)·lg(40/48), `as` div·article·section·li.
+`tone` canvas(흰 상자 + `border-line`, 기본)·ink(검정), `padding` sm(28)·md(32)·lg(40/48), `as` div·article·section·li.
+회색 tone 은 없앴다. 카드를 회색으로 칠하지 않는다.
 목록 항목이면 `as="li"`, 독립된 내용이면 `as="article"`.
 
 ### Badge / VerdictBadge
 - 판정 3분류는 항상 `VerdictBadge verdict={judgment.verdict}` — API의 `{code, label}`을 그대로 넘긴다. 라벨은 API 값, 기호·색은 `utils/verdict.ts`의 `VERDICT_META`.
 - 상태값(`verdict`·`status`·`state`)의 표시 문자열을 프론트에 하드코딩하지 않는다. 분기는 `code`, 표시는 `label`.
-- 그 외 상태 표시는 `Badge tone=...`. 다크 배경 위에서는 `tone="inverse"`.
+- 그 외 상태 표시(업로드 상태, 후보 상태, 보는 중)는 `Badge`(neutral)나 `tone="ink"`. `ok·warn·deny` 를 쓰지 않는다. 다크 배경 위에서는 `tone="inverse"`.
 
 ### StatuteCitation
 - `statuteVersionId`로 조문 1건. `GET /statutes/{id}` 응답(제목·시행일·버전·원문 링크)을 그대로 보여준다.
@@ -127,13 +162,18 @@
   - 조문을 불러오지 못하면 조용히 빼지 않고 「조문을 불러오지 못했습니다」를 남긴다.
 
 ### SectionHeading
-`eyebrow → title → description` 순서 고정. `size` lg(h1)·md(h2, 기본)·sm(h3). 다크 배경은 `inverse`.
+`eyebrow → title → description` 순서 고정. `size` page·lg·md(기본)·sm. 다크 배경은 `inverse`.
+- `size="page"` 는 로그인 뒤 화면의 머리다. 작은 accent eyebrow + 28px **h1**(기본 태그) — 흐름 화면의 `StepEyebrow` + h1 과 같은 모양이다. 내 정보·관리자처럼 단계가 없는 화면이 쓴다.
+- lg(h1)·md(h2)·sm(h3) 는 공개 화면(FAQ·버그 신고)과 랜딩 섹션 제목이다.
+- 화면마다 h1 은 하나다. 빵부스러기, 탭 제목, eyebrow, h1 은 같은 화면 이름을 쓴다.
+- `description` 은 없어도 되면 넣지 않는다(아래 문구 규칙).
 
 ### Container
-모든 섹션 내용은 이 안에 둔다. 배경색이 있는 띠 섹션은 `<section class="bg-surface"><Container>…` 구조. `canvas` 는 페이지 바탕(흰색)이라 띠로 쓰면 보이지 않는다. 괘선으로만 가르려면 `border-y border-line`.
+모든 섹션 내용은 이 안에 둔다. 띠를 회색으로 칠하지 않는다. 괘선으로 가르려면 `border-y border-line`.
 
 ### ChoiceGroup
 - 단일 선택지 3~6개 (문진, 질문 응답). `value`는 문자열 또는 불리언.
+- 고르지 않은 칸은 흰 바탕 + `border-edge`, hover 는 `surface`. 고른 칸은 `border-accent` + `accent-soft` 바탕 + `accent-hover` 글자다. 힌트는 `ink2`.
 - **있지만 아직 동작하지 않는 선택지는 `disabled: true`** — 흐리게 보이고 눌리지 않으며 '준비 중'이 붙는다. 다른 직종처럼 "보여는 주되 IT만 동작"할 때 쓴다.
 - 눌리는데 아무 일도 일어나지 않는 버튼은 만들지 않는다. 사용자는 그걸 고장으로 읽는다.
 
@@ -147,18 +187,24 @@
 - 목록 표. 정렬·페이지네이션은 **서버가** 하고 부품은 그리기만 한다 (`page` 는 0-based).
 - `hideBelow` 로 좁은 화면에서 숨길 열을 고른다. 금액·상태처럼 **핵심 정보에는 쓰지 않는다**.
 - 행 클릭이 필요하면 `onRowClick`. 행 안에 버튼이 함께 있으면 클릭 대상이 겹치므로 둘 중 하나만 쓴다.
+- 고른 행(`selectedKey`)은 `accent-soft`, hover 는 `surface` 다. 고른 행에는 hover 를 걸지 않는다.
 - `loading` 이면 골격 5줄을 보여준다. 첫 로딩에만 쓰고 필터 전환에는 이전 결과를 유지한다.
 - **헤더의 합계를 현재 페이지 배열로 더하지 않는다.** `page.totalElements` 나 서버가 주는 집계(`unresolved`)를 쓴다. 기본 페이지 크기는 20이므로(api.md 3.1) 20개를 넘는 순간 틀린다.
+- 서버 필터가 없어 화면에서 가르는 목록(불가와 답변 대기)은 `api/readAll.ts` 로 끝까지 읽은 뒤 가르고, 쪽은 화면에서 나눈다. 한 쪽(100개)만 읽으면 그 밖의 행이 말없이 빠진다.
 - 마지막 행이 목록에서 빠지면 그 페이지가 비는데, `Pagination` 이 사라져 되돌아갈 수 없다. 비면 첫 페이지로 되돌린다.
 
 ### FilterBar
 - 선택지 5개 안쪽, 서로 배타적일 때. 그보다 많거나 축이 여럿이면 `Select`.
-- 건수를 함께 보여줄 수 있다(`count`). 서버가 준 값만 쓰고 화면에서 세지 않는다.
+- 건수를 함께 보여줄 수 있다(`count`). 서버가 준 값만 쓰고 화면에서 세지 않는다. 건수를 흐리게(opacity) 하지 않는다.
+- 고른 것은 `bg-accent` 흰 글자, 나머지는 `ink2` + hover `surface`.
 - `role="group"` + `aria-pressed` 버튼 묶음이다. 탭(`tablist`)이 아니다 — 보여줄 `tabpanel` 이 따로 없고 같은 목록을 걸러내기만 하므로, 탭의 키보드 규약(화살표 이동)이 맞지 않는다.
 
 ### Empty
 - 목록이 비었을 때. **"없음"이 아니라 "왜 없는지"** 를 말하고, 다음에 할 행동이 있으면 `action` 에 버튼 하나만 둔다.
-- `tone="ok"` 는 비어 있는 것이 좋은 결과일 때만 (확인할 항목을 다 처리한 경우).
+- 문장 하나(`title`)와 동작 하나(`action`)가 기본이다. `description` 은 왜 없는지가 제목만으로 안 보일 때만.
+- `tone="ok"` 는 비어 있는 것이 좋은 결과일 때만 (확인할 항목을 다 처리한 경우). 초록이 아니라 accent 아이콘이다.
+- `tone="error"` 는 **화면 전체**를 불러오지 못했을 때만 쓴다. 붉은 상자를 쓸 수 있는 유일한 자리다.
+- 필터로 걸러 낸 표가 비었으면 `inTable` 이다. 점선 상자 대신 표 머리의 굵은 괘선 아래를 비운다. 필터 바로 밑에 상자가 붙으면 필터와 한 덩어리로 보인다. `Table` 의 `className`(간격)은 빈 상태에도 걸린다.
 - **조회가 실패한 것을 "없다"고 말하지 않는다.** `useApi` 의 `error` 를 먼저 보고, 실패면 "불러오지 못했습니다" + `다시 시도` 를 준다. 실패를 빈 목록으로 그리면 서버 장애가 정상 상태로 읽힌다.
 - 같은 이유로 "다 처리했습니다"는 **다 읽은 뒤 0건일 때만** 쓴다. 로딩 중 0건은 아직 모르는 상태다.
 
@@ -175,16 +221,29 @@
 - 그림은 **우리 색으로 직접 그린 SVG** 다. 레퍼런스 사이트의 그림은 그쪽 자산이라 가져오지 않는다.
 
 ### Field · Input · Select
-- 라벨 `body-lg bold`, 힌트 `small muted`, 오류 `small deny` + `role="alert"`.
+- 라벨 `body-lg bold`, 힌트 `small ink2`, 오류 `small deny` + `role="alert"`.
+- 입력칸 테두리는 `edge`, 바탕은 흰색. 잘못 넣은 칸에는 `aria-invalid` 를 건다 — 테두리가 `deny` 로 바뀐다. 오류 문구 한 줄과 테두리를 같이 쓰고, 칠한 상자로 감싸지 않는다.
+- 지켜야 할 조건(비밀번호 규칙 같은)을 placeholder 에만 두지 않는다. 입력하면 사라진다.
 - 입력은 기본 `w-full`. 폭을 줄이려면 `className`이 아니라 감싸는 div에 폭을 준다 (클래스 충돌 회피).
 
 ## 말투·표현 규칙 (코드가 못 막는 것)
 
 - **AI가 판정한다고 쓰지 않는다.** 판정은 규칙 엔진이 한다. AI는 분류까지. 카피에 "AI가 판단", "AI 추천" 금지.
 - **결과에는 근거가 붙는다.** 판정을 보여주는 모든 화면에 `StatuteCitation`이 있어야 한다. 근거 없는 판정 UI는 만들지 않는다.
-- **단정하지 않는다.** "가능합니다" 대신 "가능 · 근거 2건". 확인 필요는 실패가 아니라 "질문 하나 더"로 표현한다.
+- **단정하지 않는다.** "가능합니다" 대신 "가능, 근거 2건". 확인 필요는 실패가 아니라 "질문 하나 더"로 표현한다.
 - **하지 않는 일을 먼저 말한다.** 전자신고·세액 확정·금전 이동을 암시하는 UI 요소를 만들지 않는다.
-- 문장은 짧게, 존댓말 "-합니다". 느낌표 안 쓴다.
+- 문장은 짧게, 합니다체. 해요체를 섞지 않는다. 느낌표 안 쓴다.
+
+**덜 보여 준다** (11/5 치오). 화면마다 설명 문장, 번호, 기호, 회색이 많았다.
+
+1. **할 일을 돕지 않는 안내문은 뺀다.** 「카카오 계정은 이메일 계정과 따로입니다」, 「판정 이력과 저장된 답변은 계정에 묶여 관리됩니다」 같은 것.
+2. **캡션을 달지 않는다.** 제목 아래 부제, 뻔한 것을 다시 말하는 도움 문단, 안쪽 동작 설명, 각주를 넣지 않는다.
+   남기는 것: h1, 보고도 무엇을 할지 모를 때의 한 줄, 오류 문구, 빈 상태(문장 하나 + 동작 하나), 공통 고지(`DISCLAIMER`), 잘못되거나 되돌릴 수 없는 동작을 막는 문장.
+   공통 고지는 앱 위의 띠(`DisclaimerBar`)와 앱 꼬리말에 있다. 띠는 닫을 수 있고 닫은 것을 브라우저에 남긴다. 꼬리말의 문장은 닫히지 않고 인쇄(PDF)에도 들어간다.
+3. **번호와 id 를 보이지 않는다.** 버전·리비전 번호(v1, rev.1, 버전 #N), 규칙 카드 id(R-…), 게이트 코드(G0–G6), 실행·커밋 id, enum·필드 이름, 서버 코드와 HTTP 상태. 이력이 필요하면 날짜로 보인다. 조문은 id(`소득세법-33-1`) 대신 `statuteTitle()` 로 「소득세법 제33조 제1항」.
+4. **가운뎃점(· ・ •)과 낫표(「」『』)를 화면 글에 쓰지 않는다.** JSX 글자, aria-label, title, placeholder, 토스트, 오류 문구, 탭 제목, alt 모두다. 쉼표, 줄바꿈, 간격, 굵게로 나눈다. 코드 주석·테스트·문서는 써도 된다.
+5. **개발 용어를 쓰지 않는다.** 파싱, 파서, 적재, 컬럼, 해시, 매칭, 게이트, run, batch, rev.
+6. **같은 것은 같은 이름으로 부른다.** 화면 이름은 카드내역 올리기, 분류 확인, 판정 전 확인, 판정, 결과, 질문, 요약, 거래, 업로드 이력, 내 정보, 사업자 문진, 관리자. 판정은 가능, 확인 필요, 불가. 질문에 답을 기다리는 추정 불가는 답변 대기, 업종이 없는 가맹점은 분류 필요. 가능 금액의 합은 경비 가능 금액. 사람은 세무사(약관·처리방침 본문만 예외). 카드사는 KB국민카드, IBK기업은행, 파일은 승인내역.
 
 ## 화면을 새로 만들 때
 
@@ -206,4 +265,5 @@ Toast/알림, 파일 드롭존, Drawer, StatTile, Timeline.
 - 파일 드롭존은 `/upload` 한 곳에서만 쓰여 그 화면 안에 두었다(`Upload.tsx` 의 `DropZone`). 두 번째로 필요해지면 `ui/` 로 뽑는다.
 - Tabs 는 만들지 않았다. 목록 필터는 `FilterBar`(버튼 묶음)로 하고, 보여줄 패널이 갈리는 진짜 탭이 필요해지면 그때 만든다.
 - 진행 표시는 `AppShell` 의 단계 표시와, `Run`·`ClassificationPreview` 가 각자 그리는 진척 바가 있다. 같은 모양이 세 번째로 필요해지면 `Progress` 로 뽑는다.
+- 막대 그래프(요약의 계정과목별 금액)는 흰 카드 안에서 줄마다 이름, 건수, 금액을 한 줄에 쓰고 그 아래에 경비 가능 금액 가운데 몫(%)만큼 찬 `ink` 막대를 둔다. 막대가 카드 폭을 다 쓰고, 칸마다 다른 길이의 열을 잡지 않는다.
 - `Interview` 는 아직 옛 클래스(생 px)가 남아 있다. `Upload`·`Confirm`·`Run`·`Transactions`·`Uploads`·`ClassificationPreview`·`AppShell`·`Results`·`Summary`·`Questions` 는 토큰으로 옮겼다.

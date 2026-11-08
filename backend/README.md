@@ -6,10 +6,10 @@ Java 21, Spring Boot 3.5, JPA, PostgreSQL로 구성된 백엔드 애플리케이
 
 필요한 도구는 JDK 21과 Docker입니다. 시스템에 Gradle을 별도로 설치할 필요는 없습니다.
 
-저장소 루트에서 PostgreSQL을 실행합니다.
+저장소 루트에서 PostgreSQL과 Redis를 실행합니다. 로그인할 때 리프레시 토큰을 Redis에 저장하므로 Redis가 없으면 로그인이 실패합니다.
 
 ```shell
-docker compose up -d postgres
+docker compose up -d postgres redis
 ```
 
 Windows에서는 다음 명령으로 애플리케이션을 실행합니다.
@@ -24,7 +24,7 @@ macOS와 Linux에서는 다음 명령을 사용합니다.
 bash ./backend/gradlew -p backend bootRun --args='--spring.profiles.active=local'
 ```
 
-실행 후 `GET http://localhost:8080/actuator/health`에서 애플리케이션과 DB 연결 상태를 확인할 수 있습니다.
+실행 후 `GET http://localhost:8080/actuator/health`에서 애플리케이션과 DB 연결 상태를 확인할 수 있습니다. Redis는 health 검사에서 빠져 있어 Redis가 없어도 UP으로 나옵니다.
 
 `local` 프로필의 기본 연결값은 다음과 같습니다. 필요한 경우 같은 이름의 환경 변수로 변경합니다.
 
@@ -35,6 +35,8 @@ bash ./backend/gradlew -p backend bootRun --args='--spring.profiles.active=local
 | `DB_NAME` | `ktc4` |
 | `DB_USERNAME` | `ktc4` |
 | `DB_PASSWORD` | `ktc4-local` |
+| `REDIS_HOST` | `localhost` |
+| `REDIS_PORT` | `16379` |
 
 로컬 프로필을 사용하지 않는 환경에서는 Spring 표준 환경 변수인 `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`를 주입합니다.
 
@@ -66,39 +68,40 @@ bash ./backend/gradlew -p backend bootRun --args='--spring.profiles.active=local
 2. `/actuator/health`가 `UP`을 반환하는지
 3. Flyway가 `flyway_schema_history` 테이블을 생성하는지
 
-`integrationTest`와 `check`를 실행하기 전에는 Docker가 실행 중이어야 합니다. CI는 `test` 다음 `integrationTest`를 실행하며, 특정 클래스를 지정하지 않으므로 이후 추가되는 `*IntegrationTest`도 자동으로 포함합니다. 현재는 도메인 단위 테스트가 없어 `test`가 `NO-SOURCE`로 완료됩니다.
+`integrationTest`와 `check`를 실행하기 전에는 Docker가 실행 중이어야 합니다. CI는 `test` 다음 `integrationTest`를 실행하며, 특정 클래스를 지정하지 않으므로 이후 추가되는 `*IntegrationTest`도 자동으로 포함합니다. 클래스명이 `*IntegrationTest`가 아닌 단위 테스트(`AccessTokensTest`, `HolidaySyncTest` 등)는 Docker 없이 `test`에서 실행됩니다.
 
-## 목 응답
+## 인증과 요청 사용자
 
-서비스 레이어가 구현되기 전의 API는 기능별 `*MockData` Bean이 만든 고정 응답을 반환합니다. 입력과 id에 상관없이 같은 값이고, 상태를 저장하지 않습니다. 이런 API에는 `@MockResponse`가 붙어 있고 스웨거 설명이 `[목 응답]`으로 시작합니다. 지금은 남은 `*MockData` Bean이 없습니다.
-
-서비스를 구현하면 엔드포인트 단위로 다음을 바꿉니다.
-
-1. 컨트롤러가 주입받는 `*MockData`를 서비스로 바꾸고 호출부를 서비스 호출로 바꿉니다.
-2. 해당 메서드의 `@MockResponse`를 지웁니다.
-3. `*MockData`의 메서드가 더 이상 쓰이지 않으면 지웁니다. 모든 API가 바뀌면 `MockFixtures`, `MockResponse`까지 지웁니다.
+모든 API 는 서비스로 답합니다. 목 응답(`*MockData`, `@MockResponse`, `MockFixtures`)은 모두 지웠습니다.
 
 ### 요청한 사용자 (`CurrentUser`)
 
 서비스는 userId를 요청 본문이나 경로에서 받지 않습니다. 컨트롤러 메서드에 `CurrentUser` 인자를 두면 `CurrentUserArgumentResolver`가 채우고, 서비스에는 `currentUser.id()`를 넘깁니다(`UserController.me` 참고). 스웨거에는 노출되지 않습니다.
 
-`CurrentUserProvider` 구현체는 `auth.BearerCurrentUserProvider`이고, `Authorization: Bearer {accessToken}`의 사용자를 돌려줍니다. `/api/v1/auth/**`를 뺀 모든 API는 `CurrentUserWebConfig`의 인터셉터가 이를 확인해, 토큰이 없으면 `CurrentUser` 인자가 없는 API(목 응답 등)도 401 `UNAUTHORIZED`입니다. 계약은 `docs/api.md` 1.1에 있습니다.
+`CurrentUserProvider` 구현체는 `auth.BearerCurrentUserProvider`이고, `Authorization: Bearer {accessToken}`의 사용자를 돌려줍니다. `/api/v1/auth/**`를 뺀 모든 API는 `CurrentUserWebConfig`의 인터셉터가 이를 확인해, 토큰이 없으면 `CurrentUser` 인자가 없는 API(법령 조회 등)도 401 `UNAUTHORIZED`입니다. 계약은 `docs/api.md` 1.1에 있습니다.
 
 ### 인증 (`auth`)
 
-지금은 고정 사용자(`FixedUser`, `MockFixtures.USER_ID`와 같은 id) 하나만 로그인합니다. `TemporaryUserSeeder`가 기동할 때 그 사용자 행을 만듭니다. 로컬 프로필의 비밀번호는 `demo1234`입니다(`application-local.yml`, 운영은 `docs/deployment.md` 9절).
+이메일 가입(`POST /api/v1/auth/signup`)으로 만든 계정으로 로그인합니다. 비밀번호는 BCrypt 해시(`app_user.password_hash`)로 저장합니다. 가입 전에 메일 인증(`POST /api/v1/auth/email-verification` → `.../confirm`)을 합니다. 로컬 프로필은 메일을 보내지 않고 백엔드 로그에 `[메일 인증] ... 인증 코드: 123456` 으로 찍으니(`APP_AUTH_EMAIL_DELIVERY=log`), 스웨거에서 코드 요청 → 로그의 코드로 확인 → 받은 토큰으로 가입하면 됩니다.
+
+관리자 API(규칙 후보, `api.md` 3.15)는 `app_user.role`이 `ADMIN`인 사용자만 씁니다. 로컬에서 관리자 화면을 보려면 DB에서 직접 바꿉니다.
+
+```bash
+docker compose exec postgres psql -U ktc4 -d ktc4 -c "update app_user set role = 'ADMIN' where email = 'demo@example.com'"
+```
 
 | 구성요소 | 지금 | 바꿀 때 |
 | --- | --- | --- |
 | `AccessTokens` | JWT 발급·검증(15분) | 그대로 |
 | `RefreshTokenStore` | `RedisRefreshTokenStore` — 로그인 단위(family)로 토큰 해시를 Redis에 둔다. 재발급 때 교체, 이미 쓴 토큰이 오면 그 로그인 폐기, 로그아웃은 그 로그인만, 탈퇴는 전체 폐기 | 그대로 |
-| `CredentialVerifier` | `FixedUserCredentialVerifier` — `FixedUser` + `APP_AUTH_DEMO_PASSWORD` | B9b: 실제 계정·카카오 구현으로 교체, `FixedUser`·`TemporaryUserSeeder` 삭제 |
+| `KakaoClient` | 인가 코드 → 카카오 토큰 → 카카오 회원번호. 회원번호로 계정을 찾거나 만든다(`UserService.findOrCreateKakaoAccount`) | 그대로 |
+| `CredentialVerifier` | `EmailPasswordCredentialVerifier` — 이메일로 찾은 계정의 BCrypt 해시와 비교. 없는 이메일도 같은 시간이 걸리게 한 번 비교한다 | 그대로 |
 
 `AuthService`와 `AuthController`는 위 인터페이스만 보므로 교체해도 바뀌지 않습니다.
 
 ### 테스트에서 인증
 
-자동 구성 MockMvc(`@AutoConfigureMockMvc`, `@WebMvcTest`)의 요청에는 고정 사용자의 액세스 토큰이 기본으로 실립니다(`DefaultBearerTokenContextCustomizerFactory`, `src/test/resources/META-INF/spring.factories`로 모든 테스트 컨텍스트에 붙음). 그래서 API를 부르는 테스트는 `Authorization`을 넣지 않아도 됩니다. 직접 넣으면 그 값을 씁니다.
+자동 구성 MockMvc(`@AutoConfigureMockMvc`, `@WebMvcTest`)의 요청에는 테스트 사용자(`TestUser`)의 액세스 토큰이 기본으로 실리고, 그 사용자 행도 기동할 때 만들어집니다(`DefaultBearerTokenContextCustomizerFactory`, `src/test/resources/META-INF/spring.factories`로 모든 테스트 컨텍스트에 붙음). 그래서 API를 부르는 테스트는 `Authorization`을 넣지 않아도 됩니다. 직접 넣으면 그 값을 씁니다.
 
 - `@WebMvcTest`는 인증 빈이 올라오지 않으므로 `@Import(TestAuthentication.class)`를 붙입니다(`ApiResponseContractTest` 참고).
 - 인증 실패를 보는 테스트는 기본 토큰이 없는 MockMvc를 `MockMvcBuilders.webAppContextSetup`으로 직접 만듭니다(`AuthIntegrationTest` 참고).
@@ -130,5 +133,7 @@ PMD는 `backend/config/pmd/ruleset.xml`의 고복잡도·오류 가능성 규칙
 ## 코드 구성
 
 기능 코드는 `com.ktc4.pusan4.<feature>` 아래에 모으고, 기능 내부에서 controller, service, repository, entity, dto로 나눕니다. 둘 이상의 기능에서 실제로 공유되기 전에는 공통 계층을 만들지 않습니다.
+
+조회는 기본적으로 리포지토리의 `@Query`(JPQL)로 씁니다. 여러 쿼리가 같은 조건을 쓰거나 조건이 비어서 올 수 있으면 QueryDSL로 씁니다. 리포지토리에 `XxxRepositoryCustom` 인터페이스와 `XxxRepositoryCustomImpl` 구현을 붙이면 호출하는 쪽은 바뀌지 않습니다. 예를 들어 "지금 판정 대상인 거래" 조건은 `TransactionConditions`가 `TransactionDetail.effectiveStatus`에서 뽑아내고, 그 조건을 쓰는 조회는 모두 이 클래스를 가져다 씁니다. Q클래스는 빌드할 때 `build/generated`에 생성되므로 커밋하지 않습니다.
 
 DB 스키마는 Flyway만 변경합니다. 마이그레이션은 `src/main/resources/db/migration`에 `V1__create_member.sql` 형식으로 추가하며, 이미 적용된 파일은 수정하지 않고 새 버전의 파일을 추가합니다. Hibernate는 스키마를 생성하지 않고 애플리케이션 시작 시 매핑을 검증합니다.

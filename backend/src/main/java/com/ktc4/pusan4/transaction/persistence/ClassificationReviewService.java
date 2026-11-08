@@ -10,6 +10,7 @@ import com.ktc4.pusan4.merchant.MerchantCategoryVocabulary;
 import com.ktc4.pusan4.merchant.MerchantDictionaryRepository;
 import com.ktc4.pusan4.merchant.api.ClassificationReviewStatus;
 import com.ktc4.pusan4.merchant.classify.ClassificationResult;
+import com.ktc4.pusan4.merchant.classify.SuggestionPolicy;
 import com.ktc4.pusan4.shared.api.ApiException;
 import com.ktc4.pusan4.transaction.api.SourceStatus;
 import com.ktc4.pusan4.transaction.domain.ClassificationAnswer;
@@ -17,8 +18,6 @@ import com.ktc4.pusan4.transaction.domain.ClassificationReviewGroup;
 import com.ktc4.pusan4.transaction.domain.ClassificationReviewItem;
 import com.ktc4.pusan4.transaction.domain.ClassificationReviewResult;
 import com.ktc4.pusan4.transaction.persistence.ClassificationReviewRepository.ReviewRow;
-import com.ktc4.pusan4.user.domain.BusinessContext;
-import com.ktc4.pusan4.user.persistence.BusinessContextService;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
@@ -58,29 +57,32 @@ public class ClassificationReviewService {
         .thenComparing(item -> item.transactionId().toString());
 
     private final ClassificationReviewRepository reviewRepository;
+    private final MerchantModelDecisionRepository decisionRepository;
+    private final SuggestionPolicy suggestionPolicy;
     private final TransactionRecordRepository transactionRepository;
     private final MerchantDictionaryRepository dictionaryRepository;
     private final MerchantCategoryVocabulary vocabulary;
-    private final BusinessContextService contextService;
     private final JudgmentExecutor executor;
     private final LimitSettlementService limitSettlement;
     private final Clock clock;
 
     public ClassificationReviewService(
         ClassificationReviewRepository reviewRepository,
+        MerchantModelDecisionRepository decisionRepository,
+        SuggestionPolicy suggestionPolicy,
         TransactionRecordRepository transactionRepository,
         MerchantDictionaryRepository dictionaryRepository,
         MerchantCategoryVocabulary vocabulary,
-        BusinessContextService contextService,
         JudgmentExecutor executor,
         LimitSettlementService limitSettlement,
         Clock clock
     ) {
         this.reviewRepository = reviewRepository;
+        this.decisionRepository = decisionRepository;
+        this.suggestionPolicy = suggestionPolicy;
         this.transactionRepository = transactionRepository;
         this.dictionaryRepository = dictionaryRepository;
         this.vocabulary = vocabulary;
-        this.contextService = contextService;
         this.executor = executor;
         this.limitSettlement = limitSettlement;
         this.clock = clock;
@@ -89,7 +91,7 @@ public class ClassificationReviewService {
     /**
      * 분류 확인 요청을 한 카테고리로 해결한다 (api.md 3.5). 거래 분류를 확정하고, 답을 개인 사전에 남긴다.
      * batch 에 완료된 판정 실행이 있으면 그 run 의 문진 버전으로, 해결한 거래 중 판정 대상만 다시 판정하고
-     * 접대비 한도를 다시 집계한다.
+     * 접대비 한도를 다시 집계한다(접대비와 닿지 않으면 건너뜀).
      * 남의 요청은 없는 요청과 똑같이 404 다. 한 건이라도 실패하면 아무것도 바꾸지 않는다.
      */
     @Transactional
@@ -131,9 +133,6 @@ public class ClassificationReviewService {
         merchantNorms.forEach(merchantNorm -> dictionaryRepository.savePersonal(userId, merchantNorm, category, now));
 
         int judged = rejudge(userId, batchIds.iterator().next(), transactions);
-        if (judged > 0) {
-            limitSettlement.settleProvisional(userId);
-        }
         return new ClassificationAnswer(ids.size(), category, judged);
     }
 
@@ -146,22 +145,25 @@ public class ClassificationReviewService {
                 "분류 확인 항목을 찾을 수 없습니다."));
     }
 
-    /** 판정 대상(effectiveStatus = JUDGEABLE)만 다시 판정한다. origin 은 거래마다 그 거래의 분류 확인 요청이다. */
+    /**
+     * 판정 대상(effectiveStatus = JUDGEABLE)만 다시 판정하고 한도를 다시 집계한다. origin 은 거래마다 그 거래의 분류 확인 요청이다.
+     * 질문 응답과 같은 재판정을 써서, batch UserFact 를 거래마다 다시 읽지 않고 접대비와 닿지 않으면 집계를 건너뛴다(#218).
+     */
     private int rejudge(UUID userId, UUID batchId, Map<UUID, TransactionRecordEntity> transactions) {
         Optional<Integer> contextVersion = reviewRepository.findLatestCompletedRunContextVersion(batchId);
         if (contextVersion.isEmpty()) {
             return 0;
         }
-        BusinessContext context = contextService.version(userId, contextVersion.get());
-        int judged = 0;
-        for (Map.Entry<UUID, TransactionRecordEntity> entry : transactions.entrySet()) {
-            if (entry.getValue().toDetail().effectiveStatus() == SourceStatus.JUDGEABLE) {
-                executor.judge(entry.getValue().id(), context,
-                    new JudgmentOrigin(JudgmentOriginType.CLASSIFICATION_REVIEW, entry.getKey()));
-                judged++;
+        Map<UUID, JudgmentOrigin> origins = new LinkedHashMap<>();
+        transactions.forEach((reviewId, transaction) -> {
+            if (transaction.toDetail().effectiveStatus() == SourceStatus.JUDGEABLE) {
+                origins.put(transaction.id(), new JudgmentOrigin(JudgmentOriginType.CLASSIFICATION_REVIEW, reviewId));
             }
+        });
+        if (!origins.isEmpty()) {
+            executor.rejudge(userId, origins, contextVersion.get());
         }
-        return judged;
+        return origins.size();
     }
 
     /** 정렬: createdAt ASC, id ASC. */
@@ -193,7 +195,14 @@ public class ClassificationReviewService {
         List<ReviewRow> rows = batchId == null
             ? reviewRepository.findRows(userId)
             : reviewRepository.findRows(userId, batchId);
-        return rows.stream().map(ClassificationReviewService::toItem).toList();
+        // 모델 답은 거래마다 남아 있다. 포함(include)으로 나중에 생긴 요청도 같은 후보를 받는다
+        Map<UUID, List<String>> suggestions = new HashMap<>();
+        decisionRepository.findByTransactionIdIn(rows.stream().map(ReviewRow::transactionId).toList())
+            .forEach(decision -> suggestions.put(decision.transactionId(),
+                suggestionPolicy.suggestions(decision.refused(), decision.suggestions())));
+        return rows.stream()
+            .map(row -> toItem(row, suggestions.getOrDefault(row.transactionId(), List.of())))
+            .toList();
     }
 
     private static List<ClassificationReviewItem> filter(
@@ -216,11 +225,11 @@ public class ClassificationReviewService {
     }
 
     /** DB 에서 읽은 timestamptz 는 UTC 로 오므로 api.md 1.2 의 KST 표기로 되돌린다. */
-    private static ClassificationReviewItem toItem(ReviewRow row) {
+    private static ClassificationReviewItem toItem(ReviewRow row, List<String> suggestedCategories) {
         return new ClassificationReviewItem(row.reviewId(), row.batchId(), row.transactionId(),
             ClassificationReviewStatus.valueOf(row.status()), row.createdAt().atZoneSameInstant(KST).toOffsetDateTime(),
             row.resolvedAt() == null ? null : row.resolvedAt().atZoneSameInstant(KST).toOffsetDateTime(),
             row.approvedAt(), row.merchantRaw(), row.merchantNorm(), row.merchantCategory(), row.amount(),
-            row.installmentMonths());
+            row.installmentMonths(), suggestedCategories);
     }
 }

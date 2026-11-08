@@ -1,30 +1,53 @@
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRightIcon } from 'lucide-react';
 import { useSession } from '../contexts/SessionContext';
+import icon from '../assets/brand/icon/preet-icon.svg';
+import { InterviewCard, UploadRows, VerdictCard } from '../components/flowFigure';
 import { MarketingHeader } from '../components/MarketingHeader';
 import { MarketingFooter } from '../components/MarketingFooter';
-import { OrbitStage } from '../components/OrbitStage';
+import { HeroBanner } from '../components/HeroBanner';
+import { IntroOverlay } from '../components/IntroOverlay';
 import { ExampleCarousel } from '../components/ExampleCarousel';
 import {
   FLOW_STEPS,
-  HERO_SUMMARY,
   NOT_DOING,
+  RULE_CARD_COUNT,
   STATS,
-  SYSTEM_FEATURES } from
+  SYSTEM_FEATURES,
+  VERDICTS } from
 '../mock/marketing';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { PAGES } from '../seo';
 
-const won = (value: number) => value.toLocaleString('ko-KR');
+/**
+ * 인트로를 봤다는 표시. 처음 한 번만 띄운다 — 로고로 다녀와도 다시 뜨지 않는다.
+ * index.html 의 덮개 스크립트도 이 키를 읽는다. 바꾸면 거기도 바꾼다
+ */
+const INTRO_SEEN = 'preet.intro.seen';
+
+/** 움직임을 줄이라는 설정이면 아예 띄우지 않는다. 빌드 때 미리 그리는 HTML(entry-server.tsx)에는 넣지 않는다 */
+function wantsIntro() {
+  if (typeof window === 'undefined') return false;
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return false;
+  try {
+    return window.localStorage.getItem(INTRO_SEEN) === null;
+  } catch {
+    // 저장소를 막아 둔 브라우저. 띄우기는 하되 표시를 못 남겨 올 때마다 뜬다
+    return true;
+  }
+}
 
 /** 본문 폭과 좌우 여백. 레퍼런스는 1440 폭에서 좌우 62px 를 띄운다 */
 const SHELL = 'mx-auto w-full max-w-page px-6 lg:px-gutter';
 
 /** 검정 동그라미에 흰 화살표. 레퍼런스가 모든 「바로가기」에 쓰는 표시 */
-function ArrowDot({ size = 'md' }: {size?: 'sm' | 'md';}) {
+function ArrowDot({ size = 'md', invert = false }: {size?: 'sm' | 'md';invert?: boolean;}) {
   return (
     <span
       aria-hidden="true"
-      className={`inline-flex shrink-0 items-center justify-center rounded-full bg-ink text-white ${
+      className={`inline-flex shrink-0 items-center justify-center rounded-full ${
+      invert ? 'bg-canvas text-ink' : 'bg-ink text-white'} ${
       size === 'sm' ? 'h-5 w-5' : 'h-8 w-8'}`
       }>
 
@@ -35,19 +58,13 @@ function ArrowDot({ size = 'md' }: {size?: 'sm' | 'md';}) {
 
 /**
  * 섹션 제목. 레퍼런스는 글자 앞에 48×48 그림을 두고 글자는 48px 굵기 400 이다.
- * 그림은 카카오 자산이라 가져오지 않고, 같은 자리에 우리 로고 막대를 둔다.
+ * 그림은 카카오 자산이라 가져오지 않는다. 같은 자리에 브랜드 앱 아이콘을 둔다 (#247 리뷰).
  */
 function IrHeading({ children }: {children: React.ReactNode;}) {
   return (
     <h2 className="flex items-center gap-4 text-h2 font-normal tracking-ir text-ink [word-break:keep-all] lg:text-ir-section">
-      <span
-        aria-hidden="true"
-        className="flex h-12 w-12 shrink-0 items-center justify-center gap-[3px] rounded-xl bg-surface">
-
-        <span className="block h-5 w-[5px] rounded-sm bg-ink" />
-        <span className="block h-5 w-[5px] rounded-sm bg-ink" />
-        <span className="block h-5 w-[5px] rounded-sm bg-highlight" />
-      </span>
+      {/* 브랜드 앱 아이콘. 둥근 사각형과 바탕을 SVG 가 이미 갖고 있어 타일을 따로 그리지 않는다 */}
+      <img src={icon} alt="" aria-hidden="true" className="block h-12 w-12 shrink-0" />
       {children}
     </h2>);
 
@@ -97,7 +114,23 @@ const BOARDS = [
 
 export function Landing() {
   const { status } = useSession();
-  const [ok, ask] = HERO_SUMMARY.distribution;
+  useDocumentTitle(PAGES.home.title);
+
+  const [intro, setIntro] = useState(wantsIntro);
+
+  // index.html 이 미리 깔아 둔 판을 걷는다. 인트로가 뜨면 그 아래로 가려져 이어져 보이고, 안 뜨면 본문이 드러난다
+  useEffect(() => {
+    document.documentElement.classList.remove('intro-cover');
+  }, []);
+
+  const closeIntro = useCallback(() => {
+    setIntro(false);
+    try {
+      window.localStorage.setItem(INTRO_SEEN, '1');
+    } catch {
+      // 못 남기면 다음에 또 뜬다. 막을 방법이 없고 막을 일도 아니다
+    }
+  }, []);
 
   /* 로그인 뒤에는 메인으로 오므로, CTA 가 로그인 폼으로 되돌아가면 막힌다 */
   const signedIn = status === 'signedIn';
@@ -105,6 +138,8 @@ export function Landing() {
 
   return (
     <div className="min-h-full bg-canvas">
+      {intro && <IntroOverlay onDone={closeIntro} />}
+
       <MarketingHeader />
 
       <main>
@@ -112,78 +147,68 @@ export function Landing() {
         <section className={`${SHELL} pt-10`}>
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_206px]">
             <div className="relative">
-              <div className="relative min-h-[440px] overflow-hidden rounded-[20px] bg-surface2 lg:min-h-[621px]">
-                <OrbitStage />
+              <HeroBanner autoplay={!intro} />
 
-                {/* 글은 궤도 위에 올린다 */}
-                <div className="relative z-10 px-8 pt-12 sm:px-16 sm:pt-16">
-                  <p className="text-body text-highlight">
-                    1인 IT 개발 사업자를 위한 경비 판정
-                  </p>
-                  <strong className="mt-5 block text-h2 font-normal leading-tight tracking-ir text-white [word-break:keep-all] lg:text-ir-display">
-                    이 카드값이 경비인지,
-                    <br />
-                    조문까지 붙여 답합니다
-                  </strong>
-                </div>
-              </div>
+              {/*
+                왼쪽 아래 모서리를 베어 낸 자리가 그대로 버튼이다.
+                전에는 그 자리를 바탕색(흰색)으로 채우고 글자만 뒀는데, 페이지 바탕과 같은 색이라
+                판이 패인 것으로 읽히고 누를 것으로 안 보였다. 흰 자리에 알약을 또 넣으면
+                판·흰 상자·알약 세 겹이 된다 — 베어 낸 자리를 통째로 칠한다 (#254 리뷰).
+                왼쪽 아래는 판과 같은 20px 으로 깎는다. 각지면 판의 둥근 모서리를 덮어 혼자 튄다
+              */}
+              <Link
+                to={startTo}
+                className="absolute bottom-0 left-0 flex h-[76px] items-center gap-3 rounded-bl-[20px] rounded-tr-[20px] bg-ink pl-7 pr-6 text-ir-lead font-normal tracking-ir-xs text-white transition-colors duration-150 ease-snap hover:bg-ink2">
 
-              {/* 왼쪽 아래 모서리를 바탕색으로 베어 내고 그 자리에 링크를 둔다 */}
-              <div className="absolute bottom-0 left-0 flex h-[72px] items-center rounded-tr-[20px] bg-canvas pr-7 pt-2">
-                <Link
-                  to={startTo}
-                  className="flex items-center gap-3 text-ir-lead font-normal tracking-ir-xs text-ink">
-
-                  {signedIn ? '카드내역 올리기' : '무료로 판정해보기'}
-                  <ArrowDot />
-                </Link>
-              </div>
+                {signedIn ? '카드내역 올리기' : '무료로 판정해보기'}
+                <ArrowDot invert />
+              </Link>
             </div>
 
-            {/* 첫 장은 검정에 큰 숫자, 아래로 회색 (레퍼런스 wrap_banner) */}
+            {/*
+              첫 장은 남색에 큰 숫자, 아래로 회색 (레퍼런스 wrap_banner).
+              로그인 전에는 보여 줄 실제 판정 결과가 없다. 지어낸 금액·건수 대신
+              세어서 확인되는 것(규칙 카드 수)과 제품이 하는 일만 둔다
+            */}
             <div className="flex flex-col gap-2">
               <div className="rounded-2xl bg-surface2 p-5 text-white">
-                <p className="text-caption text-white/60">이번 달 인정 경비</p>
+                <p className="text-caption text-white">조문을 읽고 만든 규칙 카드</p>
                 <p className="mt-2 whitespace-nowrap text-ir-num font-bold tracking-ir-sm tabular-nums">
-                  {won(HERO_SUMMARY.availableAmount)}
-                  <span className="ml-0.5 text-body font-normal">원</span>
+                  {RULE_CARD_COUNT}
+                  <span className="ml-0.5 text-body font-normal">장</span>
                 </p>
-                <p className="mt-2 text-caption text-white/60 tabular-nums">
-                  {HERO_SUMMARY.total}건 중 {ok.count}건 가능
+                <p className="mt-2 text-caption leading-5 text-white [word-break:keep-all]">
+                  판정마다 어느 카드가 걸렸는지 함께 보여줍니다
                 </p>
               </div>
 
               <div className="rounded-2xl bg-surface p-5">
-                <p className="text-caption text-muted">판정 분포</p>
-                <ul className="mt-4 space-y-3">
-                  {HERO_SUMMARY.distribution.map((item) =>
+                <p className="text-caption text-muted">판정 세 갈래</p>
+                <ul className="mt-4 space-y-3.5">
+                  {VERDICTS.map((item) =>
                   <li key={item.label}>
-                      <div className="flex items-baseline justify-between text-small">
-                        <span className="text-ink2">{item.label}</span>
-                        <span className="font-bold tabular-nums text-ink">
-                          {item.count}건
-                        </span>
-                      </div>
-                      <div className="mt-1.5 h-1 w-full rounded-full bg-accent-line">
-                        <div
-                        className={`h-1 rounded-full ${item.bar}`}
-                        style={{
-                          width: `${Math.round(item.count / HERO_SUMMARY.total * 100)}%`
-                        }} />
+                      <div className="flex items-center gap-1.5 text-small">
+                        <span
+                        className={`h-1.5 w-1.5 shrink-0 rounded-full ${item.bar}`}
+                        aria-hidden="true" />
 
+                        <span className="font-bold text-ink">{item.label}</span>
                       </div>
+                      <p className="mt-1 text-caption leading-5 text-ink2 [word-break:keep-all]">
+                        {item.body}
+                      </p>
                     </li>
                   )}
                 </ul>
               </div>
 
               <div className="flex-1 rounded-2xl bg-surface p-5">
-                <p className="text-caption text-muted">지금 할 일</p>
+                <p className="text-caption text-muted">되돌릴 수 없는 동작</p>
                 <p className="mt-2 text-h4 font-bold tracking-ir-sm text-ink">
-                  확인 필요 {ask.count}건
+                  없습니다
                 </p>
                 <p className="mt-2 text-small leading-6 text-ink2 [word-break:keep-all]">
-                  같은 사유끼리 묶어 두었습니다. 답하면 그 자리에서 다시
+                  신고·제출·발송을 만들지 않습니다. 답을 고치면 그 자리에서 다시
                   판정합니다.
                 </p>
               </div>
@@ -199,7 +224,7 @@ export function Landing() {
             {BOARDS.map((board) =>
             <div
               key={board.title}
-              className="flex min-h-[241px] flex-col rounded-2xl bg-surface px-8 py-8">
+              className="flex min-h-[241px] flex-col rounded-2xl bg-accent-soft px-8 py-8">
 
                 <strong className="text-h3 font-bold tracking-ir-sm text-ink lg:text-ir-panel">
                   {board.title}
@@ -214,13 +239,25 @@ export function Landing() {
           </div>
 
           <ul className="mt-4 grid gap-4 md:grid-cols-3">
-            {FLOW_STEPS.slice(0, 3).map((step) =>
+            {FLOW_STEPS.slice(0, 3).map((step, index) =>
             <li key={step.step}>
-                <div className="flex h-full min-h-[360px] flex-col rounded-2xl bg-surface px-8 py-8">
+                <div className="flex h-full min-h-[360px] flex-col rounded-2xl bg-accent-soft px-8 py-8">
                   <span className="inline-flex w-fit items-center rounded-full bg-canvas px-3.5 py-1.5 text-caption text-ink2">
                     {step.step}단계
                   </span>
-                  <strong className="mt-auto block text-h3 font-bold leading-tight tracking-ir-sm text-ink [word-break:keep-all] lg:text-ir-panel">
+                  {/*
+                    히어로 2번 장면과 같은 그림을 그 단계 칸에 하나씩 둔다 (#247 리뷰).
+                    같은 말을 위에서는 그림으로, 여기서는 글로만 하고 있었고 그 자리가 비어
+                    그림이 빠진 것처럼 보였다. 연파랑 판이라 색만 light 로 바꿔 쓴다
+                  */}
+                  <div className="mt-6 flex flex-1 items-center">
+                    {[
+                    <UploadRows key="upload" tone="light" />,
+                    <InterviewCard key="interview" tone="light" />,
+                    <VerdictCard key="verdict" tone="light" />][
+                    index]}
+                  </div>
+                  <strong className="block text-h3 font-bold leading-tight tracking-ir-sm text-ink [word-break:keep-all] lg:text-ir-panel">
                     {step.title}
                   </strong>
                   <p className="mt-5 text-body leading-6 text-ink2 [word-break:keep-all]">
@@ -256,7 +293,7 @@ export function Landing() {
 
         {/* 숫자 줄 — 위아래 괘선만 */}
         <section id="evidence" className="mt-28 border-y border-line">
-          <dl className={`${SHELL} grid grid-cols-2 gap-10 py-16 md:grid-cols-4`}>
+          <dl className={`${SHELL} grid grid-cols-2 gap-10 py-16 md:grid-cols-3`}>
             {STATS.map((stat) =>
             <div key={stat.label}>
                 <dt className="sr-only">{stat.label}</dt>
@@ -279,7 +316,7 @@ export function Landing() {
             {SYSTEM_FEATURES.map((feature) =>
             <li
               key={feature.title}
-              className="flex min-h-[360px] flex-col rounded-2xl bg-surface px-8 py-8">
+              className="flex min-h-[360px] flex-col rounded-2xl bg-accent-soft px-8 py-8">
 
                 <strong className="block whitespace-pre-line text-h3 font-bold leading-tight tracking-ir-sm text-ink [word-break:keep-all] lg:text-ir-panel">
                   {feature.title}
@@ -288,7 +325,7 @@ export function Landing() {
                   {feature.body}
                 </p>
                 {feature.caption &&
-              <p className="mt-6 border-t border-accent-line pt-5 text-small text-muted">
+              <p className="mt-6 border-t border-accent-line pt-5 text-small text-ink2">
                     {feature.caption}
                   </p>
               }

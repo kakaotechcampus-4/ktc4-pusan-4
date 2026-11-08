@@ -1,6 +1,6 @@
 package com.ktc4.pusan4.integration;
 
-import com.ktc4.pusan4.shared.auth.FixedUser;
+import com.ktc4.pusan4.auth.TestUser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,7 +32,7 @@ class JudgmentQueryIntegrationTest {
     @ServiceConnection
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17-alpine");
 
-    private static final UUID USER_ID = FixedUser.ID;
+    private static final UUID USER_ID = TestUser.ID;
 
     @Autowired
     private MockMvc mockMvc;
@@ -113,6 +113,18 @@ class JudgmentQueryIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.items[*].id", contains(latest.toString())))
             .andExpect(jsonPath("$.page.totalElements").value(1));
+    }
+
+    @Test
+    void transaction_scoped_list_returns_the_current_judgment_of_an_excluded_transaction() throws Exception {
+        // given: 사용자가 제외한 거래. 거래를 지정하면 판정 대상이 아니어도 현재 판정을 보여 준다(api.md 3.7).
+        UUID excluded = insertTransaction(batchId, "2025-10-08", "JUDGEABLE", "EXCLUDED");
+        UUID current = insertJudgment(excluded, 1, "AVAILABLE", "run_id", runId, "2025-10-09T10:00:00+09:00");
+
+        // when / then
+        mockMvc.perform(get("/api/v1/judgments").param("transactionId", excluded.toString()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items[*].id", contains(current.toString())));
     }
 
     @Test
@@ -298,6 +310,7 @@ class JudgmentQueryIntegrationTest {
                 rules_commit_sha, user_context_version, tax_year, verdict, is_inference, computed_at, %s
             ) values (?, ?, ?, 'R-300', 1, '["R-300"]', 'fixture', 1, 2025, ?, false, ?::timestamptz, ?)
             """.formatted(originColumn), id, transactionId, revision, verdict, computedAt, originId);
+        CurrentJudgments.refresh(jdbcTemplate);
         return id;
     }
 
@@ -307,6 +320,7 @@ class JudgmentQueryIntegrationTest {
             insert into judgment_override(id, transaction_id, source_judgment_id, to_verdict, active, released_at)
             values (?, ?, ?, 'UNAVAILABLE', ?, case when ? then null else now() end)
             """, id, transactionId, sourceJudgmentId, active, active);
+        CurrentJudgments.refresh(jdbcTemplate);
         return id;
     }
 

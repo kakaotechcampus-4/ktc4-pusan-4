@@ -55,6 +55,14 @@ class JudgmentOverrideEntity {
         this.createdAt = createdAt;
     }
 
+    UUID transactionId() {
+        return transactionId;
+    }
+
+    boolean active() {
+        return active;
+    }
+
     /** 이미 해제했으면 처음 해제한 시각을 그대로 둔다. */
     void release(OffsetDateTime now) {
         if (!active) {

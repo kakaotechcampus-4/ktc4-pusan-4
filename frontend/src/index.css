@@ -13,17 +13,47 @@ body,
 #root {
   height: 100%;
 }
+/* 머리띠(AppShell·MarketingHeader)가 sticky 72px 이다. Tab 으로 옮긴 초점이나 #앵커가 그 밑에 숨지 않게 띄운다 */
+html {
+  scroll-padding-top: 5.5rem;
+}
 body {
   background-color: #ffffff;
-  color: #30363F;
+  color: #4E5968;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  /* 한글이 음절 단위로 꺾이지 않게 어절에서 줄을 바꾼다. 띄어쓰기 없는 긴 글(주소, 메일)은 넘치지 않게 끊는다 */
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
+/* 모서리는 건드리지 않는다. 테는 요소의 rounded-* 를 따라 그려진다. 4px 를 얹으면 알약·원 버튼에 네모 테가 생긴다 */
 :focus-visible {
-  outline: 2px solid #16181D;
+  outline: 2px solid #191F28;
   outline-offset: 2px;
-  border-radius: 4px;
 }
+/* 팔레트에서 노랑을 뺐다. 핑크는 선택 바탕으로 쓰면 ink2 대비 2.46 · muted 1.59 라 글자가 묻힌다 */
 ::selection {
-  background: #ffe600;
+  background: #E4EDFB;
+}
+
+/* 인트로가 뜨기 전에 미리 깔아 두는 판(index.html). 인트로(IntroOverlay, z-50)와 같은 색이라 이어져 보인다 */
+html.intro-cover body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: theme('colors.surface2');
+}
+
+/* 요약을 PDF 로 저장할 때(Summary.tsx 「PDF로 저장」). 비서 패널이 준 오른쪽 여백과 배경색을 빼고 본문만 찍는다 */
+@media print {
+  @page {
+    margin: 14mm;
+  }
+  body {
+    padding-right: 0 !important;
+    background: #fff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
 }

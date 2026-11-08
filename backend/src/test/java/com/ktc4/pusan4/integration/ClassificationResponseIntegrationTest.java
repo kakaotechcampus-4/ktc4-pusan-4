@@ -147,6 +147,33 @@ class ClassificationResponseIntegrationTest {
     }
 
     @Test
+    void rejudge_unrelated_to_entertainment_does_not_settle_the_limit() {
+        // given: 접대비로 들어간 거래 하나. 한도 항목 값을 집계가 내지 않을 값으로 바꿔 둔다
+        UUID userId = newUser();
+        UUID batchId = upload(userId, "hash-skip",
+            tx("k-1", "2026-01-05", "성진이네 본점"),
+            tx("k-2", "2026-01-06", "성진이네 본점"));
+        newRun(userId, batchId, "940909", 1, "COMPLETED");
+        insertStatutes("소득세법-33-1-5", "소득세법시행령-61-1-1", "소득세법-35-1");
+        UUID meeting = idOf(userId, "k-1");
+        jdbcTemplate.update("""
+            insert into user_fact(id, user_id, batch_id, scope_key, fact_type, value, version)
+            values (?, ?, ?, ?, '용도', '{"value": "업무미팅"}', 1)
+            """, UUID.randomUUID(), userId, batchId, "transaction:" + meeting);
+        reviewService.answer(userId, reviewIdsOf(userId, "k-1"), "카페");
+        jdbcTemplate.update("update limit_bucket_entry set allowed_amount = 3000 where user_id = ?", userId);
+
+        // when: 다시 판정해도 어느 판정도 접대비가 아닌 분류 응답
+        ClassificationAnswer answer = reviewService.answer(userId, reviewIdsOf(userId, "k-2"), "통신");
+
+        // then: 재판정은 했지만 집계를 건너뛰어 한도 항목이 그대로다 (#218)
+        assertThat(answer.judgedCount()).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForList(
+            "select allowed_amount from limit_bucket_entry where user_id = ?", Long.class, userId))
+            .containsExactly(3_000L);
+    }
+
+    @Test
     void answer_takes_the_user_lock_before_the_transaction_lock() throws Exception {
         UUID userId = newUser();
         UUID batchId = upload(userId, "hash-lock-order", tx("k-1", "2026-01-05", "성진이네 본점"));

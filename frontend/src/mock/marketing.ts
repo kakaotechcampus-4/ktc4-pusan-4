@@ -40,28 +40,41 @@ export const DEV_EXPENSES = [
 
 
 
-/** 히어로 뒤 카드에 겹쳐 보여주는 결과 요약 (데모 수치) */
-export const HERO_SUMMARY = {
-  total: 292,
-  availableAmount: 21_483_000,
-  distribution: [
-  { label: '가능', count: 168, bar: 'bg-ok-bar' },
-  { label: '확인 필요', count: 71, bar: 'bg-warn-bar' },
-  { label: '불가', count: 53, bar: 'bg-deny-bar' }]
+/**
+ * 판정이 내는 세 갈래. 랜딩 오른쪽 띠와 히어로 도식이 같은 것을 본다.
+ * 건수는 쓰지 않는다 — 로그인 전 방문자에게 보여 줄 수 있는 실제 수치가 없다
+ */
+export const VERDICTS = [
+{ label: '가능', body: '조문을 들어 경비로 봅니다', bar: 'bg-ok-bar', dot: '#12B76A' },
+{ label: '확인 필요', body: '사실을 더 물어야 갈립니다', bar: 'bg-warn-bar', dot: '#F7A51B' },
+{ label: '불가', body: '안 되는 이유를 조문으로 답합니다', bar: 'bg-deny-bar', dot: '#FF5A5A' }] as
+const;
 
-};
+/** rules/cards 의 실제 장 수. `ls rules/cards/*.yaml | wc -l` */
+export const RULE_CARD_COUNT = 53;
 
+/**
+ * 규칙 카드가 citations 로 다는 조문 수(중복 제거).
+ * awk '/citations:/{f=1;next} /^[a-z_]+:/{f=0} f' rules/cards/*.yaml | grep -o 'id: *[^,} ]*' | sort -u | wc -l
+ */
+export const CITED_STATUTE_COUNT = 28;
+
+/**
+ * 「허용하는 오탐 0건」은 뺐다 — 재 본 적이 없고, 확신이 없으면 「확인 필요」로
+ * 내리는 제품이라 0 이라고 말할 수 있는 수가 아니다
+ */
 export const STATS = [
-{ value: '40+', label: '검수를 마친 규칙 카드' },
-{ value: '60건', label: '적재된 조문·해석 버전' },
-{ value: '100%', label: '판정에 붙는 근거 조문' },
-{ value: '0건', label: '허용하는 오탐' }];
+// 53장 가운데 52장이 아직 `미검수` 다. 「검수를 마친」이라고 쓰면 FAQ 와 반대가 된다 (#254 리뷰)
+{ value: `${RULE_CARD_COUNT}장`, label: '조문을 읽고 만든 규칙 카드' },
+// 「60건 적재된 조문」은 첫 디자인 때 박아 둔 숫자였다. 셀 수 있는 것으로 바꾼다
+{ value: `${CITED_STATUTE_COUNT}개`, label: '규칙이 근거로 다는 조문' },
+{ value: '100%', label: '판정에 붙는 근거 조문' }];
 
 
 export const SYSTEM_FEATURES = [
 {
   title: '판정은 규칙 엔진이 하고,\nAI는 분류까지만 합니다',
-  body: 'AI가 하는 일은 가맹점 이름을 정리하고 속성을 뽑는 것까지입니다. 최종 판정은 검수를 마친 규칙 카드가 순서대로 실행되며 내립니다. AI가 틀리면 규칙 매칭이 실패해 「확인 필요」로 내려갈 뿐, 틀린 판정이 나가지 않습니다.',
+  body: 'AI가 하는 일은 가맹점 이름을 정리하고 속성을 뽑는 것까지입니다. 최종 판정은 규칙 카드가 순서대로 실행되며 내립니다. AI가 틀리면 규칙 매칭이 실패해 「확인 필요」로 내려갈 뿐, 틀린 판정이 나가지 않습니다.',
   caption: '같은 거래를 두 번 넣으면 두 번 같은 결과가 나옵니다.'
 },
 {
@@ -70,7 +83,7 @@ export const SYSTEM_FEATURES = [
 },
 {
   title: '원본 파일은\n서버로 올라가지 않습니다',
-  body: '카드내역은 브라우저에서 파싱하고 카드번호·계좌번호는 그 단계에서 폐기합니다. 서버로는 날짜·가맹점명·금액만 전송하며, 로그에 소득 금액과 이름을 남기지 않습니다.'
+  body: '카드내역은 브라우저에서 파싱하고 카드번호·계좌번호는 그 단계에서 폐기합니다. 서버로는 판정에 필요한 항목만 보냅니다 — 무엇을 보내는지는 업로드 화면의 「데이터 경계」에 그대로 적었습니다. 로그에 소득 금액과 이름을 남기지 않습니다.'
 }];
 
 
@@ -83,7 +96,7 @@ export const FLOW_STEPS = [
 {
   step: '02',
   title: '사업자 문진',
-  body: '직원·작업 공간·차량·수입 규모. 같은 지출도 상황에 따라 결과가 달라집니다.'
+  body: '직원·작업 공간·개업 시기·수입 규모. 같은 지출도 상황에 따라 결과가 달라집니다.'
 },
 {
   step: '03',

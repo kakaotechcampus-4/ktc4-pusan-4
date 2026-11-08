@@ -2,7 +2,71 @@
 
 카테캠 팀 계정의 Ubuntu 24.04 EC2 한 대에 `deploy/compose.yaml`을 실행한다. 배포 코드는 별도 worktree의 `feat/aws-deploy`에서 작성해 `develop`으로 머지한다. 첫 `release`는 이 설정이 포함된 `develop` 커밋에서 만들고, 이후 `develop → release` PR의 push가 자동 배포를 시작한다. 기존 `develop → main` 멘토 리뷰 흐름은 유지한다.
 
-현재 프런트엔드는 목업 데이터로 동작하며 주요 백엔드 API는 501을 반환한다. 이 배포의 완료 기준은 전체 스택의 정상 기동이다. 실제 카드 데이터로 시험하기 전에는 인증과 API 연동을 완료해야 한다.
+프런트엔드는 백엔드 API를 HTTP로 호출하고, 백엔드는 목 응답 없이 실제 서비스로 답한다. 로그인은 9절, 배포 뒤 확인은 각 절의 헬스체크를 따른다.
+
+## 구조
+
+### 서버 구성
+
+EC2 한 대에서 Compose 프로젝트 `ktc4`가 컨테이너 다섯 개를 띄운다. 밖으로 열린 포트는 Caddy의 80·443뿐이다.
+
+```mermaid
+flowchart LR
+    user(["브라우저"]) -->|"443 / 80"| web
+
+    subgraph ec2["EC2 t3.medium · deploy/compose.yaml"]
+        web["web<br/>Caddy 2.11.8<br/>배포해도 다시 뜨지 않음"]
+        backend["backend :8080<br/>Spring Boot · Flyway"]
+        ai["ai :8000<br/>FastAPI"]
+        pg[("postgres :5432")]
+        redis[("redis :6379")]
+        dist[("web-dist 볼륨<br/>화면 파일")]
+        timers["systemd 타이머<br/>백업 · 코퍼스 · 규칙 후보"]
+        cwa["CloudWatch Agent"]
+
+        web -->|"/api/v1/*"| backend
+        web -.->|"그 밖의 주소"| dist
+        backend -->|"비서 · 분류"| ai
+        ai -->|"비서 도구 /api/v1"| backend
+        backend --> pg
+        backend --> redis
+        ai --> pg
+        timers -.->|"pg_dump"| pg
+        timers -.->|"compose run ai"| ai
+        cwa -.->|"127.0.0.1:8080/actuator/prometheus"| backend
+    end
+
+    backend -.->|"awslogs"| logs[("CloudWatch Logs")]
+    timers -.->|"백업"| s3[("S3")]
+```
+
+- 화살표는 호출 방향이다. 점선은 요청 경로 밖의 읽기·배치·수집이다.
+- 영속 볼륨은 `postgres-data`, `redis-data`, `caddy-data`(인증서·접근 기록), `caddy-config`, `web-dist`다. 재배포해도 남는다.
+- 타이머는 5·6·11절이다. 코퍼스와 규칙 후보 배치는 상시 `ai` 컨테이너가 아니라 같은 이미지로 띄운 일회용 컨테이너에서 돈다.
+
+### 배포 순서
+
+`release` push 한 번이 아래 순서로 흐른다(4절).
+
+```mermaid
+sequenceDiagram
+    participant GH as GitHub Actions
+    participant ECR
+    participant SH as EC2 deploy.sh
+    participant C as Compose
+    participant W as web (Caddy)
+
+    GH->>GH: backend · ai · web 검증
+    GH->>ECR: backend / ai / web-<SHA> 이미지 push<br/>(postgres 는 바뀔 때만)
+    GH->>SH: SSM 으로 deploy.sh <SHA>
+    SH->>SH: release SHA 확인 · checkout
+    SH->>C: pull · up -d --wait
+    Note over C: 이미지가 바뀐 backend · ai 를 내리고 새로 띄운다.<br/>새 backend 가 부팅하며 Flyway 를 돌린다.<br/>이 사이 API 와 비서는 멈춘다.
+    C-->>W: 새 backend 가 healthy 가 되면 web-files 가<br/>web-dist 에 새 화면 파일 추가 (HTML 은 마지막)
+    SH->>W: caddy reload (Caddyfile 변경 반영)
+    SH->>C: db/schema.sql · db/rag.sql 적용
+    GH->>W: 공개 HTTPS 확인
+```
 
 ## 1. AWS와 DNS 준비
 
@@ -24,6 +88,7 @@ Repository **Settings → Secrets and variables → Actions → Variables**에 �
 | `ECR_REPOSITORY` | `123456789012.dkr.ecr.ap-northeast-2.amazonaws.com/ktc4-pusan-4` 형태의 전체 URI |
 | `EC2_INSTANCE_ID` | 제공된 EC2의 `i-...` ID |
 | `DOMAIN` | DuckDNS에서 발급한 호스트 이름 |
+| `KAKAO_REST_API_KEY` | 카카오 앱의 REST API 키. web 이미지를 빌드할 때 `VITE_KAKAO_REST_API_KEY`로 넘긴다. 브라우저 인가 주소에 실리는 공개 값이다. web 이미지를 `VITE_API=http`로 빌드해야 쓰인다. 그때 비우면 화면에서 카카오 버튼을 숨긴다. 지금 web 이미지는 목업 빌드라 키와 상관없이 목업 카카오 로그인 버튼이 보인다 |
 
 워크플로는 `id-token: write`와 `contents: read`로 OIDC 임시 자격증명을 얻는다. AWS 액세스 키나 SSH 개인키를 GitHub Secrets에 넣지 않는다. `release` 브랜치는 PR 검토를 요구하도록 보호한다. `AWS release`의 `backend`, `ai`, `web` 검증이 통과한 커밋만 승격한다. PR에서는 이 세 검증이 배포와 같은 Dockerfile로 이미지까지 빌드한다(push는 하지 않는다). 레포 구조가 바뀌어 Dockerfile이 깨지면 배포가 아니라 그 PR에서 실패한다. `release`로 가는 PR은 이 레포의 `develop`에서만 연다. `Release source`의 `release-source` 체크가 다른 브랜치나 fork에서 온 PR을 실패시키며, 이 체크도 `release` ruleset의 필수 체크로 등록한다. 이 체크는 `pull_request_target`으로 기본 브랜치(`develop`)에 있는 워크플로 파일을 실행하므로, PR 안에서 파일을 고쳐 통과시킬 수 없다. GitHub은 2025-12-08부터 `pull_request_target`을 base가 아닌 기본 브랜치의 파일로 실행한다([변경 공지](https://github.blog/changelog/2025-11-07-actions-pull_request_target-and-environment-branch-protections-changes/)).
 
@@ -51,7 +116,14 @@ sudo aws ecr get-login-password --region ap-northeast-2 >/dev/null
 
 ## 4. 배포와 확인
 
-`release` push가 발생하면 `.github/workflows/aws-release.yml`이 백엔드·AI·프런트 검증을 실행하고, GitHub 러너에서 이미지를 빌드해 ECR에 올린다. SSM이 EC2의 `deploy/deploy.sh`에 커밋 SHA를 전달한다. 스크립트는 원격 `release`의 현재 SHA와 일치하는지 확인하고 이미지 pull, Compose 기동, Flyway 완료 후 `db/schema.sql`과 `db/rag.sql`을 차례로 적용한다. DB 초기화 단계에서는 확장만 설치한다. `postgres-data`와 Caddy 인증서 볼륨은 재배포해도 유지된다.
+`release` push가 발생하면 `.github/workflows/aws-release.yml`이 백엔드·AI·프런트 검증을 실행하고, GitHub 러너에서 이미지를 빌드해 ECR에 올린다. SSM이 EC2의 `deploy/deploy.sh`에 커밋 SHA를 전달한다. 스크립트는 원격 `release`의 현재 SHA와 일치하는지 확인하고 이미지 pull, Compose 기동, 화면 파일 반영, Flyway 완료 후 `db/schema.sql`과 `db/rag.sql`을 차례로 적용한다. DB 초기화 단계에서는 확장만 설치한다. `postgres-data`와 Caddy 인증서 볼륨은 재배포해도 유지된다.
+
+웹 컨테이너(Caddy)는 배포해도 다시 뜨지 않는다.
+
+- `web-<SHA>` 이미지는 화면 파일만 담는다. Compose `up`이 새 백엔드가 healthy가 된 뒤 이 이미지를 일회성 서비스 `web-files`로 돌려 `web-dist` 볼륨에 파일을 옮긴다(`deploy/web-publish.sh`). 끝난 `web-files` 컨테이너는 `Exited (0)`으로 남는다.
+- 옛 파일은 지우지 않는다. 이미 화면을 연 브라우저가 옛 해시 청크(`/assets/*`)를 이어서 받는다. 배포당 수 MB라 따로 정리하지 않는다.
+- Caddy는 서버 repo의 `deploy/caddy/`를 그대로 읽고, `deploy.sh`가 매번 `caddy reload`로 Caddyfile 변경을 연결을 끊지 않고 반영한다. 설정이 틀리면 reload가 실패해 배포가 실패하고, Caddy는 옛 설정으로 계속 낸다.
+- Caddy 버전(`deploy/compose.yaml`의 `web` 이미지)이나 `web` 서비스 정의를 바꾼 배포에서만 웹 컨테이너가 다시 떠 몇 초 끊긴다.
 
 ```bash
 sudo cat /opt/ktc4/current-sha
@@ -60,6 +132,11 @@ curl -I "https://<도메인>/"
 ```
 
 `docker compose ps`에서 PostgreSQL·Redis·백엔드·AI가 healthy이고 웹 컨테이너가 running이어야 한다. 브라우저에서 `/`, `/upload`를 새로고침해 SPA 라우팅을 확인한다. 백엔드 `/actuator/health`와 AI `/health/db`는 컨테이너 내부 검사로 확인하며 외부에 공개하지 않는다. `docker stats`와 `df -h`로 4GB 메모리·50GB 디스크 사용량을 확인한다.
+
+SSM이 띄우는 `deploy.sh`는 직전 배포의 파일이다. 스크립트가 새 커밋을 checkout해도 bash는 이미 연 옛 파일을 끝까지 실행한다. 그래서 `deploy.sh`는 checkout까지만 하고, 대상 커밋의 `deploy.sh`를 다시 실행해 나머지를 맡긴다(배포 잠금은 이어받는다). `deploy.sh`를 고친 커밋도 자기 배포부터 새 스크립트로 돈다.
+
+- 예외는 이 재실행이 들어간 커밋을 처음 배포할 때다. 그때는 재실행이 없는 옛 스크립트가 끝까지 돈다. 그래서 화면 파일 반영(`web-files`)은 스크립트가 아니라 Compose 정의에 두었다.
+- `--rollback`으로 재실행이 없는 옛 커밋으로 돌아가면 그 커밋의 스크립트가 잠금을 다시 잡고 처음부터 돈다.
 
 Compose는 기존 백엔드를 내린 뒤 새 백엔드를 띄우고, 새 백엔드가 부팅하면서 Flyway를 실행한다. 마이그레이션이 실패하면 그 시점부터 서비스가 멈추므로 5절의 롤백 명령으로 이전 SHA를 다시 배포한다. 마이그레이션 작성 규칙은 `db/README.md`를 따른다.
 
@@ -162,12 +239,16 @@ docker compose --env-file /etc/ktc4/production.env -f "$repo/deploy/compose.yaml
 - Redis를 비우면(`FLUSHALL`, 볼륨 삭제) 모든 사용자가 로그아웃된다. 데이터 손실은 없다.
 - 비서 사용자별 한도(`assistant:*` 키, 10장)도 여기서 센다. 키마다 TTL이 있다. Redis가 내려가면 비서 대화만 503 `ASSISTANT_UNAVAILABLE`이다.
 
-## 9. 로그인 (고정 사용자)
+## 9. 로그인
 
-실제 계정이 생기기 전까지는 고정 사용자 `demo@example.com` 하나만 로그인한다(api.md 1.1). 새 값을 넣은 뒤 백엔드를 다시 배포해야 반영된다.
+이메일로 가입한 계정으로 로그인한다(api.md 1.1). 새 값을 넣은 뒤 백엔드를 다시 배포해야 반영된다.
 
 - `/etc/ktc4/production.env`의 `APP_AUTH_JWT_SECRET`에는 `openssl rand -hex 32`로 만든 값을 넣는다. 비우면 백엔드가 기동할 때마다 임시 키를 만들어, 재배포할 때마다 모든 로그인이 풀린다. 32바이트보다 짧으면 백엔드가 뜨지 않는다.
-- `APP_AUTH_DEMO_PASSWORD`에는 시연용 비밀번호를 넣는다. 비우면 아무도 로그인할 수 없다(로그인 API가 401 `INVALID_CREDENTIALS`).
+- 예전 고정 사용자 `demo@example.com` 행은 비밀번호가 없어 로그인할 수 없고, 같은 이메일로 다시 가입할 수도 없다(409). 시연 계정은 다른 이메일로 가입한다. `APP_AUTH_DEMO_PASSWORD`는 더 쓰지 않으니 `production.env`에서 지워도 된다.
+- 카카오 로그인은 `APP_AUTH_KAKAO_REST_API_KEY`(카카오 앱의 REST API 키), `APP_AUTH_KAKAO_CLIENT_SECRET`(보안 메뉴에서 켠 Client Secret, 안 쓰면 비움), `APP_AUTH_KAKAO_REDIRECT_URI`(`https://<DOMAIN>/auth/kakao/callback`, 카카오 앱에 등록한 값과 같게)를 넣는다. 키가 비면 카카오 로그인만 503으로 꺼지고 이메일 로그인은 그대로다. 동의항목은 닉네임만 쓰고 이메일은 켜지 않는다(비즈 앱 심사가 필요하다).
+- 이메일 가입은 메일 인증을 거친다. 인증 코드는 팀 Gmail 계정의 SMTP(`smtp.gmail.com:587`, STARTTLS)로 보낸다. `APP_MAIL_USERNAME`에 그 Gmail 주소, `APP_MAIL_PASSWORD`에 앱 비밀번호(Google 계정 > 보안 > 2단계 인증을 켠 뒤 "앱 비밀번호", 16자리)를 넣는다. 계정 비밀번호는 넣지 않는다. 비우면 인증 요청이 503 `EMAIL_VERIFICATION_UNAVAILABLE`이라 새 이메일 가입을 할 수 없다(이미 있는 계정의 로그인·카카오 로그인은 그대로다).
+- Gmail 한도는 하루 약 500통이다. 이메일 하나에 하루 5통까지만 보내지만 IP 단위 제한은 없다. 메일은 `/actuator/health`에서 뺐다(Gmail이 잠깐 안 돼도 배포가 멈추지 않는다).
+- 인증 상태는 Redis에 둔다(`email-verify:*`, 모두 TTL). Redis를 비우면 진행 중인 인증만 처음부터 다시 한다.
 - 리프레시 토큰 쿠키는 `Secure`라 HTTPS(Caddy)로만 저장된다. 로컬 프로필은 http라 `Secure`를 끈다.
 
 ## 10. 비서 중계
@@ -177,3 +258,251 @@ docker compose --env-file /etc/ktc4/production.env -f "$repo/deploy/compose.yaml
 - 주소는 `ASSISTANT_SERVER_URL`이다. `deploy/compose.yaml`이 `http://ai:8000`으로 넣고, 로컬 기본값은 `http://localhost:8000`이다.
 - 읽기 타임아웃은 40초로, AI 서버의 한 턴 상한(30초)보다 길다. AI 서버가 응답하지 않거나 오류를 내면 503 `ASSISTANT_UNAVAILABLE`, AI 서버 전체 한도(8턴)에 걸리면 429 `ASSISTANT_RATE_LIMITED`다.
 - 사용자별 한도(동시 1, 분당 10, 하루 100)는 Redis에 센다(8장).
+
+## 11. 규칙 후보 주간 배치와 카드 PR
+
+매주 일요일 05:00 KST(코퍼스 동기화 1시간 뒤)에 `deploy/rule-candidates.sh`가 `ai` 이미지로 세 단계를 차례로 돌린다. 배포·코퍼스 동기화와 같은 락을 잡으므로 앞 작업이 길어지면 끝날 때까지 기다린다. 한 단계가 실패해도 나머지는 돈다.
+
+1. `pipeline.promote`: 관리자가 승인한 후보(`rule_candidate.status='승인'`)를 모아 카드 PR 하나를 `develop`으로 연다.
+   - 초안에 `id: R-C<후보 id>`, 효력 시작일(승인일, 소급 없음), `review: { by: 관리자 }`를 채워 `rules/cards/R-C<id>_<카테고리>.yaml`로 올린다.
+   - 레포가 공개라 관리자 이메일은 카드와 PR에 넣지 않는다.
+   - 지난 PR도 정리한다. 닫힌 PR의 카드가 `develop`에 있으면 `promoted_rule_id`를 남긴다. 없으면 후보를 `대기`로 되돌려 다시 심사받게 한다.
+2. `pipeline.candidates --limit 10`: 새 후보를 적재한다(CONTEXT.md §9-5).
+3. `pipeline.notify`: 두 단계의 출력과 실패한 단계 이름을 코퍼스 알림과 같은 디스코드 스레드(`TEAM_DISCORD_WEBHOOK`)로 보낸다. 늘 보내므로, 일요일 아침에 알림이 없으면 타이머나 스크립트가 멈춘 것이다.
+
+후보 추출은 `docs/categories.md`와 `profiles/`를 읽는데 `ai` 이미지에는 둘 다 없다. 그래서 스크립트가 배포된 커밋의 두 경로를 컨테이너 `/docs`·`/profiles`에 읽기 전용으로 붙인다. 붙이지 않으면 `category_meta()`가 `/docs/categories.md`를 찾지 못해 실패한다.
+
+**PR 토큰.** `/etc/ktc4/production.env`의 `RULES_PR_TOKEN`에 fine-grained PAT를 넣는다.
+
+- GitHub → Settings → Developer settings → Fine-grained tokens에서 만든다.
+- Resource owner는 `kakaotechcampus-4`, Repository access는 이 레포 하나다. 권한은 Contents와 Pull requests를 Read and write로 준다.
+- 조직 설정에 따라 조직 관리자의 승인이 필요할 수 있다.
+- 만료일이 지나면 promote 단계가 실패로 알림에 뜬다. 새로 발급해 바꿔 넣는다. 비워 두어도 같은 실패로 뜬다.
+- 토큰은 스크립트가 promote 단계에만 넘기고, 상시 떠 있는 `ai` 서버 컨테이너에는 넣지 않는다.
+
+**카드 PR 처리.**
+
+- CI(`RuleCardLoader`·`EvalHarnessTest`)가 초록이면 머지한다. 머지된 카드는 다음 `develop → release` 배포부터 판정에 쓰인다. 이미 끝난 판정은 사용자가 다시 실행해야 바뀐다.
+- 카드 하나를 빼려면 PR에서 그 파일을 지우고 머지한다. 다음 실행 때 그 후보가 `대기`로 돌아간다. PR을 통째로 닫으면 들어 있던 후보가 모두 `대기`로 돌아간다.
+- 같은 날 promote를 두 번 돌리면 브랜치 이름(`feature/rule-candidates-<날짜>`)이 겹쳐 실패한다. 다음 날 다시 돌리면 된다.
+
+첫 배포에 성공한 뒤 타이머를 설치한다.
+
+```bash
+sudo cp /opt/ktc4/repo/deploy/ktc4-rule-candidates.* /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now ktc4-rule-candidates.timer
+sudo systemctl start ktc4-rule-candidates.service   # 첫 실행은 수동으로 확인
+journalctl -u ktc4-rule-candidates.service -n 50
+systemctl list-timers ktc4-rule-candidates.timer
+```
+
+실패하면 서비스가 failed로 남고 `journalctl`에 원인이 있다. 원인을 고친 뒤 `systemctl start ktc4-rule-candidates.service`로 다시 돌린다. 후보 추출은 이미 행이 있는 조합을 건너뛰고, promote는 PR에 올린 후보를 다시 올리지 않는다.
+
+## 12. 관리자 지정
+
+규칙 후보 관리자 API(api.md 3.15)는 `app_user.role`이 `ADMIN`인 사용자만 부른다. 가입하면 `USER`이고, 앱에는 role을 바꾸는 API가 없다. 관리자는 운영 서버에서 DB로 지정한다.
+
+```bash
+sudo docker compose --env-file /etc/ktc4/production.env -f /opt/ktc4/repo/deploy/compose.yaml exec postgres \
+  psql -U "$DB_USERNAME" -d "$DB_NAME" -c "update app_user set role = 'ADMIN' where email = 'admin@example.com'"
+```
+
+- `DB_USERNAME`·`DB_NAME`은 `production.env`의 값이다(`set -a; source /etc/ktc4/production.env; set +a`로 먼저 읽는다).
+- 이메일이 없는 카카오 계정은 `where id = '<사용자 id>'`로 지정한다. id 는 그 계정으로 `GET /api/v1/users/me`를 불러 확인한다.
+- 관리자를 해제할 때는 `role = 'USER'`로 되돌린다. 바뀐 role 은 다음 요청부터 바로 반영된다.
+
+## 13. 웹과 검색 노출
+
+웹 컨테이너의 Caddy(`deploy/caddy/Caddyfile`)가 `web-dist` 볼륨의 화면 파일을 낸다(4절).
+
+- 공개 페이지(`/`, `/faq`, `/terms`, `/privacy`)는 빌드 때 미리 그린 HTML(`index.html`, `faq.html` …)이 나간다. 크롤러와 카카오톡 미리보기가 자바스크립트 없이 본문·제목을 읽는다. 목록은 `frontend/src/seo.ts`다.
+- 그 밖의 주소(로그인 뒤 화면, 로그인 화면, 없는 주소)는 본문 없는 `app.html`이 나가고 화면은 브라우저가 그린다. `app.html`은 `noindex`라 검색에 잡히지 않는다.
+- `/robots.txt`, `/sitemap.xml`, `/llms.txt`는 빌드가 만든다. 검색엔진과 AI 크롤러(학습·검색·열람)를 모두 허용한다.
+- 화면 파일은 zstd·gzip으로 압축하고, `/assets/*`는 1년 동안 캐시한다(파일명에 내용 해시가 붙는다). API 응답은 손대지 않는다.
+- 모든 https 응답에 HSTS(`Strict-Transport-Security: max-age=31536000`)를 붙인다. 한 번 들어온 브라우저는 1년 동안 http 주소도 https로 바꿔 접속한다. 그 기간에는 인증서가 깨져도 http로 우회할 수 없으므로, Caddy 인증서 갱신이 실패하지 않는지 본다.
+
+배포 뒤 확인:
+
+```bash
+curl -s https://<도메인>/ | grep -c '<h1'                      # 1
+curl -s https://<도메인>/no-such-page | grep -c noindex         # 1
+curl -s https://<도메인>/robots.txt                             # User-agent: * …
+curl -s -o /dev/null -w '%{content_type}\n' https://<도메인>/llms.txt   # text/plain
+curl -sI https://<도메인>/ | grep -i strict-transport           # max-age=31536000
+```
+
+카카오톡 미리보기는 카카오가 캐시한다. 제목·설명·이미지를 바꿨으면 [카카오 공유 디버거](https://developers.kakao.com/tool/debugger/sharing)에서 주소의 캐시를 지운다.
+
+### 검색 도구 등록
+
+검색 도구는 소유 확인 값이 남아 있는 동안만 사이트를 관리하게 해 준다. 아래 값을 지우거나 덮어쓰면 확인이 풀린다.
+
+- 구글 서치콘솔: 도메인 속성. DuckDNS의 TXT 레코드에 `google-site-verification=…` 값을 넣었다. DuckDNS는 도메인마다 TXT를 하나만 두므로, 다른 용도로 TXT를 갱신하면 이 값이 사라진다.
+- Bing 웹마스터 도구: 서치콘솔에서 가져와 등록했다. 서치콘솔 확인이 풀리면 같이 풀린다.
+- 네이버 서치어드바이저: `frontend/index.html`의 `naver-site-verification` 메타 태그. 프리렌더가 이 파일을 틀로 쓰므로 공개 페이지마다 들어간다.
+- 사이트맵은 세 곳 모두 `https://<도메인>/sitemap.xml`로 제출한다.
+
+### 접근 기록
+
+검색엔진·AI 크롤러가 언제 얼마나 읽어 가는지 세려고 남긴다.
+
+- `caddy-data` 볼륨의 `/data/access.log`에 JSON 한 줄씩 쌓는다. 10MB를 넘으면 gzip으로 압축한 파일로 굴리고 5개까지만 둔다.
+- IP는 앞 두 자리만 남긴다(IPv4 /16, IPv6 /32). 쿠키·인증 헤더는 Caddy가 지운다. `/api/v1/*` 요청은 남기지 않는다.
+- 남기는 항목을 바꾸면 개인정보처리방침(`frontend/src/pages/public/Privacy.tsx`)의 「접속 기록」도 같이 고친다.
+
+크롤러별 방문 수:
+
+```bash
+sudo docker compose --env-file /etc/ktc4/production.env -f /opt/ktc4/repo/deploy/compose.yaml exec -T web \
+  sh -c 'cat /data/access.log; zcat /data/access-*.log.gz 2>/dev/null' \
+  | grep -oiE 'GPTBot|OAI-SearchBot|ChatGPT-User|ClaudeBot|Claude-SearchBot|Claude-User|PerplexityBot|Perplexity-User|CCBot|Googlebot|bingbot|Yeti' \
+  | sort | uniq -c
+```
+
+## 14. 로그
+
+백엔드 로그는 Docker `awslogs` 드라이버로 CloudWatch Logs `/ktc4/backend`(서울 리전)에 간다. 로그 스트림은 컨테이너마다 하나라 배포하면 새 스트림이 생긴다. 나머지 컨테이너(PostgreSQL·Redis·AI·웹)는 서버 디스크의 `json-file`에 컨테이너마다 10MB × 5개까지만 남긴다.
+
+- **로그 그룹이 먼저 있어야 한다.** 그룹은 15절의 모니터링 스택이 보존 기간 14일로 만든다. 보존 기간이 무기한인 그룹이 생기지 않게 compose 는 그룹을 만들지 않으므로(`awslogs-create-group: "false"`), 그룹이 없으면 백엔드 컨테이너가 뜨지 않고 배포가 실패한다. 이 설정이 든 커밋을 처음 `release`에 올리기 전에 확인한다.
+
+  ```bash
+  aws logs describe-log-groups --region ap-northeast-2 --log-group-name-prefix /ktc4/backend \
+    --query 'logGroups[].[logGroupName,retentionInDays]'
+  ```
+
+- 자격 증명은 Docker 데몬이 호스트에서 EC2 인스턴스 역할(`ktc-ec2-ssm-role`의 `CloudWatchAgentServerPolicy`)로 얻는다. 컨테이너에는 넣지 않는다.
+- `mode: non-blocking`이라 CloudWatch 가 느려도 앱은 멈추지 않는다. 대신 드라이버 버퍼(기본 1MB)가 차면 그 사이 로그는 버린다.
+- 서버에서 `docker logs`는 그대로 된다(Docker 의 dual logging). 서버에 남는 것은 최근 일부뿐이고 전체는 CloudWatch 에서 본다.
+
+  ```bash
+  sudo docker logs --tail 100 ktc4-backend-1
+  ```
+
+### 형식
+
+운영 로그는 한 줄에 JSON 하나다(Spring Boot 내장 `logstash` 형식, `application.yml`의 `logging.structured`). 로컬 프로필(`application-local.yml`)은 텍스트다.
+
+| 필드 | 내용 |
+| --- | --- |
+| `message`, `level`, `logger_name`, `thread_name`, `@timestamp` | 기본 필드 |
+| `stack_trace` | 예외. 한 이벤트 안에 들어간다. |
+| `traceId` | 요청마다 하나. 응답 헤더 `X-Trace-Id`와 에러 본문 `traceId`도 같은 값이다. |
+| `userId` | 인증을 거친 요청이면 그 사용자 id |
+| `runId` | 판정 run 워커가 낸 로그 |
+
+요청마다 `RequestTraceFilter`가 한 줄을 남긴다. 필드는 `method`, `path`(쿼리스트링 제외), `status`(숫자), `durationMs`(숫자)이고 본문은 남기지 않는다. `/actuator`는 healthcheck·지표 수집이 주기적으로 불러 성공한 요청은 남기지 않고 실패만 남긴다. 15절의 5xx 알람이 이 줄의 `status`로 센다. DB 가 끊기면 healthcheck 가 30초(Hikari 연결 대기) 뒤 503 을 받아 `GET /actuator/health 503` 이 15초마다 남는다. 사용자 요청이 없는 시간에는 이 줄이 5xx 알람을 울리는 유일한 신호다.
+
+```json
+{"@timestamp":"...","message":"GET /api/v1/users/me 200 12ms","logger_name":"com.ktc4.pusan4.shared.api.RequestTraceFilter","level":"INFO","traceId":"01a19c9e-...","userId":"0199c8f2-...","method":"GET","path":"/api/v1/users/me","status":200,"durationMs":12}
+```
+
+### 찾기
+
+CloudWatch 콘솔 → Logs Insights 에서 로그 그룹 `/ktc4/backend`를 고르고 기간을 정해 실행한다. 사용자가 에러 화면의 `traceId`를 알려 주면 그 요청의 로그를 모두 볼 수 있다.
+
+```text
+fields @timestamp, level, message, status, path, stack_trace
+| filter traceId = '<traceId>'
+| sort @timestamp asc
+```
+
+```text
+# 최근 5xx 와 느린 요청
+fields @timestamp, method, path, status, durationMs, traceId
+| filter status >= 500 or durationMs > 3000
+| sort @timestamp desc
+| limit 50
+```
+
+```text
+# 판정 run 하나의 로그
+fields @timestamp, level, message, stack_trace
+| filter runId = '<runId>'
+| sort @timestamp asc
+```
+
+CLI 로 최근 로그를 따라 볼 때는 `aws logs tail /ktc4/backend --region ap-northeast-2 --follow --since 10m`을 쓴다.
+
+## 15. 모니터링
+
+알람·Lambda·로그 그룹은 CloudFormation 스택 `ktc4-monitoring`(`deploy/monitoring/template.yaml`) 하나로 관리한다. 콘솔에서 손으로 고치지 말고 템플릿을 고쳐 다시 배포한다. 계획과 이유는 `docs/monitoring_plan.md`에 있다.
+
+| 리소스 | 이름 |
+| --- | --- |
+| 백엔드 로그 그룹 | `/ktc4/backend` (보존 14일, 스택을 지워도 남는다) |
+| 알림 Lambda | `ktc4-alarm-to-discord` (알람 → Discord 장애 알림 스레드) |
+| 알람 | `ktc4-ec2-cpu-high`, `ktc4-ec2-status-check-failed`, `ktc4-ec2-memory-high`, `ktc4-ec2-disk-high`, `ktc4-backend-http-5xx`, `ktc4-backend-restarted` |
+| 대시보드 | `ktc4-backend` |
+| Agent 로그 그룹 | `/ktc4/prometheus` (보존 3일, Agent 가 긁은 앱 지표를 EMF 로그로 쓰는 곳) |
+
+### 스택 배포
+
+SSO로 로그인한 터미널에서 실행한다. 리전은 스크립트가 `ap-northeast-2`로 고정한다.
+
+```bash
+aws sso login --profile ktc-team
+export AWS_PROFILE=ktc-team
+export ARTIFACT_BUCKET=<Lambda zip을 올릴 S3 버킷>   # 5절의 백업 버킷을 써도 된다. monitoring/ 접두사에 올린다.
+export EC2_INSTANCE_ID=i-...
+read -rs ALARM_DISCORD_WEBHOOK && export ALARM_DISCORD_WEBHOOK   # 장애 알림 스레드 웹훅(?thread_id= 포함)
+deploy/monitoring/deploy.sh
+```
+
+- 장애 알림 웹훅은 PR 알림·코퍼스 동기화와 다른 스레드다. `TEAM_DISCORD_WEBHOOK` 끝에 `?thread_id=<장애 알림 스레드 ID>`를 붙인다.
+- 웹훅은 `NoEcho` 파라미터라 스택 화면에는 보이지 않지만, Lambda 환경 변수에는 평문으로 남는다.
+- 템플릿을 고친 뒤에도 같은 명령으로 다시 배포한다. 바뀐 게 없으면 아무것도 하지 않는다.
+
+### 알림 확인
+
+배포 직후와 알람을 더한 뒤에 알람 상태를 손으로 바꿔 Discord에 오는지 본다. 다음 평가 주기(최대 5분)에 실제 상태로 돌아오며 복구 알림이 한 번 더 온다.
+
+```bash
+aws cloudwatch set-alarm-state --region ap-northeast-2 \
+  --alarm-name ktc4-ec2-cpu-high --state-value ALARM --state-reason "알림 경로 시험"
+```
+
+Discord에 오지 않으면 Lambda 로그(`/aws/lambda/ktc4-alarm-to-discord`)를 본다. 403이면 웹훅 URL, 로그 자체가 없으면 Lambda 호출 권한(`AlarmInvokePermission`)을 확인한다.
+
+### CloudWatch Agent
+
+EC2에 CloudWatch Agent를 설치해 메모리·디스크와 백엔드 앱 지표 3개를 보낸다. 설정은 `deploy/cloudwatch-agent/`에 있고, 스택을 먼저 배포한 뒤(로그 그룹 `/ktc4/prometheus`) 설치한다. 설정을 바꾼 뒤에도 같은 명령을 다시 돌린다.
+
+```bash
+cd /opt/ktc4/repo && sudo git pull
+sudo bash /opt/ktc4/repo/deploy/cloudwatch-agent/install.sh
+systemctl status amazon-cloudwatch-agent --no-pager   # Memory: 줄로 Agent 사용량을 본다
+sudo tail -n 50 /opt/aws/amazon-cloudwatch-agent/logs/amazon-cloudwatch-agent.log
+```
+
+| 지표 | 네임스페이스 | 차원 |
+| --- | --- | --- |
+| `mem_used_percent` | `CWAgent` | `InstanceId` |
+| `disk_used_percent` (`/`만) | `CWAgent` | `InstanceId`, `path`, `fstype` |
+| `hikaricp_connections_pending`, `jvm_memory_used_bytes`(heap), `executor_queued_tasks`(judgmentRunExecutor) | `ktc4/backend` | `job=ktc4-backend` |
+
+- 앱 지표는 백엔드가 `127.0.0.1:8080/actuator/prometheus`를 연 뒤(A2)부터 나온다. 그 전에는 Agent 로그에 연결 실패가 찍히는 게 정상이다.
+- 긁은 값 중 위 3개만 남기고 버린다(`prometheus.yaml`의 `metric_relabel_configs`). 늘리려면 이 규칙과 `config.json`의 `metric_selectors`를 같이 고친다. 지표 하나가 차원 조합마다 따로 과금된다.
+- 설치 뒤 확인: `aws cloudwatch list-metrics --region ap-northeast-2 --namespace CWAgent`와 `--namespace ktc4/backend`.
+
+### 알람 기준
+
+| 알람 | 조건 | 복구 알림 |
+| --- | --- | --- |
+| `ktc4-backend-http-5xx` | 요청 로그 `status >= 500`, 5분에 1건 이상 | 없음 |
+| `ktc4-backend-restarted` | 로그 `Started BackendApplication` 1건 이상. 배포 때도 울린다. | 없음 |
+| `ktc4-ec2-cpu-high` | CPU 80% 이상, 5분 단위 2번 연속 | 있음 |
+| `ktc4-ec2-status-check-failed` | 상태 검사 실패 | 있음 |
+| `ktc4-ec2-memory-high` | 메모리 90% 이상 5분 | 있음 |
+| `ktc4-ec2-disk-high` | 루트 디스크 80% 이상 | 있음 |
+
+- 건수 알람(5xx, 기동)은 건이 없으면 지표가 비어 `OK`로 돌아간다. 복구 알림은 소음이라 보내지 않는다.
+- 5xx 필터는 `status`가 숫자 필드일 때만 걸린다. 백엔드 로그 형식을 바꾸면 실제 로그 한 줄로 필터를 다시 시험한다.
+
+```bash
+aws logs test-metric-filter --region ap-northeast-2 \
+  --filter-pattern '{ $.status >= 500 }' \
+  --log-event-messages '<A1 PR 본문의 500 요청 로그 한 줄>'
+```
+
+- 디스크 알람의 `fstype` 차원은 스택 파라미터 `RootFsType`(기본 `ext4`)다. Agent 설치 뒤 `list-metrics`로 본 값과 다르면 `deploy.sh`를 고쳐 `RootFsType=<값>`을 넘긴다.

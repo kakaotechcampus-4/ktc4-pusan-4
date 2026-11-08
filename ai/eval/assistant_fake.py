@@ -81,6 +81,9 @@ DETAILS = {
     "tx08": ("R-306", "미디어 구독은 개인 여가 성격의 지출로 본다.", [3315]),
 }
 LABELS = {"AVAILABLE": "가능", "UNAVAILABLE": "불가", "NEEDS_REVIEW": "확인 필요"}
+# 같은 해 다른 달 업로드의 접대비(api.md 3.7 limits). 이 업로드에는 접대비가 없어 연도 요약에만 잡힌다.
+ENTERTAINMENT_COUNT = 24
+LIMIT = {"bucket": "접대비", "taxYear": YEAR, "totalAmount": 13006500, "excessAmount": 916500}
 PROGRESS = {
     "batch": {"label": "국민 · 2026-09", "transactionCount": 18},
     "context": {"version": 4, "bookkeeping": "복식부기", "hasEmployee": False},
@@ -180,9 +183,18 @@ class FakeBackend:
             judged = [r for r in self.transactions if r[6]]
             by_verdict = {v: {"count": sum(r[6] == v for r in judged),
                               "finalAmount": sum(r[5] for r in judged if r[6] == v == "AVAILABLE")} for v in LABELS}
+            by_account = [{"account": a, "count": 1, "finalAmount": self._txn(t)[5]} for t, a in ACCOUNTS.items()]
+            total, limits = len(judged), []
+            if "year" in p:
+                # 연도 요약은 접대비를 한도 인정액(한도 전 합계 - 초과액)으로 더한다
+                allowed = LIMIT["totalAmount"] - LIMIT["excessAmount"]
+                available = by_verdict["AVAILABLE"]
+                by_verdict["AVAILABLE"] = {"count": available["count"] + ENTERTAINMENT_COUNT,
+                                           "finalAmount": available["finalAmount"] + allowed}
+                by_account.insert(0, {"account": "접대비", "count": ENTERTAINMENT_COUNT, "finalAmount": allowed})
+                total, limits = total + ENTERTAINMENT_COUNT, [LIMIT]
             return {"scope": {"type": "YEAR" if "year" in p else "BATCH", "id": p.get("batchId")},
-                    "totalCount": len(judged), "byVerdict": by_verdict,
-                    "byAccount": [{"account": a, "count": 1, "finalAmount": self._txn(t)[5]} for t, a in ACCOUNTS.items()]}
+                    "totalCount": total, "byVerdict": by_verdict, "byAccount": by_account, "limits": limits}
         if path.startswith("/statutes/"):
             sid = int(path.rsplit("/", 1)[1])
             return {"statuteVersionId": sid, **STATUTES[sid], "effectiveFrom": "2026-01-01", "effectiveTo": None}

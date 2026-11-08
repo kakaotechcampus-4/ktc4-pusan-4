@@ -795,7 +795,7 @@ export const JUDGMENTS: JudgmentSeed[] = [
     appliedRuleIds: ['R-209'],
     rulesCommitSha: '139f8189',
     userContextVersion: 4,
-    explanation: '소프트웨어 개발업(62010)에서 서비스 운영을 위한 클라우드 사용료는 사업 수행에 직접 대응하는 비용으로, 동일 업종에서 통상적으로 지출됩니다.',
+    explanation: '인적용역 사업자(940909)가 용역 수행에 쓰는 클라우드 사용료는 수입에 직접 대응하는 비용으로, 같은 업종에서 통상적으로 지출됩니다.',
     computedAt: '2026-09-12T14:05:00+09:00',
     citations: [
       {
@@ -1678,7 +1678,8 @@ export const QUESTION_GROUPS: QuestionGroupSeed[] = [
     count: 1,
     totalAmount: 0,
     questionText: '이 요금이 나오는 공간을 사업 전용으로만 쓰나요?',
-    options: ['사업 전용', '자택 겸용']
+    // R-103 v3 (#214). 자택은 작업 공간이 따로 나뉘는지까지 묻는다
+    options: ['사업 전용', '자택 겸용(작업 공간이 따로 나뉨)', '자택 겸용(따로 나뉘지 않음)']
   },
   {
     // R-311_주말음식점. 불가인데 질문이 남는 소명 대기다. 일괄 답변 대상에서 빼야 한다(rule-card-fields.md)
@@ -1723,7 +1724,12 @@ export const QUESTION_ANSWER_VERDICT: Record<string, Record<string, Verdict>> = 
   'transaction:0199c8f2-0000-7000-8000-00000000001017': { 업무용: 'AVAILABLE', 개인: 'UNAVAILABLE' },
   'transaction:0199c8f2-0000-7000-8000-00000000001006': { 업무출장: 'AVAILABLE', 개인: 'UNAVAILABLE' },
   'merchant:SK텔레콤': { 전용: 'AVAILABLE', 공용: 'NEEDS_REVIEW', 개인: 'UNAVAILABLE' },
-  'merchant:자택 관리비': { '사업 전용': 'AVAILABLE', '자택 겸용': 'NEEDS_REVIEW' },
+  // 나뉘면 가능 + 문진의 작업 공간 면적 비율로 안분, 나뉘지 않으면 세무사 판단(확인 필요)
+  'merchant:자택 관리비': {
+    '사업 전용': 'AVAILABLE',
+    '자택 겸용(작업 공간이 따로 나뉨)': 'AVAILABLE',
+    '자택 겸용(따로 나뉘지 않음)': 'NEEDS_REVIEW'
+  },
   'transaction:0199c8f2-0000-7000-8000-00000000001016': { 업무미팅: 'AVAILABLE', 개인: 'UNAVAILABLE' },
   'transaction:0199c8f2-0000-7000-8000-00000000001004': { '월 단위 결제': 'AVAILABLE', '연간 일시불': 'NEEDS_REVIEW' }
 };
@@ -1776,9 +1782,12 @@ export const QUESTION_CARDS: Record<string, QuestionCard> = {
   },
   'merchant:자택 관리비': {
     ruleCardId: 'R-103',
-    ruleCardVersion: 1,
+    ruleCardVersion: 3,
     citations: [1418, 1435],
-    options: { '사업 전용': { account: '수도광열비' } }
+    options: {
+      '사업 전용': { account: '수도광열비' },
+      '자택 겸용(작업 공간이 따로 나뉨)': { account: '수도광열비', attributes: { 안분: '작업공간비율' } }
+    }
   },
   'transaction:0199c8f2-0000-7000-8000-00000000001004': {
     ruleCardId: 'R-107',
@@ -1798,7 +1807,7 @@ export const CLASSIFICATION_REVIEWS: ClassificationReview[] = [
   merchantRaw: 'ELEVENLABS IO',
   merchantNorm: '미확인 가맹점',
   status: { code: 'PENDING', label: '대기' },
-  suggestedCategories: ['해외SaaS', '구독서비스', '기타'],
+  suggestedCategories: ['해외SaaS', '구독서비스', '국내SW'],
   createdAt: '2026-09-12T13:58:09+09:00',
   resolvedAt: null
 },
@@ -1809,7 +1818,7 @@ export const CLASSIFICATION_REVIEWS: ClassificationReview[] = [
   merchantRaw: 'XYZ PAYMENTS',
   merchantNorm: 'XYZ PAYMENTS',
   status: { code: 'PENDING', label: '대기' },
-  suggestedCategories: ['해외SaaS', '온라인쇼핑', '기타'],
+  suggestedCategories: ['해외SaaS', '온라인쇼핑', '국내SW'],
   createdAt: '2026-09-12T13:58:10+09:00',
   resolvedAt: null
 },
@@ -1820,7 +1829,8 @@ export const CLASSIFICATION_REVIEWS: ClassificationReview[] = [
   merchantRaw: '(주)케이지이니시스',
   merchantNorm: 'KG이니시스',
   status: { code: 'PENDING', label: '대기' },
-  suggestedCategories: ['PG_미상', '온라인쇼핑', '기타'],
+  // 결제대행사라 모델이 답을 거절한 경우. 후보가 없으면 빈 배열이다(#209)
+  suggestedCategories: [],
   createdAt: '2026-09-12T13:58:11+09:00',
   resolvedAt: null
 },
@@ -1831,7 +1841,7 @@ export const CLASSIFICATION_REVIEWS: ClassificationReview[] = [
   merchantRaw: 'PADDLE.NET* CURSOR AI',
   merchantNorm: 'Paddle',
   status: { code: 'PENDING', label: '대기' },
-  suggestedCategories: ['해외SaaS', '국내SW', '기타'],
+  suggestedCategories: ['해외SaaS', '국내SW', '구독서비스'],
   createdAt: '2026-09-12T13:58:12+09:00',
   resolvedAt: null
 },
@@ -1842,7 +1852,7 @@ export const CLASSIFICATION_REVIEWS: ClassificationReview[] = [
   merchantRaw: 'PADDLE.NET* RAYCAST',
   merchantNorm: 'Paddle',
   status: { code: 'PENDING', label: '대기' },
-  suggestedCategories: ['해외SaaS', '국내SW', '기타'],
+  suggestedCategories: ['해외SaaS', '국내SW', '구독서비스'],
   createdAt: '2026-09-12T13:58:14+09:00',
   resolvedAt: null
 },
@@ -1853,7 +1863,7 @@ export const CLASSIFICATION_REVIEWS: ClassificationReview[] = [
   merchantRaw: 'PADDLE.NET* TABLEPLUS',
   merchantNorm: 'Paddle',
   status: { code: 'PENDING', label: '대기' },
-  suggestedCategories: ['해외SaaS', '국내SW', '기타'],
+  suggestedCategories: ['해외SaaS', '국내SW', '구독서비스'],
   createdAt: '2026-09-12T13:58:15+09:00',
   resolvedAt: null
 }];
@@ -1866,7 +1876,7 @@ export const RULE_CANDIDATES: RuleCandidate[] = [
 {
   id: 1,
   merchantCategory: '수리비',
-  industryCode: '62010',
+  industryCode: '940909',
   distinctUsers: 7,
   occurrenceCount: 23,
   suggestedDocs: [
@@ -1887,7 +1897,7 @@ export const RULE_CANDIDATES: RuleCandidate[] = [
   '# id 와 effective_period.start 는 승인 시점에 박는다(기본은 소급 적용 안 함).\n' +
   'id: TODO\nversion: 1\ngate: G3\npriority: 50\n' +
   'effective_period: { start: TODO, end: null }\n' +
-  'match:\n  category: [수리비]\n  industry: ["62010"]\n' +
+  'match:\n  category: [수리비]\n  industry: ["940909"]\n' +
   'verdict: 확인필요\n' +
   'citations:\n  - { id: 소득세법-27-1, verified: true }\n  - { id: 소득세법시행령-55-1-7, verified: true }\n' +
   'review: { by: 미검수, date: 2026-10-13 }\n',
@@ -1899,7 +1909,7 @@ export const RULE_CANDIDATES: RuleCandidate[] = [
 {
   id: 2,
   merchantCategory: '전문가수수료',
-  industryCode: '62010',
+  industryCode: '940909',
   distinctUsers: 5,
   occurrenceCount: 9,
   suggestedDocs: [
@@ -1914,7 +1924,7 @@ export const RULE_CANDIDATES: RuleCandidate[] = [
   '# 자동 생성 초안이다. 세무 검수 전이고 아직 카드가 아니다.\n' +
   'id: TODO\nversion: 1\ngate: G3\npriority: 50\n' +
   'effective_period: { start: TODO, end: null }\n' +
-  'match:\n  category: [전문가수수료]\n  industry: ["62010"]\n' +
+  'match:\n  category: [전문가수수료]\n  industry: ["940909"]\n' +
   'verdict: 가능\naccount: 지급수수료\n' +
   'citations:\n  - { id: 소득세법-27-1, verified: true }\n' +
   'review: { by: 미검수, date: 2026-10-13 }\n',
@@ -1926,7 +1936,7 @@ export const RULE_CANDIDATES: RuleCandidate[] = [
 {
   id: 3,
   merchantCategory: '미용',
-  industryCode: '62010',
+  industryCode: '940909',
   distinctUsers: 4,
   occurrenceCount: 11,
   suggestedDocs: [],
@@ -1940,7 +1950,7 @@ export const RULE_CANDIDATES: RuleCandidate[] = [
 {
   id: 4,
   merchantCategory: '여가',
-  industryCode: '62010',
+  industryCode: '940909',
   distinctUsers: 6,
   occurrenceCount: 14,
   suggestedDocs: [
@@ -1955,7 +1965,7 @@ export const RULE_CANDIDATES: RuleCandidate[] = [
   '# 자동 생성 초안이다. 세무 검수 전이고 아직 카드가 아니다.\n' +
   'id: TODO\nversion: 1\ngate: G2\npriority: 50\n' +
   'effective_period: { start: TODO, end: null }\n' +
-  'match:\n  category: [여가]\n  industry: ["62010"]\n' +
+  'match:\n  category: [여가]\n  industry: ["940909"]\n' +
   'verdict: 불가\n' +
   'citations:\n  - { id: 소득세법-33-1-13, verified: true }\n' +
   'review: { by: 미검수, date: 2026-10-06 }\n',
@@ -1970,8 +1980,8 @@ export const RULE_CANDIDATES: RuleCandidate[] = [
  * 고정비(통신·수도광열)는 A 이어받기, 건별 용도와 해외 SaaS 기간은 B 이력만, 소명 대기는 C 다
  */
 export const QUESTION_SUGGESTIONS: QuestionSuggestion[] = [
-{ groupKey: 'merchant:SK텔레콤', factType: '전용여부', tier: 'A', value: '전용', sourceLabel: '2025년 12월 업로드(국민)' },
-{ groupKey: 'merchant:자택 관리비', factType: '공간전용여부', tier: 'A', value: '자택 겸용', sourceLabel: '2025년 12월 업로드(국민)' },
+{ groupKey: 'merchant:SK텔레콤', factType: '전용여부', tier: 'A', value: '전용', sourceLabel: '12월 업로드(국민)' },
+{ groupKey: 'merchant:자택 관리비', factType: '공간전용여부', tier: 'A', value: '자택 겸용(작업 공간이 따로 나뉨)', sourceLabel: '12월 업로드(국민)' },
 {
   groupKey: 'transaction:0199c8f2-0000-7000-8000-00000000001004',
   factType: '기간',

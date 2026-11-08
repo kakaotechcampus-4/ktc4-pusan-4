@@ -29,7 +29,7 @@ flowchart TD
     subgraph SERVER["서버 (분류)"]
         S1{"PG 블록리스트?"}
         S2["merchant_dict 조회 (개인 먼저, 없으면 전역)"]
-        S3["업종코드 매핑 → 웹검색 → 모델 분류 → 미분류 출구"]
+        S3["키워드 룰 → 분류 모델(AI 서버) → 미분류 + 분류 확인(모델 후보 3개)"]
         S4["natural_key 중복차단 upsert"]
         S1 -->|"PG 해당"| ASKC["되묻기: 이 지출이 무엇인지"]
         S1 -->|"통과"| S2 --> S3 --> S4
@@ -123,7 +123,7 @@ flowchart TD
         LAW -->|"law_sync.py"| SV -->|"reindex.py · chunk + embed"| LC
     end
 
-    subgraph EXTRACT["규칙 후보 추출 · candidates.py (주 1회 배치, 자동, 후보당 LLM 3회)"]
+    subgraph EXTRACT["규칙 후보 추출 · candidates.py (주 1회 EC2 timer, 자동, 후보당 LLM 3회)"]
         AGG["① 집계 (SQL)<br/>unmatched_log(RULE_NOT_FOUND)<br/>merchant_category × industry_code<br/>distinct_users ≥ 2 로 자르고, 빈도는 상위 N 정렬에만 쓴다<br/>이미 후보 행이 있는 조합은 건너뛴다"]
         PLAN["② 질의 작성 (에이전트 ①)<br/>SearchPlan: 의미질의 + 정확일치 키워드"]
         SEARCH["③ 4개 위계 동시 검색 (코드)<br/>법령 · 행정규칙 · 심판례해석 · 판례 각 top-k<br/>하이브리드: 벡터 + LIKE(pg_bigm) → RRF<br/>법령은 조 단위로 뽑아 형제 잎까지 라벨을 붙여 넘긴다<br/>임베딩 호출은 여기 한 번뿐"]
@@ -137,8 +137,8 @@ flowchart TD
     end
 
     subgraph HUMAN["사람 검수 후 git 반영 (수동)"]
-        ADMIN["관리자 페이지에서 세무 검수자 승인<br/>(효력기간 시작 확정, 소급 안 함)"]
-        PR["GitHub PR 자동 생성"]
+        ADMIN["관리자 페이지에서 세무 검수자 승인<br/>(효력기간 시작 = 승인일, 소급 안 함)"]
+        PR["승인 후보를 주 1회 모아 GitHub PR 1개 · promote.py"]
         CI["CI: 평가셋 전건 회귀 + 충돌 검사"]
         CARDS["rules/cards/*.yaml"]
         ADMIN --> PR --> CI --> CARDS
@@ -156,13 +156,14 @@ flowchart TD
     class CARDS done;
 ```
 
-- **후보는 DB에, 확정된 카드는 git에 둔다.** 에이전트가 초안(`draft_yaml`)까지 자동으로 만들고, 그다음부터는 사람이 맡는다. 세무 검수자가 관리자 페이지에서 승인하면 PR이 자동으로 생성되고, CI 회귀를 통과해야 머지된다. 규칙 승격에는 항상 사람이 개입하며, 승인 시점에 효력기간 시작일을 지정해 **소급 적용하지 않는다.**
+- **후보는 DB에, 확정된 카드는 git에 둔다.** 에이전트가 초안(`draft_yaml`)까지 자동으로 만들고, 그다음부터는 사람이 맡는다. 세무 검수자가 관리자 페이지에서 승인한 후보는 주 1회 모여 PR 하나로 자동으로 올라가고, CI 회귀를 통과해야 머지된다. 규칙 승격에는 항상 사람이 개입하며, 효력기간 시작일을 승인일로 박아 **소급 적용하지 않는다.**
 - **오케스트레이터는 에이전트가 아니라 코드다.** `candidates.py`가 집계부터 적재까지 순서대로 호출하며, 그 흐름에 분기가 없어 모델이 낄 자리가 없다. 후보당 LLM 호출은 정확히 3회다.
 - **RAG는 판정 경로에 쓰지 않는다.** 하이브리드 검색(벡터와 키워드를 RRF로 융합)은 **규칙 카드 초안 생성**에서만 쓴다. 판정 화면의 근거는 규칙 카드에 하드코딩된 조문 ID로 DB에서 직접 조회한다. LLM이 조문 문자열을 지어내지 않는다.
 - **위계는 검색 순서가 아니라 초안 검증에서 지킨다.** 검색은 네 위계를 동시에 뒤지고 `doc_type` 가중치도 조기 종료도 없다. 순차 탐색을 버린 이유는 조기 종료가 결국 LLM의 "이 정도면 됐다" 판단이 되고, 법령에서 끊으면 심판례의 반례를 영영 못 보기 때문이다. 대신 확정 결론이 하위 근거(훈령·심판례·해석례·판례)만으로 서 있으면 `needs_review`가 `status='보류'`로 빼 사람이 먼저 보게 한다. **거부가 아니라 우선순위 표시다.** 실재하지 않는 조문 ID와 원문에 없는 인용문은 그와 별개로 코드가 막는다. 자세한 내용은 `CONTEXT.md`의 §9.5(규칙 후보 추출)와 §10(RAG)에 있다.
 - **원문과 검색 사본을 나눈 이유.** `statute_version`은 버전 이력을 그대로 쌓는 원문이고 임베딩이 없다. `legal_chunk`는 검색용 사본이라 임베딩과 pg_bigm 인덱스를 달고, 심판례의 기각된 '주장' 섹션을 빼고, 임베딩 상한을 넘으면 쪼갠다. **랭킹은 잎 청크(호 단위)로 해야 정확한데, 항의 88%가 다른 조문을 참조해서 호 하나만 모델에 넘기면 "제2항에도 불구하고"의 제2항을 못 본다.** 그래서 법령은 조 단위로 상위 k개를 고르고 그 조의 잎을 각자 라벨을 붙여 넘긴다(`search.pick`). 잎 합계가 8,000자를 넘는 긴 조는 순위에 든 잎 3개만 넘긴다. 같은 조의 반복 머리말(조 제목·항 도입문)은 첫 라벨 위에 라벨 없이 한 번만 찍고, 머리말만 인용하면 반려한다. 첫 라벨 아래 두었더니 33조 머리말을 1호 문장으로 인용해 G1 오판이 됐다. 인용은 라벨마다 제 본문으로만 검증하므로 형제 호 문구를 엉뚱한 호 ID로 붙이면 걸린다. 조 전문까지 `legal_chunk`에 넣으면 조와 그 안의 호가 둘 다 검색 후보가 돼 같은 내용이 중복으로 랭킹된다.
 - **27·33조는 검색 대상이 아니라 전제다.** G1은 33조1항의 열거 호, G2는 27조1항 통상성이라 카드 인용의 대부분(키별 51건 중 44건)이 두 조에서 나오는데, 주제 질의로는 수백 위로 밀린다. 그래서 `retrieve()`가 검색 없이 모든 후보 추출에 '기본' 블록으로 붙이고, 어느 호를 인용할지만 모델이 고른다. 33조1항 5호(가사)와 13호(업무무관)는 범위를 시행령 61·78조에 맡기므로 두 시행령도 같이 붙인다. 검색은 이 조들을 건너뛰어 칸을 먹지 않는다. 수치는 `docs/rag-eval.md` §9 · §14.
-- **아직 없는 것.** 배치 트리거(주 1회 cron)가 `.github/workflows/`에 없다 — GH Actions와 EC2 cron 중 미정이고, Actions는 러너 IP가 매번 바뀌어 RDS 화이트리스트를 못 쓴다는 제약이 있다(`CONTEXT.md` §9.1). 관리자 승인 화면과 PR 자동 생성도 미구현이라, **현재 자동으로 도는 구간은 `rule_candidate` 적재까지다.**
+- **트리거는 EC2 systemd timer다.** 일요일 05:00 KST(코퍼스 동기화 뒤)에 `deploy/rule-candidates.sh`가 승인 후보 카드 PR(`pipeline.promote`)과 후보 추출(`pipeline.candidates`)을 차례로 돌리고 결과를 디스코드로 보낸다. GH Actions는 쓰지 않는다. DB가 compose 내부망에만 있어(5432 비공개) 러너가 닿지 않는다. 운영 절차는 `docs/deployment.md` §11.
+- **아직 없는 것.** 관리자 화면에서 초안을 고치는 기능이 없다. 고칠 게 있으면 카드 PR에서 고친다.
 
 ---
 
@@ -170,10 +171,45 @@ flowchart TD
 
 ### 구현 범위
 
-이 문서의 다이어그램은 목표 흐름을 그린 것이고, 일부 단계는 아직 구현 전이다.
+10월 백엔드 구현 계획(`docs/backend_api_plan.md`)의 기본 흐름이 구현 대상이다. 다이어그램 중 아래 "구현하지 않음"은 목표 흐름에만 있다.
 
-- **구현됨**: 룰 로더와 검증, Python 파서·정규화·룰 검증(`tools/`), `rules/*.yaml`.
-- **설계·미착수**: 판정 엔진 `judge()`(G1~G6, 되묻기, 안전 강등), 한도 집계·확정, 판정 영속성, REST 요청·응답 계층, 금액 산정(computeAmount), 서버측 분류(merchant_dict·웹검색·모델 분류, AI 서버), 브라우저 파서(프론트).
+- **구현됨**
+  - 프론트: 카드사 파일 파서(`frontend/src/parser`). 서버는 파싱된 레코드(JSON)만 받는다.
+  - 백엔드: 업로드(Idempotency-Key 포함)·batch 조회·삭제·탈퇴, 정규화와 규칙 분류(PG 차단 → 개인·전역 `merchant_dict` → `keyword_rules.yaml`), 분류 검토·응답, 문진 Context, 판정 run(비동기)·판정 엔진 `judge()`(G1~G6, 되묻기, 안전 강등)·결과 조회, 질문·답변 재판정, override, 거래 제외·포함, 한도 집계, 인증(JWT·리프레시 토큰), 비서 중계, 규칙 후보 관리자 API.
+  - AI 서버: 규칙 후보 추출 파이프라인(적재까지), 비서 에이전트, 미분류 가맹점 분류 모델 호출.
+- **발표 이후로 미룬 것**: 분류 웹 검색, 금액 계산 완전판(여러 해 감가상각·선급비용), 규칙 후보 승인 시 GitHub PR 자동 생성.
+
+### 저장소 결정
+
+업무 데이터는 Postgres, 잃어도 다시 만들 수 있는 짧은 상태는 Redis에 둔다.
+
+| 데이터 | 저장소 | 이유 |
+| --- | --- | --- |
+| Idempotency-Key와 최초 응답 | Postgres (`idempotency_key`) | 업로드의 부작용(batch·거래 저장)과 같은 트랜잭션으로 묶는다. 그래야 "키는 남았는데 batch는 없다" 같은 불일치가 생기지 않는다. batch를 지울 때 키를 `DELETED`로 바꾸는 것도 같은 트랜잭션이다. |
+| 리프레시 토큰 | Redis (`refresh:*`, `user:*:families`) | 업무 데이터와 트랜잭션으로 묶을 필요가 없고, TTL로 만료 토큰이 저절로 정리된다. 잃어도 다시 로그인하면 된다. |
+| 메일 인증 코드·인증 토큰 | Redis (`email-verify:*`) | 수명이 분 단위이고 TTL로 지워진다. 잃으면 인증만 처음부터 다시 한다. |
+| 비서 사용자별 한도 | Redis (`assistant:*`) | 서버가 여러 대여도 같은 한도를 세야 하고, 잃어도 한도가 초기화될 뿐이다. |
+
+리프레시 토큰 저장 규칙:
+
+- 리프레시 토큰은 userId와 로그인 단위 식별자(familyId)를 담은 JWT다. Redis에서 키가 지워진 뒤에도 누구의 토큰인지 알 수 있어야 하기 때문이다.
+- `refresh:{familyId}` → `{ userId, tokenHash }`, TTL은 리프레시 토큰 수명이다. `user:{userId}:families` → familyId Set으로, 탈퇴 때 한 번에 지우는 데 쓴다. 로그인·재발급 때 Set의 TTL도 늘린다.
+- 토큰 원문 대신 해시를 저장한다.
+- 재발급(rotation)은 Lua 스크립트 하나로 원자적으로 처리한다. 저장된 해시와 같으면 새 토큰 해시로 바꾸고, 다르면 이미 쓴 토큰을 다시 쓴 것으로 보고 그 family를 지운다(그 로그인만 끊긴다).
+- 여러 탭이 같은 쿠키로 동시에 재발급하면 뒤의 요청이 재사용으로 판단된다. 서버 유예 시간을 두지 않고, 프론트가 `navigator.locks`로 탭 사이 재발급을 하나로 묶기로 했다(#178). 서버가 토큰을 바꾼 뒤 응답이 유실되는 경우만 남는데, 실제로 보이면 서버 유예를 더한다.
+- AOF를 켜서 재배포해도 모든 사용자가 로그아웃되지 않게 한다. EC2 메모리가 4GB라 `maxmemory`는 128MB다(`docs/deployment.md` 8절).
+
+### 서버측 분류
+
+업로드한 거래는 PG 블록리스트 → `merchant_dict`(개인 먼저, 없으면 전역) → `keyword_rules.yaml` 순서로 백엔드가 분류한다.
+여기서도 못 잡은 가맹점만 모아 AI 서버 `POST /classify/merchants`에 한 번 묻고, AI 서버는 GPT-6 Luna의 `/decisions`로 답한다.
+모델 호출은 DB 트랜잭션 밖에서 하고, 시간 초과·실패·기능 꺼짐이면 모델 없이 업로드한다.
+
+- **분류 확인**: 모델이 답한 가맹점도 지금처럼 `미분류` + 분류 확인이고, 모델 후보를 최대 3개 `suggestedCategories`로 보여 준다(`api.md` §3.5).
+- **확정하지 않는다**: 가장 엄격한 기준에서도 실험 정밀도가 91%라 서비스 신뢰 기준에 못 미친다. 카테고리는 항상 사용자가 고른다.
+- 모델 답은 `merchant_dict`에 쓰지 않고 `merchant_model_decision`에만 남긴다. 사전은 사용자가 분류 확인에 답할 때만 바뀐다.
+
+기준을 정한 실험은 `docs/category_decision_eval.md`, 결정 기록은 `docs/backend_api_plan.md` B10에 있다.
 
 ### natural_key (중복 방지 키)
 
@@ -193,10 +229,10 @@ flowchart TD
 - **탈퇴**: `app_user`를 지우면 사용자 소유 행(문진 Context, batch와 위의 파생 행, UserFact, 개인 `merchant_dict`, 한도 배분)이 지워진다.
 - **남는 것**: 공용 `statute_version`, 전역 `merchant_dict`(`user_id IS NULL`), `rule_candidate`. 앞의 둘은 사용자 데이터가 아니고, `rule_candidate`는 사용자 FK 없이 집계만 담는다.
 - **소유 FK만 CASCADE다.** 소유 경로는 batch → 거래 → 판정, batch → run, 사용자 → batch 같은 것이다. revision을 직접 지우는 경로는 없고(append-only), 판정은 거래를 거쳐서만 지워진다.
-- **참조 FK는 지우지 않고 막는다.** 판정의 origin 4개(`run_id` 등), run의 `context_id`, override의 `source_judgment_id`, 질문의 `answered_fact_id`가 여기에 해당한다(NO ACTION).
+- **참조 FK는 지우지 않고 막는다.** 판정의 origin 4개(`run_id` 등), run의 `context_id`, override의 `source_judgment_id`, 질문의 `answered_fact_id`, 거래의 `current_judgment_id`가 여기에 해당한다(NO ACTION).
   - 참조까지 CASCADE면 잘못 이어진 참조 하나가 다른 batch의 이력을 조용히 지운다. 예를 들어 다른 batch의 run을 가리키는 판정이 있으면, 그 batch를 지울 때 이 판정까지 사라진다.
   - 막아 두면 그런 삭제는 실패하고 데이터가 남는다.
-  - override의 `source_judgment_id`는 `(source_judgment_id, transaction_id)` 쌍으로 판정을 가리킨다. 다른 거래의 판정을 원래 판정으로 둘 수 없다.
+  - override의 `source_judgment_id`는 `(source_judgment_id, transaction_id)` 쌍으로 판정을 가리킨다. 다른 거래의 판정을 원래 판정으로 둘 수 없다. 거래의 `current_judgment_id`도 `(current_judgment_id, id)` 쌍으로 같은 거래의 판정만 가리킨다.
 - **참조 FK는 커밋 때 검사한다**(`DEFERRABLE INITIALLY DEFERRED`). 즉시 검사하면 탈퇴처럼 여러 경로로 함께 지워질 때 순서에 따라 실패한다. 예를 들어 사용자 → UserFact가 batch → 거래 → 판정보다 먼저 지워지면 아직 남은 판정에 걸린다.
 - `answered_fact_id`를 SET NULL로 두지 않은 건 "ANSWERED면 답변 fact 필수" CHECK와 부딪히기 때문이다.
 
@@ -210,6 +246,7 @@ flowchart TD
 
 - **대상은 만들 때 고정한다.** 판정대상이면서 분류 완료인 거래를 `judgment_run_item`에 PENDING으로 넣는다. 그래서 실행 중에 사용자가 거래를 제외해도 `totalCount`와 처리 대상이 어긋나지 않는다.
 - **실행은 커밋 뒤에 시작한다**(`@TransactionalEventListener`). 커밋 전에 시작하면 다른 스레드가 아직 보이지 않는 run을 읽는다.
+- **한 batch에 진행 중인 run은 하나다**(`409 RUN_ALREADY_ACTIVE`, api.md 3.6). 두 run이 같은 거래를 동시에 판정하면 늦게 쓴 쪽이 최신이 되어 문진이 다른 결과가 섞인다(#187). 만들 때 사용자 락을 잡고 진행 중인 run을 조회한다. DB 부분 유니크 인덱스는 쓰지 않았다. 마지막 진행 뒤 5분 지난 run을 빼는 시간 조건을 인덱스에 넣을 수 없고, 버그 때문에 운영에 이미 겹친 run이 남아 있으면 마이그레이션이 실패한다.
 - **판정 전용 스레드 풀에서 돈다**(`JudgmentRunExecutorConfiguration`, `app.judgment-run`). 워커 하나가 run 하나를 맡으므로 워커 수가 동시에 도는 run의 최대 개수이고, 워커마다 DB 커넥션(Hikari 기본 10개)을 하나 쓴다. 값은 서버 CPU에 따라 달라 운영(`application.yml`, 워커 2·대기열 50)과 로컬 개발(`application-local.yml`, 워커 4·대기열 150)을 따로 둔다. 근거는 각 설정 파일 주석에 있다. 대기열까지 차면 그 run은 바로 `RUN_START_FAILED`로 끝난다. 202는 이미 나갔으므로 사용자는 폴링으로 실패를 보고 다시 실행한다.
 - **거래마다 따로 커밋한다.** 판정 저장과 항목 SUCCEEDED는 한 트랜잭션이다. 판정이 실패하면 그 트랜잭션을 롤백하고, FAILED(`RULE_PROCESSING_FAILED`, 고정 문구)를 새 트랜잭션에 남긴다. 응답으로 나가는 값이라 예외 메시지는 로그에만 남긴다. 한 건의 기술적 실패가 다른 건을 막지 않는다.
 - 판정 결과(`NEEDS_REVIEW` 포함)는 실패가 아니다. 실패는 인용 조문의 `statute_version`이 없는 경우처럼 기술적인 것만 뜻한다.
@@ -230,3 +267,4 @@ flowchart TD
 - [`CONTEXT.md`](../CONTEXT.md): 설계 논의·결정·대안 전체 (단일 원본)
 - [`docs/schema_mapping.md`](./schema_mapping.md): 파서 출력과 transaction 스키마 대조, natural_key 검증
 - [`docs/limit-settlement.md`](./limit-settlement.md): 연간 한도 집계·배분·상태 전이
+- [`docs/deployment.md`](./deployment.md#구조): 운영 서버의 컨테이너 구성과 배포 순서 그림

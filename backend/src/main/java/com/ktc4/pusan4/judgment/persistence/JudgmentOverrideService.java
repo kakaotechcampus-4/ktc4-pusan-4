@@ -8,7 +8,6 @@ import com.ktc4.pusan4.shared.api.ApiException;
 import com.ktc4.pusan4.user.domain.BusinessContext;
 import com.ktc4.pusan4.user.persistence.BusinessContextService;
 import jakarta.persistence.NoResultException;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -72,7 +71,8 @@ public class JudgmentOverrideService {
         // 재판정(JudgmentService.nextRevision)과 같은 거래 락이다. 그사이 현재 판정이 바뀌지 않게 먼저 잡는다.
         TransactionRecordEntity transaction = transactionRepository.findByIdForUpdate(source.transactionId())
             .orElseThrow(NoResultException::new);
-        if (!transaction.judgeable() || !judgmentId.equals(currentJudgmentId(userId, transaction.id()))) {
+        if (!transaction.judgeable()
+            || !judgmentId.equals(transactionRepository.findCurrentJudgmentId(transaction.id()).orElse(null))) {
             throw new ApiException(HttpStatus.CONFLICT, "CONFLICT", "지금 판정이 아니어서 바꿀 수 없습니다.");
         }
 
@@ -89,6 +89,7 @@ public class JudgmentOverrideService {
         UUID revisionId = uuidGenerator.generate();
         judgmentRepository.save(source.overriddenAs(
             revisionId, judgmentRepository.findNextRevision(transaction.id()), toVerdict, overrideId, amount));
+        transactionRepository.pointCurrentJudgment(transaction.id(), revisionId);
         List<Long> versionIds = citationRepository.findRows(List.of(judgmentId)).stream()
             .map(JudgmentCitationRepository.CitationRow::statuteVersionId)
             .toList();
@@ -102,24 +103,23 @@ public class JudgmentOverrideService {
     /**
      * 이미 해제한 수정도 그대로 성공이다. 수정 revision 은 지우지 않는다. 현재 판정이 바뀌므로 한도를 다시 집계한다.
      * 수정(override)이 사용자 락 다음에 수정 행을 고치므로, 여기서도 사용자 락을 먼저 잡는다.
+     * 현재 판정은 override 가 아닌 최신 revision 으로 돌아간다(api.md 3.8). 이미 해제한 수정이면 그대로 둔다
+     * (그 뒤 다른 수정이 활성일 수 있다).
      */
     @Transactional
     public void release(UUID userId, UUID overrideId) {
         limitSettlement.lockUser(userId);
-        overrideRepository.findForUser(overrideId, userId)
+        JudgmentOverrideEntity override = overrideRepository.findForUser(overrideId, userId)
             .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "JUDGMENT_OVERRIDE_NOT_FOUND",
-                "사용자 수정을 찾을 수 없습니다."))
-            .release(OffsetDateTime.now(clock));
+                "사용자 수정을 찾을 수 없습니다."));
+        if (override.active()) {
+            // 재판정(JudgmentService.save)과 같은 거래 락이다. 그사이 새 revision 이 현재 판정을 바꾸지 않게 한다.
+            UUID transactionId = override.transactionId();
+            transactionRepository.findByIdForUpdate(transactionId).orElseThrow(NoResultException::new);
+            override.release(OffsetDateTime.now(clock));
+            transactionRepository.pointCurrentJudgment(transactionId,
+                judgmentRepository.findLatestAutomaticId(transactionId).orElseThrow(NoResultException::new));
+        }
         limitSettlement.settleProvisional(userId);
-    }
-
-    /** 현재 판정(api.md §5). 판정 목록의 "현재 판정" 조건을 그대로 쓴다. */
-    private UUID currentJudgmentId(UUID userId, UUID transactionId) {
-        return judgmentRepository.findPage(userId, transactionId, null, null, null, null, null, false,
-                PageRequest.of(0, 1))
-            .stream()
-            .map(JudgmentEntity::id)
-            .findFirst()
-            .orElse(null);
     }
 }
