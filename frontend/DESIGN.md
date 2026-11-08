@@ -133,6 +133,7 @@
 ```
 - `variant`: `primary`(파란 알약) · `secondary`(테두리 알약) · `soft`(연회색) · `ghost`(밑줄 친 텍스트 링크) · `danger`(빨강)
 - `danger` 는 **되돌릴 수 없는 동작에만**, 한 화면에 하나. 그런 동작은 항상 `Modal` 로 한 번 더 묻는다.
+  - 지금은 내 정보의 탈퇴하기와 그 확인 버튼뿐이다(11/8 회의). 업로드 지우기 같은 다른 지우기는 `secondary` 로 열고 `Modal` 에서 묻는다.
 - `size`: `sm` 헤더·표 안(36px) · `md` 폼과 화면의 주 버튼(48px) · `lg` 랜딩 CTA(56px) · `inline` 문장 속 링크(ghost 전용)
 - **모양은 알약 하나, 높이는 이 셋뿐이다.** 화면에서 `rounded-xl`·`h-*`·`disabled:bg-line` 으로 버튼을 따로 만들지 않는다. 폼 제출은 `<Button type="submit">`, 꽉 채우려면 `className="w-full"`.
 - 막힌 버튼은 모든 variant 가 `opacity-40` 하나다. 회색으로 바꾸거나 다른 불투명도를 쓰지 않는다.

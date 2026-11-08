@@ -125,9 +125,9 @@ export function Account() {
             탈퇴하면 계정과 함께 올린 카드내역과 거래, 판정 결과, 질문과 답변, 사업자 문진이 모두
             사라집니다. 되돌릴 수 없습니다.
           </p>
-          {/* 빨강은 판정과 오류에만 쓴다. 다른 지우기(업로드 삭제)처럼 칠하지 않는다 */}
+          {/* 계정을 지우는 것은 되돌릴 수 없어 빨강이다(11/8 회의). 확인 창에서 한 번 더 묻는다 */}
           <Button
-            variant="secondary"
+            variant="danger"
             size="md"
             className="mt-4"
             disabled={!me}
@@ -159,7 +159,7 @@ export function Account() {
                 취소
               </Button>
               <Button
-              variant="primary"
+              variant="danger"
               size="md"
               disabled={removing}
               onClick={() => void remove()}>
