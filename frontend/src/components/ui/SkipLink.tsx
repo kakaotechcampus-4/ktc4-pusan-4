@@ -16,7 +16,7 @@ export function SkipLink() {
         main.focus();
         main.scrollIntoView();
       }}
-      className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-full focus:bg-ink focus:px-4 focus:py-2 focus:text-small focus:font-bold focus:text-white">
+      className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-full focus:bg-accent focus:px-4 focus:py-2 focus:text-small focus:font-bold focus:text-white">
 
       본문 바로가기
     </a>);
