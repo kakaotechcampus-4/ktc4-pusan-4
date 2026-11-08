@@ -12,6 +12,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
@@ -26,6 +27,10 @@ import java.util.stream.Collectors;
 
 /**
  * 확인 질문 조회 (api.md 3.9).
+ *
+ * <p>조회는 질문, 거래, 답, 수정 여부를 쿼리 여러 번으로 나눠 읽는다. 기본 격리(READ COMMITTED)면 쿼리마다 그 순간
+ * 커밋된 것을 봐서, 사이에 업로드 삭제가 커밋되면 질문은 있는데 거래가 없어 실패했다(2026-11-08 운영 500).
+ * 그래서 읽기는 REPEATABLE READ 로 트랜잭션 첫 쿼리 시점의 스냅샷 하나를 끝까지 본다. 읽기 전용이라 잠금이나 직렬화 실패는 없다.
  */
 @Service
 public class QuestionQueryService {
@@ -54,7 +59,7 @@ public class QuestionQueryService {
      * 지금 판정 대상인 본인 거래에 걸린 질문을 상태와 상관없이 모두 돌려준다. 정렬: createdAt ASC, id ASC.
      * 묶기(grouped)와 내보내기처럼 전부가 필요한 곳이 쓴다. 목록 한 쪽은 {@link #page} 를 쓴다.
      */
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public List<Question> find(UUID userId, UUID batchId, UUID transactionId) {
         List<QuestionRow> rows = questionRepository.findRows(userId, batchId, transactionId);
         Set<UUID> withPending = rows.stream()
@@ -68,7 +73,7 @@ public class QuestionQueryService {
      * {@link #find} 와 같은 조건에 status 를 더한 한 쪽. 그 쪽의 질문만 거래, 답, 수정 여부를 붙인다.
      * 전부 읽어 메모리에서 자르면 끝까지 읽는 화면이 쪽 수만큼 전체를 다시 읽는다.
      */
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Page<Question> page(UUID userId, UUID batchId, UUID transactionId, QuestionStatus status, int page, int size) {
         Page<QuestionRow> rows = questionRepository.findRowsPage(userId, batchId, transactionId,
             status == null ? null : status.name(), PageRequest.of(page, size));
@@ -80,7 +85,7 @@ public class QuestionQueryService {
      * 묶음 목록(grouped=true)의 한 쪽. 그룹 순서는 질문 전부로 정해지므로 묶기와 순서에 쓰는 값만 전부 읽고,
      * 고른 쪽의 그룹에 든 질문에만 거래, 답, 수정 여부를 붙인다.
      */
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Page<QuestionGroup> groupPage(
         UUID userId, UUID batchId, UUID transactionId, QuestionStatus status, int page, int size
     ) {
@@ -101,14 +106,14 @@ public class QuestionQueryService {
     }
 
     /** 미해소 집계 (api.md 3.9). {@link #find} 와 같은 조건의 PENDING 질문 수와 그 거래들의 결제 금액 합이다. */
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public PendingTotal unresolved(UUID userId, UUID batchId, UUID transactionId) {
         PendingCount pending = questionRepository.countPending(userId, batchId, transactionId);
         return new PendingTotal(Math.toIntExact(pending.count()), pending.amount() == null ? 0L : pending.amount());
     }
 
     /** 주어진 거래 가운데 답하지 않은 질문이 남은 거래. */
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Set<UUID> pendingTransactionIds(Collection<UUID> transactionIds) {
         return new HashSet<>(questionRepository.findPendingTransactionIds(Set.copyOf(transactionIds)));
     }

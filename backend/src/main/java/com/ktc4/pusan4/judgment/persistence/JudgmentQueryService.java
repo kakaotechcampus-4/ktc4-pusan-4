@@ -21,6 +21,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
@@ -35,6 +36,9 @@ import java.util.stream.Collectors;
 
 /**
  * 판정 조회 (api.md 3.7). 저장은 {@link JudgmentService} 가 한다.
+ *
+ * <p>조회는 판정, 거래, 인용을 쿼리 여러 번으로 나눠 읽는다. 사이에 업로드 삭제가 커밋돼도 한 시점을 보도록
+ * 읽기는 REPEATABLE READ 다({@link QuestionQueryService} 와 같은 이유).
  */
 @Service
 public class JudgmentQueryService {
@@ -62,14 +66,14 @@ public class JudgmentQueryService {
         this.contextService = contextService;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public JudgmentRevision get(UUID userId, UUID judgmentId) {
         JudgmentEntity judgment = judgmentRepository.findForUser(judgmentId, userId)
             .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "JUDGMENT_NOT_FOUND", "판정을 찾을 수 없습니다."));
         return toDomain(List.of(judgment)).getFirst();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Page<JudgmentRevision> list(UUID userId, JudgmentListQuery query, int page, int size) {
         Page<JudgmentEntity> judgments = judgmentRepository.findPage(userId, query, PageRequest.of(page, size));
         return new PageImpl<>(toDomain(judgments.getContent()), judgments.getPageable(), judgments.getTotalElements());
@@ -83,7 +87,7 @@ public class JudgmentQueryService {
      * finalAmount 합이고, 초과액은 {@link #limits} 로 따로 준다.
      * 과거 Run 도 finalAmount 그대로다. 한도 항목은 지금 상태만 남아 그 Run 시점의 인정액이 아니다.
      */
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public JudgmentSummary summary(UUID userId, UUID batchId, Integer year, UUID runId) {
         JudgmentListQuery query = new JudgmentListQuery(null, batchId, year, null, true, runId, null, Sort.COMPUTED_AT);
         Map<UUID, Long> limitAllowed = year == null ? Map.of() : limitAllowedAmounts(userId);
@@ -98,7 +102,7 @@ public class JudgmentQueryService {
      * 주어진 거래 가운데 답하지 않은 질문이 남은 거래. 판정 응답의 답변 대기 표지(awaitingAnswer)를 만든다.
      * 거래 id 는 부르는 쪽이 이미 사용자 범위로 읽은 판정에서 온다.
      */
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Set<UUID> pendingQuestionTransactionIds(Collection<UUID> transactionIds) {
         return questionQueryService.pendingTransactionIds(transactionIds);
     }
@@ -109,7 +113,7 @@ public class JudgmentQueryService {
      * 배분 순서로만 정해지고 법이 정하지 않아서다(#15). 그해 초과액은 {@link #limits} 가 준다.
      * 파일(CSV) 변환은 FE 가 한다.
      */
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public List<JudgmentExportRow> export(UUID userId, UUID batchId, Integer year) {
         JudgmentListQuery query = new JudgmentListQuery(null, batchId, year, null, true, null, null, Sort.COMPUTED_AT);
         List<JudgmentRevision> judgments = toDomain(judgmentRepository.findPage(userId, query, Pageable.unpaged()).getContent());
@@ -148,7 +152,7 @@ public class JudgmentQueryService {
      * batchId·year 범위에 접대비 판정이 있는 과세연도마다 한도 합계와 초과액 (api.md 3.7 limits). 과세연도 순이다.
      * 한도는 사용자의 한 해 전체 기준이라, batchId 범위여도 그해의 다른 batch 까지 합친 값이다. runId 범위는 없다.
      */
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public List<LimitYearTotal> limits(UUID userId, UUID batchId, Integer year) {
         if (batchId == null && year == null) {
             return List.of();
