@@ -327,7 +327,7 @@ export function Signup() {
         회원가입
       </h1>
 
-      <KakaoStart from={from ?? '/'} label="카카오로 시작하기" divider="또는 이메일로 가입" disabled={busy} />
+      <KakaoStart from={from ?? '/'} label="카카오로 시작하기" divider="또는 이메일로" disabled={busy} />
 
       <ol className="mt-6 flex gap-2 text-[12px]" aria-label="가입 단계">
         {['이메일 인증', '코드 확인', '비밀번호'].map((label, index) =>

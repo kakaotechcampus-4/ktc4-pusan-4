@@ -115,7 +115,7 @@ export function Login() {
         </p>
       }
 
-      <KakaoStart from={from} label="카카오로 계속하기" divider="또는 이메일로 로그인" disabled={busy} />
+      <KakaoStart from={from} label="카카오로 계속하기" divider="또는 이메일로" disabled={busy} />
 
       <form onSubmit={submit} noValidate className={kakaoAvailable ? undefined : 'mt-8'}>
         <div className="space-y-3">
