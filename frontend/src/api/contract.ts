@@ -36,6 +36,8 @@ import type {
   QuestionPage,
   UnresolvedPage,
   QuestionResponseRequest,
+  QuestionWithdrawRequest,
+  QuestionWithdrawResult,
   QuestionResponseResult,
   QuestionStatus,
   QuestionSuggestion,
@@ -219,6 +221,8 @@ export interface Api {
     list(query?: QuestionQuery): Promise<QuestionPage<Question>>;
     grouped(query?: QuestionQuery): Promise<QuestionPage<QuestionGroup>>;
     respond(body: QuestionResponseRequest): Promise<QuestionResponseResult>;
+    /** 한 답을 거둔다. 같은 그룹의 질문이 다시 대기가 되고 그 거래를 다시 판정한다 */
+    withdraw(body: QuestionWithdrawRequest): Promise<QuestionWithdrawResult>;
     /** 남은 꼬리 질문을 factType 단위로 한 번에 닫는다 */
     bulkAnswer(body: BulkAnswerRequest): Promise<BulkAnswerResult>;
     /** 다른 업로드에서 같은 질문에 한 답 (명세 3.1, api.md GET /questions/suggestions) */

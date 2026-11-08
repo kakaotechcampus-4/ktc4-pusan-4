@@ -1385,6 +1385,39 @@ const mockGroups: Api = {
         rejudgedTransactionCount: rejudged.length
       });
     },
+    withdraw: ({ questionIds }) => {
+      if (questionIds.length === 0)
+      return Promise.reject(new ApiRequestError(400, 'VALIDATION_ERROR', '거둘 질문을 보내야 합니다.'));
+      const groups = liveGroups();
+      const owners = questionIds.map((id) => groups.find((g) => g.pairs.some((p) => p.questionId === id)));
+      const group = owners[0];
+      if (!group || owners.some((g) => g === undefined))
+      return notFound('QUESTION_NOT_FOUND', '질문을 찾을 수 없습니다.');
+      const { groupKey } = group.seed;
+      // 이미 대기면 바꿀 것이 없다
+      if (!store.answers.has(groupKey)) return delay({ withdrawnCount: 0, rejudgedTransactionCount: 0 });
+      store.answers.delete(groupKey);
+      // 답하기 전처럼 확인 필요로 다시 판정한다. 답할 때와 같은 거래만 다시 판정한다
+      const rejudged = group.pairs.
+      map((p) => p.transaction).
+      filter((t) => isJudgeable(t) && automaticOf(t.id) !== undefined);
+      rejudged.forEach((t) => {
+        const prev = automaticOf(t.id);
+        if (!prev) return;
+        store.judgments.push({
+          ...prev,
+          id: nextId('0199f1c3'),
+          revision: latestOf(t.id).revision + 1,
+          origin: { type: 'USER_FACT', id: factIdOf(groupKey) },
+          verdict: { code: 'NEEDS_REVIEW', label: LABEL.NEEDS_REVIEW },
+          account: null,
+          finalAmount: null,
+          explanation: null,
+          computedAt: now()
+        });
+      });
+      return delay({ withdrawnCount: group.pairs.length, rejudgedTransactionCount: rejudged.length });
+    },
     suggestions: (batchId) => delay({ items: suggestionsIn(batchId) }),
     bulkAnswer: ({ batchId, factType, answer }) => {
       // 이 배치의 PENDING 중 factType 이 같은 질문만 한 번에 닫는다. 새 Run 은 만들지 않는다 (3.11)

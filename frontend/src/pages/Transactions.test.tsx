@@ -153,9 +153,10 @@ describe('거래', () => {
   it('상태 배지는 판정대상이 아닌 행에만 달고, 바꾸는 버튼은 모든 행에 둔다', async () => {
     await render();
     expect(rowOf('스타벅스')?.textContent).not.toContain('판정대상');
-    expect(rowOf('스타벅스')?.textContent).toContain('빼기');
+    const action = (merchant: string) => rowOf(merchant)?.querySelector('button[aria-label]')?.getAttribute('aria-label');
+    expect(action('스타벅스')).toContain('판정 대상에서 빼기');
     expect(rowOf('포인트사용')?.textContent).toContain('대상제외');
-    expect(rowOf('포인트사용')?.textContent).toContain('다시 넣기');
+    expect(action('포인트사용')).toContain('판정 대상에 다시 넣기');
   });
 
   it('올린 파일이 없으면 올리기를 권하고 거래를 묻지 않는다', async () => {

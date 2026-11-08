@@ -7,7 +7,7 @@ import { AccountBreakdown } from '../components/results/AccountBreakdown';
 import { JudgmentAmount } from '../components/results/JudgmentAmount';
 import { categoryLabel, merchantTitle, verdictNote } from '../components/results/display';
 import { VerdictBadge } from '../components/VerdictBadge';
-import { BottomSheet, Button, Empty, FilterBar, Pagination, Table, type Column } from '../components/ui';
+import { BottomSheet, Button, Empty, FilterBar, IconButton, Pagination, Table, type Column } from '../components/ui';
 import { useAssistantSubject } from '../components/assistant/context';
 import { api, useApi } from '../api';
 import { readAll } from '../api/readAll';
@@ -256,10 +256,7 @@ export function Yearly() {
       }
       </div>
       {exported && exported.items.length > 0 &&
-    <Button variant="ghost" size="sm" className="whitespace-nowrap" onClick={exportCsv}>
-          <DownloadIcon className="h-4 w-4" aria-hidden="true" />
-          CSV 내려받기
-        </Button>
+    <IconButton icon={DownloadIcon} label="CSV 내려받기" onClick={exportCsv} />
     }
     </header>;
 

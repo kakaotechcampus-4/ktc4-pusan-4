@@ -1,5 +1,7 @@
 import React from 'react';
+import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import { cn } from './cn';
+import { IconButton } from './IconButton';
 
 export interface Column<T> {
   /** 헤더 문구. 숫자 열은 align: 'right' 와 함께 쓴다 */
@@ -152,25 +154,22 @@ export function Pagination({ page, onChange, note }: PaginationProps) {
         {note ?? `${first}~${last} / ${page.totalElements.toLocaleString('ko-KR')}건`}
       </span>
       <div className="flex items-center gap-2">
-        <button
-          type="button"
+        {/* 다른 그림 버튼(IconButton)과 같은 36px 알약이다 */}
+        <IconButton
+          variant="secondary"
+          icon={ChevronLeftIcon}
+          label="이전 페이지"
           disabled={page.number === 0}
-          onClick={() => onChange(page.number - 1)}
-          className="whitespace-nowrap rounded-lg border border-line px-3 py-1.5 font-normal text-ink transition-colors duration-150 hover:bg-surface disabled:cursor-not-allowed disabled:opacity-40">
-
-          이전
-        </button>
+          onClick={() => onChange(page.number - 1)} />
         <span className="tabular-nums">
           {page.number + 1} / {Math.max(1, page.totalPages)}
         </span>
-        <button
-          type="button"
+        <IconButton
+          variant="secondary"
+          icon={ChevronRightIcon}
+          label="다음 페이지"
           disabled={!page.hasNext}
-          onClick={() => onChange(page.number + 1)}
-          className="whitespace-nowrap rounded-lg border border-line px-3 py-1.5 font-normal text-ink transition-colors duration-150 hover:bg-surface disabled:cursor-not-allowed disabled:opacity-40">
-
-          다음
-        </button>
+          onClick={() => onChange(page.number + 1)} />
       </div>
     </div>);
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { CheckIcon } from 'lucide-react';
+import { CheckIcon, ChevronRightIcon } from 'lucide-react';
 import { SignedUpError, useSession } from '../contexts/SessionContext';
 import { api, ApiRequestError, mockVerificationCode } from '../api';
 import {
@@ -9,7 +9,7 @@ import {
   AUTH_LABEL,
   AuthLayout } from
 '../components/AuthLayout';
-import { Button, Modal } from '../components/ui';
+import { Button, IconButton, Modal } from '../components/ui';
 import { TERMS_EFFECTIVE, TermsBody } from './public/Terms';
 import { PRIVACY_EFFECTIVE, PrivacyBody } from './public/Privacy';
 import { PASSWORD_RULE, passwordProblem } from '../utils/password';
@@ -21,8 +21,6 @@ const RESEND_SECONDS = 60;
 /** 서버는 코드 하나에 5번까지 받고, 5번째로 틀리면 코드를 지운다. 그래도 응답은 「틀림」이라 여기서 센다 (C69) */
 const MAX_CODE_ATTEMPTS = 5;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-/** 약관·처리방침을 여는 「보기」 */
-const DOC_LINK = 'shrink-0 text-[12px] text-ink2 underline underline-offset-4 hover:text-ink';
 
 interface LocationState {
   from?: string;
@@ -509,9 +507,7 @@ export function Signup() {
                 <input id="agree-terms" type="checkbox" checked={agreeTerms} onChange={(event) => setAgreeTerms(event.target.checked)} />
                 [필수] 이용약관 동의
               </label>
-              <button type="button" onClick={() => setDoc('terms')} className={DOC_LINK}>
-                보기
-              </button>
+              <IconButton icon={ChevronRightIcon} label="이용약관 보기" onClick={() => setDoc('terms')} />
             </div>
             <div className="flex items-center gap-2 text-ink2">
               <label htmlFor="agree-privacy" className="flex flex-1 items-center gap-2">
@@ -523,9 +519,7 @@ export function Signup() {
 
                 [필수] 개인정보 수집 및 이용 동의
               </label>
-              <button type="button" onClick={() => setDoc('privacy')} className={DOC_LINK}>
-                보기
-              </button>
+              <IconButton icon={ChevronRightIcon} label="개인정보 수집 및 이용 동의 보기" onClick={() => setDoc('privacy')} />
             </div>
           </fieldset>
           {errorAt('terms')}

@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { PlayIcon } from 'lucide-react';
+import { PencilIcon, PlayIcon, UploadIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { StepEyebrow } from '../components/StepEyebrow';
-import { InfoPanel, InfoRows, PANEL_LINK, PanelFailed, PanelNote } from '../components/InfoPanel';
+import { InfoPanel, InfoRows, PANEL_ICON, PANEL_LINK, PanelFailed, PanelNote } from '../components/InfoPanel';
 import { useSession } from '../contexts/SessionContext';
 import { api, ApiRequestError, useApi } from '../api';
-import { Button } from '../components/ui';
+import { Button, IconButton } from '../components/ui';
 import { uploadName } from '../copy';
 import { formatNumber, formatPeriod } from '../utils/format';
 import { contextRows, isJudgedIndustry } from '../utils/context';
@@ -98,10 +98,12 @@ export function Confirm() {
         <InfoPanel
           title="카드내역"
           action={
-          batchState === 'ready' ?
-          <Link to="/upload" className={PANEL_LINK}>다시 올리기</Link> :
-          batchState === 'none' ?
-          <Link to="/upload" className={PANEL_LINK}>카드내역 올리기</Link> :
+          batchState === 'ready' || batchState === 'none' ?
+          <IconButton
+            to="/upload"
+            icon={UploadIcon}
+            className={PANEL_ICON}
+            label={batchState === 'ready' ? '카드내역 다시 올리기' : '카드내역 올리기'} /> :
           null
           }>
 
@@ -134,10 +136,13 @@ export function Confirm() {
         <InfoPanel
           title="사업자 문진"
           action={
-          contextStatus === 'ready' ?
-          <Link to="/interview" state={FROM_HERE} className={PANEL_LINK}>문진 고치기</Link> :
-          contextStatus === 'none' ?
-          <Link to="/interview" state={FROM_HERE} className={PANEL_LINK}>문진 하기</Link> :
+          contextStatus === 'ready' || contextStatus === 'none' ?
+          <IconButton
+            to="/interview"
+            state={FROM_HERE}
+            icon={PencilIcon}
+            className={PANEL_ICON}
+            label={contextStatus === 'ready' ? '문진 고치기' : '문진 하기'} /> :
           null
           }>
 

@@ -427,6 +427,7 @@ export function JudgmentDetailPanel({
             columns={2}
             value={preset}
             onChange={setPreset}
+            onClear={() => setPreset('')}
             options={REASONS[target].map((text) => ({ value: text, label: text }))} />
 
             <Input

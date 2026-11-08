@@ -7,8 +7,7 @@ import {
   sameContext,
   sameForm,
   saveDraft,
-  savedDraft,
-  withRevenue } from
+  savedDraft } from
 './interviewForm';
 import type { BusinessContext } from '../types/domain';
 
@@ -29,10 +28,10 @@ describe('새 문진 (C1)', () => {
   it('수입금액, 개업일, 기장의무, 자택은 비워 두고 업종과 직원 없음만 고른다', () => {
     expect(formFrom(null)).toEqual({
       industryCode: '940909',
+      knowsRevenue: '',
       revenue: '',
       openDate: '',
       duty: '',
-      dutyChosen: false,
       hasEmployee: false,
       home: '',
       ratio: ''
@@ -42,38 +41,58 @@ describe('새 문진 (C1)', () => {
   it('비어 있으면 저장하지 않고 칸마다 알린다', () => {
     const { errors, body } = checkForm(EMPTY_FORM, TODAY);
     expect(body).toBeNull();
-    expect(Object.keys(errors)).toEqual(['revenue', 'openDate', 'home']);
+    expect(Object.keys(errors)).toEqual(['knowsRevenue', 'openDate', 'home']);
   });
 
-  it('6번만 고르면 수입금액과 개업일이 없어 저장하지 않는다', () => {
+  it('5번만 고르면 수입금액을 아는지와 개업일이 없어 저장하지 않는다', () => {
     const { errors, body } = checkForm({ ...EMPTY_FORM, home: 'no' }, TODAY);
     expect(body).toBeNull();
-    expect(errors).toEqual({ revenue: '직전연도 수입금액을 입력해 주세요.', openDate: '개업일을 입력해 주세요.' });
+    expect(errors).toEqual({ knowsRevenue: '직전연도 수입금액을 아는지 골라 주세요.', openDate: '개업일을 입력해 주세요.' });
   });
 });
 
-describe('수입금액 칸 (C6)', () => {
-  it('숫자만 남기고 앞의 0 을 지운다. 0 하나는 남긴다', () => {
-    expect(revenueDigits('045000000')).toBe('45000000');
-    expect(revenueDigits('83,000,000원')).toBe('83000000');
-    expect(revenueDigits('0')).toBe('0');
-    expect(revenueDigits('')).toBe('');
-    expect(revenueDigits('12345678901234567')).toHaveLength(13);
-  });
+describe('직전연도 수입금액 (11/9)', () => {
+  const base = { ...EMPTY_FORM, openDate: '2025-01-02', home: 'no' as const };
 
-  it('기장의무를 직접 고르기 전에는 수입금액을 따라가고, 지우면 같이 비운다', () => {
-    expect(withRevenue(EMPTY_FORM, '83000000').duty).toBe('복식부기');
-    expect(withRevenue(EMPTY_FORM, '74999999').duty).toBe('간편장부');
-    expect(withRevenue(withRevenue(EMPTY_FORM, '83000000'), '').duty).toBe('');
-  });
-
-  it('직접 고른 기장의무는 수입금액이 바뀌어도 그대로 둔다', () => {
-    const chosen = { ...EMPTY_FORM, duty: '추계' as const, dutyChosen: true };
-    expect(withRevenue(chosen, '90000000').duty).toBe('추계');
+  it('알면 금액을 받고 기장의무는 7,500만 원 기준으로 정한다', () => {
+    expect(checkForm({ ...base, knowsRevenue: 'yes' }, TODAY).errors.revenue).toBe('직전연도 수입금액을 입력해 주세요.');
+    expect(checkForm({ ...base, knowsRevenue: 'yes', revenue: '74999999' }, TODAY).body).toMatchObject({
+      prevYearRevenue: 74_999_999,
+      bookkeepingDuty: '간편장부'
+    });
+    // 아는 경우에는 전에 골라 둔 기장의무를 쓰지 않는다
+    expect(checkForm({ ...base, knowsRevenue: 'yes', revenue: '75000000', duty: '간편장부' }, TODAY).body).toMatchObject({
+      prevYearRevenue: 75_000_000,
+      bookkeepingDuty: '복식부기'
+    });
   });
 
   it('0원도 저장할 수 있다', () => {
-    expect(checkForm({ ...filled, revenue: '0' }, TODAY).body?.prevYearRevenue).toBe(0);
+    expect(checkForm({ ...base, knowsRevenue: 'yes', revenue: '0' }, TODAY).body?.prevYearRevenue).toBe(0);
+  });
+
+  it('모르면 기장의무를 고르고 수입금액은 0원을 보낸다', () => {
+    expect(checkForm({ ...base, knowsRevenue: 'no' }, TODAY).errors.duty).toBe('기장의무를 골라 주세요.');
+    expect(checkForm({ ...base, knowsRevenue: 'no', revenue: '90000000', duty: '간편장부' }, TODAY).body).toMatchObject({
+      prevYearRevenue: 0,
+      bookkeepingDuty: '간편장부'
+    });
+  });
+
+  it('수입금액 칸은 숫자만 남기고 앞의 0 을 지운다. 0 하나는 남긴다', () => {
+    expect(revenueDigits('045000000')).toBe('45000000');
+    expect(revenueDigits('83,000,000원')).toBe('83000000');
+    expect(revenueDigits('0')).toBe('0');
+    expect(revenueDigits('12345678901234567')).toHaveLength(13);
+  });
+
+  it('저장된 문진은 수입금액이 있으면 안다고, 0 이면 모른다고 연다', () => {
+    expect(formFrom(saved)).toMatchObject({ knowsRevenue: 'yes', revenue: '45000000' });
+    expect(formFrom({ ...saved, prevYearRevenue: 0, bookkeepingDuty: '복식부기' })).toMatchObject({
+      knowsRevenue: 'no',
+      revenue: '',
+      duty: '복식부기'
+    });
   });
 });
 
@@ -102,16 +121,20 @@ describe('저장된 문진', () => {
     expect(sameContext({ ...body, prevYearRevenue: 46_000_000 }, saved)).toBe(false);
   });
 
-  it('수입금액 기준과 다른 기장의무는 직접 고른 것으로 본다', () => {
-    expect(formFrom(saved).dutyChosen).toBe(false);
-    expect(formFrom({ ...saved, bookkeepingDuty: '복식부기' }).dutyChosen).toBe(true);
+  it('예전에 고른 추계는 비워 두고 다시 고르게 한다', () => {
+    expect(formFrom({ ...saved, bookkeepingDuty: '복식부기' }).duty).toBe('복식부기');
+    expect(formFrom({ ...saved, bookkeepingDuty: '추계' }).duty).toBe('');
   });
 
   it('지금 판정하지 않는 업종은 판정하는 업종으로 바꿔 둔다', () => {
     expect(formFrom({ ...saved, industryCode: '62010' }).industryCode).toBe('940909');
   });
 
-  it('자택 비율을 적지 않은 문진은 6번을 고르지 않은 것으로 연다', () => {
+  it('직원 있음은 고를 수 없어(준비 중) 없음으로 연다', () => {
+    expect(formFrom({ ...saved, hasEmployee: true }).hasEmployee).toBe(false);
+  });
+
+  it('자택 비율을 적지 않은 문진은 5번을 고르지 않은 것으로 연다', () => {
     expect(formFrom({ ...saved, homeOfficeRatio: null }).home).toBe('');
     expect(formFrom({ ...saved, homeOfficeRatio: 0 }).home).toBe('no');
   });
@@ -133,7 +156,7 @@ describe('임시 저장 (C5)', () => {
 
   it('계정마다 따로 남기고, null 이면 지운다', () => {
     vi.stubGlobal('sessionStorage', memoryStorage());
-    const draft = withRevenue(EMPTY_FORM, '50000000');
+    const draft = { ...EMPTY_FORM, duty: '복식부기' as const };
     saveDraft('u1', draft);
     expect(savedDraft('u1')).toEqual(draft);
     expect(savedDraft('u2')).toBeNull();
@@ -143,7 +166,7 @@ describe('임시 저장 (C5)', () => {
 
   it('저장된 문진으로 되돌아온 폼은 남길 것이 없는 것으로 본다', () => {
     expect(sameForm({ ...formFrom(saved) }, formFrom(saved))).toBe(true);
-    expect(sameForm(withRevenue(formFrom(saved), '50000000'), formFrom(saved))).toBe(false);
+    expect(sameForm({ ...formFrom(saved), duty: '복식부기' }, formFrom(saved))).toBe(false);
   });
 
   it('저장소를 쓸 수 없으면 남기지 않고 던지지도 않는다', () => {
@@ -153,5 +176,30 @@ describe('임시 저장 (C5)', () => {
     vi.stubGlobal('sessionStorage', { getItem: blocked, setItem: blocked, removeItem: blocked });
     expect(() => saveDraft('u1', EMPTY_FORM)).not.toThrow();
     expect(savedDraft('u1')).toBeNull();
+  });
+});
+
+describe('예전 화면의 임시 값', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('고를 수 없는 추계와 지운 칸은 버리고, 적어 둔 금액이 있으면 안다고 본다', () => {
+    const map = new Map<string, string>();
+    vi.stubGlobal('sessionStorage', {
+      getItem: (key: string) => map.get(key) ?? null,
+      setItem: (key: string, value: string) => void map.set(key, value),
+      removeItem: (key: string) => void map.delete(key)
+    });
+    // 수입금액을 아는지 묻기 전의 화면이 남긴 값이다
+    const old: Partial<typeof filled> = { ...filled };
+    delete old.knowsRevenue;
+    map.set('preet:interview:u1', JSON.stringify({ ...old, revenue: '90000000', duty: '추계', dutyChosen: true }));
+    const draft = savedDraft('u1');
+    expect(draft).not.toHaveProperty('dutyChosen');
+    expect(draft).toMatchObject({ knowsRevenue: 'yes', revenue: '90000000', duty: '' });
+    expect(checkForm(draft ?? EMPTY_FORM, TODAY).body?.bookkeepingDuty).toBe('복식부기');
+    map.set('preet:interview:u1', JSON.stringify({ ...old, revenue: '', duty: '추계' }));
+    expect(checkForm(savedDraft('u1') ?? EMPTY_FORM, TODAY).errors.knowsRevenue).toBeDefined();
   });
 });

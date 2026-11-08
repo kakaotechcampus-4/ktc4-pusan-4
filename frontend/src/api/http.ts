@@ -417,6 +417,7 @@ export const httpApi: Api = {
       grouped: true
     }),
     respond: (body) => post('/question-responses', body),
+    withdraw: (body) => post('/question-responses/withdraw', body),
     bulkAnswer: (body) => post('/questions/bulk-answer', body),
     suggestions: (batchId) => get('/questions/suggestions', { batchId })
   },

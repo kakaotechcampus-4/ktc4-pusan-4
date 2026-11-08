@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRightIcon } from 'lucide-react';
+import { ArrowRightIcon, PencilIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
-import { InfoPanel, InfoRows, PANEL_LINK, PanelFailed, PanelNote } from '../components/InfoPanel';
+import { InfoPanel, InfoRows, PANEL_ICON, PanelFailed, PanelNote } from '../components/InfoPanel';
 import { api, ApiRequestError, useApi } from '../api';
 import { useSession } from '../contexts/SessionContext';
-import { Button, Modal } from '../components/ui';
+import { Button, IconButton, Modal } from '../components/ui';
 import { formatFullDate } from '../utils/format';
 import { accountLabel } from '../utils/account';
 import { contextRows } from '../utils/context';
@@ -71,10 +71,13 @@ export function Account() {
         <InfoPanel
           title="사업자 문진"
           action={
-          contextStatus === 'ready' ?
-          <Link to="/interview" state={{ from: '/account' }} className={PANEL_LINK}>문진 고치기</Link> :
-          contextStatus === 'none' ?
-          <Link to="/interview" state={{ from: '/account' }} className={PANEL_LINK}>문진 하기</Link> :
+          contextStatus === 'ready' || contextStatus === 'none' ?
+          <IconButton
+            to="/interview"
+            state={{ from: '/account' }}
+            icon={PencilIcon}
+            className={PANEL_ICON}
+            label={contextStatus === 'ready' ? '문진 고치기' : '문진 하기'} /> :
           null
           }>
 

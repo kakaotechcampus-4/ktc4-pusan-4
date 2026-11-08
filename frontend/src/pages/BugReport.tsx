@@ -17,33 +17,36 @@ export function BugReport() {
     <div className="min-h-full bg-canvas">
       <MarketingHeader />
 
-      <main id={MAIN_ID} tabIndex={-1} className="mx-auto w-full max-w-page px-6 pb-28 pt-16 outline-none lg:px-gutter">
-        <SectionHeading as="h1" eyebrow="버그 신고" title="잘못 나온 것을 알려 주세요" />
+      {/* 한 단 화면이다. 왼쪽에 붙이면 넓은 화면에서 오른쪽 절반이 빈다. 문진, 내 정보처럼 가운데 한 단에 둔다 */}
+      <main id={MAIN_ID} tabIndex={-1} className="mx-auto w-full max-w-page px-6 pb-28 pt-16 outline-none">
+        <div className="mx-auto max-w-2xl">
+          <SectionHeading as="h1" eyebrow="버그 신고" title="잘못 나온 것을 알려 주세요" />
 
-        <div className="mt-12 max-w-2xl rounded-2xl border border-line px-8 py-10">
-          <BugReportPanel />
+          <div className="mt-12 rounded-2xl border border-line px-8 py-10">
+            <BugReportPanel />
+          </div>
+
+          <section className="mt-16">
+            <h2 className="text-h3 font-bold tracking-ir-sm text-ink">
+              이렇게 적어 주시면 좋습니다
+            </h2>
+            <dl className="mt-6 border-t border-line">
+              {WHAT_TO_WRITE.map((item) =>
+              <div
+                key={item.term}
+                className="flex flex-col gap-1 border-b border-line py-5 sm:flex-row sm:gap-8">
+
+                  <dt className="shrink-0 text-body font-bold text-ink sm:w-40">
+                    {item.term}
+                  </dt>
+                  <dd className="text-body leading-6 text-ink2 [word-break:keep-all]">
+                    {item.detail}
+                  </dd>
+                </div>
+              )}
+            </dl>
+          </section>
         </div>
-
-        <section className="mt-16 max-w-2xl">
-          <h2 className="text-h3 font-bold tracking-ir-sm text-ink">
-            이렇게 적어 주시면 좋습니다
-          </h2>
-          <dl className="mt-6 border-t border-line">
-            {WHAT_TO_WRITE.map((item) =>
-            <div
-              key={item.term}
-              className="flex flex-col gap-1 border-b border-line py-5 sm:flex-row sm:gap-8">
-
-                <dt className="shrink-0 text-body font-bold text-ink sm:w-40">
-                  {item.term}
-                </dt>
-                <dd className="text-body leading-6 text-ink2 [word-break:keep-all]">
-                  {item.detail}
-                </dd>
-              </div>
-            )}
-          </dl>
-        </section>
       </main>
 
       <MarketingFooter />

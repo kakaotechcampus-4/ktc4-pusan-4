@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ChevronDownIcon, SearchXIcon } from 'lucide-react';
+import { ChevronDownIcon, MinusIcon, PlusIcon, SearchXIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { api, ApiRequestError, useApi } from '../api';
 import { useSession } from '../contexts/SessionContext';
@@ -9,6 +9,7 @@ import {
   Button,
   Empty,
   FilterBar,
+  IconButton,
   Pagination,
   Table,
   type Column } from
@@ -185,17 +186,14 @@ export function Transactions() {
       <span className="inline-flex flex-row-reverse items-center gap-3 sm:flex-row">
         {row.effectiveStatus.code !== 'JUDGEABLE' && <Badge>{row.effectiveStatus.label}</Badge>}
         {canceled ?
-        <span aria-hidden="true" className="hidden w-[6.5rem] sm:block" /> :
+        <span aria-hidden="true" className="hidden w-9 sm:block" /> :
 
-        <Button
+        <IconButton
           variant="secondary"
-          size="sm"
-          className="w-[6.5rem] px-0"
-          disabled={busyId === row.id}
-          onClick={() => void change(row, excluded ? 'INCLUDED' : 'EXCLUDED')}>
-
-            {excluded ? '다시 넣기' : '빼기'}
-          </Button>
+          icon={excluded ? PlusIcon : MinusIcon}
+          label={`${merchantTitle(row)} ${excluded ? '판정 대상에 다시 넣기' : '판정 대상에서 빼기'}`}
+          busy={busyId === row.id}
+          onClick={() => void change(row, excluded ? 'INCLUDED' : 'EXCLUDED')} />
         }
       </span>);
 
