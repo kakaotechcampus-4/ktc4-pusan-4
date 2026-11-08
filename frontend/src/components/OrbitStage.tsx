@@ -106,17 +106,27 @@ const NARROW: Spot[] = [
 { angle: 288, radius: 44, size: 56, Icon: Statute }];
 
 
-/** scale: 그림 크기 배수. 좁은 화면은 판이 작아 그대로 두면 그림끼리 붙는다 */
+/** 배너 판이 가장 클 때의 폭. fluid 그림 크기는 이 폭에 대한 비율이다 */
+const BOARD_PX = 584;
+
+/**
+ * scale: 그림 크기 배수. 좁은 화면은 판이 작아 그대로 두면 그림끼리 붙는다
+ * fluid: 그림 크기를 판 폭에 맞춰 줄인다. 배너 판은 1024~1279 에서 작아지는데 그림이
+ *        그대로면 안팎 테의 그림끼리 겹친다
+ */
 function Ring({
   spots,
   spin,
   counter,
-  scale = 1
+  scale = 1,
+  fluid = false
 
 
-}: {spots: Spot[];spin: string;counter: string;scale?: number;}) {
+
+
+}: {spots: Spot[];spin: string;counter: string;scale?: number;fluid?: boolean;}) {
   return (
-    <div className={`absolute inset-0 ${spin} motion-reduce:animate-none`}>
+    <div className={`absolute inset-0 ${spin} motion-reduce:animate-none ${fluid ? '[container-type:size]' : ''}`}>
       {spots.map((spot) => {
         const rad = (spot.angle - 90) * Math.PI / 180;
         const size = spot.size * scale;
@@ -125,7 +135,16 @@ function Ring({
           <span
             key={spot.angle}
             className="absolute"
-            style={{
+            style={fluid ?
+            {
+              left: `${50 + radius * Math.cos(rad)}%`,
+              top: `${50 + radius * Math.sin(rad)}%`,
+              // 판 폭을 따라 줄되 60% 아래로는 줄이지 않는다. 더 작으면 그림이 무엇인지 안 읽힌다
+              width: `clamp(${size * 0.6}px, ${size / BOARD_PX * 100}cqw, ${size}px)`,
+              aspectRatio: '1',
+              transform: 'translate(-50%, -50%)'
+            } :
+            {
               left: `${50 + radius * Math.cos(rad)}%`,
               top: `${50 + radius * Math.sin(rad)}%`,
               width: size,
@@ -215,14 +234,14 @@ export function OrbitStage({ intro = false, full = false, paused = false }: {int
         타원이 되어 그림이 좌우 끝으로 밀린다.
 
         배너에서는 판을 오른쪽 끝에 붙이고, 폭에서 제목 몫(lg 424px, xl 520px)을 뺀 만큼만
-        키운다. 전에는 중심을 66% 에 두고 판 높이에 맞춰 키워서 바깥 그림이 제목 둘째 줄
+        키운다. 500px 에서 멈춘다. 더 크면 오른쪽 아래 그림이 1 / 3 알약 밑으로 지나간다. 전에는 중심을 66% 에 두고 판 높이에 맞춰 키워서 바깥 그림이 제목 둘째 줄
         위를 지나갔다 (C81). 1024~1279 는 자리가 좁아 제목도 한 단계 작다(HeroBanner)
       */}
       <div
         className={
         full ?
         'absolute left-1/2 top-1/2 aspect-square w-[88%] -translate-x-1/2 -translate-y-1/2 lg:left-[66%] lg:h-[94%] lg:w-auto' :
-        'absolute right-8 top-1/2 hidden aspect-square -translate-y-1/2 lg:block lg:w-[min(584px,calc(100%-424px))] xl:w-[min(584px,calc(100%-520px))]'
+        'absolute right-8 top-1/2 hidden aspect-square -translate-y-1/2 lg:block lg:w-[min(500px,calc(100%-424px))] xl:w-[min(500px,calc(100%-520px))]'
         }>
         <div className={`absolute inset-0 ${intro ? DRAW : ''}`}>
           <span className="absolute left-1/2 top-1/2 aspect-square w-[104%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20" />
@@ -231,11 +250,12 @@ export function OrbitStage({ intro = false, full = false, paused = false }: {int
 
         {/* 회전은 Ring 이 하고 퍼지는 것은 이 겉면이 한다. 한 요소에 두면 둘 중 하나가 덮인다 */}
         <div className={`absolute inset-0 ${intro ? SPREAD : ''}`}>
-          <Ring spots={OUTER} spin="animate-orbit" counter="animate-orbit-back" />
+          <Ring spots={OUTER} spin="animate-orbit" counter="animate-orbit-back" fluid={!full} />
           <Ring
             spots={INNER}
             spin="animate-orbit-slow"
-            counter="animate-orbit-slow-back" />
+            counter="animate-orbit-slow-back"
+            fluid={!full} />
 
         </div>
 

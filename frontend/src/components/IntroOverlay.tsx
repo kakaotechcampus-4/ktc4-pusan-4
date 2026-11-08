@@ -31,6 +31,9 @@ function heroInset() {
   return `inset(${r.top}px ${right}px ${bottom}px ${r.left}px round 20px)`;
 }
 
+/** 보이는 중일 때만 걷기 시작한다 */
+const leave = (phase: 'show' | 'shrink' | 'fade') => phase === 'show' ? 'shrink' : phase;
+
 /** onDone: 다 걷혔다. Landing 이 이때 화면에서 지운다 */
 export function IntroOverlay({ onDone }: {onDone: () => void;}) {
   /** shrink: 배너 자리로 줄어드는 중. fade: 다 줄어 배너 위에 겹쳐 있다가 사라지는 중 */
@@ -38,7 +41,8 @@ export function IntroOverlay({ onDone }: {onDone: () => void;}) {
   const [clip, setClip] = useState<string | null>(null);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setPhase('shrink'), HOLD_MS);
+    // 건너뛰기로 이미 걷는 중이면 되돌리지 않는다. 앞으로만 간다
+    const timer = window.setTimeout(() => setPhase(leave), HOLD_MS);
     return () => window.clearTimeout(timer);
   }, []);
 
@@ -52,8 +56,14 @@ export function IntroOverlay({ onDone }: {onDone: () => void;}) {
         return;
       }
       setClip(target);
+      // 줄어드는 동안 창 크기가 바뀌면 배너 자리도 바뀐다. 새 자리로 다시 겨눈다
+      const retarget = () => setClip(heroInset());
+      window.addEventListener('resize', retarget);
       const timer = window.setTimeout(() => setPhase('fade'), SHRINK_MS);
-      return () => window.clearTimeout(timer);
+      return () => {
+        window.removeEventListener('resize', retarget);
+        window.clearTimeout(timer);
+      };
     }
     const timer = window.setTimeout(onDone, FADE_MS);
     return () => window.clearTimeout(timer);
@@ -84,7 +94,7 @@ export function IntroOverlay({ onDone }: {onDone: () => void;}) {
 
         <button
           type="button"
-          onClick={() => setPhase('shrink')}
+          onClick={() => setPhase(leave)}
           className="absolute right-6 top-6 z-20 rounded-full border border-white/20 px-4 py-1.5 text-small text-white transition-colors hover:border-white/40 hover:text-white sm:right-8 sm:top-8">
 
           건너뛰기

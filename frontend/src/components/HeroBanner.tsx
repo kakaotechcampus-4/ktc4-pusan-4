@@ -242,9 +242,10 @@ function TextSlide({
       </strong>
       {/* 도식은 제목과 항목 사이 빈 자리를 채운다. 좁은 화면에서는 자리가 없어 숨는다 */}
       <div className="relative flex min-h-0 flex-1 items-center sm:py-8">{figure}</div>
-      <ul className="relative grid gap-6 pb-24 sm:grid-cols-3">
+      {/* 좁은 화면은 1 / 3 알약이 항목 줄 바로 아래(bottom-24)에 떠 있다. 항목 사이를 좁히고 알약 높이만큼 더 띄운다 */}
+      <ul className="relative grid gap-3 pb-36 sm:grid-cols-3 sm:gap-6 sm:pb-24">
         {items.map((item) =>
-        <li key={item} className="border-t border-white/20 pt-5">
+        <li key={item} className="border-t border-white/20 pt-3 sm:pt-5">
             <strong className="block text-h4 font-bold leading-tight tracking-ir-sm text-white [word-break:keep-all]">
               {item}
             </strong>
