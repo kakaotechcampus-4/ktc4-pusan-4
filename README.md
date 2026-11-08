@@ -192,15 +192,66 @@
 
 AWS 준비, 백업, 주간 배치 타이머 설치는 [docs/deployment.md](docs/deployment.md)를 참고하세요.
 
-### Redis
+### Redis (리프레시 토큰 교체)
 
-<!-- 도식화 자리: Redis — Redis 이미지를 어디서 가져와 어떻게 띄우는지. 그림은 docs/img/readme/ 에 넣고 아래 인용을 이미지로 바꿔 주세요 -->
-> 🖼️ **도식화 예정: Redis**
+```mermaid
+sequenceDiagram
+    participant B as 브라우저
+    participant A as API 서버
+    participant R as Redis
+
+    Note over B,R: 로그인
+    B->>A: POST /api/v1/auth/login 또는 /auth/kakao
+    A->>R: refresh:{familyId} 에 사용자와 토큰 해시 저장 (TTL 14일)
+    A-->>B: 액세스 토큰(15분) + refresh_token 쿠키
+
+    Note over B,R: 액세스 토큰이 만료되면 재발급
+    B->>A: POST /api/v1/auth/refresh (쿠키)
+    A->>R: Lua 스크립트로 저장된 해시와 비교
+    alt 해시가 같음
+        R-->>A: 새 토큰 해시로 교체
+        A-->>B: 새 액세스 토큰 + 새 쿠키
+    else 해시가 다름 (이미 쓴 토큰을 다시 보냄)
+        R-->>A: 그 family 삭제
+        A-->>B: 401, 그 기기는 다시 로그인
+    else family 없음 (만료, 로그아웃)
+        A-->>B: 401
+    end
+
+    Note over B,R: 로그아웃
+    B->>A: POST /api/v1/auth/logout
+    A->>R: refresh:{familyId} 삭제
+```
+
+로그인 한 번이 family 하나이고, Redis 에는 토큰 원문이 아니라 해시만 둡니다. 비교와 교체를 Lua 스크립트 하나로 해서 두 요청이 같은 토큰으로 동시에 재발급받을 수 없습니다. 이메일 인증 코드, 비서 사용량 한도, 버그 신고 한도도 TTL 이 있는 키로 Redis 에서 셉니다.
 
 ### Blue / Green 배포
 
-<!-- 도식화 자리: Blue / Green 배포 — 두 벌의 API · AI 서버와 배포 때 Caddy 전환 흐름. 그림은 docs/img/readme/ 에 넣고 아래 인용을 이미지로 바꿔 주세요 -->
-> 🖼️ **도식화 예정: Blue / Green 배포**
+```mermaid
+sequenceDiagram
+    participant D as deploy.sh
+    participant C as Caddy
+    participant B as blue (API, AI)
+    participant G as green (API, AI)
+    participant P as PostgreSQL
+
+    Note over C,B: 평소에는 /api/v1 을 blue 가 받음<br/>green 은 멈춰 있음
+    D->>G: 새 이미지로 기동 (up --wait)
+    G->>P: Flyway 마이그레이션
+    Note over C,B: 그동안에도 blue 가 계속 받음
+    G-->>D: healthy
+    D->>C: upstream.caddy 를 green 으로 바꾸고 caddy reload
+    alt reload 성공
+        Note over C,G: 이제 /api/v1 은 green 이 받음 (연결은 끊기지 않음)
+        D->>B: stop
+        Note over B: 하던 요청과 판정을 마치고 멈춤 (최대 60초)
+    else reload 실패
+        D->>D: upstream.caddy 를 되돌리고 배포 실패
+        Note over C,B: blue 가 계속 받음
+    end
+```
+
+같은 색끼리만 서로 부르므로 전환 중에도 옛 버전과 새 버전이 섞이지 않습니다. 두 색이 같은 DB 를 쓰기 때문에 마이그레이션은 직전 릴리스와도 함께 돌아야 합니다. 다음 배포는 멈춰 있는 색을 새 버전으로 띄웁니다.
 
 ### 모니터링
 
