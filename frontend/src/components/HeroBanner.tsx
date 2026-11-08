@@ -369,6 +369,7 @@ export function HeroBanner({ autoplay = true }: {autoplay?: boolean;}) {
       }}>
       <ul
         ref={track}
+        data-hero-panel
         onScroll={() => {
           const el = track.current;
           if (!el) return;
