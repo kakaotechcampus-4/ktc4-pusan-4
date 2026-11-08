@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { cn } from './cn';
 
 export interface ChoiceOption<T extends string | boolean> {
@@ -56,7 +56,12 @@ export function ChoiceGroup<T extends string | boolean>({
    * 칸 사이는 화살표로 옮기고 옮기면 바로 고른다 (WAI-ARIA radio group)
    */
   const selectedIndex = options.findIndex((option) => option.value === value && !option.disabled);
-  const tabStop = selectedIndex >= 0 ? selectedIndex : enabled[0];
+  /**
+   * 고르지 않고 초점만 옮긴 칸(selectOnFocus 를 끈 묶음). Tab 은 지금 초점이 있는 칸에 서야
+   * Shift+Tab 한 번에 묶음을 벗어난다. 묶음을 벗어나면 다시 고른 칸으로 돌아간다
+   */
+  const [focused, setFocused] = useState<number | null>(null);
+  const tabStop = !selectOnFocus && focused !== null ? focused : selectedIndex >= 0 ? selectedIndex : enabled[0];
 
   const onKeyDown = (event: React.KeyboardEvent, index: number) => {
     // Alt+← 같은 브라우저 단축키는 그대로 둔다
@@ -68,13 +73,17 @@ export function ChoiceGroup<T extends string | boolean>({
     if (next === undefined) return;
     event.preventDefault();
     buttons.current[next]?.focus();
-    if (selectOnFocus) onChange(options[next].value);
+    if (selectOnFocus) onChange(options[next].value);else
+    setFocused(next);
   };
 
   return (
     <div
       role="radiogroup"
       aria-label={name}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setFocused(null);
+      }}
       className={cn('grid gap-2', COLUMNS[columns], className)}>
 
       {options.map((option, index) => {

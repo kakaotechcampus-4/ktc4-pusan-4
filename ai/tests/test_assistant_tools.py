@@ -153,9 +153,9 @@ def test_말로_답하면_실제_질문_id_로_바꾼_카드를_만든다():
 
     out = t.propose_answer(g, "공용", "user_said", "SK텔레콤은 가족이랑 같이 쓰는 공용 회선이야.")
 
-    assert out == {"status": "proposed", "card": "SK텔레콤 9/15 78,000원 답변: '공용'"}
+    assert out == {"status": "proposed", "card": "SK텔레콤 9/15 78,000원 답변: '업무와 개인 둘 다'"}
     assert t.proposals == [{"kind": "answer", "questionIds": ["q-skt"], "value": "공용", "source": "ASSISTANT",
-                            "card": "SK텔레콤 9/15 78,000원 답변: '공용'"}]
+                            "card": "SK텔레콤 9/15 78,000원 답변: '업무와 개인 둘 다'"}]
 
 
 def test_지난번_답은_A등급이고_충돌이_없고_같은_값일_때만_된다():
@@ -213,7 +213,7 @@ def test_일괄_답은_모두가_받는_선택지로_대상_건수와_합계를_
 
     out = t.propose_bulk_answer("용도", "개인", "전부 개인이야")
 
-    assert out["card"] == "남은 '용도' 질문 2건 39,800원 답변: '개인'"
+    assert out["card"] == "남은 '용도' 질문 2건 39,800원 답변: '개인 용도'"
     assert t.proposals[0] | {"card": None} == {"kind": "bulk_answer", "batchId": BATCH, "factType": "용도",
                                                "value": "개인", "card": None}
     assert t.run("propose_bulk_answer", {"fact_type": "용도", "value": "업무미팅", "quote": "전부 개인이야"})["allowed"] == ["개인"]
@@ -298,8 +298,27 @@ def test_화면에_없는_도구는_부를_수_없다():
 
 def test_card_shows_answer_label_not_stored_value():
     from assistant.tools import shown
-    # 저장 값은 그대로 두고 카드에만 화면 이름을 쓴다
+    # 저장 값은 그대로 두고 카드에만 질문 화면과 같은 이름을 쓴다
     assert shown("업무·개인 혼용") == "업무와 개인 둘 다"
-    assert shown("PC·휴대폰·가구 같은 물건이에요") == "PC, 휴대폰, 가구 같은 물건"
+    assert shown("업무·개인 혼재") == "업무와 개인 둘 다"
+    assert shown("공용") == "업무와 개인 둘 다"
+    assert shown("업무미팅") == "거래처 접대"
     assert shown("새·값") == "새, 값"
-    assert shown("공용") == "공용"
+
+
+def test_answer_label_matches_frontend():
+    import re
+    from pathlib import Path
+
+    from assistant.tools import ANSWER_LABEL
+    fe = Path(__file__).resolve().parents[2] / "frontend/src/components/questions/logic.ts"
+    if not fe.exists():  # ai/ 만 따로 빌드하는 환경
+        pytest.skip("frontend 가 없다")
+    src = fe.read_text()
+    pairs = {}
+    # 지금 카드의 표와 예전 카드 값의 표를 합친 것이 비서 표와 같아야 한다
+    for name in ("ANSWER_LABEL", "LEGACY_ANSWER_LABEL"):
+        start = src.index(f"export const {name}")
+        body = src[start:src.index("};", start)]
+        pairs.update(re.findall(r"^\s*'?([^':/\n]+?)'?:\s*'([^']+)'", body, re.MULTILINE))
+    assert pairs == ANSWER_LABEL

@@ -106,7 +106,11 @@ const NARROW: Spot[] = [
 { angle: 288, radius: 44, size: 56, Icon: Statute }];
 
 
-/** 배너 판이 가장 클 때의 폭. fluid 그림 크기는 이 폭에 대한 비율이다 */
+/**
+ * fluid 그림 크기의 기준 폭. 그림은 판 폭이 이만할 때 원래 크기(76px 등)가 된다.
+ * 배너 판은 500px 에서 멈추므로 그림은 원래 크기의 86% 까지만 큰다. 원래 크기로 두면
+ * 그림이 1 / 3 알약과 제목 끝에 닿는다(1279~1920 에서 재 봤다)
+ */
 const BOARD_PX = 584;
 
 /**
@@ -212,12 +216,13 @@ export function OrbitStage({ intro = false, full = false, paused = false }: {int
         그림을 껐는데, 인트로(full)에서는 그림이 다 나와서 메인으로 넘어오면 그림이
         사라진 것처럼 보였다.
 
-        판 크기는 제목 아랫줄과 「무료로 판정해보기」 사이(170px)에 맞춘 것이다 —
-        더 키우면 그림이 글자나 버튼에 걸린다. 바깥 테를 그림이 도는 자리에 바로 두어,
-        그림이 테에 올라타 보이게 한다. 안쪽 테는 그림 없이 깊이만 준다
+        판은 제목 아랫줄과 1 / 3 알약 사이에 둔다. 휴대폰은 그 틈이 140px 남짓이라 105px,
+        640 이상은 제목이 한 줄 덜 내려와 160px 이다. 판 폭을 % 로 두면 넓은 쪽에서 판이 커져
+        그림이 제목과 알약에 걸렸다. 360 아래는 제목이 세 줄이라 자리가 없어 그림을 뺀다.
+        바깥 테를 그림이 도는 자리에 바로 두어, 그림이 테에 올라타 보이게 한다. 안쪽 테는 깊이만 준다
       */}
       <div
-        className={`absolute left-[60%] top-[53%] aspect-square w-[37%] -translate-x-1/2 -translate-y-1/2 ${
+        className={`absolute left-[60%] top-[53%] aspect-square w-[105px] -translate-x-1/2 -translate-y-1/2 max-[359px]:hidden sm:left-[62%] sm:top-[62.5%] sm:w-[160px] ${
         full ? 'hidden' : 'lg:hidden'}`
         }>
         <div className={`absolute inset-0 ${intro ? DRAW : ''}`}>
@@ -243,20 +248,31 @@ export function OrbitStage({ intro = false, full = false, paused = false }: {int
         'absolute left-1/2 top-1/2 aspect-square w-[88%] -translate-x-1/2 -translate-y-1/2 lg:left-[66%] lg:h-[94%] lg:w-auto' :
         'absolute right-8 top-1/2 hidden aspect-square -translate-y-1/2 lg:block lg:w-[min(500px,calc(100%-424px))] xl:w-[min(500px,calc(100%-520px))]'
         }>
+        {/*
+          배너 판은 1280 아래에서 작아(최소 250px 남짓) 테 둘에 그림을 나누면 안팎 그림이 겹친다.
+          그 폭에서는 좁은 화면처럼 테 하나에 다섯을 고르게 올리고, 테도 그 자리(88%, 44%)에 둔다
+        */}
         <div className={`absolute inset-0 ${intro ? DRAW : ''}`}>
-          <span className="absolute left-1/2 top-1/2 aspect-square w-[104%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20" />
-          <span className="absolute left-1/2 top-1/2 aspect-square w-[72%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20" />
+          <span className={`absolute left-1/2 top-1/2 aspect-square -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20 ${full ? 'w-[104%]' : 'w-[88%] xl:w-[104%]'}`} />
+          <span className={`absolute left-1/2 top-1/2 aspect-square -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20 ${full ? 'w-[72%]' : 'w-[44%] xl:w-[72%]'}`} />
         </div>
 
         {/* 회전은 Ring 이 하고 퍼지는 것은 이 겉면이 한다. 한 요소에 두면 둘 중 하나가 덮인다 */}
         <div className={`absolute inset-0 ${intro ? SPREAD : ''}`}>
-          <Ring spots={OUTER} spin="animate-orbit" counter="animate-orbit-back" fluid={!full} />
-          <Ring
-            spots={INNER}
-            spin="animate-orbit-slow"
-            counter="animate-orbit-slow-back"
-            fluid={!full} />
+          <div className={`absolute inset-0 ${full ? '' : 'hidden xl:block'}`}>
+            <Ring spots={OUTER} spin="animate-orbit" counter="animate-orbit-back" fluid={!full} />
+            <Ring
+              spots={INNER}
+              spin="animate-orbit-slow"
+              counter="animate-orbit-slow-back"
+              fluid={!full} />
 
+          </div>
+          {!full &&
+          <div className="absolute inset-0 xl:hidden">
+              <Ring spots={NARROW} spin="animate-orbit" counter="animate-orbit-back" fluid />
+            </div>
+          }
         </div>
 
         {/*

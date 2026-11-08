@@ -66,10 +66,15 @@ export function IntroOverlay({ onDone }: {onDone: () => void;}) {
       }
       setView({ width: window.innerWidth, height: window.innerHeight });
       setBox(target);
-      // 줄어드는 동안 창 크기가 바뀌면 배너 자리도 바뀐다. 새 자리로 다시 겨눈다
-      const retarget = () => setBox(heroBox());
+      let timer = window.setTimeout(() => setPhase('fade'), SHRINK_MS);
+      // 줄어드는 동안 창 크기가 바뀌면 배너 자리도 바뀐다. 새 자리로 다시 겨누고, 새로 시작한
+      // 전환이 끝날 때까지 기다린다
+      const retarget = () => {
+        setBox(heroBox());
+        window.clearTimeout(timer);
+        timer = window.setTimeout(() => setPhase('fade'), SHRINK_MS);
+      };
       window.addEventListener('resize', retarget);
-      const timer = window.setTimeout(() => setPhase('fade'), SHRINK_MS);
       return () => {
         window.removeEventListener('resize', retarget);
         window.clearTimeout(timer);

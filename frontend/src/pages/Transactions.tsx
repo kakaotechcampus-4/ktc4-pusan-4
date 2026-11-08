@@ -185,7 +185,7 @@ export function Transactions() {
       <span className="inline-flex flex-row-reverse items-center gap-3 sm:flex-row">
         {row.effectiveStatus.code !== 'JUDGEABLE' && <Badge>{row.effectiveStatus.label}</Badge>}
         {canceled ?
-        <span aria-hidden="true" className="w-[6.5rem]" /> :
+        <span aria-hidden="true" className="hidden w-[6.5rem] sm:block" /> :
 
         <Button
           variant="secondary"

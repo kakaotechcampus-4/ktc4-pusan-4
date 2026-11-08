@@ -79,6 +79,8 @@ describe('ChoiceGroup 키보드', () => {
     press('ArrowRight');
     expect(document.activeElement).toBe(radios()[2]);
     expect(spy).not.toHaveBeenCalled();
+    // Tab 은 초점이 있는 칸 하나에만 선다. Shift+Tab 한 번에 묶음을 벗어난다
+    expect(radios().map((r) => r.tabIndex)).toEqual([-1, -1, 0, -1]);
   });
 
   it('Alt 같은 보조 키와 함께 누르면 건드리지 않는다', () => {
