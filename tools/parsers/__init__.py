@@ -405,8 +405,14 @@ def to_rows(records: list, st: Stats, norm=None) -> list:
         if not approved_at:
             st.no_date += 1
 
-        # 키는 마스킹 전 원본 상호명으로 만든다 (재파싱 안정성)
+        # 키는 마스킹 전 원본 상호명으로 만든다 (재파싱 안정성).
+        # 금액도 아래에서 부호를 맞추기 전, 파일에 적힌 값이다. 이미 올린 파일을 다시 올려도 같은 키가 나와야 한다
         nkey = natural_key(approved_at, r.merchant, r.amount, r.approval_no)
+
+        # 취소 행 금액은 음수로 맞춘다 (C35). KB 는 취소를 음수로 주지만 IBK 는 승인구분만 취소이고 금액은 양수다
+        amount = r.amount
+        if r.is_cancel and amount is not None and amount > 0:
+            amount = -amount
 
         st.kept += 1
         st.per_card[r.source] += 1
@@ -419,7 +425,7 @@ def to_rows(records: list, st: Stats, norm=None) -> list:
             "approval_no": r.approval_no,
             "natural_key": nkey,
             "raw_merchant": merchant,
-            "amount": r.amount,
+            "amount": amount,
             "biz_no": biz_no,
             "memo": memo,
             "source_card": r.source,

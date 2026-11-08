@@ -211,6 +211,18 @@ describe('MedicalMasker', () => {
 });
 
 describe('toRows', () => {
+  it('취소 행 금액은 음수로 내보내고, 키는 파일에 적힌 금액으로 만든다 (C35)', async () => {
+    // IBK 는 취소도 양수로 온다. KB 는 이미 음수다
+    const ibk = cancel({ source: 'ibk', amount: 12000, approvalNo: '30000001', when: '2026-02-01' });
+    const kb = cancel({ amount: -8000, approvalNo: '30000002', when: '2026-02-02' });
+    const paid = rec({ source: 'ibk', amount: 5000, approvalNo: '30000003', when: '2026-02-03' });
+    const rows = await toRows([ibk, kb, paid], newStats(3, 0));
+
+    expect(rows.map((r) => r.amount)).toEqual([-12000, -8000, 5000]);
+    expect(rows[0].naturalKey).toBe(await naturalKey('2026-02-01', '가짜상점', 12000, '30000001'));
+    expect(rows[1].naturalKey).toBe(await naturalKey('2026-02-02', '가짜상점', -8000, '30000002'));
+  });
+
   it('의료 행은 상호를 마스킹하고, 키도 의료_마스킹 으로 만든다', async () => {
     const records = [
     rec({ merchant: '가짜정형외과의원', amount: 15000, approvalNo: '10000002', when: '2026-01-05', memo: '메모', bizNo: '111-22-33333' }),

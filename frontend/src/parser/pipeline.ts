@@ -183,6 +183,11 @@ export class MedicalMasker {
   }
 }
 
+/**
+ * 취소 행 금액은 음수로 맞춘다 (C35). KB 는 취소를 음수로 주지만 IBK 는 승인구분만 취소이고 금액은 양수다
+ */
+const signedAmount = (r: RawRecord) => r.isCancel && r.amount !== null && r.amount > 0 ? -r.amount : r.amount;
+
 /** 출력 행으로 바꾼다. 레코드 순서를 지킨다 */
 export async function toRows(records: RawRecord[], stats: ParseStats): Promise<ParsedRow[]> {
   const masker = new MedicalMasker();
@@ -222,7 +227,8 @@ export async function toRows(records: RawRecord[], stats: ParseStats): Promise<P
     const approvedAt = r.when ?? '';
     if (!approvedAt) stats.noDate += 1;
 
-    // 마스킹한 행은 원래 상호 대신 고정 문자열 의료_마스킹 으로 키를 만든다 (hash.ts naturalKey 참고)
+    // 마스킹한 행은 원래 상호 대신 고정 문자열 의료_마스킹 으로 키를 만든다 (hash.ts naturalKey 참고).
+    // 금액은 아래에서 부호를 맞추기 전, 파일에 적힌 값이다. 이미 올린 파일을 다시 올려도 같은 키가 나와야 한다
     keys.push(naturalKey(approvedAt, masked ? MEDICAL_PREFIX : r.merchant, r.amount, r.approvalNo));
 
     stats.kept += 1;
@@ -231,7 +237,7 @@ export async function toRows(records: RawRecord[], stats: ParseStats): Promise<P
     rows.push({
       approvedAt,
       rawMerchant,
-      amount: r.amount,
+      amount: signedAmount(r),
       installmentMonths: r.installment,
       approvalNo: r.approvalNo,
       naturalKey: '',
