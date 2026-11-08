@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, ApiRequestError } from '../api';
 import { useSession } from '../contexts/SessionContext';
@@ -32,6 +32,25 @@ export function PasswordChange({ email }: {email: string | null;}) {
     setError(message);
     setField(at);
   };
+
+  /** 틀렸다고 한 칸을 고치기 시작하면 그 오류는 걷는다. 새 비밀번호 칸은 그래야 규칙 확인이 다시 보인다 */
+  const edit = (at: Exclude<Field, null>, set: (value: string) => void) => (event: React.ChangeEvent<HTMLInputElement>) => {
+    set(event.target.value);
+    if (field === at) {
+      setError(null);
+      setField(null);
+    }
+  };
+
+  /*
+   * 여는 버튼과 폼이 서로 자리를 바꿔 초점이 body 로 떨어진다. 열면 첫 칸으로, 취소하면 다시 여는 버튼으로 옮긴다.
+   * 처음 그릴 때는 옮기지 않는다
+   */
+  const wasOpen = useRef(open);
+  useEffect(() => {
+    if (wasOpen.current !== open) document.getElementById(open ? 'password-current' : 'password-change-open')?.focus();
+    wasOpen.current = open;
+  }, [open]);
 
   const close = () => {
     setOpen(false);
@@ -104,7 +123,7 @@ export function PasswordChange({ email }: {email: string | null;}) {
 
   if (!open)
   return (
-    <Button variant="secondary" size="md" className="mt-4" onClick={() => setOpen(true)}>
+    <Button id="password-change-open" variant="secondary" size="md" className="mt-4" onClick={() => setOpen(true)}>
         비밀번호 바꾸기
       </Button>);
 
@@ -119,7 +138,7 @@ export function PasswordChange({ email }: {email: string | null;}) {
           type="password"
           autoComplete="current-password"
           value={current}
-          onChange={(event) => setCurrent(event.target.value)}
+          onChange={edit('current', setCurrent)}
           aria-invalid={field === 'current'}
           aria-describedby={describedBy('current')}
           className={AUTH_INPUT} />
@@ -135,7 +154,7 @@ export function PasswordChange({ email }: {email: string | null;}) {
           type="password"
           autoComplete="new-password"
           value={next}
-          onChange={(event) => setNext(event.target.value)}
+          onChange={edit('next', setNext)}
           aria-invalid={field === 'next'}
           aria-describedby={describedBy('next') ?? (next ? 'password-next-check' : undefined)}
           className={AUTH_INPUT} />
@@ -152,7 +171,7 @@ export function PasswordChange({ email }: {email: string | null;}) {
           type="password"
           autoComplete="new-password"
           value={again}
-          onChange={(event) => setAgain(event.target.value)}
+          onChange={edit('again', setAgain)}
           aria-invalid={field === 'again'}
           aria-describedby={describedBy('again')}
           className={AUTH_INPUT} />

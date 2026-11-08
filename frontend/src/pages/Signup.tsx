@@ -157,6 +157,15 @@ export function Signup() {
     setErrorField(field);
   };
 
+  /** 틀렸다고 한 비밀번호 칸을 고치기 시작하면 그 오류는 걷는다. 그래야 규칙 확인(PasswordCheck)이 다시 보인다 */
+  const editPassword = (field: 'password' | 'passwordAgain', set: (value: string) => void) => (event: React.ChangeEvent<HTMLInputElement>) => {
+    set(event.target.value);
+    if (errorField === field) {
+      setError(null);
+      setErrorField(null);
+    }
+  };
+
   /** 새 코드를 보냈다(보냈을 수 있다). 코드 칸과 틀린 횟수를 새로 시작한다 */
   const codeSent = (target: string) => {
     setSentTo(target);
@@ -442,7 +451,7 @@ export function Signup() {
               type="password"
               autoComplete="new-password"
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              onChange={editPassword('password', setPassword)}
               aria-invalid={errorField === 'password'}
               aria-describedby={describedBy('password') ?? (password ? 'signup-password-check' : undefined)}
               className={AUTH_INPUT} />
@@ -459,7 +468,7 @@ export function Signup() {
               type="password"
               autoComplete="new-password"
               value={passwordAgain}
-              onChange={(event) => setPasswordAgain(event.target.value)}
+              onChange={editPassword('passwordAgain', setPasswordAgain)}
               aria-invalid={errorField === 'passwordAgain'}
               aria-describedby={describedBy('passwordAgain')}
               className={AUTH_INPUT} />
