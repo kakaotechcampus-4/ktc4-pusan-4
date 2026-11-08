@@ -41,6 +41,10 @@ class UserFactEntity {
     @Column(nullable = false)
     private String source;
 
+    /** 답을 취소한 version. 값은 비어 있고, 최신 version 이 이것이면 그 질문에는 답이 없다 (V23). */
+    @Column(nullable = false)
+    private boolean withdrawn;
+
     protected UserFactEntity() {
     }
 
@@ -59,12 +63,26 @@ class UserFactEntity {
         this.source = source.name();
     }
 
+    /** 답 취소를 새 version 으로 남긴다. 사용자가 한 일이라 출처는 USER 다. */
+    static UserFactEntity withdrawal(
+        UUID id, UUID userId, UUID batchId, String scopeKey, String factType, int version
+    ) {
+        UserFactEntity entity =
+            new UserFactEntity(id, userId, batchId, new UserFact(scopeKey, factType, Map.of()), version);
+        entity.withdrawn = true;
+        return entity;
+    }
+
     UUID id() {
         return id;
     }
 
     int version() {
         return version;
+    }
+
+    boolean withdrawn() {
+        return withdrawn;
     }
 
     AnswerSource source() {
