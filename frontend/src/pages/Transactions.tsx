@@ -172,7 +172,8 @@ export function Transactions() {
   };
 
   /**
-   * 판정 대상 칸. 상태는 늘 같은 배지로, 바꾸는 동작은 늘 같은 버튼으로 보인다.
+   * 판정 대상 칸. 배지는 기본(판정대상)과 다른 행에만 단다. 모든 행에 같은 배지가 서 있으면
+   * 다른 것이 눈에 띄지 않는다. 바꾸는 동작은 늘 같은 버튼으로 보인다.
    * 취소상계는 바꿀 수 없어 버튼 자리를 비워 두고, 배지가 다른 행과 같은 줄에 서게 한다.
    * 좁은 화면에서는 가맹점 칸 아래로 옮긴다
    */
@@ -181,7 +182,7 @@ export function Transactions() {
     const excluded = row.effectiveStatus.code === 'EXCLUDED';
     return (
       <span className="inline-flex items-center gap-3">
-        <Badge>{row.effectiveStatus.label}</Badge>
+        {row.effectiveStatus.code !== 'JUDGEABLE' && <Badge>{row.effectiveStatus.label}</Badge>}
         {canceled ?
         <span aria-hidden="true" className="w-[6.5rem]" /> :
 
