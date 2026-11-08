@@ -43,6 +43,7 @@ import {
   UPLOAD_BATCH } from
 './data';
 import { STATUTES } from './statutes';
+import { passwordProblem } from '../../utils/password';
 
 /**
  * 백엔드 준비 전 목업 구현. 응답 모양은 API 명세와 같고,
@@ -218,6 +219,12 @@ const store = {
   verifications: new Map<string, { sentAt: number; sentToday: number; attempts: number; used: boolean }>(),
   /** 가입 토큰 → 인증한 이메일 */
   verificationTokens: new Map<string, string>(),
+  /** 이메일 → 보낸 비밀번호 재설정 코드의 상태. 가입 인증과 따로 센다 */
+  resets: new Map<string, { sentAt: number; sentToday: number; attempts: number; used: boolean }>(),
+  /** 재설정 토큰 → 인증한 이메일 */
+  resetTokens: new Map<string, string>(),
+  /** 이번 시간에 받은 버그 신고 시각들 (한 시간 5건) */
+  bugReports: [] as number[],
   ruleCandidates: RULE_CANDIDATES.map((c) => ({ ...c })) as RuleCandidate[],
   /** 다음 비서 요청을 이 오류로 실패시킨다 (개발용) */
   failAssistant: null as ApiRequestError | null,
@@ -239,8 +246,48 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const CODE_TTL_MS = 5 * 60_000;
 const RESEND_MS = 60_000;
 
+/** 서버처럼 오류마다 traceId 를 붙인다. 버그 신고가 마지막 traceId 를 싣는 것을 목업에서도 볼 수 있다 */
 const reject = (status: number, code: string, message: string) =>
-Promise.reject(new ApiRequestError(status, code, message));
+Promise.reject(new ApiRequestError(status, code, message, nextId('mock-trace')));
+
+/** 코드 보내기. 가입 인증과 재설정이 같은 규칙(60초, 하루 5번)을 따로 센다 */
+const sendCode = (
+sent: Map<string, { sentAt: number; sentToday: number; attempts: number; used: boolean }>,
+key: string) =>
+{
+  const previous = sent.get(key);
+  const at = Date.now();
+  if (previous && at - previous.sentAt < RESEND_MS) {
+    const left = Math.ceil((RESEND_MS - (at - previous.sentAt)) / 1000);
+    return reject(429, 'VERIFICATION_RESEND_TOO_SOON', `${left}초 뒤에 다시 요청할 수 있습니다.`);
+  }
+  if (previous && previous.sentToday >= 5)
+  return reject(429, 'VERIFICATION_DAILY_LIMIT', '오늘은 더 보낼 수 없습니다.');
+  sent.set(key, { sentAt: at, sentToday: (previous?.sentToday ?? 0) + 1, attempts: 0, used: false });
+  return delay(undefined);
+};
+
+/** 코드 확인. 맞으면 tokens 에 토큰을 넣고 돌려준다 */
+const confirmCode = (
+sent: Map<string, { sentAt: number; sentToday: number; attempts: number; used: boolean }>,
+tokens: Map<string, string>,
+email: string,
+code: string) =>
+{
+  const key = normalizeEmail(email);
+  if (!/^\d{6}$/.test(code)) return reject(400, 'VALIDATION_ERROR', '코드는 숫자 6자리입니다.');
+  const record = sent.get(key);
+  if (!record || record.used || record.attempts >= 5 || Date.now() - record.sentAt > CODE_TTL_MS)
+  return reject(400, 'VERIFICATION_CODE_EXPIRED', '코드를 다시 받아 주세요.');
+  if (code !== MOCK_VERIFICATION_CODE) {
+    record.attempts += 1;
+    return reject(400, 'INVALID_VERIFICATION_CODE', '코드가 맞지 않습니다.');
+  }
+  record.used = true;
+  const verificationToken = `mock-verification-${++seq}`;
+  tokens.set(verificationToken, key);
+  return delay({ verificationToken });
+};
 
 const signInAs = (email: string | null) => {
   store.signedIn = true;
@@ -756,42 +803,37 @@ export const mockApi: Api = {
       const key = normalizeEmail(email);
       if (!EMAIL_PATTERN.test(key)) return reject(400, 'VALIDATION_ERROR', '이메일 형식이 아닙니다.');
       if (store.accounts.has(key)) return reject(409, 'EMAIL_ALREADY_EXISTS', '이미 가입한 이메일입니다.');
-      const previous = store.verifications.get(key);
-      const at = Date.now();
-      if (previous && at - previous.sentAt < RESEND_MS) {
-        const left = Math.ceil((RESEND_MS - (at - previous.sentAt)) / 1000);
-        return reject(429, 'VERIFICATION_RESEND_TOO_SOON', `${left}초 뒤에 다시 요청할 수 있습니다.`);
-      }
-      if (previous && previous.sentToday >= 5)
-      return reject(429, 'VERIFICATION_DAILY_LIMIT', '오늘은 더 보낼 수 없습니다.');
-      store.verifications.set(key, { sentAt: at, sentToday: (previous?.sentToday ?? 0) + 1, attempts: 0, used: false });
-      return delay(undefined);
+      return sendCode(store.verifications, key);
     },
-    confirmEmailVerification: ({ email, code }) => {
-      const key = normalizeEmail(email);
-      if (!/^\d{6}$/.test(code)) return reject(400, 'VALIDATION_ERROR', '코드는 숫자 6자리입니다.');
-      const sent = store.verifications.get(key);
-      if (!sent || sent.used || sent.attempts >= 5 || Date.now() - sent.sentAt > CODE_TTL_MS)
-      return reject(400, 'VERIFICATION_CODE_EXPIRED', '코드를 다시 받아 주세요.');
-      if (code !== MOCK_VERIFICATION_CODE) {
-        sent.attempts += 1;
-        return reject(400, 'INVALID_VERIFICATION_CODE', '코드가 맞지 않습니다.');
-      }
-      sent.used = true;
-      const verificationToken = `mock-verification-${++seq}`;
-      store.verificationTokens.set(verificationToken, key);
-      return delay({ verificationToken });
-    },
+    confirmEmailVerification: ({ email, code }) => confirmCode(store.verifications, store.verificationTokens, email, code),
     signup: ({ email, password, verificationToken }) => {
       const key = normalizeEmail(email);
-      if (password.length < 8 || new TextEncoder().encode(password).length > 72)
-      return reject(400, 'VALIDATION_ERROR', '비밀번호는 8자 이상, 72바이트 이하입니다.');
+      const problem = passwordProblem(password);
+      if (problem) return reject(400, 'VALIDATION_ERROR', problem);
       if (store.verificationTokens.get(verificationToken) !== key)
       return reject(400, 'EMAIL_NOT_VERIFIED', '이메일 인증을 다시 해 주세요.');
       if (store.accounts.has(key)) return reject(409, 'EMAIL_ALREADY_EXISTS', '이미 가입한 이메일입니다.');
       store.verificationTokens.delete(verificationToken);
       store.accounts.set(key, password);
       signInAs(key);
+      return delay(undefined);
+    },
+    // 목업은 어느 이메일이든 목업 비밀번호로 들어가므로 가입한 이메일로 보고 코드를 보낸다
+    requestPasswordReset: ({ email }) => {
+      const key = normalizeEmail(email);
+      if (!EMAIL_PATTERN.test(key)) return reject(400, 'VALIDATION_ERROR', '이메일 형식이 아닙니다.');
+      return sendCode(store.resets, key);
+    },
+    confirmPasswordReset: ({ email, code }) => confirmCode(store.resets, store.resetTokens, email, code),
+    completePasswordReset: ({ email, verificationToken, newPassword }) => {
+      const key = normalizeEmail(email);
+      if (store.resetTokens.get(verificationToken) !== key)
+      return reject(400, 'EMAIL_NOT_VERIFIED', '코드 확인부터 다시 해 주세요.');
+      // 규칙에 맞지 않으면 토큰은 그대로 둔다. 고쳐서 다시 보내면 된다
+      const problem = passwordProblem(newPassword);
+      if (problem) return reject(400, 'VALIDATION_ERROR', problem);
+      store.resetTokens.delete(verificationToken);
+      store.accounts.set(key, newPassword);
       return delay(undefined);
     },
     // 목업은 카카오에 다녀오지 않는다. 코드가 비어 있지 않으면 카카오 계정(이메일 없음)으로 들어간다
@@ -821,7 +863,32 @@ export const mockApi: Api = {
       createdAt: '2026-09-01T10:00:00+09:00',
       role: isAdminEmail(store.email) ? 'ADMIN' as const : 'USER' as const
     }),
-    remove: () => delay(undefined)
+    remove: () => delay(undefined),
+    changePassword: ({ currentPassword, newPassword }) => {
+      if (!store.signedIn) return reject(401, 'UNAUTHORIZED', '로그인이 필요합니다.');
+      if (store.email === null) return reject(409, 'PASSWORD_NOT_SET', '비밀번호가 없는 계정입니다.');
+      const saved = store.accounts.get(store.email);
+      if (currentPassword !== (saved ?? MOCK_PASSWORD))
+      return reject(400, 'INVALID_CURRENT_PASSWORD', '현재 비밀번호가 맞지 않습니다.');
+      const problem = passwordProblem(newPassword);
+      if (problem) return reject(400, 'VALIDATION_ERROR', problem);
+      store.accounts.set(store.email, newPassword);
+      return delay(undefined);
+    }
+  },
+
+  bugReports: {
+    create: ({ message }) => {
+      if (!store.signedIn) return reject(401, 'UNAUTHORIZED', '로그인이 필요합니다.');
+      if (!message.trim() || message.length > 2000)
+      return reject(400, 'VALIDATION_ERROR', '내용을 2000자 안으로 적어 주세요.');
+      const hour = Math.floor(Date.now() / 3_600_000);
+      store.bugReports = store.bugReports.filter((at) => Math.floor(at / 3_600_000) === hour);
+      if (store.bugReports.length >= 5)
+      return reject(429, 'BUG_REPORT_RATE_LIMITED', '한 시간에 5건까지 받습니다.');
+      store.bugReports.push(Date.now());
+      return delay(undefined);
+    }
   },
 
   contexts: {

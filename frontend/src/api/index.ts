@@ -3,7 +3,7 @@ import { httpApi } from './http';
 import { MOCK_PASSWORD, MOCK_VERIFICATION_CODE, mockApi, mockSeedSession } from './mock';
 
 export type { Api, ExportScope, PageQuery, TransactionQuery, JudgmentQuery, QuestionQuery } from './contract';
-export { ApiRequestError } from './contract';
+export { ApiRequestError, lastErrorTraceId } from './contract';
 
 /**
  * 화면에서 쓰는 단일 진입점.

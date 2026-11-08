@@ -43,7 +43,10 @@ const NO_BEARER = new Set([
 '/auth/signup',
 '/auth/kakao',
 '/auth/email-verification',
-'/auth/email-verification/confirm']
+'/auth/email-verification/confirm',
+'/auth/password-reset',
+'/auth/password-reset/confirm',
+'/auth/password-reset/complete']
 );
 /** 이 경로의 401 은 재발급으로 풀리지 않는다 */
 const isAuthPath = (path: string) => path.startsWith('/auth/');
@@ -220,7 +223,8 @@ retried = false)
       error.code ?? 'UNKNOWN',
       // 본문이 없거나(프록시의 502·504) 한글이 없는 서버 기본 문구(Spring 의 영어)면 화면에 올리지 않는다 (C65)
       error.message && /[가-힣]/.test(error.message) ? error.message : '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.',
-      error.traceId ?? '',
+      // 본문이 없는 오류(프록시의 502)도 서버를 거쳤으면 헤더에 남는다 (#225)
+      error.traceId ?? response.headers.get('X-Trace-Id') ?? '',
       response.headers.has('Retry-After') && Number.isFinite(retryAfter) ? retryAfter : undefined,
       // 409 RUN_ALREADY_ACTIVE 에만 붙는다 (#228). 문자열이 아니면 없는 것으로 둔다
       typeof error.runId === 'string' ? error.runId : undefined
@@ -232,6 +236,7 @@ retried = false)
 const get = <T,>(path: string, query?: Query) => request<T>('GET', path, { query });
 const post = <T,>(path: string, body?: unknown, idempotencyKey?: string) =>
 request<T>('POST', path, { body, idempotencyKey });
+const put = <T,>(path: string, body?: unknown) => request<T>('PUT', path, { body });
 const del = (path: string) => request<void>('DELETE', path);
 
 /** 응답에서 쓰지 않는 쿼리 값을 거르지 않고 그대로 넘긴다. 서버가 계약의 주인이다 */
@@ -260,6 +265,9 @@ export const httpApi: Api = {
     requestEmailVerification: (body) => post<void>('/auth/email-verification', body),
     confirmEmailVerification: (body) => post('/auth/email-verification/confirm', body),
     signup: (body) => enter('/auth/signup', body),
+    requestPasswordReset: (body) => post<void>('/auth/password-reset', body),
+    confirmPasswordReset: (body) => post('/auth/password-reset/confirm', body),
+    completePasswordReset: (body) => post<void>('/auth/password-reset/complete', body),
     kakao: (body) => enter('/auth/kakao', body),
     // 아직 로그인 전이라 잃을 것이 없다. 어떤 이유로든 못 이어 가면 로그인 화면이다
     restore: () => {
@@ -290,7 +298,12 @@ export const httpApi: Api = {
 
   users: {
     me: () => get('/users/me'),
-    remove: () => del('/users/me')
+    remove: () => del('/users/me'),
+    changePassword: (body) => put<void>('/users/me/password', body)
+  },
+
+  bugReports: {
+    create: (body) => post<void>('/bug-reports', body)
   },
 
   contexts: {

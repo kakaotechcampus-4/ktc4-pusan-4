@@ -419,11 +419,11 @@ describe('가입·카카오 로그인 (목업, #193·#176)', () => {
   it('코드 받기 → 확인 → 가입하면 바로 로그인되고, 그 비밀번호로 다시 들어온다', async () => {
     await api.auth.requestEmailVerification({ email: ' New@Example.com ' });
     const { verificationToken } = await api.auth.confirmEmailVerification({ email: 'new@example.com', code: '123456' });
-    await api.auth.signup({ email: 'new@example.com', password: 'longenough', verificationToken });
+    await api.auth.signup({ email: 'new@example.com', password: 'longenough1!', verificationToken });
     expect(await api.users.me()).toMatchObject({ email: 'new@example.com' });
 
     await api.auth.logout();
-    await api.auth.login({ email: 'NEW@example.com', password: 'longenough' });
+    await api.auth.login({ email: 'NEW@example.com', password: 'longenough1!' });
     expect((await api.users.me()).email).toBe('new@example.com');
     // 가입한 이메일은 코드를 다시 받을 수 없다
     await expect(api.auth.requestEmailVerification({ email: 'new@example.com' })).rejects.toMatchObject({
@@ -454,7 +454,7 @@ describe('가입·카카오 로그인 (목업, #193·#176)', () => {
     await api.auth.requestEmailVerification({ email: 'c@example.com' });
     const { verificationToken } = await api.auth.confirmEmailVerification({ email: 'c@example.com', code: '123456' });
     await expect(
-      api.auth.signup({ email: 'd@example.com', password: 'longenough', verificationToken })
+      api.auth.signup({ email: 'd@example.com', password: 'longenough1!', verificationToken })
     ).rejects.toMatchObject({ code: 'EMAIL_NOT_VERIFIED' });
     await expect(
       api.auth.signup({ email: 'c@example.com', password: 'short', verificationToken })
@@ -465,6 +465,65 @@ describe('가입·카카오 로그인 (목업, #193·#176)', () => {
   it('카카오 계정은 email 이 null 이다', async () => {
     await api.auth.kakao({ code: 'any-code' });
     expect(await api.users.me()).toMatchObject({ email: null, role: 'USER' });
+  });
+
+  it('규칙에 맞지 않는 비밀번호는 이유를 message 에 담아 400 이다', async () => {
+    await api.auth.requestEmailVerification({ email: 'e@example.com' });
+    const { verificationToken } = await api.auth.confirmEmailVerification({ email: 'e@example.com', code: '123456' });
+    await expect(
+      api.auth.signup({ email: 'e@example.com', password: 'longenough', verificationToken })
+    ).rejects.toMatchObject({ code: 'VALIDATION_ERROR', message: '숫자, 기호를 하나 이상 넣어 주세요.' });
+  });
+});
+
+describe('비밀번호 재설정과 변경 (목업, #270)', () => {
+  it('코드 받기 → 확인 → 새 비밀번호로 바꾸면 그 비밀번호로 들어온다', async () => {
+    await api.auth.requestPasswordReset({ email: 'r@example.com' });
+    const { verificationToken } = await api.auth.confirmPasswordReset({ email: 'r@example.com', code: '123456' });
+    // 규칙에 맞지 않으면 토큰은 그대로라 고쳐서 다시 보낸다
+    await expect(
+      api.auth.completePasswordReset({ email: 'r@example.com', verificationToken, newPassword: 'short' })
+    ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    await api.auth.completePasswordReset({ email: 'r@example.com', verificationToken, newPassword: 'newpass1!' });
+    // 바꾸고 나면 토큰은 더 쓸 수 없다
+    await expect(
+      api.auth.completePasswordReset({ email: 'r@example.com', verificationToken, newPassword: 'other12!' })
+    ).rejects.toMatchObject({ code: 'EMAIL_NOT_VERIFIED' });
+    await api.auth.login({ email: 'r@example.com', password: 'newpass1!' });
+    expect((await api.users.me()).email).toBe('r@example.com');
+  });
+
+  it('가입 인증 코드와 재설정 코드는 따로 센다', async () => {
+    await api.auth.requestEmailVerification({ email: 's@example.com' });
+    await expect(api.auth.requestPasswordReset({ email: 's@example.com' })).resolves.toBeUndefined();
+    await expect(api.auth.requestPasswordReset({ email: 's@example.com' })).rejects.toMatchObject({
+      code: 'VERIFICATION_RESEND_TOO_SOON'
+    });
+  });
+
+  it('현재 비밀번호가 맞아야 바꾸고, 카카오 계정은 409 PASSWORD_NOT_SET 이다', async () => {
+    await api.auth.login({ email: 'p@example.com', password: 'demo1234' });
+    await expect(
+      api.users.changePassword({ currentPassword: 'wrong', newPassword: 'newpass1!' })
+    ).rejects.toMatchObject({ code: 'INVALID_CURRENT_PASSWORD' });
+    await api.users.changePassword({ currentPassword: 'demo1234', newPassword: 'newpass1!' });
+    await api.auth.logout();
+    await api.auth.login({ email: 'p@example.com', password: 'newpass1!' });
+
+    await api.auth.kakao({ code: 'any-code' });
+    await expect(
+      api.users.changePassword({ currentPassword: 'x', newPassword: 'newpass1!' })
+    ).rejects.toMatchObject({ status: 409, code: 'PASSWORD_NOT_SET' });
+  });
+
+  it('버그 신고는 로그인해야 받고 한 시간에 5건까지다', async () => {
+    await expect(api.bugReports.create({ message: '금액이 0원' })).rejects.toMatchObject({ status: 401 });
+    await api.auth.login({ email: 'q@example.com', password: 'demo1234' });
+    for (let i = 0; i < 5; i += 1) await api.bugReports.create({ message: `신고 ${i}` });
+    await expect(api.bugReports.create({ message: '여섯 번째' })).rejects.toMatchObject({
+      status: 429,
+      code: 'BUG_REPORT_RATE_LIMITED'
+    });
   });
 });
 

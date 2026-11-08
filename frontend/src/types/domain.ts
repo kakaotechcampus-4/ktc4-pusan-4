@@ -115,11 +115,33 @@ export interface EmailVerificationConfirmed {
   verificationToken: string;
 }
 
-/** 이메일 가입 (#193). password 는 8자 이상, UTF-8 72바이트 이하 */
+/** 이메일 가입 (#193). password 는 영문, 숫자, 기호를 섞은 8~72자(utils/password.ts) */
 export interface SignupRequest {
   email: string;
   password: string;
   verificationToken: string;
+}
+
+/** 비밀번호 재설정 마무리 (api.md 1.1). 토큰은 password-reset/confirm 이 준 것이다 */
+export interface PasswordResetCompleteRequest {
+  email: string;
+  verificationToken: string;
+  newPassword: string;
+}
+
+/** 내 비밀번호 바꾸기 (api.md 3.1) */
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
+/** 버그 신고 (api.md 3.16). message 만 필수다 */
+export interface BugReportRequest {
+  message: string;
+  pageUrl?: string;
+  userAgent?: string;
+  /** 마지막으로 받은 오류 응답의 traceId */
+  traceId?: string;
 }
 
 /** 카카오가 콜백 주소로 넘긴 인가 코드 (#176). 한 번만 쓸 수 있다 */
