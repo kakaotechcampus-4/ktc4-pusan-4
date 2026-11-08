@@ -351,6 +351,8 @@ export interface Judgment {
   /** 이 revision 이 생성된 직접 원인 */
   origin: JudgmentOrigin;
   verdict: Coded<Verdict>;
+  /** 답변 대기. 불가인데 이 거래에 답하지 않은 질문이 남았다. 판정이 아니라 불가에 붙는 표지다 (C12) */
+  awaitingAnswer: boolean;
   /** 룰엔진 판정 범위 밖(핸드오프). NEEDS_REVIEW 일 때만 true 일 수 있다 */
   outOfScope: boolean;
   blockedAtGate: GateId | null;
@@ -393,6 +395,8 @@ export interface JudgmentExportRow {
 export interface VerdictSummary {
   count: number;
   finalAmount: number;
+  /** 그 판정이 난 거래의 결제 금액 합 */
+  spendAmount: number;
 }
 
 export type SummaryScopeType = 'BATCH' | 'YEAR' | 'RUN';
@@ -422,6 +426,8 @@ export interface JudgmentSummary {
   byAccount: { account: string; accountLabel: string; count: number; finalAmount: number }[];
   /** 범위에 접대비 판정이 있는 과세연도마다 하나. runId 범위는 빈 배열 */
   limits: LimitYear[];
+  /** 답변 대기. 불가에 붙는 표지라 byVerdict.UNAVAILABLE 에도 들어 있다 */
+  awaiting: { count: number; spendAmount: number };
 }
 
 /**

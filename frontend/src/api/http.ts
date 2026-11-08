@@ -387,7 +387,9 @@ export const httpApi: Api = {
       transactionId: query?.transactionId,
       runId: query?.runId,
       verdict: query?.verdict,
-      latestOnly: query?.latestOnly
+      latestOnly: query?.latestOnly,
+      awaiting: query?.awaiting,
+      sort: query?.sort
     }),
     get: (judgmentId) => get(`/judgments/${judgmentId}`),
     export: (scope) => get('/judgments/export', { batchId: scope.batchId, year: scope.year }),

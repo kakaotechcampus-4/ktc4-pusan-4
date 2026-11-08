@@ -13,7 +13,7 @@ import type {
 /** 백엔드 준비 전 목업. 모양은 API 명세 3.3~3.7 응답과 같다. */
 
 /** 응답 시점에 붙는 필드(거래 요약)는 목업이 읽을 때 채운다 */
-export type JudgmentSeed = Omit<Judgment, 'transaction' | 'accountLabel'>;
+export type JudgmentSeed = Omit<Judgment, 'transaction' | 'accountLabel' | 'awaitingAnswer'>;
 
 /** 상태·답·거래 줄은 목업이 지금 상태에서 계산한다 */
 export type QuestionGroupSeed = Pick<
