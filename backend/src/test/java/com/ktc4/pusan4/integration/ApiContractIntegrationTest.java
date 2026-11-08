@@ -63,6 +63,7 @@ class ApiContractIntegrationTest {
         "GET /api/v1/classification-reviews",
         "POST /api/v1/classification-responses",
         "POST /api/v1/judgment-runs",
+        "GET /api/v1/judgment-runs/active",
         "GET /api/v1/judgment-runs/{runId}",
         "GET /api/v1/judgment-runs/{runId}/failures",
         "GET /api/v1/judgments",

@@ -24,3 +24,8 @@
 
 - `JudgmentRunActiveConflictIntegrationTest` 에 4건 추가: 다른 batch 도 막힘, 다른 사용자는 안 막힘, active 가 내 run 만 줌, 끝났거나 멈춘 run 은 active 가 아님.
 - 클라우드 세션에서 Maven Central 이 막혀 BE 빌드와 테스트를 돌리지 못했다. 로컬에서 돌려야 한다.
+
+## 추가: CI 실패 수정
+
+- PR #276 의 Backend CI 가 `ApiContractIntegrationTest.openapi_paths_match_api_md_contract` 에서 실패했다. 이 테스트는 OpenAPI 경로가 계약 목록과 정확히 같아야 해서, 새 `GET /api/v1/judgment-runs/active` 를 목록에 넣었다.
+- 처음 확인 때 새 테스트 클래스 하나만 돌려서 놓쳤다. 엔드포인트를 더하면 이 목록도 같이 고친다.
