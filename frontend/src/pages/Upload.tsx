@@ -86,6 +86,8 @@ const draft = {
   seq: 0,
   /** 연타로 두 번 보내지 않게 막는다 */
   sending: false,
+  /** 보내기 시작한 때. 다른 화면에 갔다 와도 지난 시간을 이어 센다 */
+  sendingSince: 0,
   listeners: new Set<() => void>()
 };
 
@@ -236,6 +238,7 @@ export function Upload() {
     if (!request) return;
     const mine = draft.seq;
     draft.sending = true;
+    draft.sendingSince = Date.now();
     put({ ...phase, send: 'sending' });
     try {
       const created = await api.uploads.create(request, key);
@@ -293,7 +296,12 @@ export function Upload() {
             <BlockedCard file={phase.file} outcome={phase.outcome} onReset={reset} />
             }
 
-            {phase.kind === 'preview' &&
+            {/* 1만 건이면 서버가 저장하고 분류하는 데 10초 넘게 걸린다(#274). 미리보기 대신 올리는 중임을 크게 보인다 (11/8 회의) */}
+            {phase.kind === 'preview' && phase.send === 'sending' && phase.outcome.request &&
+            <SendingCard request={phase.outcome.request} since={draft.sendingSince} />
+            }
+
+            {phase.kind === 'preview' && phase.send !== 'sending' &&
             <PreviewCard
               file={phase.file}
               outcome={phase.outcome}
@@ -420,6 +428,35 @@ function ParsingCard({ file }: {file: File;}) {
         <h2 className="text-body-lg font-bold text-ink">파일을 읽고 있습니다</h2>
       </div>
       <p className="mt-1.5 break-all text-body text-ink2">{file.name}</p>
+    </section>);
+
+}
+
+/**
+ * 올리는 중. 서버는 한 요청 안에서 거래를 저장하고 가맹점을 분류한 뒤 답한다. 얼마나 남았는지 알 길이 없어
+ * 진행 막대 대신 지난 시간을 센다. 멈춘 것이 아니라는 것만 보인다
+ */
+function SendingCard({ request, since }: {request: UploadBatchRequest;since: number;}) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const seconds = Math.max(0, Math.floor((now - since) / 1000));
+
+  return (
+    <section className={BOX} aria-busy="true">
+      <div className="flex items-center gap-2.5">
+        <Loader2Icon className="h-4 w-4 animate-spin text-ink2" aria-hidden="true" />
+        <h2 className="text-body-lg font-bold text-ink">카드내역을 올리고 있습니다</h2>
+      </div>
+      <Identity request={request} />
+      <p className="mt-4 text-body text-ink">
+        {formatNumber(request.transactions.length)}건을 저장하고 가맹점을 분류합니다.{' '}
+        {/* 매초 읽으면 시끄럽다. 화면 읽기 프로그램에는 aria-busy 로 기다리는 중임을 알린다 */}
+        <span className="tabular-nums text-ink2">{formatNumber(seconds)}초</span>
+      </p>
+      <p className="mt-1.5 text-body text-ink2">다른 화면으로 가도 올리기는 이어집니다.</p>
     </section>);
 
 }
