@@ -626,7 +626,7 @@ transactionId?: string)
 };
 
 const notFound = (code: string, message: string) =>
-Promise.reject(new ApiRequestError(404, code, message));
+Promise.reject(new ApiRequestError(404, code, message, nextId('mock-trace')));
 
 /** 승인·기각. 검토한 사람과 시각을 남긴다. 이미 처리한 후보는 다시 바꾸지 않는다 */
 const reviewCandidate = (id: number, status: RuleCandidate['status']) => {
@@ -1636,7 +1636,23 @@ Object.fromEntries(
 ) as T;
 
 /** 로그인과 신고 자체의 실패는 신고할 오류가 아니라 적지 않는다 (http.ts 와 같다) */
-export const mockApi: Api = { ...remembering(mockGroups), auth: mockGroups.auth, bugReports: mockGroups.bugReports };
+/** 로그인, 로그아웃하면 앞 세션의 traceId 를 지운다 (http.ts 와 같다) */
+const forgetting = <A extends unknown[], R>(call: (...args: A) => R) => (...args: A) => {
+  rememberTraceId(null);
+  return call(...args);
+};
+
+export const mockApi: Api = {
+  ...remembering(mockGroups),
+  auth: {
+    ...mockGroups.auth,
+    login: forgetting(mockGroups.auth.login),
+    signup: forgetting(mockGroups.auth.signup),
+    kakao: forgetting(mockGroups.auth.kakao),
+    logout: forgetting(mockGroups.auth.logout)
+  },
+  bugReports: mockGroups.bugReports
+};
 
 /**
  * 목업 전용 — 흐름을 거치지 않고 화면에 바로 들어와도 보이도록 세션 초기값을 준다.

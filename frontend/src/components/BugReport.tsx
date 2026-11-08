@@ -256,13 +256,14 @@ export function BugReportButton({ className, label = '버그 신고', icon = tru
 /** /bug-report 화면의 신고 칸. 로그인 전이거나 메일 계정이 없는 서버면 메일 안내를 보인다 */
 export function BugReportPanel() {
   const form = useBugReportForm();
-  // 보냈거나 메일로 넘어가면 보내기 버튼이 사라져 초점이 body 로 떨어진다. 바뀐 첫 줄로 옮긴다
+  // 보냈거나 메일로 넘어가면 보내기 버튼이, 하나 더 보내면 그 버튼이 사라져 초점이 body 로 떨어진다. 바뀐 첫 줄이나 적는 칸으로 옮긴다
   const status = useRef<HTMLParagraphElement>(null);
   const shown = useRef(form.mode);
   useEffect(() => {
-    if (shown.current !== form.mode) status.current?.focus();
+    if (shown.current !== form.mode)
+    (form.mode === 'form' ? document.getElementById(form.formId)?.querySelector('textarea') : status.current)?.focus();
     shown.current = form.mode;
-  }, [form.mode]);
+  }, [form.mode, form.formId]);
 
   if (form.mode === 'mail')
   return (
