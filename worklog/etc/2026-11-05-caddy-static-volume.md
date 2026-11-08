@@ -63,3 +63,51 @@
 - 이 PR 자신의 첫 배포는 여전히 옛 스크립트가 돈다. 그래서 `web-files` 를 compose 에 둔 앞의 고침은 그대로 필요하다.
 - `--rollback` 으로 재실행이 없는 옛 커밋에 가면 그 스크립트가 `exec 9>` 로 잠금을 다시 잡는다. 이어받은 fd 가 닫히며 잠금이 잠깐 풀렸다 다시 잡힌다.
 - 가짜 EC2 확인: 이 커밋을 배포한 뒤 블루그린 브랜치를 배포하니 새 스크립트로 넘어가 돌았다(블루그린 쪽 전환이 실행됨). `--rollback` 으로 이 커밋에 돌아오는 것도 돌았다.
+
+## 20:33 백엔드·AI 블루그린 배포 (feature/blue-green-deploy, ffa200c..559f699)
+
+- `deploy/compose.yaml`: `backend`·`ai` 를 앵커(`x-backend`, `x-ai`)로 올리고 `backend-blue/green`, `ai-blue/green` 을 profile 로 둔다. 같은 색끼리만 서로 부른다. backend 호스트 포트는 blue 8080, green 8081. ai 에 `stop_grace_period: 40s`(비서 한 턴 30초). 배치용 `ai-job` 을 두고 `corpus-sync.sh`·`rule-candidates.sh` 가 쓴다.
+- `deploy.sh`: 받는 색은 `deploy/caddy/upstream.caddy`(gitignore, Caddyfile 이 import). 쉬는 색 `up --wait` → schema/rag → upstream 쓰기 → `up --no-deps web` → `caddy reload` → `run web-files` → 다른 색 `stop` → 블루그린 이전 한 쌍이 있으면 stop·rm.
+- 문서: `deployment.md` 구조도·순서도를 블루그린으로 바꾸고 4절 「블루그린 전환」, 5절 롤백, 6·10·14·15절 이름을 고쳤다. `db/README.md` 호환 규칙에 블루그린을 적었다.
+
+### 왜
+
+- 쌍으로 묶은 이유: backend → ai(비서·분류), ai → backend(비서 도구) 로 서로 부른다. 따로 바꾸면 전환 중 새 backend 와 옛 ai 가 섞인다.
+- 전환을 Caddy reload 로 한 이유: `lb_policy first` + 헬스체크로 자동 전환하면 옛 색이 앞 순서일 때 SIGTERM 전까지 계속 받고, keep-alive 로 들어간 POST 가 종료 중에 끊길 수 있다. reload 는 옛 서버가 하던 요청만 마저 끝내고 새 요청은 새 설정으로 보낸다.
+- 받는 색을 git 밖 파일에 둔 이유: 추적 파일이면 `git checkout --force` 가 매 배포 되돌린다. 디렉터리 마운트(`deploy/caddy/`) 안이라 web 정의를 바꾸지 않아도 되고, 그래서 첫 전환에서도 Caddy 가 다시 뜨지 않는다.
+- green 부터 띄우는 경우: 가짜 EC2 첫 시도에서 옛 `backend` 가 호스트 8080 을 잡고 있어 `backend-blue` 가 `port is already allocated` 로 못 떴다(배포는 실패, 옛 쌍이 계속 받아 끊김 0). 한 쌍 컨테이너가 있으면 green(8081)부터 띄우게 했다. `--rollback` 으로 한 쌍에 갔다 돌아올 때도 같은 경로다.
+- 다른 색을 늘 stop 하는 이유: 넘기기 전에 실패한 배포가 남긴 컨테이너(위 첫 시도의 ai-blue)를 다음 배포가 치운다.
+
+### 가짜 EC2 확인 (0.2초마다 `/`·`/api/v1/users/me`, 메모리는 cgroup anon)
+
+| 배포 | 화면 끊김 | API 끊김 | 메모리 최대 |
+| --- | --- | --- | --- |
+| 한 쌍 → 블루그린 첫 배포(PR1 스크립트가 이 스크립트로 넘김) | 0 | 0 | 1,245MB |
+| green → blue | 0 | 0 | 1,128MB |
+| blue → green | 0 | 0 | 1,145MB |
+| `--rollback` 으로 한 쌍 커밋 | 0 | 19.1초 | 679MB |
+| 한 쌍 → 블루그린 다시 | 0 | 0 | 1,186MB |
+
+- 한 쌍일 때 평소 메모리는 약 620~660MB 였다. 빈 DB 라 운영보다 적다.
+- `ai-job` 을 `corpus-sync.sh` 와 같은 인자(`run --rm --no-deps -T -v rules:/rules:ro`)로 띄워 import·마운트·DB 주소를 확인했다.
+
+### 남은 것
+
+- 판정 run 이 도는 중의 전환, 비서 턴이 걸친 전환은 재지 않았다(가짜 EC2 에 로그인 수단이 없음). 옛 쌍 종료 대기는 기존 `stop_grace_period` 동작이다.
+- CloudWatch Agent 설정(`prometheus.yaml`)은 배포로 바뀌지 않는다. 머지 뒤 EC2 에서 `deploy/cloudwatch-agent/install.sh` 를 다시 돌려야 green(8081) 지표가 들어간다.
+- 위 PR1 절의 "20:55" 머리글은 잘못 적은 시각이다(실제로는 20:30 무렵).
+
+## 21:40 판정 run 이 도는 중의 배포 측정 (가짜 EC2)
+
+- 가입은 Redis 에 `email-verify:verified:<email>` 을 직접 넣어 메일 없이 했다. 문진·업로드·거래 N건·인용 조문은 `JudgmentRunBenchmarkIntegrationTest` 처럼 DB 에 넣고, run 은 API 로 만들었다. run 을 만든 3초 뒤 배포하며 1초마다 run 상태를 API 로 조회했다.
+- 처리 실패 185/5000 은 가짜 조문 데이터 때문이고 매번 같은 수다.
+
+| 배포 | API 끊김 | run 결과 |
+| --- | --- | --- |
+| 블루그린, run 5,000건(약 50초) | 0 | 5,000건 모두 처리. 옛 백엔드가 끝낸 뒤 내려감. 전환 뒤 조회도 새 백엔드로 진행률이 보임 |
+| 블루그린, run 12,000건(종료 대기 60초 초과) | 0 | 옛 백엔드가 60초 기다린 뒤 내려가 8,252건에서 멈춤. 약 6분 뒤 남은 건을 실패로 `PARTIAL_FAILED` |
+| 블루그린 이전 한 쌍, run 5,000건 | 63.1초 | 5,000건 모두 처리. 그 대신 run 이 끝날 때까지 API 가 멈춤 |
+
+- 첫 측정에서 전환 뒤 run 조회가 401 이었다. 가짜 환경의 `APP_AUTH_JWT_SECRET` 이 비어 백엔드마다 임시 키를 만들었기 때문이다. 키를 넣고 다시 쟀다.
+- 운영 `/etc/ktc4/production.env` 에도 `APP_AUTH_JWT_SECRET` 줄이 없다(2026-11-05 SSM 으로 줄 수만 셈). 지금도 재배포마다 모두 로그아웃되고, 블루그린에서도 전환마다 모두 로그아웃된다. 끊김 없는 배포가 의미 있으려면 운영 키를 먼저 넣어야 한다(deployment.md 9절).
+- 제안(아직 반영 안 함): 블루그린에서는 옛 백엔드의 종료 대기가 사용자에게 보이지 않는다. `app.judgment-run.await-termination` 과 `stop_grace_period` 를 늘리면 긴 run 도 옛 백엔드에서 끝낼 수 있다. 대신 두 쌍이 같이 떠 있는 시간과 배포 시간이 늘어난다.

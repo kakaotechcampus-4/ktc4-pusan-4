@@ -20,7 +20,9 @@
     handle /api/v1/* {
         # 로그인 뒤 API 요청은 기록하지 않는다
         log_skip
-        reverse_proxy backend:8080
+        # 지금 받는 색(reverse_proxy backend-blue:8080 또는 backend-green:8080). deploy.sh 가 쓰고 caddy reload 한다.
+        # 서버에만 있는 파일이라 git 에 없다(.gitignore). 블루그린 전환은 docs/deployment.md 4절
+        import upstream.caddy
     }
 
     handle {

@@ -26,7 +26,7 @@ trap 'rm -f "$log"' EXIT
 # 한 단계가 실패해도 나머지와 알림은 돌린다
 failed=()
 # 토큰은 PR 단계에만 넘긴다. 상시 떠 있는 ai 서버에는 두지 않는다
-"${run[@]}" -e RULES_PR_TOKEN ai python -m pipeline.promote | tee -a "$log" || failed+=(promote)
-"${run[@]}" ai python -m pipeline.candidates --limit 10 | tee -a "$log" || failed+=(candidates)
-"${run[@]}" ai python -m pipeline.notify --failed "${failed[*]}" <"$log" || failed+=(notify)
+"${run[@]}" -e RULES_PR_TOKEN ai-job python -m pipeline.promote | tee -a "$log" || failed+=(promote)
+"${run[@]}" ai-job python -m pipeline.candidates --limit 10 | tee -a "$log" || failed+=(candidates)
+"${run[@]}" ai-job python -m pipeline.notify --failed "${failed[*]}" <"$log" || failed+=(notify)
 [[ ${#failed[@]} -eq 0 ]]
