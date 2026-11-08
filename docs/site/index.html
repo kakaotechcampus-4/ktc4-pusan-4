@@ -79,17 +79,15 @@
   @media (prefers-reduced-motion:reduce) { .toc-ind, .toc a { transition:none; } }
   a.repo { text-decoration:none; white-space:nowrap; }
   a.repo:hover code { background:var(--blue); color:#fff; }
-  .rel { margin-top:56px; padding:24px; background:var(--surface); border-radius:24px; display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px; }
-  .rel p { grid-column:1/-1; margin:0 0 4px; font-size:13px; font-weight:700; color:var(--blue-d); }
-  .rel a { background:#fff; border-radius:16px; padding:12px 14px; text-decoration:none; color:var(--text); transition:background-color .15s; }
-  .rel a:hover { background:var(--blue-l); }
-  .rel b { display:block; font-size:14px; }
-  .rel small { color:var(--muted); font-size:12px; }
-  .pager { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:56px; }
-  .pager a { padding:16px 18px; background:var(--surface); border-radius:16px; text-decoration:none; color:var(--text); font-weight:700; font-size:15px; }
-  .pager a small { display:block; color:var(--muted); font-weight:500; font-size:12px; margin-bottom:4px; }
-  .pager a:hover { background:var(--blue-l); color:var(--blue-d); }
-  .pager .n { text-align:right; grid-column:2; }
+  /* 문서 끝 이동 줄: 이전 · 함께 보기 · 다음, 같은 비중 */
+  .pager { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); margin-top:56px; border-top:1px solid var(--line); }
+  .pager a { display:block; padding:14px 16px; border-radius:12px; text-decoration:none; color:var(--text); transition:background-color .15s; }
+  .pager a + a { box-shadow:inset 1px 0 0 var(--line); border-radius:0; }
+  .pager a:hover { background:var(--surface); border-radius:12px; box-shadow:none; }
+  .pager small { display:block; font-size:12px; color:var(--muted); margin-bottom:4px; }
+  .pager .rel-i small { color:var(--blue-d); }
+  .pager b { display:block; font-size:14px; font-weight:700; }
+  .pager a:hover b { color:var(--blue-d); }
   @media (max-width:1100px) { .page { grid-template-columns:200px minmax(0,1fr); } .toc { display:none; } }
   @media (max-width:860px) { .page { grid-template-columns:1fr; } .side { display:none; } .toc { display:none; } .top { gap:12px; padding:0 16px; } .tabs a { padding:0 8px; font-size:14px; white-space:nowrap; } .gh { display:none; } .hero h1 { font-size:32px; } }
   /* 오른쪽 아래 홈 버튼 (Really 코 클로즈업, 색은 frontend/src/assets/brand/really-fab 기준) */
@@ -869,6 +867,14 @@ function home() {
     }</div></section>`).join('')}</div>`;
 }
 
+// 문서 끝 한 줄: 이전 · 함께 보기(최대 2개, 이전/다음과 겹치면 뺌) · 다음 — 같은 모양으로 나란히
+function pagerItems(d, prev, next) {
+  const skip = new Set([d.id, prev?.id, next?.id]);
+  const rel = (RELATED[d.id] || []).filter(id => !skip.has(id)).slice(0, 2).map(id => flat.find(x => x.id === id));
+  const cell = (x, label, cls = '') => `<a class="${cls}" href="#${x.id}"><small>${label}</small><b>${x.t}</b></a>`;
+  return [prev && cell(prev, '← 이전'), ...rel.map(x => cell(x, '함께 보기', 'rel-i')), next && cell(next, '다음 →', 'n')].filter(Boolean).join('');
+}
+
 function doc(i) {
   const d = flat[i], prev = flat[i - 1], next = flat[i + 1];
   // 왼쪽 목록: 그룹마다 페이지를 나열하고 지금 페이지를 표시
@@ -881,8 +887,7 @@ function doc(i) {
       <div class="crumb"><a href="#">홈</a> / ${d.g}</div>
       <h1>${d.t}</h1>
       ${repoLink(d.html)}
-      ${RELATED[d.id] ? `<div class="rel"><p>함께 보면 좋은 문서</p>${RELATED[d.id].map(r => flat.find(x => x.id === r)).map(x => `<a href="#${x.id}"><b>${x.t}</b><small>${DESC[x.id]}</small></a>`).join('')}</div>` : ''}
-      <div class="pager">${prev ? `<a href="#${prev.id}"><small>← 이전</small>${prev.t}</a>` : ''}${next ? `<a class="n" href="#${next.id}"><small>다음 →</small>${next.t}</a>` : ''}</div>
+      <nav class="pager" aria-label="다른 문서">${pagerItems(d, prev, next)}</nav>
     </article><aside class="toc" id="toc"></aside></div>`;
   const hs = [...view.querySelectorAll('article h2')];
   const toc = document.getElementById('toc');
