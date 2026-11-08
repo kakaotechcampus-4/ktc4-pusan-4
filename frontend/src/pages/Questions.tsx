@@ -591,6 +591,7 @@ export function Questions() {
                           name={group.questionText}
                           columns={group.options.length >= 3 ? 3 : 2}
                           value={answerOf(group) ?? ''}
+                          selectOnFocus={false}
                           onChange={(value) => void answer(group, value, { index })}
                           options={choicesOf(group)} />
 
@@ -722,6 +723,7 @@ export function Questions() {
                       name={`${group.questionText} 답 바꾸기`}
                       columns={group.options.length >= 3 ? 3 : 2}
                       value={value ?? ''}
+                      selectOnFocus={false}
                       onChange={(next) => void answer(group, next)}
                       options={choicesOf(group)} />
 

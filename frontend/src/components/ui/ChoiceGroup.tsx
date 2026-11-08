@@ -19,6 +19,11 @@ interface ChoiceGroupProps<T extends string | boolean> {
   options: ChoiceOption<T>[];
   value: T;
   onChange: (value: T) => void;
+  /**
+   * 화살표로 옮길 때 바로 고르는지. 기본은 고른다(라디오 묶음 관례).
+   * 고르는 순간 서버에 저장하는 곳(질문 답)은 끈다. 화살표는 초점만 옮기고 Space, Enter 로 고른다
+   */
+  selectOnFocus?: boolean;
   /** 한 줄에 놓을 개수 (sm 이상). 기본 3 */
   columns?: 2 | 3 | 4;
   className?: string;
@@ -40,6 +45,7 @@ export function ChoiceGroup<T extends string | boolean>({
   options,
   value,
   onChange,
+  selectOnFocus = true,
   columns = 3,
   className
 }: ChoiceGroupProps<T>) {
@@ -53,6 +59,8 @@ export function ChoiceGroup<T extends string | boolean>({
   const tabStop = selectedIndex >= 0 ? selectedIndex : enabled[0];
 
   const onKeyDown = (event: React.KeyboardEvent, index: number) => {
+    // Alt+← 같은 브라우저 단축키는 그대로 둔다
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
     const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
     const edge = { Home: enabled[0], End: enabled[enabled.length - 1] }[event.key];
     const at = enabled.indexOf(index);
@@ -60,7 +68,7 @@ export function ChoiceGroup<T extends string | boolean>({
     if (next === undefined) return;
     event.preventDefault();
     buttons.current[next]?.focus();
-    onChange(options[next].value);
+    if (selectOnFocus) onChange(options[next].value);
   };
 
   return (
