@@ -45,7 +45,7 @@
 </td>
 <td width="50%">
 
-### 🤝 팀이 개발한 방법
+### 🤝 팀이&nbsp;개발한&nbsp;방법
 
 - **[디렉터리 구조](#디렉터리-구조)**
 - **[Git 규칙](#git-규칙)**
@@ -162,11 +162,17 @@
 
 ## RAG · 코퍼스 동기화
 
-<!-- 도식화 자리: RAG · 코퍼스 동기화 — 법령 코퍼스를 어디서 받아 어떻게 동기화하고, 규칙 후보 생성 때 어떻게 검색하는지. 그림은 docs/img/readme/ 에 넣고 아래 인용을 이미지로 바꿔 주세요 -->
-> 🖼️ **도식화 예정: RAG · 코퍼스 동기화**
+### RAG
 
-<!-- TODO: 짧은 설명 2~3줄 -->
-> ✏️ 작성 필요
+<p align="center"><img src="./docs/img/readme/rag.png" width="90%" alt="RAG 룰카드 후보 생성" /></p>
+
+> 하이브리드 검색 기반 RAG로 규칙 카드 자동 생성
+
+### 코퍼스 동기화
+
+<p align="center"><img src="./docs/img/readme/corpus-sync.png" width="90%" alt="코퍼스 동기화" /></p>
+
+> 매주 국가법령정보 API에서 바뀐 법령만 다시 임베딩해 코퍼스를 최신으로 유지하고, 영향받는 규칙 카드를 알림
 
 ---
 
@@ -197,11 +203,17 @@ AWS 준비, 백업, 주간 배치 타이머 설치는 [docs/deployment.md](docs/
 <!-- 도식화 자리: Blue / Green 배포 — 두 벌의 API · AI 서버와 배포 때 Caddy 전환 흐름. 그림은 docs/img/readme/ 에 넣고 아래 인용을 이미지로 바꿔 주세요 -->
 > 🖼️ **도식화 예정: Blue / Green 배포**
 
-### 모니터링 (CloudWatch)
+### 모니터링
+
+#### CloudWatch
 
 <!-- 넣을지 검토 중 -->
 <!-- 도식화 자리: CloudWatch — 로그 · 지표 수집과 Discord 알람 흐름 (넣을지 검토 중). 그림은 docs/img/readme/ 에 넣고 아래 인용을 이미지로 바꿔 주세요 -->
 > 🖼️ **도식화 예정: CloudWatch**
+
+#### Langfuse (AI 에이전트 모니터링)
+
+<p align="center"><img src="./docs/img/readme/langfuse.gif" width="90%" alt="Langfuse AI 에이전트 모니터링" /></p>
 
 ---
 
