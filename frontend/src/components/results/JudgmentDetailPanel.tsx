@@ -390,8 +390,9 @@ export function JudgmentDetailPanel({
           판정이 실제와 다르다면
         </h3>
 
+        {/* 버튼은 판 폭을 채운다. 아래 빼기 버튼과 같은 폭이 된다 */}
         {target === null ?
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 flex gap-2">
             {targets.map((code) =>
           <Button
             key={code}
@@ -459,21 +460,23 @@ export function JudgmentDetailPanel({
       {onExcluded &&
       <section className="px-5 py-4">
           <h3 className="text-body font-bold text-ink">판정할 필요가 없는 거래라면</h3>
-          {/* 불가에는 위에 「불가로 바꾸기」가 없다. 판정에 맞는 말만 한다 (C105) */}
+          {/* 불가에는 위에 「불가로 바꾸기」가 없어 빼면 어떻게 되는지만 적는다 (C105) */}
+          {judgment.verdict.code === 'UNAVAILABLE' &&
           <p className="mt-1.5 text-small text-ink2">
-            {judgment.verdict.code === 'UNAVAILABLE' ?
-          '빼면 결과와 합계에서 사라지고, 거래 화면에서 다시 넣을 수 있습니다.' :
-          '경비가 아니라는 뜻이면 빼지 말고 위에서 불가로 바꿔 주세요. 뺀 거래는 거래 화면에서 다시 넣을 수 있습니다.'}
-          </p>
-          <Button
-          variant="secondary"
-          size="sm"
-          className="mt-3 whitespace-nowrap"
-          disabled={busy}
-          onClick={() => void exclude()}>
+              빼면 결과와 합계에서 사라지고, 거래 화면에서 다시 넣을 수 있습니다.
+            </p>
+          }
+          <div className="mt-3 flex">
+            <Button
+            variant="secondary"
+            size="sm"
+            className="flex-1 whitespace-nowrap"
+            disabled={busy}
+            onClick={() => void exclude()}>
 
-            판정 대상에서 빼기
-          </Button>
+              판정 대상에서 빼기
+            </Button>
+          </div>
           {excludeError &&
         <p role="alert" className="mt-2 text-small text-deny">
               {excludeError}

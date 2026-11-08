@@ -3,7 +3,7 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { CheckIcon } from 'lucide-react';
 import { DisclaimerBar } from './DisclaimerBar';
-import { Button, MAIN_ID, BackLink } from './ui';
+import { Button, MAIN_ID } from './ui';
 import { BugReportButton } from './BugReport';
 import { Logo } from './Logo';
 import { STEPS, STEP_ALIAS, doneSteps, under } from './steps';
@@ -103,7 +103,6 @@ export function AppShell({ children, showSteps = true, disclaimer = true, narrow
 
   return (
     <div className="flex min-h-full w-full flex-col bg-canvas">
-      <BackLink />
       <header className="sticky top-0 z-30 border-b border-line bg-canvas/95 shadow-header backdrop-blur print:hidden">
         {/*
           한 줄을 넘기면 한글이 음절 단위로 꺾인다. 줄바꿈을 막고, 폭이 모자라면 덜 중요한 것부터 접는다:

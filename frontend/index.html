@@ -18,14 +18,14 @@
     <meta name="naver-site-verification" content="d417909b31f6bcbb6512d221ba824e0f1d7bbed2" />
     <title>PreeT</title>
     <script>
-      // 첫 방문의 랜딩은 인트로가 덮는다(Landing.tsx). 빌드 때 미리 그린 본문이 인트로보다 먼저
+      // 로그인하지 않은 사람이 홈을 열면 인트로가 덮는다(Landing.tsx). 빌드 때 미리 그린 본문이 인트로보다 먼저
       // 번쩍이지 않게, 자바스크립트가 뜨기 전부터 인트로와 같은 색 판을 깐다(index.css 의 intro-cover).
       // Landing 이 뜨면 걷는다. 번들이 끝내 못 뜨면 본문이라도 보이게 8초 뒤 걷는다
       try {
         if (
           location.pathname === '/' &&
           !matchMedia('(prefers-reduced-motion: reduce)').matches &&
-          localStorage.getItem('preet.intro.seen') === null
+          localStorage.getItem('preet.signedIn') === null
         ) {
           document.documentElement.classList.add('intro-cover');
           setTimeout(function () {
