@@ -100,14 +100,14 @@ const BOARDS = [
   title: '판정',
   rows: [
   { to: '/results', label: '판정 결과' },
-  { to: '/questions', label: '질문' }]
+  { to: '/questions', label: '되묻기' }]
 
 },
 {
   title: '자료',
   rows: [
   { to: '/transactions', label: '거래 목록' },
-  { to: '/summary', label: '세무대리인 전달 요약' }]
+  { to: '/summary', label: '세무사 전달 요약' }]
 
 }];
 

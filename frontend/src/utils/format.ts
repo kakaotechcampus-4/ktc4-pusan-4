@@ -9,9 +9,14 @@ export const formatDate = (iso: string): string => {
   return `${Number(month)}월 ${Number(day)}일`;
 };
 
-export const formatFullDate = (iso: string): string => {
-  const [year, month, day] = iso.split('-');
-  return `${year}. ${month}. ${day}`;
+/**
+ * 화면의 날짜는 모두 이 꼴이다 (C86). `YYYY-MM-DD` 도, offset 이 붙은 시각(1.2)도 받는다 — 시각은 KST 날짜로 읽는다.
+ * 날짜로 읽히지 않는 값(파일에서 못 읽은 승인일 등)은 그대로 돌려준다
+ */
+export const formatFullDate = (value: string): string => {
+  const date = /^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:?\d{2})$/i.test(value) ? toKst(value).date : value;
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(date);
+  return match ? `${match[1]}. ${match[2]}. ${match[3]}` : value;
 };
 
 export const formatPeriod = (start: string, end: string): string =>
@@ -42,9 +47,10 @@ export const toKst = (iso: string): { date: string; time: string } => {
   };
 };
 
+/** 다른 날짜와 같은 꼴(2026. 11. 05)에 시:분을 붙인다 (C86) */
 export const formatDateTime = (iso: string): string => {
   const { date, time } = toKst(iso);
-  return `${date} ${time}`;
+  return `${formatFullDate(date)} ${time}`;
 };
 
 /** 숫자는 읽는 소리로 정한다. 영·삼·육은 받침이 있고, 일·칠·팔은 ㄹ 받침이라 「로」 */
@@ -64,17 +70,3 @@ export const ro = (word: string): '로' | '으로' => {
   const coda = last >= 0 && last < 11172 ? last % 28 : 0;
   return coda === 0 || coda === 8 ? '로' : '으로';
 };
-
-/**
- * 카드사 이름. 서버는 '국민'·'기업'만 주고 화면마다 뒤에 「카드」를 붙여 써서
- * 「기업카드」가 법인카드처럼 읽혔다(치오 UX 감사 C92). 파서 코드(kb·ibk)도 같은 이름으로 모은다.
- * 사용자가 카드사 홈페이지에서 찾을 이름과 같아야 해서 줄이지 않는다
- */
-const ISSUER_LABEL: Record<string, string> = {
-  국민: 'KB국민카드',
-  kb: 'KB국민카드',
-  기업: 'IBK기업은행 카드',
-  ibk: 'IBK기업은행 카드'
-};
-
-export const issuerLabel = (issuer: string): string => ISSUER_LABEL[issuer] ?? `${issuer}카드`;

@@ -4,7 +4,7 @@
  * 크롤러·카카오톡 미리보기는 자바스크립트를 돌리지 않거나 덜 돌린다. 빈 #root 만 받으면 본문·제목을 못 본다.
  * 그래서 vite 가 만든 dist/index.html 을 틀로 삼아 페이지마다 본문과 head 를 채운 파일을 쓴다.
  *
- * - dist/<file>  공개 페이지. Caddy 가 /faq 를 faq.html 로 찾는다(deploy/Caddyfile)
+ * - dist/<file>  공개 페이지. Caddy 가 /faq 를 faq.html 로 찾는다(deploy/caddy/Caddyfile)
  * - dist/app.html  본문 없는 틀 + noindex. 로그인 뒤 화면·로그인 화면·없는 주소가 모두 이것을 받는다
  * - dist/robots.txt · sitemap.xml · llms.txt  크롤러와 AI 에게 주는 안내
  */
@@ -40,7 +40,7 @@ function openGraph({ title, description, url }) {
   `<meta property="og:image" content="${SITE_URL}/og-image.png" />`,
   '<meta property="og:image:width" content="1200" />',
   '<meta property="og:image:height" content="630" />',
-  `<meta property="og:image:alt" content="PreeT · ${escape(TAGLINE)}" />`,
+  `<meta property="og:image:alt" content="PreeT, ${escape(TAGLINE)}" />`,
   '<meta name="twitter:card" content="summary_large_image" />'];
 
 }
@@ -72,6 +72,21 @@ function check(path, body) {
 const pages = Object.values(PAGES);
 const urlOf = (page) => `${SITE_URL}${page.path}`;
 
+/**
+ * 검색 결과에 뜨는 사이트 이름. 구글은 WebSite 구조화 데이터의 name 을 제일 먼저 보고,
+ * 없으면 og:site_name → title → 도메인 순으로 내려간다. 지금은 이게 없어서 도메인까지 내려갔고,
+ * duckdns.org 가 공용 DDNS 라 「Duck DNS」가 나왔다 (og:site_name 은 이미 PreeT 였는데도).
+ * 구글 지침대로 홈에만 넣는다
+ */
+const WEBSITE_JSON_LD = `<script type="application/ld+json">${JSON.stringify({
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: 'PreeT',
+  url: `${SITE_URL}/`,
+  description: PAGES.home.description,
+  inLanguage: 'ko-KR'
+})}</script>`;
+
 await writeFile(
   join(dist, 'app.html'),
   fill({
@@ -91,7 +106,10 @@ for (const page of pages) {
       title: documentTitle(page.title),
       description: page.description,
       url: urlOf(page),
-      head: [`<link rel="canonical" href="${urlOf(page)}" />`],
+      head: [
+      `<link rel="canonical" href="${urlOf(page)}" />`,
+      ...(page === PAGES.home ? [WEBSITE_JSON_LD] : [])],
+
       body
     })
   );
@@ -106,7 +124,7 @@ for (const page of pages) {
 await writeFile(
   join(dist, 'robots.txt'),
   [
-  '# PreeT: 검색엔진과 AI 크롤러(학습·검색·열람)를 모두 허용합니다.',
+  '# PreeT: 검색엔진과 AI 크롤러(학습, 검색, 열람)를 모두 허용합니다.',
   'User-agent: *',
   'Allow: /',
   '',
@@ -146,10 +164,10 @@ await writeFile(
   '## 판정 근거와 범위',
   '',
   '- 판정 근거: 국가법령정보 OPEN API에서 받은 소득세법 조문. 매일 03:00 KST에 동기화합니다.',
-  '- 지원 파일: 국민카드·기업카드 이용내역',
-  '- 지원 업종: 지금은 프리랜서·인적용역 사업자(국세청 업종코드 940909)만 판정합니다.',
+  '- 지원 파일: KB국민카드, IBK기업은행 승인내역',
+  '- 지원 업종: 지금은 프리랜서 인적용역 사업자(국세청 업종코드 940909)만 판정합니다.',
   `- 하지 않는 일: ${NOT_DOING.map((item) => item.title).join(', ')}`,
-  '- 결과는 확인할 항목과 근거까지입니다. 최종 판단에는 세무대리인의 확인이 필요합니다.',
+  '- 결과는 확인할 항목과 근거까지입니다. 최종 판단에는 세무사의 확인이 필요합니다.',
   ''].
   join('\n')
 );

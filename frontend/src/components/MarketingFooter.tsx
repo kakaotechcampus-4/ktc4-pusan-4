@@ -1,33 +1,25 @@
 import { Link } from 'react-router-dom';
 import { Container } from './ui';
 import { SUPPORT_EMAIL } from '../utils/contact';
+import { DISCLAIMER } from '../copy';
 
 export function MarketingFooter() {
   return (
-    <footer className="border-t border-line bg-surface">
+    <footer className="border-t border-line bg-canvas">
       <Container className="py-12">
         <div className="flex flex-wrap items-start justify-between gap-8">
           <div className="max-w-xl">
             <p className="text-body-lg font-bold text-ink">PreeT</p>
-            <p className="mt-3 text-small leading-6 text-muted">
-              이 서비스는 확인할 항목과 근거까지만 제시합니다. 세액을 확정하거나
-              세무 신고를 대리하지 않으며, 최종 판단에는 세무대리인의 확인이
-              필요합니다. 판정 결과를 그대로 신고에 사용해 발생한 결과에 대해서는
-              책임을 지지 않습니다.
-            </p>
+            <p className="mt-3 text-small leading-6 text-ink2 [word-break:keep-all]">{DISCLAIMER}</p>
           </div>
           <dl className="grid gap-x-10 gap-y-2 text-small sm:grid-cols-2">
             <div className="flex gap-3">
-              <dt className="text-muted">데이터 출처</dt>
-              <dd className="text-ink2">국가법령정보 OPEN API</dd>
-            </div>
-            <div className="flex gap-3">
-              <dt className="text-muted">조문 동기화</dt>
-              <dd className="tabular-nums text-ink2">매일 03:00 KST</dd>
+              <dt className="text-muted">조문 출처</dt>
+              <dd className="text-ink2">국가법령정보센터</dd>
             </div>
             <div className="flex gap-3">
               <dt className="text-muted">지원 파일</dt>
-              <dd className="text-ink2">KB국민카드 · IBK기업은행 카드 승인내역</dd>
+              <dd className="text-ink2">KB국민카드, IBK기업은행 승인내역</dd>
             </div>
             <div className="flex gap-3">
               <dt className="text-muted">문의</dt>
@@ -37,8 +29,8 @@ export function MarketingFooter() {
         </div>
 
         <div className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t border-line2 pt-6 text-caption text-muted">
-          <p>© 2026 PreeT. 무자격 세무대리를 하지 않습니다.</p>
-          <ul className="flex flex-wrap items-center gap-5">
+          <p>© 2026 PreeT</p>
+          <ul className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
             <li>
               <Link to="/faq" className="transition-colors hover:text-ink">
                 자주 묻는 질문
@@ -55,7 +47,7 @@ export function MarketingFooter() {
               </Link>
             </li>
             <li>
-              <Link to="/privacy" className="font-bold transition-colors hover:text-ink">
+              <Link to="/privacy" className="transition-colors hover:text-ink">
                 개인정보처리방침
               </Link>
             </li>

@@ -30,6 +30,9 @@ export const BIZNO_RE = /^\d{3}-?\d{2}-?\d{5}$/;
 /** 취소-원결제 폴백 매칭에서 허용하는 날짜 차이 */
 export const PAIR_WINDOW_DAYS = 62;
 
+/** 외화만 있고 원화 금액이 없는 행의 사유. 대상제외로 남기고 보내지 않는다 */
+export const FOREIGN_ONLY_REASON = '해외 결제 (원화 금액 없음)';
+
 export const CANCEL_MARK = '취소';
 
 export type ParserErrorCode = 'KB_READ' | 'HASH_UNAVAILABLE';
@@ -118,6 +121,7 @@ export interface RecordFields {
   isCancel: boolean;
   bizNo?: string;
   memo?: string;
+  foreignAmount?: number | null;
 }
 
 /** Python make_record. 승인번호 · 날짜는 취소 페어링과 natural_key 에 쓴다 */
@@ -134,6 +138,7 @@ export function makeRecord(fields: RecordFields): RawRecord {
     installment: fields.installment,
     status: null,
     needsReview: false,
-    reviewReason: ''
+    reviewReason: '',
+    foreignAmount: fields.foreignAmount ?? null
   };
 }

@@ -28,8 +28,8 @@ export function BugReportAddress() {
     void navigator.clipboard?.writeText(SUPPORT_EMAIL).then(() => setCopied(true), () => setCopied(false));
   };
   return (
-    <div className="rounded-xl bg-canvas p-4 text-small">
-      <p className="text-muted">받는 주소</p>
+    <div className="text-small">
+      <p className="text-ink2">받는 주소</p>
       <div className="mt-1 flex items-center justify-between gap-3">
         <span className="break-all font-bold text-ink">{SUPPORT_EMAIL}</span>
         <button
@@ -41,9 +41,8 @@ export function BugReportAddress() {
           {copied ? '복사했습니다' : '주소 복사'}
         </button>
       </div>
-      <p className="mt-3 leading-6 text-muted">
-        「메일 쓰기」를 눌러도 아무 일이 없으면 메일 앱이 설정되지 않은 것입니다. 주소를 복사해 쓰는 메일에서 보내
-        주세요.
+      <p className="mt-3 leading-6 text-ink2">
+        메일 쓰기를 눌러도 아무 일이 없으면 주소를 복사해 쓰는 메일에서 보내 주세요.
       </p>
     </div>);
 
@@ -81,7 +80,7 @@ export function BugReportButton({ className, label = '버그 신고', icon = tru
         open={open}
         onClose={() => setOpen(false)}
         title="버그 신고"
-        description="메일로 받습니다. 적어 주실 것과 지금 화면·시각·브라우저를 본문에 미리 채워 둡니다."
+        description="메일로 받습니다. 지금 화면과 시각, 브라우저를 본문에 미리 채워 둡니다."
         footer={
         <>
             <Button variant="secondary" size="md" onClick={() => setOpen(false)}>

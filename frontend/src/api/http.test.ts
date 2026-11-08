@@ -155,6 +155,19 @@ describe('인증 (#139 가정)', () => {
     expect(callsTo('/users/me').map(([, init]) => bearer(init))).toEqual(['Bearer old', 'Bearer new']);
   });
 
+  it('서버 오류 문구가 없거나 영어면 상태 번호 없이 일반 문구를 쓴다 (C65)', async () => {
+    const api = await fresh();
+    route({
+      '/upload-batches': () => [502],
+      '/users/me': () => [405, { code: 'METHOD_NOT_ALLOWED', message: "Method 'PUT' is not supported." }],
+      '/judgment-runs': () => [409, { code: 'CONFLICT', message: '이미 판정 중입니다.' }]
+    });
+    const generic = '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.';
+    await expect(api.uploads.list()).rejects.toMatchObject({ status: 502, code: 'UNKNOWN', message: generic });
+    await expect(api.users.me()).rejects.toMatchObject({ code: 'METHOD_NOT_ALLOWED', message: generic });
+    await expect(api.runs.create({ batchId: 'b1', contextId: 'c1' })).rejects.toMatchObject({ message: '이미 판정 중입니다.' });
+  });
+
   it('재발급도 401 이면 로그인이 풀렸다고 한 번만 알린다', async () => {
     const api = await fresh();
     const lost = vi.fn();
@@ -169,6 +182,74 @@ describe('인증 (#139 가정)', () => {
     const results = await Promise.allSettled([api.users.me(), api.contexts.list()]);
     expect(results.map((r) => r.status)).toEqual(['rejected', 'rejected']);
     expect(lost).toHaveBeenCalledTimes(1);
+    expect(lost).toHaveBeenCalledWith('expired');
+  });
+
+  /** sub 만 든 JWT 모양의 토큰. 서명은 보지 않는다 */
+  const jwt = (sub: string, n = 1) => `h.${btoa(JSON.stringify({ sub, n })).replace(/=+$/, '')}.s`;
+
+  it('재발급 토큰이 다른 계정이면 받지 않고 로그인을 끝낸다 (C44)', async () => {
+    const api = await fresh();
+    const lost = vi.fn();
+    api.auth.onLost(lost);
+    route({
+      '/auth/login': () => [200, { accessToken: jwt('x') }],
+      // 다른 탭이 y 로 로그인해 쿠키가 y 것이 됐다
+      '/auth/refresh': () => [200, { accessToken: jwt('y') }],
+      '/users/me': (init) => bearer(init) === `Bearer ${jwt('y')}` ? [200, { id: 'y' }] : [401, { code: 'UNAUTHORIZED' }]
+    });
+    await api.auth.login({ email: 'x@b.c', password: 'secret1' });
+    await expect(api.users.me()).rejects.toMatchObject({ status: 401 });
+    expect(lost).toHaveBeenCalledWith('account-changed');
+    // y 의 토큰으로 다시 보내지 않았고, 이 탭에는 토큰이 남지 않는다
+    expect(callsTo('/users/me')).toHaveLength(1);
+    await api.users.me().catch(() => undefined);
+    expect(bearer(callsTo('/users/me')[1][1])).toBeUndefined();
+  });
+
+  it('재발급 토큰이 같은 계정이면 그대로 받는다', async () => {
+    const api = await fresh();
+    const lost = vi.fn();
+    api.auth.onLost(lost);
+    route({
+      '/auth/login': () => [200, { accessToken: jwt('x', 1) }],
+      '/auth/refresh': () => [200, { accessToken: jwt('x', 2) }],
+      '/users/me': (init) => bearer(init) === `Bearer ${jwt('x', 2)}` ? [200, { id: 'x' }] : [401, { code: 'UNAUTHORIZED' }]
+    });
+    await api.auth.login({ email: 'x@b.c', password: 'secret1' });
+    await expect(api.users.me()).resolves.toEqual({ id: 'x' });
+    expect(lost).not.toHaveBeenCalled();
+  });
+
+  describe('다른 탭의 로그인·로그아웃 (C44·C45)', () => {
+    /** 탭 둘. 모듈을 따로 읽으면 토큰과 채널도 따로다 */
+    const twoTabs = async () => {
+      const first = await fresh();
+      const second = await fresh();
+      route({
+        '/auth/login': (init) => [200, { accessToken: jwt((JSON.parse(init.body as string) as { email: string }).email) }],
+        '/auth/logout': () => [204]
+      });
+      const lost = vi.fn();
+      first.auth.onLost(lost);
+      return { first, second, lost };
+    };
+
+    it('다른 탭이 다른 계정으로 로그인하면 이 탭의 로그인을 끝낸다', async () => {
+      const { first, second, lost } = await twoTabs();
+      await first.auth.login({ email: 'x', password: 'secret1' });
+      await second.auth.login({ email: 'y', password: 'secret1' });
+      await vi.waitFor(() => expect(lost).toHaveBeenCalledWith('account-changed'));
+    });
+
+    it('같은 계정 로그인에는 그대로 두고, 로그아웃하면 이 탭도 끝낸다', async () => {
+      const { first, second, lost } = await twoTabs();
+      await first.auth.login({ email: 'x', password: 'secret1' });
+      await second.auth.login({ email: 'x', password: 'secret1' });
+      await second.auth.logout();
+      await vi.waitFor(() => expect(lost).toHaveBeenCalledWith('signed-out'));
+      expect(lost).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('로그인이 401 이면 재발급하지 않고 그대로 던진다', async () => {

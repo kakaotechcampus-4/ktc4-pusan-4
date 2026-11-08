@@ -17,17 +17,10 @@ export function BugReport() {
       <MarketingHeader />
 
       <main className="mx-auto w-full max-w-page px-6 pb-28 pt-16 lg:px-gutter">
-        <SectionHeading
-          as="h1"
-          eyebrow="버그 신고"
-          title="잘못 나온 것을 알려 주세요"
-          description="판정이 이상하거나 화면이 깨졌다면 알려주시면 고칩니다." />
+        <SectionHeading as="h1" eyebrow="버그 신고" title="잘못 나온 것을 알려 주세요" />
 
-        <div className="mt-12 max-w-2xl rounded-2xl border border-line bg-surface px-8 py-10">
+        <div className="mt-12 max-w-2xl rounded-2xl border border-line px-8 py-10">
           <p className="text-h4 font-bold text-ink">메일로 받습니다</p>
-          <p className="mt-4 text-body leading-6 text-ink2 [word-break:keep-all]">
-            「메일 쓰기」를 누르면 아래 적을 것과 지금 시각·브라우저를 채운 메일이 열립니다.
-          </p>
           <div className="mt-6">
             <BugReportMailButton />
           </div>
@@ -55,9 +48,8 @@ export function BugReport() {
               </div>
             )}
           </dl>
-          <p className="mt-6 text-small leading-6 text-muted [word-break:keep-all]">
-            카드내역 원본 파일은 보내지 않으셔도 됩니다. 원본은 서버로
-            올라가지 않으며, 저희도 받지 않습니다.
+          <p className="mt-6 text-small leading-6 text-ink2 [word-break:keep-all]">
+            카드내역 원본 파일은 보내지 않으셔도 됩니다.
           </p>
         </section>
       </main>

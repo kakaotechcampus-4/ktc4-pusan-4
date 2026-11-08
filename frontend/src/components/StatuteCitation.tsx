@@ -1,8 +1,9 @@
 import { ExternalLinkIcon } from 'lucide-react';
 import { api, ApiRequestError, useApi } from '../api';
 import type { StatuteHierarchy } from '../types/domain';
+import { formatFullDate } from '../utils/format';
+import { lawGoKrUrl, statuteTitle } from '../utils/statute';
 import { Badge } from './ui/Badge';
-import { cn } from './ui/cn';
 
 interface StatuteCitationProps {
   statuteVersionId: number;
@@ -46,20 +47,20 @@ export function StatuteCitation({
     () => api.statutes.get(statuteVersionId),
     [statuteVersionId]
   );
-  // 불러오지 못한 조문을 조용히 빼면 근거가 없는 판정처럼 보인다. 실패는 오류 상자로 알린다.
+  // 불러오지 못한 조문을 조용히 빼면 근거가 없는 판정처럼 보인다. 조문 자리에 실패를 남긴다.
   // 없는 버전(3.13 STATUTE_NOT_FOUND)은 다시 시도해도 같으니 버튼을 두지 않는다
   if (error instanceof ApiRequestError && error.code === 'STATUTE_NOT_FOUND')
   return (
-    <p role="alert" className="rounded-xl border border-deny-line bg-deny-bg p-3.5 text-small text-deny">
-        이 조문 버전을 찾을 수 없습니다 (버전 #{statuteVersionId}).
+    <p role="alert" className="rounded-xl border border-line p-3.5 text-small text-deny">
+        이 조문을 찾을 수 없습니다.
       </p>);
 
   // 다시 시도하는 동안에는 골격을 보여 버튼이 눌렸음을 알린다
   if (error && !loading)
   return (
-    <p role="alert" className="rounded-xl border border-deny-line bg-deny-bg p-3.5 text-small text-deny">
-        조문을 불러오지 못했습니다 (버전 #{statuteVersionId}).{' '}
-        <button type="button" onClick={reload} className="font-bold underline">
+    <p role="alert" className="rounded-xl border border-line p-3.5 text-small text-deny">
+        조문을 불러오지 못했습니다.{' '}
+        <button type="button" onClick={reload} className="py-1 font-bold underline">
           다시 시도
         </button>
       </p>);
@@ -67,18 +68,14 @@ export function StatuteCitation({
   if (!statute) return <span className="block h-16 animate-pulse rounded-xl bg-line2" />;
 
   const tier = tierOf(statute.hierarchy);
-  const binding = tier.binding;
 
+  // 법령과 참고는 배지로 가른다. 바탕은 둘 다 흰색이다
   return (
-    <article
-      className={cn(
-        'rounded-xl border border-line p-3.5',
-        binding ? 'bg-surface' : 'bg-canvas'
-      )}>
-
+    <article className="rounded-xl border border-line p-3.5">
       <header className="flex flex-wrap items-center gap-2">
-        <Badge tone={binding ? 'ink' : 'neutral'}>{tier.label}</Badge>
-        <h4 className="text-small font-bold text-ink">{statute.title}</h4>
+        <Badge tone={tier.binding ? 'ink' : 'neutral'}>{tier.label}</Badge>
+        {/* 서버 제목은 법령 이름뿐이라 조·항·호를 붙인다 (C8) */}
+        <h4 className="text-small font-bold text-ink">{statuteTitle(statute.statuteId, statute.title)}</h4>
       </header>
 
       {/*
@@ -88,24 +85,26 @@ export function StatuteCitation({
       */}
       {showBody &&
       <details className="mt-2">
-          <summary className="cursor-pointer text-caption font-bold text-ink2 hover:text-ink">
+          {/* 좁은 화면에서도 누를 자리가 24px 을 넘게 위아래 여백을 준다 (C82) */}
+          <summary className="cursor-pointer py-1 text-caption font-bold text-ink2 hover:text-ink">
             조문 보기
           </summary>
           <p className="mt-2 text-small leading-6 text-ink2">{statute.body}</p>
         </details>
       }
 
-      <footer className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-caption tabular-nums text-muted">
-        {tier.note && <span>{tier.note}</span>}
+      {tier.note && <p className="mt-2 text-caption text-ink2">{tier.note}</p>}
+      <footer className="mt-1 flex flex-wrap items-center gap-x-3 text-caption tabular-nums text-muted">
         <span>
-          시행 {statute.effectiveFrom}
-          {statute.effectiveTo ? ` – ${statute.effectiveTo}` : ' – 현행'}
+          시행 {formatFullDate(statute.effectiveFrom)}
+          {statute.effectiveTo ? ` – ${formatFullDate(statute.effectiveTo)}` : ' – 현행'}
         </span>
+        {/* 말뭉치가 쌓아 둔 …/제81의6조 꼴은 law.go.kr 이 열지 못한다 (C9) */}
         <a
-          href={statute.sourceUrl}
+          href={lawGoKrUrl(statute.sourceUrl)}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-1 text-accent hover:underline">
+          className="inline-flex items-center gap-1 py-1 text-accent hover:underline">
 
           국가법령정보
           <ExternalLinkIcon className="h-3 w-3" aria-hidden="true" />

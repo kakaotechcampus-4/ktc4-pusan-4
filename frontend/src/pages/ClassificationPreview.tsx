@@ -1,13 +1,34 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowRightIcon, CheckIcon, SparklesIcon, UploadIcon } from 'lucide-react';
+import { ArrowRightIcon, CheckIcon, ChevronDownIcon, Loader2Icon, SparklesIcon, UploadIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { StepEyebrow } from '../components/StepEyebrow';
 import { api, ApiRequestError, useApi } from '../api';
 import { useSession } from '../contexts/SessionContext';
-import { Badge, Button, Card, Empty, Select } from '../components/ui';
+import { Button, Empty, cn } from '../components/ui';
 import { MERCHANT_CATEGORIES } from '../types/domain';
-import { formatFullDate, formatNumber, formatWon } from '../utils/format';
+import { categoryLabel, merchantName } from '../components/results/display';
+import type { ClassificationReviewGroup } from '../types/domain';
+import { uploadName } from '../copy';
+import { formatFullDate, formatNumber, formatPeriod, formatWon } from '../utils/format';
+
+/**
+ * 직접 고르는 카테고리. PG_미상은 결제대행사라 가맹점을 모른다는 표시지 지출의 종류가 아니라서 뺀다.
+ * 가나다순이고 기타는 맨 끝이다. 화면에서만 바꾼다 — 어휘의 원본은 rules/categories.yaml 이다
+ */
+const PICKABLE_CATEGORIES: string[] = MERCHANT_CATEGORIES.
+filter((category) => category !== 'PG_미상').
+sort((a, b) => a === '기타' ? 1 : b === '기타' ? -1 : categoryLabel(a).localeCompare(categoryLabel(b), 'ko'));
+
+/** 고르는 칸. 추천도, 다른 카테고리도, 펼치는 칸도 같은 모양이다 */
+const CHOICE =
+'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-4 py-2 text-body text-ink transition-colors duration-150 ease-snap hover:bg-surface disabled:cursor-not-allowed';
+
+/** 카드 하나의 저장 상태. saved 는 빠지는 동안이고, 빠지고 나면 gone 이라 그리지 않는다 */
+type CardState =
+{kind: 'saving';category: string;} |
+{kind: 'saved';} |
+{kind: 'gone';} |
+{kind: 'error';message: string;};
 
 /**
  * 가맹점 분류 확인. 몇 단계인지는 STEPS 가 정한다(components/steps.tsx)
@@ -15,17 +36,14 @@ import { formatFullDate, formatNumber, formatWon } from '../utils/format';
  * 미분류로 남은 거래는 룰엔진에 전달되지 않으므로(api.md 3.3) 판정에서 빠진다는 것을 화면에서 말한다.
  */
 export function ClassificationPreview() {
-  const navigate = useNavigate();
-  const { batchId, context } = useSession();
-  const [resolving, setResolving] = useState<Record<string, true>>({});
+  const { batchId, batchStatus, reloadBatch, contextStatus } = useSession();
+  const [cards, setCards] = useState<Record<string, CardState>>({});
 
   const groupsQ = useApi(
     () =>
-    api.classificationReviews.grouped({
-      batchId: batchId ?? undefined,
-      status: 'PENDING',
-      size: 100
-    }),
+    batchId ?
+    api.classificationReviews.grouped({ batchId, status: 'PENDING', size: 100 }) :
+    Promise.resolve(null),
     [batchId]
   );
   const batchQ = useApi(
@@ -33,9 +51,11 @@ export function ClassificationPreview() {
     [batchId]
   );
 
+  // 보던 업로드가 바뀌면 카드 상태도 처음부터다
+  useEffect(() => setCards({}), [batchId]);
+
   const groups = groupsQ.data?.items ?? [];
   const batch = batchQ.data;
-  const total = batch?.transactionCount ?? 0;
 
   /**
    * 서버가 주는 미해소 집계. page·size 와 무관하게 배치 전체 기준이다 (api.md 3.5).
@@ -44,104 +64,75 @@ export function ClassificationPreview() {
   const unresolved = groupsQ.data?.unresolved;
   const pendingCount = unresolved?.count ?? 0;
   const pendingAmount = unresolved?.amount ?? null;
-  const groupsComplete =
-  groupsQ.data !== null &&
-  groupsQ.data.items.length === groupsQ.data.page.totalElements;
-  const classified = Math.max(0, total - pendingCount);
-  const coverage = total ? classified / total * 100 : 100;
+  const merchantTotal = groupsQ.data?.page.totalElements ?? 0;
 
-  const loading = groupsQ.loading || batchQ.loading;
+  /** 처음 읽는 중이다. 0건으로 그리지 않고 자리만 보인다. 다시 읽을 때는 앞서 읽은 것을 그대로 둔다 (C61) */
+  const waiting =
+  batchStatus === 'loading' ||
+  (groupsQ.loading && groupsQ.data === null) ||
+  (batchQ.loading && batchQ.data === null);
   const loadError = groupsQ.error ?? batchQ.error;
-  /** 다 읽고 나서 0건일 때만 「다 분류했다」다 */
-  const done = !loading && !loadError && groups.length === 0;
   /** 올린 배치 자체가 없으면 「다 분류했다」가 아니라 「올린 게 없다」다 */
-  const noBatch = !batchId || (!batchQ.loading && !batchQ.error && batch === null);
+  const noBatch = !batchId || batch === null;
+
+  /** 문진이 이미 있으면 문진을 건너뛴다. 조회 중이거나 실패했으면 판정 전 확인이 다시 막는다 (C2) */
+  const toInterview = contextStatus === 'none';
+  const nextTo = toInterview ? '/interview' : '/confirm';
 
   const timers = useRef<number[]>([]);
   useEffect(() => () => timers.current.forEach(window.clearTimeout), []);
 
-  const [resolveError, setResolveError] = useState<string | null>(null);
+  const setCard = (key: string, state: CardState) =>
+  setCards((prev) => ({ ...prev, [key]: state }));
 
-  const resolve = async (groupKey: string, reviewIds: string[], category: string) => {
-    // 카드가 사라지는 동안 다시 누르면 자기 요청이 409(이미 분류)로 돌아온다
-    if (resolving[groupKey]) return;
-    setResolving((prev) => ({ ...prev, [groupKey]: true }));
-    setResolveError(null);
+  const resolve = async (group: ClassificationReviewGroup, title: string, category: string) => {
+    const key = group.groupKey;
+    // 저장하는 동안 다시 누르면 자기 요청이 409(이미 분류)로 돌아온다
+    const current = cards[key];
+    if (current && current.kind !== 'error') return;
+    setCard(key, { kind: 'saving', category });
     try {
-      await api.classificationReviews.respond({ reviewIds, merchantCategory: category });
+      await api.classificationReviews.respond({ reviewIds: group.reviewIds, merchantCategory: category });
     } catch (caught) {
-      // 409: 다른 탭·기기에서 이미 분류했다(CLASSIFICATION_ALREADY_RESOLVED). 남은 카드로 다시 읽는다
-      const resolvedElsewhere = caught instanceof ApiRequestError && caught.status === 409;
-      setResolveError(
-        resolvedElsewhere ?
-        '이미 분류한 가맹점입니다. 목록을 다시 불러왔습니다.' :
-        caught instanceof ApiRequestError ?
-        caught.message :
-        '업종을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.'
-      );
-      if (resolvedElsewhere) {
-        groupsQ.reload();
-        batchQ.reload();
+      // 409: 다른 탭·기기에서 이미 분류했다(CLASSIFICATION_ALREADY_RESOLVED). 저장한 것처럼 빼고 다시 읽는다
+      if (!(caught instanceof ApiRequestError && caught.status === 409)) {
+        // 실패는 그 카드 안에 적는다. 화면 위에 띄우면 보이지 않는다 (C60)
+        setCard(key, { kind: 'error', message: `${title} 분류를 저장하지 못했습니다. 다시 눌러 주세요.` });
+        return;
       }
-      setResolving((prev) => {
-        const next = { ...prev };
-        delete next[groupKey];
-        return next;
-      });
-      return;
     }
-    // 카드가 빠지는 게 보이도록 전환이 끝난 뒤 다시 읽는다
+    // 저장된 뒤에야 카드를 뺀다. 빠지는 게 보이도록 전환이 끝난 뒤 다시 읽는다
+    setCard(key, { kind: 'saved' });
     timers.current.push(window.setTimeout(() => {
+      setCard(key, { kind: 'gone' });
       groupsQ.reload();
-      batchQ.reload();
-      setResolving((prev) => {
-        const next = { ...prev };
-        delete next[groupKey];
-        return next;
-      });
     }, 280));
   };
 
-  return (
-    <AppShell>
-      <div className="mx-auto max-w-3xl">
-        <header>
-          <StepEyebrow>분류 확인</StepEyebrow>
-          <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">
-            {loadError ?
-            '분류 결과를 불러오지 못했습니다' :
-            noBatch ?
-            '올린 카드내역이 없습니다' :
-            done ?
-            '모든 거래를 분류했습니다' :
-            '읽지 못한 가맹점만 확인합니다'}
-          </h1>
-          <p className="mt-2 max-w-2xl text-body leading-6 text-ink2">
-            {loadError ?
-            '잠시 후 다시 시도해 주세요. 네트워크나 서버 상태를 확인해 주세요.' :
-            noBatch ?
-            '카드내역을 먼저 올리면 분류 결과를 여기서 확인할 수 있습니다.' :
-            done ?
-            '모든 거래에 업종이 붙었습니다. 판정은 이제 규칙이 순서대로 실행하며 내립니다.' :
-            '가맹점 이름을 업종으로 바꾸는 일까지는 AI가 합니다. 확신이 없는 건만 남겨 두었으니 여기서 골라 주세요. 판정은 그다음에 규칙이 합니다.'}
-          </p>
-        </header>
-
-        {resolveError &&
-        <p
-          role="alert"
-          className="mt-4 rounded-xl border border-deny-line bg-deny-bg px-4 py-3 text-body text-deny">
-
-            {resolveError}
-          </p>
-        }
-
-        {loadError ?
+  const body = () => {
+    if (batchStatus === 'error') {
+      return (
         <Empty
           className="mt-8"
+          tone="error"
+          icon={<UploadIcon className="h-5 w-5" />}
+          title="올린 카드내역을 불러오지 못했습니다"
+          action={
+          <Button size="md" variant="secondary" onClick={reloadBatch}>
+              다시 시도
+            </Button>
+          } />);
+
+
+    }
+    if (waiting) return <Placeholder />;
+    if (loadError) {
+      return (
+        <Empty
+          className="mt-8"
+          tone="error"
           icon={<UploadIcon className="h-5 w-5" />}
           title="분류 결과를 불러오지 못했습니다"
-          description="잠시 후 다시 시도해 주세요."
           action={
           <Button
             size="md"
@@ -153,243 +144,294 @@ export function ClassificationPreview() {
 
                 다시 시도
               </Button>
-          } /> :
+          } />);
 
-        noBatch ?
+
+    }
+    if (noBatch) {
+      return (
         <Empty
           className="mt-8"
           icon={<UploadIcon className="h-5 w-5" />}
-          title="아직 올린 카드내역이 없습니다"
-          description="KB국민카드·IBK기업은행 카드의 승인내역을 올리면 분류 결과를 여기서 확인합니다."
+          title="올린 카드내역이 없습니다"
           action={
           <Button to="/upload" size="md">
                 카드내역 올리기
               </Button>
-          } /> :
+          } />);
 
-        <>
-        {/* 분류 진척 */}
-        <Card tone="canvas" padding="md" className="mt-6">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <p className="text-small text-muted">분류를 마친 거래</p>
-              <p className="mt-1 text-stat font-bold tabular-nums text-ink">
-                {formatNumber(classified)}
-                <span className="ml-1 text-h4 font-bold text-muted">
-                  / {formatNumber(total)}건
-                </span>
-              </p>
-            </div>
-            {done ?
-            <Badge tone="ok" symbol="✓">
-                분류 완료
-              </Badge> :
 
-            <p className="text-small tabular-nums text-warn">
-                확인 필요 {formatNumber(pendingCount)}건
-                {pendingAmount !== null && ` · ${formatWon(pendingAmount)}`}
-              </p>
-            }
-          </div>
+    }
+    if (groups.length === 0) {
+      // 이 화면에서 다 고른 것이면 고른 만큼 말한다. 처음부터 없던 것과 같은 말을 하면 고른 일이 사라진 듯 읽힌다
+      const done = Object.values(cards).filter((card) => card.kind === 'gone' || card.kind === 'saved').length;
+      return (
+        <Empty
+          className="mt-8"
+          icon={<CheckIcon className="h-5 w-5" strokeWidth={2.5} />}
+          title={done > 0 ? `가맹점 ${formatNumber(done)}곳을 모두 분류했습니다` : '분류할 가맹점이 없습니다'}
+          action={
+          <Button to={nextTo} size="md">
+                {toInterview ? '다음: 사업자 문진' : '다음: 판정 전 확인'}
+                <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
+              </Button>
+          } />);
 
-          <div
-            className="mt-4 h-2 overflow-hidden rounded-full bg-line2"
-            role="progressbar"
-            aria-valuenow={Math.round(coverage)}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-label="가맹점 분류 진척">
 
-            <div
-              className="h-full rounded-full bg-accent transition-[width] duration-500 ease-snap"
-              style={{ width: `${coverage}%` }} />
+    }
 
-          </div>
-        </Card>
-
-        {/* 확인 필요 목록 */}
-        <section className="mt-8">
-          {!done &&
-          <h2 className="text-h4 font-bold text-ink">
-              확인이 필요한 가맹점{' '}
-              {formatNumber(groupsQ.data?.page.totalElements ?? groups.length)}곳
-              {!groupsComplete && ` (${formatNumber(groups.length)}곳 표시)`}
+    return (
+      <>
+        <section className="mt-8" aria-labelledby="pending-heading">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h2 id="pending-heading" className="text-h4 font-bold text-ink">
+              분류 필요 {formatNumber(pendingCount)}건
             </h2>
-          }
-
-          {done ?
-          <Empty
-            tone="ok"
-            icon={<CheckIcon className="h-5 w-5" strokeWidth={2.5} />}
-            title="확인할 가맹점이 없습니다"
-            description={
-            context ?
-            '모든 거래에 업종이 붙었습니다. 이제 판정을 시작할 수 있습니다.' :
-            '모든 거래에 업종이 붙었습니다. 이제 사업자 문진을 마치면 판정을 시작할 수 있습니다.'
+            {pendingAmount !== null &&
+            <p className="whitespace-nowrap text-body font-bold tabular-nums text-ink">
+                {formatWon(pendingAmount)}
+              </p>
             }
-            action={
-            <Button to={context ? '/confirm' : '/interview'} size="md">
-                  {context ? '판정 전 확인으로' : '사업자 문진으로'}
-                  <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
-                </Button>
-            } /> :
-
+          </div>
+          {groups.length < merchantTotal &&
+          <p className="mt-1 text-body text-ink2">
+              가맹점 {formatNumber(merchantTotal)}곳 가운데 {formatNumber(groups.length)}곳을 먼저 보여 줍니다.
+            </p>
+          }
 
           <ul className="mt-4 space-y-3">
-              {groups.map((group) => {
-              // 승인일 오름차순으로 이미 정렬돼 온다 (api.md 3.5)
-              const rows = group.transactions;
-              // 한 가맹점이 카드사에서 여러 표기로 찍힌 경우 제목은 정규화된 이름을 쓴다.
-              // groupKey 는 형식을 보장하지 않으므로 파싱하지 않고 merchantNorm 을 쓴다.
-              const rawVariants = new Set(rows.map((row) => row.merchantRaw)).size;
-              const title =
-              rawVariants > 1 ? group.merchantNorm : group.merchantRaw;
-              return (
-                <Card
+            {groups.
+            filter((group) => cards[group.groupKey]?.kind !== 'gone').
+            map((group) =>
+            <ReviewCard
               key={group.groupKey}
-              as="li"
-              padding="md"
-              className={`border-l-[3px] border-l-warn transition-all duration-300 ease-snap hover:shadow-card ${
-              resolving[group.groupKey] ?
-              'scale-[0.98] opacity-0' :
-              'opacity-100'}`
-              }>
+              group={group}
+              state={cards[group.groupKey]}
+              onPick={(title, category) => void resolve(group, title, category)} />
 
-                  <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                    <p className="text-body-lg font-bold text-ink">
-                      {title}
-                    </p>
-                    <p className="text-small tabular-nums text-muted">
-                      {formatNumber(group.count)}건 · {formatWon(group.totalAmount)}
-                    </p>
-                  </div>
-                  <p className="mt-1 text-small text-muted">
-                    {rawVariants > 1 ?
-                    `카드사에 ${formatNumber(rawVariants)}가지 표기로 찍혔습니다. 업종을 읽지 못했습니다` :
-                    '카드사에 찍힌 표기 그대로입니다. 이것만으로는 업종을 읽지 못했습니다'}
-                  </p>
-
-                  {/*
-                    건별 목록은 접어 둔다. 그룹 카드가 여러 장 쌓이는데 카드마다 거래가 네 줄씩
-                    붙어 있어 「어떤 지출인가요?」까지 내려가기도 전에 화면이 찬다 (#242 리뷰).
-                    고르는 일은 늘 보이고, 떠올릴 거리만 열어서 본다
-                  */}
-                  <details className="mt-4">
-                    <summary className="cursor-pointer text-caption font-bold text-ink2 hover:text-ink">
-                      건별 보기 ({formatNumber(group.count)}건)
-                    </summary>
-                  <ul className="mt-2 divide-y divide-line2 rounded-xl border border-line2 bg-canvas">
-                    {rows.slice(0, 4).map((row) =>
-                <li
-                  key={row.transactionId}
-                  className="flex items-baseline justify-between gap-3 px-3.5 py-2.5">
-                  
-                        <span className="w-24 shrink-0 text-small tabular-nums text-ink2">
-                          {formatFullDate(row.approvedAt)}
-                        </span>
-                        <span className="min-w-0 flex-1 truncate text-small text-muted">
-                          {/* 그룹 제목과 같은 표기면 반복하지 않는다 */}
-                          {row.merchantRaw === title ? '' : row.merchantRaw}
-                          {row.installmentMonths > 0 &&
-                    `${row.merchantRaw === title ? '' : ' · '}${row.installmentMonths}개월 할부`}
-                        </span>
-                        <span className="shrink-0 text-small font-bold tabular-nums text-ink">
-                          {formatWon(row.amount)}
-                        </span>
-                      </li>
-                )}
-                    {group.count > 4 &&
-                <li className="px-3.5 py-2 text-caption text-muted">
-                        외 {formatNumber(group.count - 4)}건
-                      </li>
-                }
-                  </ul>
-                  </details>
-
-                  <p className="mt-5 text-body font-bold text-ink">
-                    이 {formatNumber(group.count)}건은 어떤 지출인가요?
-                  </p>
-                  <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                    {group.suggestedCategories.map((category, index) =>
-                <Button
-                  key={category}
-                  variant={index === 0 ? 'soft' : 'secondary'}
-                  size="sm"
-                  disabled={resolving[group.groupKey]}
-                  onClick={() =>
-                  void resolve(group.groupKey, group.reviewIds, category)
-                  }>
-
-                        {index === 0 &&
-                  <SparklesIcon
-                    className="h-3.5 w-3.5"
-                    aria-hidden="true" />
-                  }
-                        {category}
-                      </Button>
-                )}
-
-                    <div className="w-44">
-                      <Select
-                    aria-label={`${title} 카테고리 직접 선택`}
-                    // 고르면 바로 저장한다. 값을 붙잡아 두지 않아야 실패한 뒤 고른 값에 머물지 않는다
-                    value=""
-                    disabled={resolving[group.groupKey]}
-                    onChange={(event) => {
-                      if (!event.target.value) return;
-                      void resolve(
-                        group.groupKey,
-                        group.reviewIds,
-                        event.target.value
-                      );
-                    }}>
-
-                        {/* 모델 후보가 없으면(빈 배열) 버튼이 없으니 「다른」이라고 하지 않는다 */}
-                        <option value="">
-                          {group.suggestedCategories.length > 0 ? '다른 카테고리…' : '카테고리 고르기…'}
-                        </option>
-                        {MERCHANT_CATEGORIES.map((category) =>
-                    <option key={category} value={category}>
-                            {category}
-                          </option>
-                    )}
-                      </Select>
-                    </div>
-                  </div>
-                </Card>);
-
-            })}
-            </ul>
-          }
+            )}
+          </ul>
         </section>
 
-        {/* 다음 단계 */}
-        {!done &&
+        {/* 건너뛰면 잃는 것을 말한다. 고르지 않은 거래는 판정에 들어가지 않는다 */}
         <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-line pt-6">
-            <p className="max-w-md text-small leading-6 text-muted">
-              지금 넘어가면 확인하지 않은{' '}
-              <strong className="font-bold text-ink">
-                {formatNumber(pendingCount)}건
-              </strong>
-              은 판정에서 빠집니다. 나중에 이 화면에서 다시 확인할 수 있습니다.
-            </p>
-            <div className="flex items-center gap-3">
-              <Button
-              variant="ghost"
-              size="inline"
-              onClick={() => navigate(context ? '/confirm' : '/interview')}>
-
-                {context ? '건너뛰고 판정으로' : '건너뛰고 문진으로'}
-              </Button>
-              <Button variant="secondary" size="md" to="/upload">
-                카드내역 다시 올리기
-              </Button>
-            </div>
+          <p className="max-w-md text-body text-ink2">
+            분류하지 않은{' '}
+            <strong className="font-bold text-ink">{formatNumber(pendingCount)}건</strong>은 판정에서 빠집니다.
+          </p>
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            <Button variant="secondary" size="md" className="whitespace-nowrap" to="/upload">
+              다시 올리기
+            </Button>
+            <Button variant="secondary" size="md" className="whitespace-nowrap" to={nextTo}>
+              {toInterview ? '건너뛰고 사업자 문진으로' : '건너뛰고 판정 전 확인으로'}
+              <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
+            </Button>
           </div>
-        }
-        </>
-        }
+        </div>
+      </>);
+
+  };
+
+  return (
+    <AppShell narrow>
+      <div className="max-w-3xl">
+        <header>
+          <StepEyebrow />
+          <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">분류 확인</h1>
+          {/* 어느 업로드를 보고 있는지 (C54). 업로드 이력·판정 전 확인과 같은 이름을 쓴다 */}
+          {batch &&
+          <p className="mt-2 flex flex-wrap gap-x-3 text-body text-ink2">
+              <span className="font-bold text-ink">{uploadName(batch)}</span>
+              <span className="tabular-nums">{formatPeriod(batch.periodStart, batch.periodEnd)}</span>
+            </p>
+          }
+        </header>
+        {body()}
       </div>
     </AppShell>);
+
+}
+
+/** 처음 읽는 동안의 자리. 숫자와 버튼을 그리지 않는다 (C61) */
+function Placeholder() {
+  return (
+    <div aria-busy="true" className="mt-8">
+      <span className="sr-only">분류할 가맹점을 불러오는 중입니다</span>
+      <span className="block h-6 w-40 animate-pulse rounded bg-line2 motion-reduce:animate-none" />
+      <div className="mt-4 space-y-3">
+        {[0, 1].map((index) =>
+        <div key={index} className="rounded-2xl border border-line p-6">
+            <span className="block h-5 w-1/2 animate-pulse rounded bg-line2 motion-reduce:animate-none" />
+            <span className="mt-6 block h-10 w-3/4 animate-pulse rounded-full bg-line2 motion-reduce:animate-none" />
+          </div>
+        )}
+      </div>
+    </div>);
+
+}
+
+function Choice({
+  suggestion,
+  saving,
+  disabled,
+  onClick,
+  children
+
+
+
+
+
+
+}: {suggestion: boolean;saving: boolean;disabled: boolean;onClick: () => void;children: React.ReactNode;}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        CHOICE,
+        suggestion ? 'border-accent' : 'border-edge',
+        // 저장 중인 칸은 고른 칸이라 흐리게 하지 않는다
+        saving ? 'bg-accent-soft' : 'bg-canvas disabled:opacity-40'
+      )}>
+
+      {saving ?
+      <Loader2Icon className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> :
+      suggestion && <SparklesIcon className="h-3.5 w-3.5 text-accent" aria-hidden="true" />}
+      {children}
+      {/* AI 가 고른 첫 후보라는 표시. 판정이 아니라 분류 후보다 (DESIGN.md 말투 규칙) */}
+      {suggestion && <span className="text-caption font-bold text-accent">추천</span>}
+      {saving && <span className="sr-only">저장하는 중</span>}
+    </button>);
+
+}
+
+/**
+ * 가맹점 하나. 이름과 금액, 묻는 말, 그리고 같은 모양의 선택지 한 줄이다 (U6, C74).
+ * 모델의 첫 후보는 파란 테두리와 「추천」으로 표시하고, 나머지 카테고리는 같은 모양으로 펼친다
+ */
+function ReviewCard({
+  group,
+  state,
+  onPick
+
+
+
+
+}: {group: ClassificationReviewGroup;state: CardState | undefined;onPick: (title: string, category: string) => void;}) {
+  const [expanded, setExpanded] = useState(false);
+  // 승인일 오름차순으로 이미 정렬돼 온다 (api.md 3.5)
+  const rows = group.transactions;
+  // 한 가맹점이 카드사에서 여러 표기로 찍힌 경우 제목은 정규화된 이름을 쓴다.
+  // groupKey 는 형식을 보장하지 않으므로 파싱하지 않고 merchantNorm 을 쓴다.
+  const rawVariants = new Set(rows.map((row) => row.merchantRaw)).size;
+  const title = rawVariants > 1 ? group.merchantNorm : merchantName(group.merchantRaw);
+
+  const suggested = group.suggestedCategories;
+  const others = PICKABLE_CATEGORIES.filter((category) => !suggested.includes(category));
+  // 모델 후보가 없으면 펼칠 것 없이 처음부터 다 보인다
+  const open = expanded || suggested.length === 0;
+  const busy = state?.kind === 'saving' || state?.kind === 'saved';
+
+  const choice = (category: string, suggestion: boolean) =>
+  <Choice
+    key={category}
+    suggestion={suggestion}
+    saving={state?.kind === 'saving' && state.category === category}
+    disabled={busy}
+    onClick={() => onPick(title, category)}>
+
+      {categoryLabel(category)}
+    </Choice>;
+
+
+  return (
+    <li
+      aria-busy={state?.kind === 'saving' || undefined}
+      className={cn(
+        'rounded-2xl border border-line bg-canvas p-6 transition-all duration-300 ease-snap',
+        state?.kind === 'saved' && 'scale-[0.98] opacity-0'
+      )}>
+
+      <div className="flex items-baseline justify-between gap-4">
+        <p className="min-w-0 truncate text-body-lg font-bold text-ink" title={title}>
+          {title}
+        </p>
+        <p className="shrink-0 whitespace-nowrap text-body-lg font-bold tabular-nums text-ink">
+          {formatWon(group.totalAmount)}
+        </p>
+      </div>
+
+      {/*
+        건별 목록은 접어 둔다. 그룹 카드가 여러 장 쌓이는데 카드마다 거래가 네 줄씩
+        붙어 있어 「어떤 지출인가요?」까지 내려가기도 전에 화면이 찬다 (#242 리뷰).
+        고르는 일은 늘 보이고, 떠올릴 거리만 열어서 본다
+      */}
+      <details className="mt-1">
+        <summary className="cursor-pointer text-small text-ink2 hover:text-ink">
+          건별 보기 ({formatNumber(group.count)}건)
+        </summary>
+        <ul className="mt-2 divide-y divide-line2">
+          {rows.slice(0, 4).map((row) => {
+            // 그룹 제목과 같은 표기면 반복하지 않는다
+            const detail = [
+            merchantName(row.merchantRaw) === title ? '' : merchantName(row.merchantRaw),
+            row.installmentMonths > 0 ? `${row.installmentMonths}개월 할부` : ''].
+            filter(Boolean).join(', ');
+            return (
+              <li key={row.transactionId} className="flex items-baseline justify-between gap-3 py-2.5">
+                <span className="w-24 shrink-0 whitespace-nowrap text-small tabular-nums text-ink2">
+                  {formatFullDate(row.approvedAt)}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-small text-ink2">{detail}</span>
+                <span className="shrink-0 whitespace-nowrap text-small font-bold tabular-nums text-ink">
+                  {formatWon(row.amount)}
+                </span>
+              </li>);
+
+          })}
+          {group.count > 4 &&
+          <li className="py-2 text-small text-ink2">외 {formatNumber(group.count - 4)}건</li>
+          }
+        </ul>
+      </details>
+
+      <p className="mt-5 text-body font-bold text-ink">
+        {group.count > 1 ? `이 ${formatNumber(group.count)}건은 어떤 지출인가요?` : '어떤 지출인가요?'}
+      </p>
+      {suggested.length > 0 &&
+      <div role="group" aria-label={`${title} 카테고리`} className="mt-3 flex flex-wrap gap-2">
+          {suggested.map((category, index) => choice(category, index === 0))}
+          <button
+          type="button"
+          aria-expanded={open}
+          disabled={busy}
+          onClick={() => setExpanded((value) => !value)}
+          className={cn(CHOICE, 'border-edge bg-canvas disabled:opacity-40')}>
+
+            다른 카테고리
+            <ChevronDownIcon
+            className={cn('h-4 w-4 transition-transform duration-150', open && 'rotate-180')}
+            aria-hidden="true" />
+
+          </button>
+        </div>
+      }
+      {open &&
+      <div
+        role="group"
+        aria-label={suggested.length > 0 ? `${title} 다른 카테고리` : `${title} 카테고리`}
+        className="mt-3 flex flex-wrap gap-2">
+
+          {others.map((category) => choice(category, false))}
+        </div>
+      }
+      {state?.kind === 'error' &&
+      <p role="alert" className="mt-3 text-body text-deny">
+          {state.message}
+        </p>
+      }
+    </li>);
 
 }

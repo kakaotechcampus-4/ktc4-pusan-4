@@ -169,7 +169,8 @@ describe('makeRecord', () => {
       installment: 0,
       status: null,
       needsReview: false,
-      reviewReason: ''
+      reviewReason: '',
+      foreignAmount: null
     });
   });
 });

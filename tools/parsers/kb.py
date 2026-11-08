@@ -14,7 +14,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from . import Stats, make_record, parse_amount, parse_date, parse_installment
+from . import (FOREIGN_ONLY_REASON, ST_EXCLUDED, Stats, make_record, parse_amount,
+               parse_date, parse_installment)
 
 SOURCE = "kb"
 
@@ -65,31 +66,34 @@ def read(path: Path, st: Stats) -> list:
         if len(cells) <= COL["메모"]:
             cells = cells + [""] * (COL["메모"] + 1 - len(cells))
         merchant = str(cells[COL["이용하신곳"]]).strip()
-        if not merchant:
+        when = parse_date(cells[COL["이용일"]])
+        # 가맹점명도 승인일도 없으면 빈 줄이다. 가맹점명만 빈 행은 남긴다 (IBK 와 같다).
+        if not merchant and when is None:
             continue
         st.total += 1
 
-        domestic = parse_amount(cells[COL["국내이용금액"]]) or 0
+        domestic = parse_amount(cells[COL["국내이용금액"]])   # 빈 칸은 None, 0 은 0
         foreign = parse_amount(cells[COL["해외이용금액"]]) or 0
-        if domestic:
-            amount = domestic
-        elif foreign:
-            # 외화 전용 행. 원화 환산액이 없어 그대로 넣으면 단위가 섞인다.
+        # 외화 전용 행. 원화 환산액이 없어 그대로 넣으면 단위가 섞인다.
+        # 버리지 않고 대상제외로 남긴다 — 왜 빠졌는지 보여야 한다.
+        foreign_only = not domestic and bool(foreign)
+        if foreign_only:
             st.foreign_ccy += 1
-            continue
-        else:
-            amount = None
 
-        out.append(make_record(
+        rec = make_record(
             merchant=merchant,
-            amount=amount,
+            amount=None if foreign_only else domestic,
             biz_no="",              # KB 파일에는 가맹점 사업자번호가 없다
             memo=str(cells[COL["메모"]]).strip(),
             source=SOURCE,
             src_file=path.name,
             approval_no=cells[COL["승인번호"]],
-            when=parse_date(cells[COL["이용일"]]),
+            when=when,
             installment=parse_installment(cells[COL["결제방법"]]),
             is_cancel=(CANCEL_MARK in str(cells[COL["상태"]])),
-        ))
+        )
+        if foreign_only:
+            rec["status"] = ST_EXCLUDED
+            rec["review_reason"] = FOREIGN_ONLY_REASON
+        out.append(rec)
     return out
