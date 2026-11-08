@@ -192,7 +192,7 @@ def target(transactions: list[dict], quote: str, presumed: bool = False) -> None
             raise Reject("AMBIGUOUS_TARGET", "소명 대기 건은 인용 문장에 그 건의 날짜나 금액이 있어야 합니다. "
                                              "조건에 맞는 건이 여러 개면 제안하지 말고 사용자에게 어느 건인지 물어보세요.")
     elif not all(identifies(t, quote) or names(t, quote) for t in transactions):
-        raise Reject("AMBIGUOUS_TARGET", "인용 문장에 그 가맹점 이름이나 날짜·금액이 있어야 합니다. "
+        raise Reject("AMBIGUOUS_TARGET", "인용 문장에 그 가맹점 이름이나 날짜, 금액이 있어야 합니다. "
                                          "남은 질문을 한꺼번에 말했다면 propose_bulk_answer 를 쓰고, 아니면 어느 건인지 물어보세요.")
 
 
@@ -410,7 +410,7 @@ class Turn:
             raise Reject("NO_BASIS", "basis 는 user_said 나 previous_answer 여야 합니다.")
         return self._propose({"kind": "answer", "questionIds": g["questionIds"], "value": value,
                               "source": "PREVIOUS_ANSWER" if basis == "previous_answer" else "ASSISTANT",
-                              "card": f"{what(g['transactions'], g['totalAmount'])} → '{value}'"})
+                              "card": f"{what(g['transactions'], g['totalAmount'])} 답변: '{value}'"})
 
     def propose_bulk_answer(self, fact_type: str, value: str, quote: str) -> dict:
         self._check_quote(quote)
@@ -433,7 +433,7 @@ class Turn:
             raise Reject("INVALID_OPTION", "이 종류의 질문 모두가 받는 선택지가 아닙니다.", allowed=common)
         count, amount = sum(g["count"] for g in targets), sum(g["totalAmount"] for g in targets)
         return self._propose({"kind": "bulk_answer", "batchId": self.batch, "factType": fact_type, "value": value,
-                              "card": f"남은 '{fact_type}' 질문 {count}건 {amount:,}원 → '{value}'"})
+                              "card": f"남은 '{fact_type}' 질문 {count}건 {amount:,}원 답변: '{value}'"})
 
     def propose_classification(self, group: str, category: str, basis: str, quote: str | None) -> dict:
         g = self._get(group, "c", "분류 그룹")
@@ -449,13 +449,13 @@ class Turn:
         else:
             raise Reject("NO_BASIS", "basis 는 user_said 나 suggested_category 여야 합니다.")
         return self._propose({"kind": "classification", "reviewIds": g["reviewIds"], "merchantCategory": category,
-                              "card": f"{what(g['transactions'], g['totalAmount'])} → {category}"})
+                              "card": f"{what(g['transactions'], g['totalAmount'])} 분류: {category}"})
 
     def propose_override(self, transaction: str, to_verdict: str, quote: str) -> dict:
         self._check_quote(quote)
         tid = self._get(transaction, "t", "거래")["id"]
         if to_verdict not in OVERRIDE_VERDICTS:
-            raise Reject("INVALID_VERDICT", "판정은 가능·불가로만 바꿀 수 있습니다. 판단이 필요하면 세무대리인 질문을 제안하세요.",
+            raise Reject("INVALID_VERDICT", "판정은 가능이나 불가로만 바꿀 수 있습니다. 판단이 필요하면 세무대리인 질문을 제안하세요.",
                          allowed=OVERRIDE_VERDICTS)
         if self.be.get("/questions", transactionId=tid, status="PENDING")["items"]:
             raise Reject("USE_QUESTION", "이 거래에는 답하지 않은 질문이 있습니다. 판정을 바꾸지 말고 질문에 답하도록 "
@@ -469,7 +469,8 @@ class Turn:
             raise Reject("SAME_VERDICT", f"이미 {to_verdict} 판정입니다.")
         return self._propose({"kind": "override", "judgmentId": j["id"], "toVerdict": VERDICTS[to_verdict],
                               "reason": quote.strip(),
-                              "card": f"{what([tx], tx['amount'])} 판정 {j['verdict']['label']} → {to_verdict}"})
+                              "card": f"{what([tx], tx['amount'])} 판정을 {j['verdict']['label']}에서 "
+                                      f"{to_verdict}{'으로' if to_verdict == '가능' else '로'} 변경"})
 
     def add_handoff_note(self, text: str, transactions: list[str] | None, quote: str) -> dict:
         self._check_quote(quote)
