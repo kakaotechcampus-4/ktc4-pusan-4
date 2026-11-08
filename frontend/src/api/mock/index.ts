@@ -1,5 +1,5 @@
 import type { Api } from '../contract';
-import { ApiRequestError } from '../contract';
+import { ApiRequestError, rememberTraceId } from '../contract';
 import type {
   AssistantChatRequest,
   AssistantChatResponse,
@@ -789,7 +789,7 @@ const mockChat = async ({ message, context }: AssistantChatRequest): Promise<Ass
 
 // ── 구현 ────────────────────────────────────────────
 
-export const mockApi: Api = {
+const mockGroups: Api = {
   auth: {
     // 목업 비밀번호면 어떤 이메일이든 들어간다. 목업에서 가입한 계정은 그 비밀번호로도 들어간다
     login: ({ email, password }) => {
@@ -885,7 +885,7 @@ export const mockApi: Api = {
       const hour = Math.floor(Date.now() / 3_600_000);
       store.bugReports = store.bugReports.filter((at) => Math.floor(at / 3_600_000) === hour);
       if (store.bugReports.length >= 5)
-      return reject(429, 'BUG_REPORT_RATE_LIMITED', '한 시간에 5건까지 받습니다.');
+      return reject(429, 'BUG_REPORT_RATE_LIMITED', `${60 - new Date().getMinutes()}분 뒤에 다시 보내 주세요.`);
       store.bugReports.push(Date.now());
       return delay(undefined);
     }
@@ -1613,6 +1613,30 @@ export const mockApi: Api = {
     }
   }
 };
+
+/** http.ts 처럼 오류 응답의 traceId 를 버그 신고에 실을 값으로 적는다 */
+const remembering = <T extends object>(group: T): T =>
+Object.fromEntries(
+  Object.entries(group).map(([key, value]) => [
+  key,
+  typeof value === 'function' ?
+  (...args: unknown[]) => {
+    const result: unknown = value(...args);
+    return result instanceof Promise ?
+    result.catch((caught: unknown) => {
+      if (caught instanceof ApiRequestError && caught.traceId) rememberTraceId(caught.traceId);
+      throw caught;
+    }) :
+    result;
+  } :
+  typeof value === 'object' && value !== null ?
+  remembering(value) :
+  value]
+  )
+) as T;
+
+/** 로그인과 신고 자체의 실패는 신고할 오류가 아니라 적지 않는다 (http.ts 와 같다) */
+export const mockApi: Api = { ...remembering(mockGroups), auth: mockGroups.auth, bugReports: mockGroups.bugReports };
 
 /**
  * 목업 전용 — 흐름을 거치지 않고 화면에 바로 들어와도 보이도록 세션 초기값을 준다.

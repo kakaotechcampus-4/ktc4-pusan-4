@@ -1,10 +1,11 @@
-import React, { useId, useRef, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { BugIcon, CopyIcon, MailIcon } from 'lucide-react';
 import { useSession } from '../contexts/SessionContext';
 import { api, ApiRequestError, lastErrorTraceId } from '../api';
+import { rememberTraceId } from '../api/contract';
 import { Button, Modal } from './ui';
-import { bugReportMailto } from '../utils/bugReport';
+import { bugReportMailto, cutText } from '../utils/bugReport';
 import { SUPPORT_EMAIL } from '../utils/contact';
 
 /** 서버가 받는 길이 (api.md 3.16) */
@@ -61,9 +62,12 @@ function useBugReportForm() {
       () => {
         setSent(true);
         setMessage('');
+        // 이 오류는 신고했다. 다음 신고에 다시 싣지 않는다
+        rememberTraceId(null);
       },
       (caught: unknown) => {
         const code = caught instanceof ApiRequestError ? caught.code : '';
+        // 적은 글은 지우지 않는다. 메일 본문에 옮겨 준다
         if (code === 'BUG_REPORT_UNAVAILABLE') {
           setUnavailable(true);
           return;
@@ -71,6 +75,9 @@ function useBugReportForm() {
         setError(
           caught instanceof ApiRequestError && caught.status === 0 ?
           '서버에 연결하지 못했습니다. 잠시 뒤 다시 보내 주세요.' :
+          // 서버가 남은 시간(「N분 뒤에 다시 보내 주세요.」)을 준다. 없으면 고정 문구를 쓴다
+          code === 'BUG_REPORT_RATE_LIMITED' && caught instanceof ApiRequestError && /\d+분/.test(caught.message) ?
+          `한 시간에 5건까지 받습니다. ${caught.message}` :
           SEND_ERRORS[code] ?? SEND_ERRORS.BUG_REPORT_SEND_FAILED
         );
       }
@@ -87,7 +94,13 @@ function useBugReportForm() {
     setError(null);
   };
 
-  return { mode, message, setMessage, busy, error, submit, reset, formId };
+  /** 고쳐 적기 시작하면 「적어 주세요」 같은 오류는 걷는다 */
+  const write = (value: string) => {
+    setMessage(value);
+    setError(null);
+  };
+
+  return { mode, message, setMessage: write, busy, error, submit, reset, formId };
 }
 
 /** 적는 칸. 보내기 버튼은 부르는 쪽이 form 속성으로 잇는다 */
@@ -101,32 +114,36 @@ function BugReportFields({ form }: {form: ReturnType<typeof useBugReportForm>;})
       <textarea
         id={fieldId}
         value={form.message}
-        onChange={(event) => form.setMessage(event.target.value.slice(0, MESSAGE_LIMIT))}
+        onChange={(event) => form.setMessage(cutText(event.target.value, MESSAGE_LIMIT))}
         rows={6}
         placeholder="예: 결과 화면에서 금액이 0원으로 나와요"
         aria-invalid={form.error !== null}
         aria-describedby={form.error ? `${fieldId}-error` : undefined}
-        className="mt-1.5 w-full resize-y rounded-xl border border-edge bg-canvas px-3.5 py-2.5 text-[14px] leading-6 text-ink placeholder:text-muted aria-[invalid=true]:border-deny" />
+        className="mt-1.5 w-full resize-y rounded-xl border border-edge bg-canvas px-3.5 py-2.5 text-[14px] leading-6 text-ink placeholder:text-muted focus-visible:outline-none aria-[invalid=true]:border-deny" />
 
       {form.error &&
       <p id={`${fieldId}-error`} role="alert" className="mt-1.5 text-[13px] text-deny">
           {form.error}
         </p>
       }
-      <p className="mt-2 text-caption leading-5 text-ink2">지금 화면 주소와 브라우저를 같이 보냅니다.</p>
     </form>);
 
 }
 
-/** 지금 화면·시각·브라우저·계정 id 를 채운 메일 링크. 열 때마다 시각이 새로 들어간다 */
-function useMailto() {
+/**
+ * 지금 화면·시각·브라우저·계정 id 를 채운 메일 링크. 열 때마다 시각이 새로 들어간다.
+ * message: 서비스 안에서 보내려다 메일로 넘어왔으면 그때 적은 글
+ */
+function useMailto(message?: string) {
   const { pathname } = useLocation();
   const { userId } = useSession();
   return bugReportMailto({
     path: pathname,
     at: new Date().toISOString(),
     userAgent: navigator.userAgent,
-    userId
+    userId,
+    message: message?.trim() || undefined,
+    traceId: lastErrorTraceId() ?? undefined
   });
 }
 
@@ -161,8 +178,8 @@ export function BugReportAddress() {
 }
 
 /** 메일 쓰기 버튼. 제목과 본문(적을 것, 화면·시각·브라우저)을 미리 채운다 */
-export function BugReportMailButton({ onClick }: {onClick?: () => void;}) {
-  const href = useMailto();
+export function BugReportMailButton({ onClick, message }: {onClick?: () => void;message?: string;}) {
+  const href = useMailto(message);
   return (
     <Button href={href} size="md" onClick={onClick}>
       <MailIcon className="h-4 w-4" aria-hidden="true" />
@@ -182,6 +199,16 @@ export function BugReportButton({ className, label = '버그 신고', icon = tru
     setOpen(false);
     form.reset();
   };
+  /*
+   * 보냈거나 메일로 넘어가면 보내기 버튼이 사라져 초점이 창 밖(body)으로 떨어진다. 바뀐 내용으로 옮긴다.
+   * 창을 처음 열 때의 초점은 Modal 이 잡는다
+   */
+  const body = useRef<HTMLDivElement>(null);
+  const shown = useRef(form.mode);
+  useEffect(() => {
+    if (open && shown.current !== form.mode) body.current?.focus();
+    shown.current = form.mode;
+  }, [open, form.mode]);
 
   return (
     <>
@@ -197,19 +224,13 @@ export function BugReportButton({ className, label = '버그 신고', icon = tru
         open={open}
         onClose={close}
         title="버그 신고"
-        description={
-        form.mode === 'mail' ?
-        '메일로 받습니다. 지금 화면과 시각, 브라우저를 본문에 미리 채워 둡니다.' :
-        form.mode === 'sent' ?
-        undefined :
-        '팀에 바로 보냅니다.'
-        }
+        description={form.mode === 'mail' ? '메일로 받습니다.' : undefined}
         footer={
         <>
             <Button variant="secondary" size="md" onClick={close}>
               닫기
             </Button>
-            {open && form.mode === 'mail' && <BugReportMailButton onClick={close} />}
+            {open && form.mode === 'mail' && <BugReportMailButton onClick={close} message={form.message} />}
             {form.mode === 'form' &&
           <Button type="submit" form={form.formId} size="md" disabled={form.busy}>
                 {form.busy ? '보내는 중…' : '보내기'}
@@ -218,13 +239,15 @@ export function BugReportButton({ className, label = '버그 신고', icon = tru
           </>
         }>
 
-        {form.mode === 'mail' && <BugReportAddress />}
-        {form.mode === 'form' && <BugReportFields form={form} />}
-        {form.mode === 'sent' &&
-        <p role="status" className="text-body text-ink">
-            보냈습니다. 알려 주셔서 고맙습니다.
-          </p>
-        }
+        <div ref={body} tabIndex={-1} className="outline-none">
+          {form.mode === 'mail' && <BugReportAddress />}
+          {form.mode === 'form' && <BugReportFields form={form} />}
+          {form.mode === 'sent' &&
+          <p role="status" className="text-body text-ink">
+              보냈습니다. 알려 주셔서 고맙습니다.
+            </p>
+          }
+        </div>
       </Modal>
     </>);
 
@@ -233,13 +256,20 @@ export function BugReportButton({ className, label = '버그 신고', icon = tru
 /** /bug-report 화면의 신고 칸. 로그인 전이거나 메일 계정이 없는 서버면 메일 안내를 보인다 */
 export function BugReportPanel() {
   const form = useBugReportForm();
+  // 보냈거나 메일로 넘어가면 보내기 버튼이 사라져 초점이 body 로 떨어진다. 바뀐 첫 줄로 옮긴다
+  const status = useRef<HTMLParagraphElement>(null);
+  const shown = useRef(form.mode);
+  useEffect(() => {
+    if (shown.current !== form.mode) status.current?.focus();
+    shown.current = form.mode;
+  }, [form.mode]);
 
   if (form.mode === 'mail')
   return (
     <>
-        <p className="text-h4 font-bold text-ink">메일로 받습니다</p>
+        <p ref={status} tabIndex={-1} className="text-h4 font-bold text-ink outline-none">메일로 받습니다</p>
         <div className="mt-6">
-          <BugReportMailButton />
+          <BugReportMailButton message={form.message} />
         </div>
         <div className="mt-6">
           <BugReportAddress />
@@ -249,7 +279,7 @@ export function BugReportPanel() {
   if (form.mode === 'sent')
   return (
     <>
-        <p role="status" className="text-h4 font-bold text-ink">
+        <p ref={status} tabIndex={-1} role="status" className="text-h4 font-bold text-ink outline-none">
           보냈습니다. 알려 주셔서 고맙습니다.
         </p>
         <Button variant="secondary" size="md" className="mt-6" onClick={form.reset}>

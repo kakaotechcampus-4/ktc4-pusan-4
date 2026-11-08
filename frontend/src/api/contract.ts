@@ -249,12 +249,18 @@ export interface Api {
   };
 }
 
-/** 마지막으로 받은 오류 응답의 traceId. 버그 신고에 실어 서버 로그와 바로 잇는다 (#225) */
+/**
+ * 마지막으로 받은 오류 응답의 traceId. 버그 신고에 실어 서버 로그와 바로 잇는다 (#225).
+ * 적는 쪽은 http.ts 다. 로그인 실패나 신고 자체의 실패는 적지 않고, 로그인, 로그아웃, 신고를 보낸 뒤에는 지운다
+ */
 let lastTraceId: string | null = null;
 
 export const lastErrorTraceId = () => lastTraceId;
+export const rememberTraceId = (traceId: string | null) => {
+  lastTraceId = traceId;
+};
 
-/** 1.3 에러 응답을 그대로 던진다. traceId 가 있으면 마지막 traceId 로 적어 둔다 */
+/** 1.3 에러 응답을 그대로 던진다 */
 export class ApiRequestError extends Error {
   constructor(
   public readonly status: number,
@@ -268,6 +274,5 @@ export class ApiRequestError extends Error {
   {
     super(message);
     this.name = 'ApiRequestError';
-    if (traceId) lastTraceId = traceId;
   }
 }

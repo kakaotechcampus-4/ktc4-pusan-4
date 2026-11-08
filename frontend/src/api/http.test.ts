@@ -79,6 +79,23 @@ describe('httpApi', () => {
     // 성공한 응답은 마지막 traceId 를 지우지 않는다
     await httpApi.uploads.list();
     expect(lastErrorTraceId()).toBe('tr-header');
+
+    // 로그인 실패와 신고 자체의 실패는 신고할 오류가 아니라 적지 않는다
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ code: 'INVALID_CREDENTIALS', message: '틀렸습니다.', traceId: 'tr-login' }), { status: 401 })
+    );
+    await httpApi.auth.login({ email: 'a@b.test', password: 'x' }).catch(() => undefined);
+    expect(lastErrorTraceId()).toBeNull();
+
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ code: 'INTERNAL_ERROR', message: '실패했습니다.', traceId: 'tr-again' }), { status: 500 })
+    );
+    await httpApi.uploads.list().catch(() => undefined);
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ code: 'BUG_REPORT_RATE_LIMITED', message: '30분 뒤에 다시 보내 주세요.', traceId: 'tr-report' }), { status: 429 })
+    );
+    await httpApi.bugReports.create({ message: '금액이 0원' }).catch(() => undefined);
+    expect(lastErrorTraceId()).toBe('tr-again');
   });
 
   it('비밀번호 변경은 PUT, 버그 신고는 POST 로 보낸다', async () => {

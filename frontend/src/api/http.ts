@@ -1,4 +1,4 @@
-import { ApiRequestError } from './contract';
+import { ApiRequestError, rememberTraceId } from './contract';
 import type { Api } from './contract';
 import type { SessionEndReason } from '../auth/session';
 
@@ -62,6 +62,7 @@ const lose = (reason: SessionEndReason) => {
   if (accessToken === null) return;
   accessToken = null;
   generation += 1;
+  rememberTraceId(null);
   lostListeners.forEach((listener) => listener(reason));
 };
 
@@ -218,13 +219,17 @@ retried = false)
     };
     // 초 단위만 읽는다. 날짜 형식이면 버린다
     const retryAfter = Number(response.headers.get('Retry-After'));
+    // 본문이 없는 오류(프록시의 502)도 서버를 거쳤으면 헤더에 남는다 (#225)
+    const traceId = error.traceId ?? response.headers.get('X-Trace-Id') ?? '';
+    // 버그 신고에 실을 traceId. 비밀번호를 틀렸거나 쿠키 없이 재발급한 401, 신고 자체의 실패는 신고할 오류가 아니다
+    // 그사이 로그인, 로그아웃했거나 로그인이 풀렸으면(lose) 지난 세션의 오류라 적지 않는다
+    if (traceId && !isAuthPath(path) && path !== '/bug-reports' && generation === sentAt) rememberTraceId(traceId);
     throw new ApiRequestError(
       response.status,
       error.code ?? 'UNKNOWN',
       // 본문이 없거나(프록시의 502·504) 한글이 없는 서버 기본 문구(Spring 의 영어)면 화면에 올리지 않는다 (C65)
       error.message && /[가-힣]/.test(error.message) ? error.message : '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.',
-      // 본문이 없는 오류(프록시의 502)도 서버를 거쳤으면 헤더에 남는다 (#225)
-      error.traceId ?? response.headers.get('X-Trace-Id') ?? '',
+      traceId,
       response.headers.has('Retry-After') && Number.isFinite(retryAfter) ? retryAfter : undefined,
       // 409 RUN_ALREADY_ACTIVE 에만 붙는다 (#228). 문자열이 아니면 없는 것으로 둔다
       typeof error.runId === 'string' ? error.runId : undefined
@@ -247,9 +252,10 @@ const page = (query?: { page?: number; size?: number }): Query => ({
 
 /** 로그인·가입·카카오 로그인. 응답은 모두 `{accessToken}` + 리프레시 쿠키다 (api.md 1.1) */
 const enter = async (path: string, body: unknown) => {
-  // 다른 계정으로 로그인하다 실패해도 앞 사람의 토큰이 남지 않게 먼저 버린다
+  // 다른 계정으로 로그인하다 실패해도 앞 사람의 토큰이 남지 않게 먼저 버린다. 앞 사람의 오류도 신고에 싣지 않는다
   accessToken = null;
   generation += 1;
+  rememberTraceId(null);
   await settled();
   const startedAt = generation;
   const result = await post<{ accessToken: string }>(path, body);
@@ -276,6 +282,7 @@ export const httpApi: Api = {
     },
     logout: async () => {
       generation += 1;
+      rememberTraceId(null);
       announce({ type: 'logout' });
       if (refreshing) {
         // 재발급이 끝난 뒤에 보낸다(settled). 토큰은 싣지 않는다 — /auth/* 는 토큰을 보지 않고 쿠키만 지운다
