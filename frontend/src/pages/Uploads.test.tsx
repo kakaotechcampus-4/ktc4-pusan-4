@@ -89,8 +89,8 @@ afterEach(() => {
   container.remove();
 });
 
-const KB_DELETE = 'KB국민카드 승인내역 2026. 01. 01 – 2026. 03. 05 업로드 삭제';
-const IBK_DELETE = 'IBK기업은행 승인내역 2026. 01. 01 – 2026. 03. 05 업로드 삭제';
+const KB_DELETE = 'KB국민카드 승인내역 2026. 01. 01 ~ 2026. 03. 05 업로드 삭제';
+const IBK_DELETE = 'IBK기업은행 승인내역 2026. 01. 01 ~ 2026. 03. 05 업로드 삭제';
 
 describe('업로드 이력', () => {
   it('파일 이름을 화면마다 같은 이름으로, 올린 시각까지 보여 준다 (C59·C92)', async () => {

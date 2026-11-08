@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import { DEV_EXPENSES } from '../mock/marketing';
-import { Badge, type BadgeTone } from './ui';
+import { Badge, type BadgeSymbol, type BadgeTone } from './ui';
 
 /** 랜딩의 지출 예시 카드. 판정 3분류를 색·기호와 함께 보여준다 */
 const VERDICT: Record<
   (typeof DEV_EXPENSES)[number]['verdict'],
-  {label: string; symbol: string; tone: BadgeTone; skin: string;}> =
+  {label: string; symbol: BadgeSymbol; tone: BadgeTone; skin: string;}> =
 {
-  ok: { label: '가능', symbol: '✓', tone: 'ok', skin: 'border-ok-line bg-ok-bg' },
-  ask: { label: '확인 필요', symbol: '?', tone: 'warn', skin: 'border-warn-line bg-warn-bg' },
-  deny: { label: '불가', symbol: '✕', tone: 'deny', skin: 'border-deny-line bg-deny-bg' }
+  ok: { label: '가능', symbol: 'check', tone: 'ok', skin: 'border-ok-line bg-ok-bg' },
+  ask: { label: '확인 필요', symbol: 'question', tone: 'warn', skin: 'border-warn-line bg-warn-bg' },
+  deny: { label: '불가', symbol: 'cross', tone: 'deny', skin: 'border-deny-line bg-deny-bg' }
 };
 
 /**

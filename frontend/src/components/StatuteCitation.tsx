@@ -97,7 +97,7 @@ export function StatuteCitation({
       <footer className="mt-1 flex flex-wrap items-center gap-x-3 text-caption tabular-nums text-muted">
         <span>
           시행 {formatFullDate(statute.effectiveFrom)}
-          {statute.effectiveTo ? ` – ${formatFullDate(statute.effectiveTo)}` : ' – 현행'}
+          {statute.effectiveTo ? ` ~ ${formatFullDate(statute.effectiveTo)}` : ' ~ 현행'}
         </span>
         {/* 말뭉치가 쌓아 둔 …/제81의6조 꼴은 law.go.kr 이 열지 못한다 (C9) */}
         <a

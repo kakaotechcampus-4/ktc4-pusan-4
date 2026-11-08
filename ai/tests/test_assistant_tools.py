@@ -153,9 +153,9 @@ def test_말로_답하면_실제_질문_id_로_바꾼_카드를_만든다():
 
     out = t.propose_answer(g, "공용", "user_said", "SK텔레콤은 가족이랑 같이 쓰는 공용 회선이야.")
 
-    assert out == {"status": "proposed", "card": "SK텔레콤 9/15 78,000원 → '공용'"}
+    assert out == {"status": "proposed", "card": "SK텔레콤 9/15 78,000원 답변: '업무와 개인 둘 다'"}
     assert t.proposals == [{"kind": "answer", "questionIds": ["q-skt"], "value": "공용", "source": "ASSISTANT",
-                            "card": "SK텔레콤 9/15 78,000원 → '공용'"}]
+                            "card": "SK텔레콤 9/15 78,000원 답변: '업무와 개인 둘 다'"}]
 
 
 def test_지난번_답은_A등급이고_충돌이_없고_같은_값일_때만_된다():
@@ -213,7 +213,7 @@ def test_일괄_답은_모두가_받는_선택지로_대상_건수와_합계를_
 
     out = t.propose_bulk_answer("용도", "개인", "전부 개인이야")
 
-    assert out["card"] == "남은 '용도' 질문 2건 39,800원 → '개인'"
+    assert out["card"] == "남은 '용도' 질문 2건 39,800원 답변: '개인 용도'"
     assert t.proposals[0] | {"card": None} == {"kind": "bulk_answer", "batchId": BATCH, "factType": "용도",
                                                "value": "개인", "card": None}
     assert t.run("propose_bulk_answer", {"fact_type": "용도", "value": "업무미팅", "quote": "전부 개인이야"})["allowed"] == ["개인"]
@@ -238,7 +238,7 @@ def test_분류_제안은_후보_안이거나_사용자_설명이_근거여야_�
     assert t.propose_classification(c, "해외SaaS", "suggested_category", None)["status"] == "proposed"
     assert t.run("propose_classification", {"group": c, "category": "기타", "basis": "user_said", "quote": "나머지도 다 기타야"})["error"] == "AMBIGUOUS_TARGET"
     quote = "XYZ PAYMENTS는 디자인 툴 결제라 국내 소프트웨어야"
-    assert t.propose_classification(c, "국내SW", "user_said", quote)["card"] == "XYZ PAYMENTS 2건 97,000원 → 국내SW"
+    assert t.propose_classification(c, "국내SW", "user_said", quote)["card"] == "XYZ PAYMENTS 2건 97,000원 분류: 국내SW"
     assert [p["reviewIds"] for p in t.proposals] == [["r-tx17", "r-tx18"]] * 2
 
 
@@ -259,7 +259,7 @@ def test_판정_수정_카드는_현재_판정_id_와_사용자_문장을_사유
     assert t.run("propose_override", {"transaction": ref, "to_verdict": "가능", "quote": "판정 바꿔 줘"})["error"] == "AMBIGUOUS_TARGET"
     out = t.propose_override(ref, "가능", "넷플릭스는 강의 자료 조사용이라 업무용이야")
 
-    assert out["card"] == "넷플릭스 9/28 17,000원 판정 불가 → 가능"
+    assert out["card"] == "넷플릭스 9/28 17,000원 판정을 불가에서 가능으로 변경"
     assert t.proposals[0] | {"card": None} == {"kind": "override", "judgmentId": "j-tx08", "toVerdict": "AVAILABLE",
                                                "reason": "넷플릭스는 강의 자료 조사용이라 업무용이야", "card": None}
 
@@ -294,3 +294,31 @@ def test_화면별_도구는_9개_이하이고_모두_정의돼_있다():
 def test_화면에_없는_도구는_부를_수_없다():
     t = Turn(FakeBackend(), {"batchId": BATCH}, ["공용이야"], tools.tools_for("/upload"))
     assert t.run("propose_answer", {"group": "g1", "value": "공용", "basis": "user_said", "quote": "공용이야"})["error"] == "UNKNOWN_TOOL"
+
+
+def test_card_shows_answer_label_not_stored_value():
+    from assistant.tools import shown
+    # 저장 값은 그대로 두고 카드에만 질문 화면과 같은 이름을 쓴다
+    assert shown("업무·개인 혼용") == "업무와 개인 둘 다"
+    assert shown("업무·개인 혼재") == "업무와 개인 둘 다"
+    assert shown("공용") == "업무와 개인 둘 다"
+    assert shown("업무미팅") == "거래처 접대"
+    assert shown("새·값") == "새, 값"
+
+
+def test_answer_label_matches_frontend():
+    import re
+    from pathlib import Path
+
+    from assistant.tools import ANSWER_LABEL
+    fe = Path(__file__).resolve().parents[2] / "frontend/src/components/questions/logic.ts"
+    if not fe.exists():  # ai/ 만 따로 빌드하는 환경
+        pytest.skip("frontend 가 없다")
+    src = fe.read_text()
+    pairs = {}
+    # 지금 카드의 표와 예전 카드 값의 표를 합친 것이 비서 표와 같아야 한다
+    for name in ("ANSWER_LABEL", "LEGACY_ANSWER_LABEL"):
+        start = src.index(f"export const {name}")
+        body = src[start:src.index("};", start)]
+        pairs.update(re.findall(r"^\s*'?([^':/\n]+?)'?:\s*'([^']+)'", body, re.MULTILINE))
+    assert pairs == ANSWER_LABEL

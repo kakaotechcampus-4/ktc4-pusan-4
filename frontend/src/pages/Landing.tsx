@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRightIcon } from 'lucide-react';
 import { useSession } from '../contexts/SessionContext';
+import { signedInHint } from '../contexts/signedInHint';
 import icon from '../assets/brand/icon/preet-icon.svg';
 import { InterviewCard, UploadRows, VerdictCard } from '../components/flowFigure';
 import { MarketingHeader } from '../components/MarketingHeader';
@@ -19,23 +20,19 @@ import {
 '../mock/marketing';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { PAGES } from '../seo';
+import { MAIN_ID } from '../components/ui';
 
 /**
- * 인트로를 봤다는 표시. 처음 한 번만 띄운다 — 로고로 다녀와도 다시 뜨지 않는다.
- * index.html 의 덮개 스크립트도 이 키를 읽는다. 바꾸면 거기도 바꾼다
+ * 인트로는 로그인하지 않은 사람이 홈을 새로 열 때마다(새로고침 포함) 띄운다.
+ * 한 번 띄운 뒤 로고로 홈에 돌아오면 다시 띄우지 않는다 — 페이지를 새로 열 때까지 기억한다
  */
-const INTRO_SEEN = 'preet.intro.seen';
+let introPlayed = false;
 
 /** 움직임을 줄이라는 설정이면 아예 띄우지 않는다. 빌드 때 미리 그리는 HTML(entry-server.tsx)에는 넣지 않는다 */
 function wantsIntro() {
   if (typeof window === 'undefined') return false;
   if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return false;
-  try {
-    return window.localStorage.getItem(INTRO_SEEN) === null;
-  } catch {
-    // 저장소를 막아 둔 브라우저. 띄우기는 하되 표시를 못 남겨 올 때마다 뜬다
-    return true;
-  }
+  return !introPlayed && !signedInHint();
 }
 
 /** 본문 폭과 좌우 여백. 레퍼런스는 1440 폭에서 좌우 62px 를 띄운다 */
@@ -124,17 +121,13 @@ export function Landing() {
   }, []);
 
   const closeIntro = useCallback(() => {
+    introPlayed = true;
     setIntro(false);
-    try {
-      window.localStorage.setItem(INTRO_SEEN, '1');
-    } catch {
-      // 못 남기면 다음에 또 뜬다. 막을 방법이 없고 막을 일도 아니다
-    }
   }, []);
 
-  /* 로그인 뒤에는 메인으로 오므로, CTA 가 로그인 폼으로 되돌아가면 막힌다 */
+  /* 로그인 뒤에는 메인으로 오므로, CTA 가 로그인 폼으로 되돌아가면 막힌다. 처음 온 사람은 가입부터 한다 (C101) */
   const signedIn = status === 'signedIn';
-  const startTo = signedIn ? '/upload' : '/login';
+  const startTo = signedIn ? '/upload' : '/signup';
 
   return (
     <div className="min-h-full bg-canvas">
@@ -142,7 +135,7 @@ export function Landing() {
 
       <MarketingHeader />
 
-      <main>
+      <main id={MAIN_ID} tabIndex={-1} className="outline-none">
         {/* 큰 패널 + 오른쪽 세로 띠 (레퍼런스 section_visual: 1094 / 206, 사이 16) */}
         <section className={`${SHELL} pt-10`}>
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_206px]">
@@ -205,10 +198,10 @@ export function Landing() {
               <div className="flex-1 rounded-2xl bg-surface p-5">
                 <p className="text-caption text-muted">되돌릴 수 없는 동작</p>
                 <p className="mt-2 text-h4 font-bold tracking-ir-sm text-ink">
-                  없습니다
+                  만들지 않습니다
                 </p>
                 <p className="mt-2 text-small leading-6 text-ink2 [word-break:keep-all]">
-                  신고·제출·발송을 만들지 않습니다. 답을 고치면 그 자리에서 다시
+                  신고, 제출, 발송은 하지 않습니다. 답을 고치면 그 자리에서 다시
                   판정합니다.
                 </p>
               </div>

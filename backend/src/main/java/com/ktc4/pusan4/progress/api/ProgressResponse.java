@@ -21,7 +21,7 @@ public record ProgressResponse(
 
     private static final DateTimeFormatter MONTH = DateTimeFormatter.ofPattern("yyyy-MM");
 
-    public record Batch(UUID id, @Schema(example = "국민 · 2026-09") String label, long transactionCount) {
+    public record Batch(UUID id, @Schema(example = "국민 2026-09") String label, long transactionCount) {
     }
 
     public record Context(int version, @Schema(example = "복식부기") String bookkeeping, boolean hasEmployee) {
@@ -63,12 +63,12 @@ public record ProgressResponse(
         );
     }
 
-    /** 「국민 · 2026-09」. 여러 달이면 「국민 · 2026-01~2026-03」. */
+    /** 국민 2026-09. 여러 달이면 국민 2026-01~2026-03. */
     static String label(String cardIssuer, LocalDate start, LocalDate end) {
         String months = start.withDayOfMonth(1).equals(end.withDayOfMonth(1))
             ? MONTH.format(start)
             : MONTH.format(start) + "~" + MONTH.format(end);
-        return cardIssuer + " · " + months;
+        return cardIssuer + " " + months;
     }
 
     /** 화면 문구는 api.md 2.7 을 따른다(JudgmentRunResponse 와 같다). */

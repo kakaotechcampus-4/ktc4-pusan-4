@@ -150,9 +150,9 @@ describe('거래', () => {
     expect(transactions.list).toHaveBeenLastCalledWith(expect.objectContaining({ year: 2026, month: 2 }));
   });
 
-  it('판정 대상 칸은 상태 배지와 같은 모양의 버튼으로 맞춘다', async () => {
+  it('상태 배지는 판정대상이 아닌 행에만 달고, 바꾸는 버튼은 모든 행에 둔다', async () => {
     await render();
-    expect(rowOf('스타벅스')?.textContent).toContain('판정대상');
+    expect(rowOf('스타벅스')?.textContent).not.toContain('판정대상');
     expect(rowOf('스타벅스')?.textContent).toContain('빼기');
     expect(rowOf('포인트사용')?.textContent).toContain('대상제외');
     expect(rowOf('포인트사용')?.textContent).toContain('다시 넣기');

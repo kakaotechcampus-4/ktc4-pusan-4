@@ -41,7 +41,7 @@ export async function parseCardBytes(bytes: ArrayBuffer): Promise<ParseOutcome> 
       kind: 'blocked',
       statement: '판별불가',
       code: 'UNKNOWN_FORMAT',
-      why: '형식 판별 실패 — 건너뜁니다',
+      why: '형식 판별 실패, 건너뜁니다',
       detected
     };
   }

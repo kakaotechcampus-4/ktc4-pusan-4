@@ -216,7 +216,7 @@ export function Uploads() {
             disabled={deleting}
             onClick={() => void remove()}>
 
-              {deleting ? '지우는 중…' : '지우기'}
+              {deleting ? '지우는 중' : '지우기'}
             </Button>
           </>
         }>

@@ -1,8 +1,18 @@
 import React from 'react';
+import { CheckIcon, XIcon } from 'lucide-react';
 import { cn } from './cn';
 
 export type BadgeTone = 'ok' | 'warn' | 'deny' | 'neutral' | 'ink' | 'inverse';
 export type BadgeSize = 'sm' | 'md';
+/** 판정 기호. 글자 기호(✓ ✕) 대신 그림으로 그린다. 물음표는 자판 글자라 그대로 쓴다 */
+export type BadgeSymbol = 'check' | 'cross' | 'question';
+
+/** 판정 기호 하나. 배지 밖(판정 상세 머리)에서도 같은 모양을 쓴다 */
+export function SymbolIcon({ symbol, className }: {symbol: BadgeSymbol;className?: string;}) {
+  if (symbol === 'question') return <span aria-hidden="true" className={cn('font-bold leading-none', className)}>?</span>;
+  const Icon = symbol === 'check' ? CheckIcon : XIcon;
+  return <Icon aria-hidden="true" strokeWidth={3} className={cn('h-3 w-3 shrink-0', className)} />;
+}
 
 /**
  * ok·warn·deny 는 판정(가능·확인 필요·불가)에만 쓴다. 판정 배지는 VerdictBadge 가 고른다.
@@ -26,7 +36,7 @@ interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
   tone?: BadgeTone;
   size?: BadgeSize;
   /** 색각이상 대응: 색만으로 구분하지 않도록 기호를 같이 넣는다 */
-  symbol?: string;
+  symbol?: BadgeSymbol;
 }
 
 export function Badge({
@@ -47,11 +57,7 @@ export function Badge({
       )}
       {...rest}>
       
-      {symbol &&
-      <span aria-hidden="true" className="font-bold leading-none">
-          {symbol}
-        </span>
-      }
+      {symbol && <SymbolIcon symbol={symbol} />}
       {children}
     </span>);
 

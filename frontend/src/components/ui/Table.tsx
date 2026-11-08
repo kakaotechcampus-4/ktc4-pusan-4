@@ -149,7 +149,7 @@ export function Pagination({ page, onChange, note }: PaginationProps) {
   return (
     <div className="mt-5 flex flex-wrap items-center justify-between gap-3 text-small text-muted">
       <span className="tabular-nums">
-        {note ?? `${first}–${last} / ${page.totalElements.toLocaleString('ko-KR')}건`}
+        {note ?? `${first}~${last} / ${page.totalElements.toLocaleString('ko-KR')}건`}
       </span>
       <div className="flex items-center gap-2">
         <button

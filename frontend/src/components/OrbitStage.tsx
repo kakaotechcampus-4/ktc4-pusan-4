@@ -94,30 +94,67 @@ const INNER: Spot[] = [
 { angle: 300, radius: 34, size: 56, Icon: Statute }];
 
 
+/**
+ * 좁은 화면용. 테 하나에 다섯을 고르게 올린다 — 판이 작으면 안팎 테의 반지름 차이가
+ * 17px 밖에 안 되어 그림끼리 겹쳐 보인다. 크기 순서는 바깥 테를 따른다
+ */
+const NARROW: Spot[] = [
+{ angle: 0, radius: 44, size: 76, Icon: Store },
+{ angle: 72, radius: 44, size: 72, Icon: Bubble },
+{ angle: 144, radius: 44, size: 66, Icon: Receipt },
+{ angle: 216, radius: 44, size: 62, Icon: Card },
+{ angle: 288, radius: 44, size: 56, Icon: Statute }];
+
+
+/**
+ * fluid 그림 크기의 기준 폭. 그림은 판 폭이 이만할 때 원래 크기(76px 등)가 된다.
+ * 배너 판은 500px 에서 멈추므로 그림은 원래 크기의 86% 까지만 큰다. 원래 크기로 두면
+ * 그림이 1 / 3 알약과 제목 끝에 닿는다(1279~1920 에서 재 봤다)
+ */
+const BOARD_PX = 584;
+
+/**
+ * scale: 그림 크기 배수. 좁은 화면은 판이 작아 그대로 두면 그림끼리 붙는다
+ * fluid: 그림 크기를 판 폭에 맞춰 줄인다. 배너 판은 1024~1279 에서 작아지는데 그림이
+ *        그대로면 안팎 테의 그림끼리 겹친다
+ */
 function Ring({
   spots,
   spin,
-  counter
+  counter,
+  scale = 1,
+  fluid = false
 
 
 
 
-}: {spots: Spot[];spin: string;counter: string;}) {
+}: {spots: Spot[];spin: string;counter: string;scale?: number;fluid?: boolean;}) {
   return (
-    <div className={`absolute inset-0 ${spin} motion-reduce:animate-none`}>
+    <div className={`absolute inset-0 ${spin} motion-reduce:animate-none ${fluid ? '[container-type:size]' : ''}`}>
       {spots.map((spot) => {
         const rad = (spot.angle - 90) * Math.PI / 180;
+        const size = spot.size * scale;
+        const radius = spot.radius;
         return (
           <span
             key={spot.angle}
             className="absolute"
-            style={{
-              left: `${50 + spot.radius * Math.cos(rad)}%`,
-              top: `${50 + spot.radius * Math.sin(rad)}%`,
-              width: spot.size,
-              height: spot.size,
-              marginLeft: -spot.size / 2,
-              marginTop: -spot.size / 2
+            style={fluid ?
+            {
+              left: `${50 + radius * Math.cos(rad)}%`,
+              top: `${50 + radius * Math.sin(rad)}%`,
+              // 판 폭을 따라 줄되 60% 아래로는 줄이지 않는다. 더 작으면 그림이 무엇인지 안 읽힌다
+              width: `clamp(${size * 0.6}px, ${size / BOARD_PX * 100}cqw, ${size}px)`,
+              aspectRatio: '1',
+              transform: 'translate(-50%, -50%)'
+            } :
+            {
+              left: `${50 + radius * Math.cos(rad)}%`,
+              top: `${50 + radius * Math.sin(rad)}%`,
+              width: size,
+              height: size,
+              marginLeft: -size / 2,
+              marginTop: -size / 2
             }}>
 
             <span
@@ -136,79 +173,125 @@ function Ring({
  * intro: 첫 모션 중인가. 인트로 화면에서만 켠다 — 메인 배너에서는 돌기만 한다
  * full: 전체화면인가. 좁은 화면에서도 그림을 다 띄운다 — 440px 패널에서는 테만 남기지만
  *       844px 짜리 인트로에서 테만 두면 거의 빈 화면이 된다
+ * paused: 배너의 멈춤 버튼을 눌렀다. 가운데 문구도 바꾸지 않는다. 회전은 HeroBanner 가 멈춘다
  */
-export function OrbitStage({ intro = false, full = false }: {intro?: boolean; full?: boolean;}) {
+export function OrbitStage({ intro = false, full = false, paused = false }: {intro?: boolean; full?: boolean; paused?: boolean;}) {
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
     const reduce = window.matchMedia?.(
       '(prefers-reduced-motion: reduce)'
     ).matches;
-    if (reduce) return;
+    if (reduce || paused) return;
     const timer = window.setInterval(
       () => setIndex((n) => (n + 1) % CENTER_LINES.length),
       SWAP_MS
     );
     return () => window.clearInterval(timer);
-  }, []);
+  }, [paused]);
+
+  const centerText =
+  <p
+    className={`relative text-center text-h3 font-bold tracking-ir-sm text-white ${
+    full ? 'lg:text-ir-panel' : 'min-[1400px]:text-ir-panel'} ${intro ? CENTER_RISE : ''}`
+    }>
+
+      {CENTER_LINES.map((line, i) =>
+    <span
+      key={line}
+      className={`block transition-opacity duration-700 ${
+      i === index ? 'opacity-100' : 'absolute inset-0 opacity-0'}`
+      }>
+
+          {line}
+        </span>
+    )}
+    </p>;
+
 
   return (
     <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
-      {/* 좁은 화면에서는 테만 남긴다 — 전체화면은 아래 판을 그대로 쓴다 */}
+      {/*
+        좁은 화면용 판. 아래 lg 판과 중심·크기가 달라 따로 둔다. 전에는 여기에 테만 두고
+        그림을 껐는데, 인트로(full)에서는 그림이 다 나와서 메인으로 넘어오면 그림이
+        사라진 것처럼 보였다.
+
+        판은 제목 아랫줄과 1 / 3 알약 사이에 둔다. 휴대폰은 그 틈이 140px 남짓이라 105px,
+        640 이상은 제목이 한 줄 덜 내려와 160px 이다. 판 폭을 % 로 두면 넓은 쪽에서 판이 커져
+        그림이 제목과 알약에 걸렸다. 360 아래는 제목이 세 줄이라 자리가 없어 그림을 뺀다.
+        바깥 테를 그림이 도는 자리에 바로 두어, 그림이 테에 올라타 보이게 한다. 안쪽 테는 깊이만 준다
+      */}
       <div
-        className={`absolute inset-0 ${full ? 'hidden' : 'lg:hidden'} ${
-        intro ? DRAW : ''}`
+        className={`absolute left-[60%] top-[53%] aspect-square w-[105px] -translate-x-1/2 -translate-y-1/2 max-[359px]:hidden sm:left-[62%] sm:top-[62.5%] sm:w-[160px] ${
+        full ? 'hidden' : 'lg:hidden'}`
         }>
-        <span className="absolute left-[72%] top-[62%] aspect-square w-[90%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20" />
-        <span className="absolute left-[72%] top-[62%] aspect-square w-[58%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20" />
+        <div className={`absolute inset-0 ${intro ? DRAW : ''}`}>
+          <span className="absolute left-1/2 top-1/2 aspect-square w-[88%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20" />
+          <span className="absolute left-1/2 top-1/2 aspect-square w-[44%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20" />
+        </div>
+
+        <div className={`absolute inset-0 ${intro ? SPREAD : ''}`}>
+          <Ring spots={NARROW} spin="animate-orbit" counter="animate-orbit-back" scale={0.5} />
+        </div>
       </div>
       {/*
         궤도는 정사각 판 안에서만 돈다. 가로·세로 %를 따로 쓰면 원이 아니라
-        타원이 되어 그림이 좌우 끝으로 밀린다. 중심을 오른쪽으로 비켜 두어
-        왼쪽 위 제목과 겹치지 않게 한다
+        타원이 되어 그림이 좌우 끝으로 밀린다.
+
+        배너에서는 판을 오른쪽 끝에 붙이고, 폭에서 제목 몫(lg 424px, xl 520px)을 뺀 만큼만
+        키운다. 500px 에서 멈춘다. 더 크면 오른쪽 아래 그림이 1 / 3 알약 밑으로 지나간다. 전에는 중심을 66% 에 두고 판 높이에 맞춰 키워서 바깥 그림이 제목 둘째 줄
+        위를 지나갔다 (C81). 1024~1279 는 자리가 좁아 제목도 한 단계 작다(HeroBanner)
       */}
       <div
-        className={`absolute left-1/2 top-1/2 aspect-square w-[88%] -translate-x-1/2 -translate-y-1/2 lg:left-[66%] lg:h-[94%] lg:w-auto ${
-        full ? 'block' : 'hidden'} lg:block`
+        className={
+        full ?
+        'absolute left-1/2 top-1/2 aspect-square w-[88%] -translate-x-1/2 -translate-y-1/2 lg:left-[66%] lg:h-[94%] lg:w-auto' :
+        'absolute right-8 top-1/2 hidden aspect-square -translate-y-1/2 lg:block lg:w-[min(500px,calc(100%-424px))] xl:w-[min(500px,calc(100%-520px))]'
         }>
+        {/*
+          배너 판은 1280 아래에서 작아(최소 250px 남짓) 테 둘에 그림을 나누면 안팎 그림이 겹친다.
+          그 폭에서는 좁은 화면처럼 테 하나에 다섯을 고르게 올리고, 테도 그 자리(88%, 44%)에 둔다
+        */}
         <div className={`absolute inset-0 ${intro ? DRAW : ''}`}>
-          <span className="absolute left-1/2 top-1/2 aspect-square w-[104%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20" />
-          <span className="absolute left-1/2 top-1/2 aspect-square w-[72%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20" />
+          <span className={`absolute left-1/2 top-1/2 aspect-square -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20 ${full ? 'w-[104%]' : 'w-[88%] xl:w-[104%]'}`} />
+          <span className={`absolute left-1/2 top-1/2 aspect-square -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20 ${full ? 'w-[72%]' : 'w-[44%] xl:w-[72%]'}`} />
         </div>
 
         {/* 회전은 Ring 이 하고 퍼지는 것은 이 겉면이 한다. 한 요소에 두면 둘 중 하나가 덮인다 */}
         <div className={`absolute inset-0 ${intro ? SPREAD : ''}`}>
-          <Ring spots={OUTER} spin="animate-orbit" counter="animate-orbit-back" />
-          <Ring
-            spots={INNER}
-            spin="animate-orbit-slow"
-            counter="animate-orbit-slow-back" />
+          <div className={`absolute inset-0 ${full ? '' : 'hidden xl:block'}`}>
+            <Ring spots={OUTER} spin="animate-orbit" counter="animate-orbit-back" fluid={!full} />
+            <Ring
+              spots={INNER}
+              spin="animate-orbit-slow"
+              counter="animate-orbit-slow-back"
+              fluid={!full} />
 
+          </div>
+          {!full &&
+          <div className="absolute inset-0 xl:hidden">
+              <Ring spots={NARROW} spin="animate-orbit" counter="animate-orbit-back" fluid />
+            </div>
+          }
         </div>
+
+        {/*
+          배너에서는 문구를 판 안에 둔다. 판이 오른쪽에 붙어 있어 판과 함께 움직여야 중심이 맞는다.
+          1280 아래는 판이 작아 문구가 안쪽 그림에 걸린다. 휴대폰처럼 그림만 둔다
+        */}
+        {!full &&
+        <div className="absolute left-1/2 top-1/2 hidden w-[150%] -translate-x-1/2 -translate-y-1/2 justify-center xl:flex">
+            {centerText}
+          </div>
+        }
       </div>
 
-      {/* 가운데 바뀌는 문구 — 궤도 중심에 맞춘다 */}
-      <div
-        className={`absolute inset-y-0 left-1/2 w-[80%] -translate-x-1/2 items-center justify-center px-8 lg:left-[66%] lg:w-[70%] ${
-        full ? 'flex' : 'hidden'} lg:flex`
-        }>
-        <p
-          className={`relative text-center text-h3 font-bold tracking-ir-sm text-white lg:text-ir-panel ${
-          intro ? CENTER_RISE : ''}`
-          }>
-
-          {CENTER_LINES.map((line, i) =>
-          <span
-            key={line}
-            className={`block transition-opacity duration-700 ${
-            i === index ? 'opacity-100' : 'absolute inset-0 opacity-0'}`
-            }>
-
-              {line}
-            </span>
-          )}
-        </p>
-      </div>
+      {/* 가운데 바뀌는 문구. 인트로는 궤도 중심에 맞춘다 */}
+      {full &&
+      <div className="absolute inset-y-0 left-1/2 flex w-[80%] -translate-x-1/2 items-center justify-center px-8 lg:left-[66%] lg:w-[70%]">
+          {centerText}
+        </div>
+      }
     </div>);
 
 }

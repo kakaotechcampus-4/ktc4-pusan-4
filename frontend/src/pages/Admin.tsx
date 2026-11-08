@@ -186,7 +186,7 @@ export function Admin() {
               disabled={busy}
               onClick={() => void decide()}>
 
-                {busy ? '처리 중…' : pending?.decision === 'approve' ? '승인' : '기각'}
+                {busy ? '처리 중' : pending?.decision === 'approve' ? '승인' : '기각'}
               </Button>
             </>
           }>

@@ -85,7 +85,7 @@ LABELS = {"AVAILABLE": "가능", "UNAVAILABLE": "불가", "NEEDS_REVIEW": "확�
 ENTERTAINMENT_COUNT = 24
 LIMIT = {"bucket": "접대비", "taxYear": YEAR, "totalAmount": 13006500, "excessAmount": 916500}
 PROGRESS = {
-    "batch": {"label": "국민 · 2026-09", "transactionCount": 18},
+    "batch": {"label": "국민 2026-09", "transactionCount": 18},
     "context": {"version": 4, "bookkeeping": "복식부기", "hasEmployee": False},
     "classification": {"pendingCount": 2, "pendingAmount": 97000},
     "run": {"id": "run-2026-09", "status": {"code": "COMPLETED", "label": "완료"}},

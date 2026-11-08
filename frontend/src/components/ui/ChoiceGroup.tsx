@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react';
 import { cn } from './cn';
 
 export interface ChoiceOption<T extends string | boolean> {
@@ -18,6 +19,11 @@ interface ChoiceGroupProps<T extends string | boolean> {
   options: ChoiceOption<T>[];
   value: T;
   onChange: (value: T) => void;
+  /**
+   * 화살표로 옮길 때 바로 고르는지. 기본은 고른다(라디오 묶음 관례).
+   * 고르는 순간 서버에 저장하는 곳(질문 답)은 끈다. 화살표는 초점만 옮기고 Space, Enter 로 고른다
+   */
+  selectOnFocus?: boolean;
   /** 한 줄에 놓을 개수 (sm 이상). 기본 3 */
   columns?: 2 | 3 | 4;
   className?: string;
@@ -39,25 +45,62 @@ export function ChoiceGroup<T extends string | boolean>({
   options,
   value,
   onChange,
+  selectOnFocus = true,
   columns = 3,
   className
 }: ChoiceGroupProps<T>) {
+  const buttons = useRef<(HTMLButtonElement | null)[]>([]);
+  const enabled = options.flatMap((option, index) => option.disabled ? [] : [index]);
+  /*
+   * 라디오 묶음처럼 Tab 은 한 번만 선다. 고른 칸에, 아직 안 골랐으면 첫 칸에 선다.
+   * 칸 사이는 화살표로 옮기고 옮기면 바로 고른다 (WAI-ARIA radio group)
+   */
+  const selectedIndex = options.findIndex((option) => option.value === value && !option.disabled);
+  /**
+   * 고르지 않고 초점만 옮긴 칸(selectOnFocus 를 끈 묶음). Tab 은 지금 초점이 있는 칸에 서야
+   * Shift+Tab 한 번에 묶음을 벗어난다. 묶음을 벗어나면 다시 고른 칸으로 돌아간다
+   */
+  const [focused, setFocused] = useState<number | null>(null);
+  const tabStop = !selectOnFocus && focused !== null ? focused : selectedIndex >= 0 ? selectedIndex : enabled[0];
+
+  const onKeyDown = (event: React.KeyboardEvent, index: number) => {
+    // Alt+← 같은 브라우저 단축키는 그대로 둔다
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
+    const edge = { Home: enabled[0], End: enabled[enabled.length - 1] }[event.key];
+    const at = enabled.indexOf(index);
+    const next = edge ?? (step === undefined ? undefined : enabled[(at + step + enabled.length) % enabled.length]);
+    if (next === undefined) return;
+    event.preventDefault();
+    buttons.current[next]?.focus();
+    if (selectOnFocus) onChange(options[next].value);else
+    setFocused(next);
+  };
+
   return (
     <div
       role="radiogroup"
       aria-label={name}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setFocused(null);
+      }}
       className={cn('grid gap-2', COLUMNS[columns], className)}>
 
-      {options.map((option) => {
+      {options.map((option, index) => {
         const selected = option.value === value;
         return (
           <button
             key={String(option.value)}
+            ref={(el) => {
+              buttons.current[index] = el;
+            }}
             type="button"
             role="radio"
             aria-checked={selected}
             aria-disabled={option.disabled || undefined}
             disabled={option.disabled}
+            tabIndex={index === tabStop ? 0 : -1}
+            onKeyDown={(event) => onKeyDown(event, index)}
             onClick={() => onChange(option.value)}
             className={cn(
               'rounded-xl border px-3.5 py-3 text-left transition-colors duration-150 ease-snap',

@@ -2677,7 +2677,7 @@ Question을 삭제하지 않고 상태를 남겨 판정 이력을 보존한다.
 
 ```json
 {
-  "batch": { "id": "0199aa11-...", "label": "국민 · 2026-09", "transactionCount": 18 },
+  "batch": { "id": "0199aa11-...", "label": "국민 2026-09", "transactionCount": 18 },
   "context": { "version": 4, "bookkeeping": "복식부기", "hasEmployee": false },
   "classification": { "pendingCount": 2, "pendingAmount": 97000 },
   "run": { "id": "0199b2...", "status": { "code": "COMPLETED", "label": "완료" } },
@@ -2688,7 +2688,7 @@ Question을 삭제하지 않고 상태를 남겨 판정 이력을 보존한다.
 
 | 필드 | 뜻 |
 | --- | --- |
-| batch.label | `카드사 · 시작월`. 기간이 여러 달이면 `카드사 · 시작월~끝월` |
+| batch.label | `카드사 시작월`. 기간이 여러 달이면 `카드사 시작월~끝월` |
 | context | 최신 문진의 버전·기장의무·직원 유무. 문진 전이면 `null` |
 | classification | 이 Batch 에서 분류를 기다리는 거래 수와 금액 |
 | run | 이 Batch 의 최근 판정 실행. 실행한 적 없으면 `null` |

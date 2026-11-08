@@ -2,6 +2,7 @@ import React from 'react';
 import { MarketingHeader } from './MarketingHeader';
 import { MarketingFooter } from './MarketingFooter';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { MAIN_ID } from './ui';
 
 /** 로그인 없이 보는 안내 화면(약관·처리방침·FAQ·없는 주소). 랜딩과 같은 머리말·꼬리말을 쓴다 */
 export function PublicLayout({ title, children }: {title: string;children: React.ReactNode;}) {
@@ -9,7 +10,7 @@ export function PublicLayout({ title, children }: {title: string;children: React
   return (
     <div className="flex min-h-full flex-col bg-canvas">
       <MarketingHeader />
-      <main className="mx-auto w-full max-w-3xl flex-1 px-6 pb-20 pt-10">{children}</main>
+      <main id={MAIN_ID} tabIndex={-1} className="mx-auto w-full max-w-3xl flex-1 px-6 pb-20 pt-10 outline-none">{children}</main>
       <MarketingFooter />
     </div>);
 

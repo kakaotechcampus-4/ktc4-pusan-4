@@ -367,7 +367,7 @@ export function Signup() {
             {errorAt('email')}
             {errorAt(null)}
             <Button type="submit" disabled={busy} className="mt-4 w-full">
-              {busy ? '보내는 중…' : '인증 코드 받기'}
+              {busy ? '보내는 중' : '인증 코드 받기'}
             </Button>
           </> :
 
@@ -416,7 +416,7 @@ export function Signup() {
             </p>
         }
           <Button type="submit" disabled={busy} className="mt-4 w-full">
-            {busy ? '확인 중…' : '코드 확인'}
+            {busy ? '확인 중' : '코드 확인'}
           </Button>
           <Button
           variant="secondary"
@@ -475,8 +475,9 @@ export function Signup() {
           }>
 
             <legend className="sr-only">약관 동의</legend>
-            <label className="flex items-center gap-2 font-bold text-ink">
+            <label htmlFor="agree-all" className="flex items-center gap-2 font-bold text-ink">
               <input
+              id="agree-all"
               type="checkbox"
               checked={agreeTerms && agreePrivacy}
               onChange={(event) => {
@@ -492,8 +493,8 @@ export function Signup() {
               읽어 보려다 동의한 것이 되면 안 된다 (#247 리뷰)
             */}
             <div className="flex items-center gap-2 text-ink2">
-              <label className="flex flex-1 items-center gap-2">
-                <input type="checkbox" checked={agreeTerms} onChange={(event) => setAgreeTerms(event.target.checked)} />
+              <label htmlFor="agree-terms" className="flex flex-1 items-center gap-2">
+                <input id="agree-terms" type="checkbox" checked={agreeTerms} onChange={(event) => setAgreeTerms(event.target.checked)} />
                 [필수] 이용약관 동의
               </label>
               <button type="button" onClick={() => setDoc('terms')} className={DOC_LINK}>
@@ -501,8 +502,9 @@ export function Signup() {
               </button>
             </div>
             <div className="flex items-center gap-2 text-ink2">
-              <label className="flex flex-1 items-center gap-2">
+              <label htmlFor="agree-privacy" className="flex flex-1 items-center gap-2">
                 <input
+                  id="agree-privacy"
                   type="checkbox"
                   checked={agreePrivacy}
                   onChange={(event) => setAgreePrivacy(event.target.checked)} />
@@ -534,7 +536,7 @@ export function Signup() {
 
           {errorAt(null)}
           <Button type="submit" disabled={busy} className="mt-5 w-full">
-            {busy ? '가입하는 중…' : '가입하기'}
+            {busy ? '가입하는 중' : '가입하기'}
           </Button>
         </form>
       }

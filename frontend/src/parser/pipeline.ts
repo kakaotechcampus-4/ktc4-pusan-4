@@ -82,7 +82,7 @@ export function resolveCancellations(records: RawRecord[], stats: ParseStats): R
 
     if (AGGREGATED_RE.test(c.merchant)) {
       stats.cancelsUnpaired += 1;
-      c.reviewReason = '취소 행 (합산 행 — 개별 취소 대상이 없다)';
+      c.reviewReason = '취소 행 (합산 행이라 개별 취소 대상이 없다)';
       continue;
     }
 
@@ -130,22 +130,22 @@ export function resolveCancellations(records: RawRecord[], stats: ParseStats): R
       c.reviewReason = `취소 행 (${how} 매칭으로 상계됨)`;
     } else if (cands.length >= 2) {
       stats.cancelsAmbiguous += 1;
-      c.reviewReason = `취소 행 (상계 대상 불확정 — 후보 ${cands.length}건)`;
+      c.reviewReason = `취소 행 (상계 대상 불확정, 후보 ${cands.length}건)`;
       for (const o of cands) {
         flagged.set(o,
-        `취소 대상 불확정 — 같은 상호·금액 결제가 ${cands.length}건이라 어느 건이 취소됐는지 자동 판정 불가`
+        `취소 대상 불확정: 같은 상호와 금액 결제가 ${cands.length}건이라 어느 건이 취소됐는지 자동 판정 불가`
         );
       }
     } else if (outside.length > 0) {
       stats.cancelsUnpaired += 1;
       stats.cancelsOutOfWindow += 1;
-      c.reviewReason = `취소 행 (같은 상호·금액 결제가 ${PAIR_WINDOW_DAYS}일 밖에만 있음 — 상계하지 않음)`;
+      c.reviewReason = `취소 행 (같은 상호와 금액 결제가 ${PAIR_WINDOW_DAYS}일 밖에만 있어 상계하지 않음)`;
       for (const [o, days] of outside) {
-        flagged.set(o, `같은 상호·금액 취소가 ${days}일 떨어져 있음 — ${PAIR_WINDOW_DAYS}일 밖이라 상계하지 않음`);
+        flagged.set(o, `같은 상호와 금액 취소가 ${days}일 떨어져 있음. ${PAIR_WINDOW_DAYS}일 밖이라 상계하지 않음`);
       }
     } else {
       stats.cancelsUnpaired += 1;
-      c.reviewReason = '취소 행 (짝 후보 없음 — 원 결제가 조회 기간 밖일 수 있다)';
+      c.reviewReason = '취소 행 (짝 후보 없음. 원 결제가 조회 기간 밖일 수 있다)';
     }
   }
 

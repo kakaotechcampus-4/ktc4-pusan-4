@@ -3,7 +3,7 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { CheckIcon } from 'lucide-react';
 import { DisclaimerBar } from './DisclaimerBar';
-import { Button } from './ui';
+import { Button, MAIN_ID } from './ui';
 import { BugReportButton } from './BugReport';
 import { Logo } from './Logo';
 import { STEPS, STEP_ALIAS, doneSteps, under } from './steps';
@@ -237,17 +237,17 @@ export function AppShell({ children, showSteps = true, disclaimer = true, narrow
             */}
             {crumb[0] !== crumb[1] &&
           <>
-                <li>›</li>
+                <li>&gt;</li>
                 <li>{crumb[0]}</li>
               </>
           }
-            <li>›</li>
+            <li>&gt;</li>
             <li className="text-ink">{crumb[1]}</li>
           </ol>
         </nav>
       }
 
-      <main className={`mx-auto w-full max-w-page flex-1 pb-12 pt-5 ${gutter}`}>
+      <main id={MAIN_ID} tabIndex={-1} className={`mx-auto w-full max-w-page flex-1 pb-12 pt-5 outline-none ${gutter}`}>
         {narrow ? <div className={column}>{children}</div> : children}
       </main>
 
