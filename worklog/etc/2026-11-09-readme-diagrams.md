@@ -18,3 +18,23 @@
 
 - CI/CD · Redis · Blue/Green · CloudWatch 도식화 자리는 아직 비어 있음
 - langfuse.gif 가 2.2MB 로 다른 GIF(0.2~0.4MB)보다 큼
+
+## 02:14 README CI/CD 파이프라인 도식 추가
+
+- 커밋: c90ef249 (1개)
+- 주요파일: README.md, docs/img/readme/cicd.png
+
+### 한 일
+
+- 「CI/CD 파이프라인」 도식화 자리를 `cicd.png` 로 교체. 개발자 PR → GitHub → release 머지 → GitHub Actions → 이미지 빌드, ECR push / SSM 으로 EC2 `deploy.sh` 실행 → ECR 에서 pull 해 Docker Compose 로 idle 색 기동, 블루그린 전환 흐름을 그림
+- 흐름은 `.github/workflows/aws-release.yml`, `deploy/deploy.sh` 에 맞춤
+- 너비는 `architecture-hd.png` 와 같은 3050px
+
+### 왜 이렇게 했나
+
+- 아키텍처 그림에는 GitHub Actions, ECR, SSM 경로가 없어 배포 흐름은 따로 그림이 필요했다
+
+### 남은 것 · 아는 문제
+
+- 그림의 편집용 원본(pptx)은 레포에 넣지 않았다
+- Redis, Blue/Green, CloudWatch 도식화 자리는 아직 비어 있음
