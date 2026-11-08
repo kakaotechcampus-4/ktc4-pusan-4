@@ -174,7 +174,8 @@ export function Landing() {
                 </p>
               </div>
 
-              <div className="rounded-2xl bg-surface p-5">
+              {/* 하지 않는 일은 여기 두지 않는다. 히어로 3번 장면과 맨 아래 판이 말한다 (11/8 회의, 겹치는 내용 정리) */}
+              <div className="flex-1 rounded-2xl bg-surface p-5">
                 <p className="text-caption text-muted">판정 세 갈래</p>
                 <ul className="mt-4 space-y-3.5">
                   {VERDICTS.map((item) =>
@@ -192,17 +193,6 @@ export function Landing() {
                     </li>
                   )}
                 </ul>
-              </div>
-
-              <div className="flex-1 rounded-2xl bg-surface p-5">
-                <p className="text-caption text-muted">되돌릴 수 없는 동작</p>
-                <p className="mt-2 text-h4 font-bold tracking-ir-sm text-ink">
-                  만들지 않습니다
-                </p>
-                <p className="mt-2 text-small leading-6 text-ink2 [word-break:keep-all]">
-                  신고, 제출, 발송은 하지 않습니다. 답을 고치면 그 자리에서 다시
-                  판정합니다.
-                </p>
               </div>
             </div>
           </div>
@@ -266,8 +256,7 @@ export function Landing() {
         <section className={`${SHELL} pt-28`}>
           <IrHeading>이런 지출을 이렇게 봅니다</IrHeading>
           <p className="mt-5 max-w-xl text-body-lg text-ink2 [word-break:keep-all]">
-            1인 개발 사업자가 자주 쓰는 항목입니다. 같은 지출도 상황에 따라
-            결과가 달라집니다.
+            1인 개발 사업자가 자주 쓰는 항목입니다.
           </p>
           <div className="mt-10">
             <ExampleCarousel />
