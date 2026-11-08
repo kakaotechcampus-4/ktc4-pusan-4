@@ -180,8 +180,7 @@
 
 ### CI/CD 파이프라인
 
-<!-- 도식화 자리: CI/CD 파이프라인 — 머지되면 GitHub Actions 가 돌고, 빌드는 어디서 하고, ECR 에 올린 이미지를 어디서 당기고, CD 는 어떻게 트리거되는지. 그림은 docs/img/readme/ 에 넣고 아래 인용을 이미지로 바꿔 주세요 -->
-> 🖼️ **도식화 예정: CI/CD 파이프라인**
+<p align="center"><img src="./docs/img/readme/cicd.png" width="90%" alt="CI/CD 파이프라인" /></p>
 
 `develop` → `release` PR 이 머지되면 GitHub Actions(`aws-release.yml`)가 자동으로 배포합니다.
 
