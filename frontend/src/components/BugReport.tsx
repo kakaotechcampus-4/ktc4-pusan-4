@@ -51,7 +51,8 @@ function useBugReportForm() {
     void api.bugReports.
     create({
       message: message.trim(),
-      pageUrl: window.location.href.slice(0, URL_LIMIT),
+      // 도메인은 뻔해서 뺀다. 어느 업로드, 어느 판정인지는 쿼리에 있어 남긴다
+      pageUrl: (window.location.pathname + window.location.search).slice(0, URL_LIMIT),
       userAgent: navigator.userAgent.slice(0, USER_AGENT_LIMIT),
       // 마지막으로 받은 오류 응답의 traceId. 서버 로그와 바로 잇는다 (#225)
       traceId: lastErrorTraceId() ?? undefined

@@ -2965,7 +2965,7 @@ Query: `status`(없으면 전체), `page`, `size`(1.4). 정렬은 `createdAt` DE
 ```
 {
   "message": "결과 화면에서 금액이 0원으로 나와요",
-  "pageUrl": "https://.../results?batch=...",
+  "pageUrl": "/results?batchId=...",
   "userAgent": "Mozilla/5.0 ...",
   "traceId": "..."
 }
@@ -2974,7 +2974,7 @@ Query: `status`(없으면 전체), `page`, `size`(1.4). 정렬은 `createdAt` DE
 | 필드 | 필수 | 제약 |
 | --- | --- | --- |
 | message | Y | 공백만은 안 됨, 최대 2000자 |
-| pageUrl | N | 최대 2000자 |
+| pageUrl | N | 최대 2000자. 프론트는 도메인 없이 경로와 쿼리를 보낸다 |
 | userAgent | N | 최대 500자 |
 | traceId | N | 최대 100자. 화면이 마지막으로 받은 에러 응답의 `traceId`. 로그와 바로 이을 수 있다 |
 
