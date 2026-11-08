@@ -368,7 +368,7 @@ AI 서버    에이전트 루프 ── 도구 (백엔드 조회 API를 사용�
 ```json
 {
   "answer": "토요일 스타벅스 결제가 두 건 있습니다. ...",
-  "proposals": [{"kind": "answer", "questionIds": ["..."], "value": "업무미팅", "source": "ASSISTANT", "card": "스타벅스 서면점 9/12 12,800원 → '업무미팅'"}],
+  "proposals": [{"kind": "answer", "questionIds": ["..."], "value": "업무미팅", "source": "ASSISTANT", "card": "스타벅스 서면점 9/12 12,800원 답변: '업무미팅'"}],
   "traceId": "0ba0fb7f..."
 }
 ```

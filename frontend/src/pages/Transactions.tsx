@@ -181,7 +181,8 @@ export function Transactions() {
     const canceled = row.sourceStatus.code === 'CANCELED_OFFSET';
     const excluded = row.effectiveStatus.code === 'EXCLUDED';
     return (
-      <span className="inline-flex items-center gap-3">
+      // 좁은 화면은 왼쪽 정렬이라 배지가 없는 행에서 버튼이 밀린다. 버튼을 앞에 두어 줄을 맞춘다
+      <span className="inline-flex flex-row-reverse items-center gap-3 sm:flex-row">
         {row.effectiveStatus.code !== 'JUDGEABLE' && <Badge>{row.effectiveStatus.label}</Badge>}
         {canceled ?
         <span aria-hidden="true" className="w-[6.5rem]" /> :

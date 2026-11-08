@@ -4,7 +4,7 @@
  */
 
 /** 승인내역 받는 길. 업로드 화면의 막힌 카드와 도움말이 같은 문장을 쓴다 */
-export const APPROVAL_EXPORT_STEPS = '카드사 홈페이지나 앱에서 이용(승인)내역을 조회해 엑셀로 저장';
+export const APPROVAL_EXPORT_STEPS = '카드사 홈페이지나 앱에서 이용(승인)내역을 조회해 엑셀로 저장합니다.';
 
 /**
  * 비서에게 물을 때 외부 모델로 가는 것 (QR-7). 비서 도구(ai/assistant/tools.py)가 모델에 넘기는 필드에서 뽑았다.
@@ -45,7 +45,7 @@ export const HELP_TOPICS: HelpTopic[] = [
 {
   id: 'approval',
   label: '승인내역 받는 법',
-  text: `${APPROVAL_EXPORT_STEPS}. 청구내역은 할부가 회차별로 쪼개져 있어 판정에 쓰지 않습니다.`
+  text: `${APPROVAL_EXPORT_STEPS} 청구내역은 할부가 회차별로 쪼개져 있어 판정에 쓰지 않습니다.`
 },
 {
   id: 'boundary',

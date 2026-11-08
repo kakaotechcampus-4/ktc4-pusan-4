@@ -1442,7 +1442,7 @@ export const mockApi: Api = {
           appliedRuleIds: [],
           rulesCommitSha: RULES_SHA,
           userContextVersion: completedRun.contextVersion,
-          explanation: `가맹점 업종을 ${merchantCategory}로 확인한 뒤 다시 판정했습니다.`,
+          explanation: `가맹점 업종을 ${merchantCategory} 분류로 확인한 뒤 다시 판정했습니다.`,
           computedAt: now(),
           citations: []
         });
