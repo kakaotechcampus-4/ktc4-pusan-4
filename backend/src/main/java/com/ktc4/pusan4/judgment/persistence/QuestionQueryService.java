@@ -2,6 +2,7 @@ package com.ktc4.pusan4.judgment.persistence;
 
 import com.ktc4.pusan4.judgment.domain.PendingTotal;
 import com.ktc4.pusan4.judgment.domain.Question;
+import com.ktc4.pusan4.judgment.domain.QuestionGroup;
 import com.ktc4.pusan4.judgment.domain.QuestionStatus;
 import com.ktc4.pusan4.judgment.domain.Verdict;
 import com.ktc4.pusan4.judgment.persistence.JudgmentRepository.AutomaticVerdict;
@@ -73,6 +74,30 @@ public class QuestionQueryService {
             status == null ? null : status.name(), PageRequest.of(page, size));
         Set<UUID> withPending = pendingTransactionIds(rows.stream().map(QuestionRow::transactionId).toList());
         return new PageImpl<>(toDomain(rows.getContent(), withPending), rows.getPageable(), rows.getTotalElements());
+    }
+
+    /**
+     * 묶음 목록(grouped=true)의 한 쪽. 그룹 순서는 질문 전부로 정해지므로 묶기와 순서에 쓰는 값만 전부 읽고,
+     * 고른 쪽의 그룹에 든 질문에만 거래, 답, 수정 여부를 붙인다.
+     */
+    @Transactional(readOnly = true)
+    public Page<QuestionGroup> groupPage(
+        UUID userId, UUID batchId, UUID transactionId, QuestionStatus status, int page, int size
+    ) {
+        List<List<QuestionGroup.Member>> ordered = QuestionGroup.order(questionRepository
+            .findMembers(userId, batchId, transactionId, status == null ? null : status.name()).stream()
+            .map(row -> new QuestionGroup.Member(row.id(), row.batchId(), row.groupKey(), row.factType(),
+                QuestionStatus.valueOf(row.status()), row.transactionId(), row.approvedAt(), row.amount()))
+            .toList());
+        int from = (int) Math.min((long) page * size, ordered.size());
+        List<UUID> questionIds = ordered.subList(from, Math.min(from + size, ordered.size())).stream()
+            .flatMap(List::stream)
+            .map(QuestionGroup.Member::id)
+            .toList();
+        List<QuestionRow> rows = questionRepository.findRowsByIds(questionIds);
+        Set<UUID> withPending = pendingTransactionIds(rows.stream().map(QuestionRow::transactionId).toList());
+        return new PageImpl<>(QuestionGroup.group(toDomain(rows, withPending)), PageRequest.of(page, size),
+            ordered.size());
     }
 
     /** 미해소 집계 (api.md 3.9). {@link #find} 와 같은 조건의 PENDING 질문 수와 그 거래들의 결제 금액 합이다. */

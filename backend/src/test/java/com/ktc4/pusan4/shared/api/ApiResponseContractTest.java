@@ -20,6 +20,7 @@ import com.ktc4.pusan4.judgment.domain.JudgmentSummary;
 import com.ktc4.pusan4.judgment.domain.LimitYearTotal;
 import com.ktc4.pusan4.judgment.domain.PendingTotal;
 import com.ktc4.pusan4.judgment.domain.Question;
+import com.ktc4.pusan4.judgment.domain.QuestionGroup;
 import com.ktc4.pusan4.judgment.domain.QuestionStatus;
 import com.ktc4.pusan4.judgment.domain.RuleCandidate;
 import com.ktc4.pusan4.judgment.domain.RuleCandidateStatus;
@@ -246,6 +247,8 @@ class ApiResponseContractTest {
         given(questionQueryService.page(any(), any(), any(), any(), anyInt(), anyInt()))
             .willReturn(new PageImpl<>(List.of(question)));
         given(questionQueryService.unresolved(any(), any(), any())).willReturn(new PendingTotal(1, 11_000L));
+        given(questionQueryService.groupPage(any(), any(), any(), any(), anyInt(), anyInt()))
+            .willReturn(new PageImpl<>(QuestionGroup.group(List.of(question))));
         given(assistantRelayService.chat(any(), any(), any()))
             .willReturn(new ChatResponse("판정 근거를 확인했습니다.", List.of(), "trace-1"));
         given(progressService.progress(any(), any())).willReturn(new ProgressService.Progress(

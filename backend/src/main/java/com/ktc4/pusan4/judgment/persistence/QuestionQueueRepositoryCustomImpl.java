@@ -58,6 +58,31 @@ class QuestionQueueRepositoryCustomImpl implements QuestionQueueRepositoryCustom
     }
 
     @Override
+    public List<MemberRow> findMembers(UUID userId, UUID batchId, UUID transactionId, String status) {
+        return queryFactory
+            .select(Projections.constructor(MemberRow.class, QUESTION.id, TRANSACTION.batchId, QUESTION.groupKey,
+                QUESTION.factType, QUESTION.status, TRANSACTION.id, TRANSACTION.approvedAt, TRANSACTION.amount))
+            .from(QUESTION, JUDGMENT, TRANSACTION)
+            .where(conditions(userId, batchId, transactionId, status))
+            .fetch();
+    }
+
+    @Override
+    public List<QuestionRow> findRowsByIds(Collection<UUID> questionIds) {
+        if (questionIds.isEmpty()) {
+            return List.of();
+        }
+        return queryFactory
+            .select(Projections.constructor(QuestionRow.class, QUESTION, TRANSACTION.id, TRANSACTION.batchId))
+            .from(QUESTION, JUDGMENT, TRANSACTION)
+            .where(QUESTION.id.in(questionIds),
+                QUESTION.judgmentId.eq(JUDGMENT.id),
+                JUDGMENT.transactionId.eq(TRANSACTION.id))
+            .orderBy(QUESTION.createdAt.asc(), QUESTION.id.asc())
+            .fetch();
+    }
+
+    @Override
     public List<UUID> findPendingTransactionIds(Collection<UUID> transactionIds) {
         if (transactionIds.isEmpty()) {
             return List.of();

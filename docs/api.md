@@ -2373,7 +2373,7 @@ Question 개별 항목을 반환한다. `unresolved` 집계는 grouped 여부와
 
 `code`는 질문을 만든 규칙 카드의 질문 코드(`question.code`)다. 다른 업로드의 같은 질문을 찾는 데 쓴다(3.14 지난번 답). 같은 `factType`이라도 카드마다 선택지가 달라서 `factType`이 아니라 `code`로 맞춘다. 저장 값은 `question_queue.reason_code`다. `grouped=true` 그룹에도 같은 값이 붙는다.
 
-`grouped=false`는 요청한 쪽만 DB에서 읽는다. `grouped=true`는 그룹 순서(건수, 금액)를 정하려고 조건에 맞는 질문을 전부 읽는다. 미해소 집계나 건수만 필요하면 `grouped=false&size=1`을 쓴다.
+`grouped=false`는 요청한 쪽만 DB에서 읽는다. `grouped=true`는 그룹 순서(건수, 금액)가 질문 전부로 정해져서, 묶기와 순서에 쓰는 값(그룹 키, 상태, 거래 승인일, 금액)만 전부 읽고 그 쪽의 그룹에 든 질문에만 거래, 답, 수정 여부를 붙인다. 미해소 집계나 건수만 필요하면 `grouped=false&size=1`이 더 가볍다.
 
 ### grouped=true
 

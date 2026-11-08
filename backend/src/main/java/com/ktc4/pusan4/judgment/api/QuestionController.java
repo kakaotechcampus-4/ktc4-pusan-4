@@ -2,8 +2,6 @@ package com.ktc4.pusan4.judgment.api;
 
 import com.ktc4.pusan4.judgment.domain.AnswerSource;
 import com.ktc4.pusan4.judgment.domain.PendingTotal;
-import com.ktc4.pusan4.judgment.domain.Question;
-import com.ktc4.pusan4.judgment.domain.QuestionGroup;
 import com.ktc4.pusan4.judgment.domain.QuestionStatus;
 import com.ktc4.pusan4.judgment.persistence.QuestionAnswerService;
 import com.ktc4.pusan4.judgment.persistence.QuestionQueryService;
@@ -19,16 +17,12 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 import java.util.UUID;
 
 @Tag(name = "questions", description = "룰엔진 확인 질문 (api.md 3.9~3.12). 사용자가 질문을 직접 취소하는 API 는 없다")
@@ -78,27 +72,17 @@ public class QuestionController {
         @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size
     ) {
         // 미해소 집계는 status·grouped·page 를 적용하기 전 목록으로 센다 (api.md 3.9)
-        if (grouped) {
-            // 그룹 순서(건수, 금액)는 질문 전부를 묶어야 정해져서 전부 읽는다
-            List<Question> questions = queryService.find(currentUser.id(), batchId, transactionId);
-            PendingTotal pending = PendingTotal.of(questions);
-            List<Question> matched = questions.stream()
-                .filter(question -> status == null || question.status() == status)
-                .toList();
-            PageResponse<QuestionGroupResponse> groups =
-                PageResponse.of(slice(QuestionGroup.group(matched), page, size).map(QuestionGroupResponse::from));
-            return new QuestionGroupPage(groups.items(), new Unresolved(pending.count(), pending.amount()), groups.page());
-        }
         PendingTotal pending = queryService.unresolved(currentUser.id(), batchId, transactionId);
+        Unresolved unresolved = new Unresolved(pending.count(), pending.amount());
+        if (grouped) {
+            PageResponse<QuestionGroupResponse> groups = PageResponse.of(
+                queryService.groupPage(currentUser.id(), batchId, transactionId, status, page, size)
+                    .map(QuestionGroupResponse::from));
+            return new QuestionGroupPage(groups.items(), unresolved, groups.page());
+        }
         PageResponse<QuestionResponse> items = PageResponse.of(
             queryService.page(currentUser.id(), batchId, transactionId, status, page, size).map(QuestionResponse::from));
-        return new QuestionPage(items.items(), new Unresolved(pending.count(), pending.amount()), items.page());
-    }
-
-    private static <T> Page<T> slice(List<T> items, int page, int size) {
-        int from = (int) Math.min((long) page * size, items.size());
-        int to = Math.min(from + size, items.size());
-        return new PageImpl<>(items.subList(from, to), PageRequest.of(page, size), items.size());
+        return new QuestionPage(items.items(), unresolved, items.page());
     }
 
     @Operation(summary = "확인 질문 응답 및 부분 재판정",
