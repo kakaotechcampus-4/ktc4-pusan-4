@@ -5,6 +5,7 @@ import com.ktc4.pusan4.judgment.domain.QuestionEffect;
 import com.ktc4.pusan4.judgment.domain.Gate;
 import com.ktc4.pusan4.judgment.domain.PreviousAnswer;
 import com.ktc4.pusan4.judgment.domain.RuleCard;
+import com.ktc4.pusan4.judgment.domain.RuleSet;
 import com.ktc4.pusan4.judgment.domain.Verdict;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -454,6 +455,99 @@ class RuleCardLoaderTest {
         List<RuleCard> cards = new RuleCardLoader().load(root).get(Gate.G4);
 
         assertThat(cards).extracting(RuleCard::id).containsExactly("R-051");
+    }
+
+    @Test
+    void rejects_card_account_outside_vocabulary_when_accounts_file_present() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("accounts.yaml"), """
+            accounts:
+              - { id: 접대비, label: 기업업무추진비 }
+            """);
+        Files.writeString(root.resolve("cards/R-300.yaml"), accountCardYaml("소모픔비", "접대비"));
+
+        assertThatThrownBy(() -> new RuleCardLoader().load(root))
+            .isInstanceOf(RuleCardValidationException.class)
+            .hasMessageContaining("소모픔비");
+    }
+
+    @Test
+    void rejects_option_account_outside_vocabulary_when_accounts_file_present() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("accounts.yaml"), """
+            accounts:
+              - { id: 소모품비 }
+            """);
+        Files.writeString(root.resolve("cards/R-300.yaml"), accountCardYaml("소모품비", "접대븨"));
+
+        assertThatThrownBy(() -> new RuleCardLoader().load(root))
+            .isInstanceOf(RuleCardValidationException.class)
+            .hasMessageContaining("접대븨");
+    }
+
+    @Test
+    void labels_accounts_from_accounts_file_and_falls_back_to_id() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("accounts.yaml"), """
+            accounts:
+              - { id: 접대비, label: 기업업무추진비 }
+              - { id: 소모품비 }
+            """);
+        Files.writeString(root.resolve("cards/R-300.yaml"), accountCardYaml("소모품비", "접대비"));
+
+        RuleSet rules = new RuleCardLoader().load(root);
+
+        assertThat(rules.accountLabel("접대비")).isEqualTo("기업업무추진비");
+        assertThat(rules.accountLabel("소모품비")).isEqualTo("소모품비");
+        assertThat(rules.accountLabel(null)).isNull();
+    }
+
+    @Test
+    void rejects_duplicate_account_id() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("accounts.yaml"), """
+            accounts:
+              - { id: 접대비 }
+              - { id: 접대비, label: 기업업무추진비 }
+            """);
+
+        assertThatThrownBy(() -> new RuleCardLoader().load(root))
+            .isInstanceOf(RuleCardValidationException.class)
+            .hasMessageContaining("접대비");
+    }
+
+    @Test
+    void skips_account_check_and_labels_with_id_when_accounts_file_absent() throws IOException {
+        Files.createDirectories(root.resolve("cards"));
+        Files.writeString(root.resolve("cards/R-300.yaml"), accountCardYaml("아무계정", "접대비"));
+
+        RuleSet rules = new RuleCardLoader().load(root);
+
+        assertThat(rules.accountLabel("접대비")).isEqualTo("접대비");
+    }
+
+    private static String accountCardYaml(String cardAccount, String optionAccount) {
+        return """
+            id: R-300
+            version: 1
+            gate: G2
+            priority: 500
+            effective_period: { start: 2025-01-01, end: null }
+            match:
+              category: [카페]
+            verdict: 확인필요
+            account: %s
+            citations: [소득세법-33-1-5]
+            question:
+              code: CAFE_PURPOSE
+              text: 누구와 썼나요?
+              fact_type: 용도
+              group_by: transaction
+              options:
+                - { value: 업무미팅, verdict: 가능, citations: [소득세법-35-1], account: %s, limit_bucket: 접대비 }
+                - { value: 개인, verdict: 불가 }
+            review: { by: 외부자문, date: 2026-09-05 }
+            """.formatted(cardAccount, optionAccount);
     }
 
     @Test

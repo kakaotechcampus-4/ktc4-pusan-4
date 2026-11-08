@@ -82,6 +82,15 @@ class RuleCardLoaderRealCardsTest {
     }
 
     @Test
+    void 접대비는_법_이름인_기업업무추진비로_보이고_다른_계정과목은_이름_그대로다() throws IOException {
+        RuleSet rules = load();
+
+        // 소득세법 §35 제목. 판정에 저장된 ID 는 접대비 그대로다
+        assertThat(rules.accountLabel("접대비")).isEqualTo("기업업무추진비");
+        assertThat(rules.accountLabel("소모품비")).isEqualTo("소모품비");
+    }
+
+    @Test
     void G1_카드는_전부_불가이고_근거를_가진다() throws IOException {
         assertThat(load().get(Gate.G1)).allSatisfy(card -> {
             assertThat(card.verdict()).isEqualTo(Verdict.UNAVAILABLE);

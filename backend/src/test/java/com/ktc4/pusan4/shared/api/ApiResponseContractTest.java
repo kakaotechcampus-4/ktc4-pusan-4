@@ -16,11 +16,13 @@ import com.ktc4.pusan4.judgment.domain.JudgmentRun;
 import com.ktc4.pusan4.judgment.domain.JudgmentRunFailure;
 import com.ktc4.pusan4.judgment.domain.JudgmentRunStatus;
 import com.ktc4.pusan4.judgment.domain.JudgmentSummary;
+import com.ktc4.pusan4.judgment.domain.LimitYearTotal;
 import com.ktc4.pusan4.judgment.domain.PendingTotal;
 import com.ktc4.pusan4.judgment.domain.Question;
 import com.ktc4.pusan4.judgment.domain.QuestionStatus;
 import com.ktc4.pusan4.judgment.domain.RuleCandidate;
 import com.ktc4.pusan4.judgment.domain.RuleCandidateStatus;
+import com.ktc4.pusan4.judgment.domain.RuleSet;
 import com.ktc4.pusan4.judgment.domain.StatuteVersion;
 import com.ktc4.pusan4.judgment.domain.Verdict;
 import com.ktc4.pusan4.judgment.persistence.BulkAnswerResult;
@@ -71,6 +73,8 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -106,7 +110,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 컨트롤러가 api.md 의 상태 코드를 지키는지 DB 없이 확인한다. 서비스는 대역으로 바꾸고 값은 보지 않는다.
  */
 @WebMvcTest
-@Import({ApiExceptionHandler.class, UuidV7Generator.class, TestAuthentication.class})
+@Import({ApiExceptionHandler.class, UuidV7Generator.class, TestAuthentication.class,
+    ApiResponseContractTest.AccountLabels.class})
 class ApiResponseContractTest {
 
     private static final String ID = "0199c8f2-0000-7000-8000-000000000001";
@@ -215,13 +220,7 @@ class ApiResponseContractTest {
                 UUID.fromString(ID), "RULE_PROCESSING_FAILED", "조문 없음",
                 OffsetDateTime.parse("2026-09-12T14:05:00+09:00")))));
 
-        JudgmentRevision judgment = new JudgmentRevision(UUID.fromString(ID), UUID.fromString(ID),
-            new JudgmentRevision.JudgedTransaction(LocalDate.parse("2026-01-12"), "스타벅스코리아 서면점", "스타벅스",
-                "카페", 12_800L, 0),
-            1, new JudgmentOrigin(JudgmentOriginType.RUN, UUID.fromString(ID)), Verdict.NEEDS_REVIEW, Gate.G2, false,
-            "소모품비", null, false, null, Map.of(), "R-300", 1, List.of("R-300"), "0".repeat(40), 1,
-            OffsetDateTime.parse("2026-09-12T14:05:00+09:00"),
-            List.of(new JudgmentRevision.CitedStatute(1418, "소득세법-27-1")));
+        JudgmentRevision judgment = judgment("소모품비");
         given(judgmentQueryService.get(any(), any())).willReturn(judgment);
         given(overrideService.override(any(), any(), any(), any())).willReturn(UUID.fromString(ID));
         given(judgmentQueryService.list(any(), any(), anyInt(), anyInt())).willReturn(new PageImpl<>(List.of(judgment)));
@@ -381,7 +380,7 @@ class ApiResponseContractTest {
     private static final Set<String> TRANSACTION_SUMMARY_KEYS = Set.of("approvedAt", "merchantRaw", "merchantNorm",
         "merchantCategory", "amount", "installmentMonths");
     private static final Set<String> JUDGMENT_KEYS = Set.of("id", "transactionId", "transaction", "revision", "origin",
-        "verdict", "outOfScope", "blockedAtGate", "account", "finalAmount", "isInference", "unmatchedReason", "attributes",
+        "verdict", "outOfScope", "blockedAtGate", "account", "accountLabel", "finalAmount", "isInference", "unmatchedReason", "attributes",
         "ruleCardId", "ruleCardVersion", "appliedRuleIds", "rulesCommitSha", "userContextVersion", "explanation",
         "computedAt", "citations");
     private static final Set<String> QUESTION_KEYS = Set.of("id", "batchId", "transactionId", "groupKey", "factType",
@@ -534,6 +533,57 @@ class ApiResponseContractTest {
             .andExpect(status().isConflict())
             .andExpect(jsonPath("$.code").value("RUN_ALREADY_ACTIVE"))
             .andExpect(jsonPath("$.runId").value(ID));
+    }
+
+    @Test
+    void judgment_responses_show_account_label_while_keeping_account_id() throws Exception {
+        // given: 판정에 저장된 계정과목 ID 는 접대비다
+        given(judgmentQueryService.get(any(), any())).willReturn(judgment("접대비"));
+        given(judgmentQueryService.list(any(), any(), anyInt(), anyInt()))
+            .willReturn(new PageImpl<>(List.of(judgment("접대비"))));
+        given(judgmentQueryService.export(any(), any(), any()))
+            .willReturn(List.of(new JudgmentExportRow(judgment("접대비"), 0L, List.of())));
+        given(judgmentQueryService.summary(any(), any(), any(), any())).willReturn(JudgmentSummary.of(List.of(
+            new JudgmentSummary.Row(Verdict.AVAILABLE, "접대비", 50_000L),
+            new JudgmentSummary.Row(Verdict.AVAILABLE, "소모품비", 12_800L))));
+        given(judgmentQueryService.limits(any(), any(), any()))
+            .willReturn(List.of(new LimitYearTotal("접대비", 2026, 12_246_000L, 50_000L, 0L)));
+
+        // when / then: 분기는 account·bucket, 화면은 label (rules/accounts.yaml)
+        mockMvc.perform(get("/api/v1/judgments/" + ID))
+            .andExpect(jsonPath("$.account").value("접대비"))
+            .andExpect(jsonPath("$.accountLabel").value("기업업무추진비"));
+        mockMvc.perform(get("/api/v1/judgments?batchId=" + ID))
+            .andExpect(jsonPath("$.items[0].accountLabel").value("기업업무추진비"));
+        mockMvc.perform(get("/api/v1/judgments/export?batchId=" + ID))
+            .andExpect(jsonPath("$.items[0].judgment.accountLabel").value("기업업무추진비"))
+            .andExpect(jsonPath("$.limits[0].bucket").value("접대비"))
+            .andExpect(jsonPath("$.limits[0].bucketLabel").value("기업업무추진비"));
+        mockMvc.perform(get("/api/v1/judgments/summary?batchId=" + ID))
+            .andExpect(jsonPath("$.byAccount[?(@.account == '접대비')].accountLabel").value("기업업무추진비"))
+            .andExpect(jsonPath("$.byAccount[?(@.account == '소모품비')].accountLabel").value("소모품비"))
+            .andExpect(jsonPath("$.limits[0].bucketLabel").value("기업업무추진비"))
+            .andExpect(jsonPath("$.limits[0].limitAmount").value(12_246_000L));
+    }
+
+    private static JudgmentRevision judgment(String account) {
+        return new JudgmentRevision(UUID.fromString(ID), UUID.fromString(ID),
+            new JudgmentRevision.JudgedTransaction(LocalDate.parse("2026-01-12"), "스타벅스코리아 서면점", "스타벅스",
+                "카페", 12_800L, 0),
+            1, new JudgmentOrigin(JudgmentOriginType.RUN, UUID.fromString(ID)), Verdict.NEEDS_REVIEW, Gate.G2, false,
+            account, null, false, null, Map.of(), "R-300", 1, List.of("R-300"), "0".repeat(40), 1,
+            OffsetDateTime.parse("2026-09-12T14:05:00+09:00"),
+            List.of(new JudgmentRevision.CitedStatute(1418, "소득세법-27-1")));
+    }
+
+    /** 계정과목 화면 이름은 규칙 묶음(rules/accounts.yaml)에서 온다. 카드 없이 이름만 둔다. */
+    @TestConfiguration(proxyBeanMethods = false)
+    static class AccountLabels {
+
+        @Bean
+        RuleSet ruleSet() {
+            return new RuleSet(List.of(), Map.of("접대비", "기업업무추진비"));
+        }
     }
 
     static Stream<String> invalidSummaryScopes() {

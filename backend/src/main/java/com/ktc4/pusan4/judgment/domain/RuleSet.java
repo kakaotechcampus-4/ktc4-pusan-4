@@ -21,8 +21,14 @@ public final class RuleSet {
     private final Map<Gate, List<RuleCard>> rulesByGate;
     private final Set<String> statuteIds;
     private final Map<String, PreviousAnswer> previousAnswers;
+    private final Map<String, String> accountLabels;
 
     public RuleSet(List<RuleCard> rules) {
+        this(rules, Map.of());
+    }
+
+    /** @param accountLabels 계정과목 ID → 화면 이름 (rules/accounts.yaml). 이름이 ID 와 같은 계정과목은 없어도 된다 */
+    public RuleSet(List<RuleCard> rules, Map<String, String> accountLabels) {
         Map<Gate, List<RuleCard>> grouped = new EnumMap<>(Gate.class);
         for (RuleCard rule : rules) {
             grouped.computeIfAbsent(rule.gate(), ignored -> new ArrayList<>()).add(rule);
@@ -43,6 +49,7 @@ public final class RuleSet {
             }
         });
         previousAnswers = Map.copyOf(byCode);
+        this.accountLabels = Map.copyOf(accountLabels);
     }
 
     public List<RuleCard> get(Gate gate) {
@@ -60,6 +67,13 @@ public final class RuleSet {
      */
     public PreviousAnswer previousAnswer(String questionCode) {
         return previousAnswers.getOrDefault(questionCode, PreviousAnswer.NONE);
+    }
+
+    /**
+     * 계정과목의 화면 이름. 판정에는 ID(account)가 저장되고 비교도 ID 로 한다. 이름이 따로 없으면 ID 그대로다.
+     */
+    public String accountLabel(String account) {
+        return account == null ? null : accountLabels.getOrDefault(account, account);
     }
 
     private static Stream<Citation> citations(RuleCard card) {
