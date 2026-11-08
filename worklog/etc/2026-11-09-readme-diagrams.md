@@ -38,3 +38,18 @@
 
 - 그림의 편집용 원본(pptx)은 레포에 넣지 않았다
 - Redis, Blue/Green, CloudWatch 도식화 자리는 아직 비어 있음
+
+## 02:20 README CloudWatch 대시보드 캡처 추가
+
+- 커밋: 8b44e729 (1개)
+- 주요파일: README.md, docs/img/readme/cloudwatch.png
+
+### 한 일
+
+- 「모니터링 > CloudWatch」의 도식화 자리를 운영 대시보드 `ktc4-backend` 캡처(`cloudwatch.png`)로 교체. 도식 대신 Langfuse 처럼 실제 화면을 넣음
+- 캡처는 대시보드 제목과 위젯 6개(CPU, 메모리, 디스크, 5xx와 기동, JVM 힙, Hikari와 판정 풀 대기)만 잘랐다. 콘솔 상단의 계정 ID와 사용자 이메일은 들어가지 않게 했다
+
+### 남은 것 · 아는 문제
+
+- 캡처는 2026-11-09 기준 최근 3시간 화면이라 값은 그때 것이다
+- Redis, Blue/Green 도식화 자리는 아직 비어 있음
