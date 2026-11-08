@@ -229,7 +229,7 @@ class ApiResponseContractTest {
         given(overrideService.override(any(), any(), any(), any())).willReturn(UUID.fromString(ID));
         given(judgmentQueryService.list(any(), any(), anyInt(), anyInt())).willReturn(new PageImpl<>(List.of(judgment)));
         given(judgmentQueryService.summary(any(), any(), any(), any())).willReturn(JudgmentSummary.of(List.of(
-            new JudgmentSummary.Row(Verdict.AVAILABLE, "소모품비", 12_800L, 0L, false))));
+            new JudgmentSummary.Row(Verdict.AVAILABLE, "소모품비", 12_800L, 0L, false, 2026, false))));
         given(judgmentQueryService.export(any(), any(), any())).willReturn(List.of(new JudgmentExportRow(judgment,
             0L, List.of(new JudgmentExportRow.Answer("용도가 무엇인가요?", "혼용")), false)));
         HandoffNote note = new HandoffNote(UUID.fromString(ID), "휴대폰 요금의 업무 비중은?", List.of(UUID.fromString(ID)),
@@ -552,8 +552,8 @@ class ApiResponseContractTest {
         given(judgmentQueryService.export(any(), any(), any()))
             .willReturn(List.of(new JudgmentExportRow(judgment("접대비"), 0L, List.of(), false)));
         given(judgmentQueryService.summary(any(), any(), any(), any())).willReturn(JudgmentSummary.of(List.of(
-            new JudgmentSummary.Row(Verdict.AVAILABLE, "접대비", 50_000L, 0L, false),
-            new JudgmentSummary.Row(Verdict.AVAILABLE, "소모품비", 12_800L, 0L, false))));
+            new JudgmentSummary.Row(Verdict.AVAILABLE, "접대비", 50_000L, 0L, false, 2026, false),
+            new JudgmentSummary.Row(Verdict.AVAILABLE, "소모품비", 12_800L, 0L, false, 2026, false))));
         given(judgmentQueryService.limits(any(), any(), any()))
             .willReturn(List.of(new LimitYearTotal("접대비", 2026, 12_246_000L, 50_000L, 0L)));
 

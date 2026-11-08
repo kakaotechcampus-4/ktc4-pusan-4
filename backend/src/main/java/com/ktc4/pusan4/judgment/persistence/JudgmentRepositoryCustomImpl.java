@@ -56,7 +56,9 @@ class JudgmentRepositoryCustomImpl implements JudgmentRepositoryCustom {
         return queryFactory
             .select(Projections.constructor(SummaryRow.class,
                 JUDGMENT.id, JUDGMENT.verdict, JUDGMENT.account, JUDGMENT.finalAmount, TRANSACTION.amount,
-                new CaseBuilder().when(awaitingAnswer()).then(true).otherwise(false)))
+                new CaseBuilder().when(awaitingAnswer()).then(true).otherwise(false),
+                TRANSACTION.approvedAt.year(),
+                new CaseBuilder().when(JUDGMENT.judgmentOverrideId.isNotNull()).then(true).otherwise(false)))
             .from(JUDGMENT, TRANSACTION)
             .where(conditions(userId, query))
             .fetch();

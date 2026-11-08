@@ -1950,6 +1950,31 @@ GET /api/v1/judgments/summary?runId=R1
     "spendAmount": 410000
   },
 
+  "overridden": {
+    "AVAILABLE": {
+      "count": 3,
+      "finalAmount": 85000,
+      "spendAmount": 85000
+    },
+    "UNAVAILABLE": {
+      "count": 1,
+      "finalAmount": 0,
+      "spendAmount": 12000
+    },
+    "NEEDS_REVIEW": {
+      "count": 0,
+      "finalAmount": 0,
+      "spendAmount": 0
+    }
+  },
+
+  "byYear": [
+    {
+      "year": 2026,
+      "finalAmount": 4820000
+    }
+  ],
+
   "byAccount": [
     {
       "account": "소모품비",
@@ -1975,6 +2000,10 @@ GET /api/v1/judgments/summary?runId=R1
 `byVerdict`는 세 verdict를 늘 담는다. 판정이 없는 verdict는 `count`·`finalAmount`·`spendAmount`가 0이다. `finalAmount`가 아직 없는 Judgment(금액 계산 전)는 0으로 더한다. `spendAmount`는 그 판정이 난 거래의 결제 금액(`transaction.amount`) 합이다. 경비 가능 금액을 결제 금액과 견주어 보이는 바탕이다.
 
 `awaiting`은 답변 대기(`GET /judgments/{judgmentId}`의 `awaitingAnswer`가 `true`인 판정)의 건수와 결제 금액 합이다. 답변 대기는 불가에 붙는 표지라 `byVerdict.UNAVAILABLE`에도 들어 있다. 답변 대기를 따로 보이려면 불가에서 뺀다. 범위(`batchId`, `year`, `runId`)는 위와 같다.
+
+`overridden`은 사용자가 직접 바꾼(3.8 Override) 판정을 바뀐 판정별로 센다. `byVerdict`와 같은 모양이고 `byVerdict`에도 들어 있다. 현재 판정이 수정 revision(`origin.type = OVERRIDE`)인 것만 세고, 해제한 수정은 세지 않는다. 수정은 확인 필요로 가지 않아 `NEEDS_REVIEW`는 늘 0이다.
+
+`byYear`는 범위의 판정이 있는 해(거래 `approvedAt`)마다 가능 판정의 경비 가능 금액 합이다. 해 순이고, 가능이 없는 해는 0이다. 금액은 `byVerdict.AVAILABLE.finalAmount`와 같은 기준이다(`year` 집계만 접대비 한도 인정액). 신고는 해마다 따로 해서 두 해에 걸친 업로드를 나눠 보인다.
 
 접대비 한도(소득세법 §35 3항)는 사용자의 한 해 전체 지출로 정해지고, 어느 거래가 초과분인지는 법이 정하지 않는다. 그래서 거래별·batch별로 한도를 나누지 않고 연 단위로만 다룬다(#15, `CONTEXT.md` G6 "건별로 계산하지 않는다").
 

@@ -1190,6 +1190,12 @@ const mockGroups: Api = {
         NEEDS_REVIEW: { count: 0, finalAmount: 0, spendAmount: 0 }
       };
       const awaiting = { count: 0, spendAmount: 0 };
+      const overridden: Record<Verdict, { count: number; finalAmount: number; spendAmount: number }> = {
+        AVAILABLE: { count: 0, finalAmount: 0, spendAmount: 0 },
+        UNAVAILABLE: { count: 0, finalAmount: 0, spendAmount: 0 },
+        NEEDS_REVIEW: { count: 0, finalAmount: 0, spendAmount: 0 }
+      };
+      const years = new Map<number, number>();
       const accounts = new Map<string, { count: number; finalAmount: number }>();
       for (const j of rows) {
         const slot = by[j.verdict.code];
@@ -1201,6 +1207,14 @@ const mockGroups: Api = {
           awaiting.count += 1;
           awaiting.spendAmount += spend;
         }
+        if (j.origin.type === 'OVERRIDE') {
+          const changed = overridden[j.verdict.code];
+          changed.count += 1;
+          changed.finalAmount += j.finalAmount ?? 0;
+          changed.spendAmount += spend;
+        }
+        const year = Number(transactionOf(j.transactionId)?.approvedAt.slice(0, 4));
+        years.set(year, (years.get(year) ?? 0) + (j.verdict.code === 'AVAILABLE' ? j.finalAmount ?? 0 : 0));
         if (j.verdict.code !== 'AVAILABLE' || !j.account) continue;
         const acc = accounts.get(j.account) ?? { count: 0, finalAmount: 0 };
         acc.count += 1;
@@ -1217,7 +1231,9 @@ const mockGroups: Api = {
         sort((a, b) => b.finalAmount - a.finalAmount || a.account.localeCompare(b.account)),
         // 과거 Run 범위는 그 시점 한도가 남아 있지 않아 빈 배열이다 (api.md 3.7)
         limits: scope.runId ? [] : limitsFor(rows),
-        awaiting
+        awaiting,
+        overridden,
+        byYear: [...years].sort(([a], [b]) => a - b).map(([year, finalAmount]) => ({ year, finalAmount }))
       });
     },
     list: (q) => {

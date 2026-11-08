@@ -147,6 +147,30 @@ class JudgmentQueryIntegrationTest {
         mockMvc.perform(get("/api/v1/judgments").param("batchId", batchId.toString()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.items[*].id", contains(overrideRevision.toString(), automatic.toString())));
+
+        // when / then: 요약은 현재 판정 가운데 사용자가 바꾼 것만 바뀐 판정별로 센다. 해제한 수정은 세지 않는다
+        mockMvc.perform(get("/api/v1/judgments/summary").param("batchId", batchId.toString()))
+            .andExpect(jsonPath("$.overridden.UNAVAILABLE.count").value(1))
+            .andExpect(jsonPath("$.overridden.AVAILABLE.count").value(0))
+            .andExpect(jsonPath("$.overridden.NEEDS_REVIEW.count").value(0));
+    }
+
+    @Test
+    void summary_splits_available_amount_by_approval_year() throws Exception {
+        // given: 두 해에 걸친 가능 판정과, 가능이 없는 해의 불가 판정
+        UUID december = insertTransaction(batchId, "2025-12-30", "JUDGEABLE", "AUTO");
+        UUID decemberJudgment = insertJudgment(december, 1, "AVAILABLE", "run_id", runId, "2026-01-02T10:00:00+09:00");
+        UUID january = insertTransaction(batchId, "2026-01-03", "JUDGEABLE", "AUTO");
+        UUID januaryJudgment = insertJudgment(january, 1, "AVAILABLE", "run_id", runId, "2026-01-04T10:00:00+09:00");
+        jdbcTemplate.update("update judgment set final_amount = 4000 where id = ?", decemberJudgment);
+        jdbcTemplate.update("update judgment set final_amount = 6500 where id = ?", januaryJudgment);
+        UUID later = insertTransaction(batchId, "2027-02-01", "JUDGEABLE", "AUTO");
+        insertJudgment(later, 1, "UNAVAILABLE", "run_id", runId, "2027-02-02T10:00:00+09:00");
+
+        // when / then: 해 순이고, 가능이 없는 해는 0 이다
+        mockMvc.perform(get("/api/v1/judgments/summary").param("batchId", batchId.toString()))
+            .andExpect(jsonPath("$.byYear[*].year", contains(2025, 2026, 2027)))
+            .andExpect(jsonPath("$.byYear[*].finalAmount", contains(4000, 6500, 0)));
     }
 
     @Test

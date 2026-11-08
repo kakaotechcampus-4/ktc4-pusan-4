@@ -66,6 +66,17 @@ describe('판정 (3.7)', () => {
     expect(dates).toEqual([...dates].sort().reverse());
   });
 
+  it('요약은 직접 바꾼 판정을 바뀐 판정별로 세고, 해마다 나눈 금액의 합은 경비 가능 금액이다', async () => {
+    const before = await api.judgments.summary({ batchId });
+    expect(before.overridden.AVAILABLE.count).toBe(0);
+    expect(before.byYear.reduce((sum, row) => sum + row.finalAmount, 0)).toBe(before.byVerdict.AVAILABLE.finalAmount);
+
+    await api.judgments.override((await currentOf(tx('1005'))).id, { toVerdict: 'AVAILABLE', reason: '업무' }, 'k1');
+    const after = await api.judgments.summary({ batchId });
+    expect(after.overridden.AVAILABLE.count).toBe(1);
+    expect(after.overridden.AVAILABLE.finalAmount).toBe((await currentOf(tx('1005'))).finalAmount ?? 0);
+  });
+
   it('제외한 거래는 현재 결과·요약에서 빠지지만 transactionId 로는 읽힌다', async () => {
     const before = await api.judgments.summary({ batchId });
     const excluded = await api.transactions.exclude(tx('1005'));

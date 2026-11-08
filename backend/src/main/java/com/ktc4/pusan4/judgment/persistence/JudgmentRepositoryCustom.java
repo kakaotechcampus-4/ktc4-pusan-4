@@ -28,8 +28,11 @@ interface JudgmentRepositoryCustom {
     // 엔티티로 읽으면 거래 수의 제곱만큼 메모리를 쓴다. 집계에 필요한 값만 꺼낸다.
     List<LimitTagged> findCurrentLimitTagged(UUID userId, String bucket);
 
-    /** 요약할 판정 하나. spendAmount 는 거래 결제 금액, awaiting 은 답변 대기 여부다. */
+    /**
+     * 요약할 판정 하나. spendAmount 는 거래 결제 금액, awaiting 은 답변 대기 여부, year 는 거래 승인일의 해,
+     * overridden 은 사용자 수정(override)으로 생긴 판정인지다.
+     */
     record SummaryRow(UUID judgmentId, String verdict, String account, Long finalAmount, long spendAmount,
-                      boolean awaiting) {
+                      boolean awaiting, int year, boolean overridden) {
     }
 }

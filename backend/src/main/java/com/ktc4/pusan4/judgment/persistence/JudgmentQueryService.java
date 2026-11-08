@@ -89,7 +89,8 @@ public class JudgmentQueryService {
         Map<UUID, Long> limitAllowed = year == null ? Map.of() : limitAllowedAmounts(userId);
         return JudgmentSummary.of(judgmentRepository.findSummaryRows(userId, query).stream()
             .map(row -> new JudgmentSummary.Row(Verdict.valueOf(row.verdict()), row.account(),
-                limitAllowed.getOrDefault(row.judgmentId(), row.finalAmount()), row.spendAmount(), row.awaiting()))
+                limitAllowed.getOrDefault(row.judgmentId(), row.finalAmount()), row.spendAmount(), row.awaiting(),
+                row.year(), row.overridden()))
             .toList());
     }
 

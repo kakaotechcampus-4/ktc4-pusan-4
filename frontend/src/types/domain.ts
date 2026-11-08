@@ -428,6 +428,10 @@ export interface JudgmentSummary {
   limits: LimitYear[];
   /** 답변 대기. 불가에 붙는 표지라 byVerdict.UNAVAILABLE 에도 들어 있다 */
   awaiting: { count: number; spendAmount: number };
+  /** 사용자가 직접 바꾼 판정을 바뀐 판정별로 센다. byVerdict 에도 들어 있다 */
+  overridden: Record<Verdict, VerdictSummary>;
+  /** 판정이 있는 해(승인일)마다 가능 판정의 경비 가능 금액. 해 순 */
+  byYear: { year: number; finalAmount: number }[];
 }
 
 /**

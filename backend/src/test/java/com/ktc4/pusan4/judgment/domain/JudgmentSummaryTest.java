@@ -3,6 +3,7 @@ package com.ktc4.pusan4.judgment.domain;
 import com.ktc4.pusan4.judgment.domain.JudgmentSummary.AccountTotal;
 import com.ktc4.pusan4.judgment.domain.JudgmentSummary.Row;
 import com.ktc4.pusan4.judgment.domain.JudgmentSummary.Total;
+import com.ktc4.pusan4.judgment.domain.JudgmentSummary.YearTotal;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -16,9 +17,9 @@ class JudgmentSummaryTest {
     void by_verdict_counts_every_verdict_and_treats_missing_amount_as_zero() {
         // given: NEEDS_REVIEW 는 하나도 없고, 금액 계산 전 판정이 섞여 있다
         List<Row> rows = List.of(
-            new Row(Verdict.AVAILABLE, "소모품비", 10_000L, 0L, false),
-            new Row(Verdict.AVAILABLE, "소모품비", null, 0L, false),
-            new Row(Verdict.UNAVAILABLE, null, null, 0L, false)
+            new Row(Verdict.AVAILABLE, "소모품비", 10_000L, 0L, false, 2026, false),
+            new Row(Verdict.AVAILABLE, "소모품비", null, 0L, false, 2026, false),
+            new Row(Verdict.UNAVAILABLE, null, null, 0L, false, 2026, false)
         );
 
         // when
@@ -37,13 +38,13 @@ class JudgmentSummaryTest {
     void by_account_sums_available_judgments_by_amount_then_name() {
         // given: 불가·확인 필요의 계정과 계정 없는 가능 판정은 세지 않는다
         List<Row> rows = List.of(
-            new Row(Verdict.AVAILABLE, "소모품비", 5_000L, 0L, false),
-            new Row(Verdict.AVAILABLE, "지급수수료", 7_000L, 0L, false),
-            new Row(Verdict.AVAILABLE, "소모품비", 3_000L, 0L, false),
-            new Row(Verdict.AVAILABLE, "도서인쇄비", 8_000L, 0L, false),
-            new Row(Verdict.AVAILABLE, null, 9_000L, 0L, false),
-            new Row(Verdict.UNAVAILABLE, "접대비", 50_000L, 0L, false),
-            new Row(Verdict.NEEDS_REVIEW, "소모품비", 1_000L, 0L, false)
+            new Row(Verdict.AVAILABLE, "소모품비", 5_000L, 0L, false, 2026, false),
+            new Row(Verdict.AVAILABLE, "지급수수료", 7_000L, 0L, false, 2026, false),
+            new Row(Verdict.AVAILABLE, "소모품비", 3_000L, 0L, false, 2026, false),
+            new Row(Verdict.AVAILABLE, "도서인쇄비", 8_000L, 0L, false, 2026, false),
+            new Row(Verdict.AVAILABLE, null, 9_000L, 0L, false, 2026, false),
+            new Row(Verdict.UNAVAILABLE, "접대비", 50_000L, 0L, false, 2026, false),
+            new Row(Verdict.NEEDS_REVIEW, "소모품비", 1_000L, 0L, false, 2026, false)
         );
 
         // when
@@ -61,9 +62,9 @@ class JudgmentSummaryTest {
     void spend_sums_payment_amounts_and_awaiting_is_counted_inside_unavailable() {
         // given: 불가 둘 중 하나는 답을 기다린다(답변 대기)
         List<Row> rows = List.of(
-            new Row(Verdict.AVAILABLE, "소모품비", 8_000L, 10_000L, false),
-            new Row(Verdict.UNAVAILABLE, null, null, 30_000L, true),
-            new Row(Verdict.UNAVAILABLE, null, null, 5_000L, false)
+            new Row(Verdict.AVAILABLE, "소모품비", 8_000L, 10_000L, false, 2026, false),
+            new Row(Verdict.UNAVAILABLE, null, null, 30_000L, true, 2026, false),
+            new Row(Verdict.UNAVAILABLE, null, null, 5_000L, false, 2026, false)
         );
 
         // when
@@ -73,5 +74,28 @@ class JudgmentSummaryTest {
         assertThat(summary.byVerdict().get(Verdict.AVAILABLE)).isEqualTo(new Total(1, 8_000L, 10_000L));
         assertThat(summary.byVerdict().get(Verdict.UNAVAILABLE)).isEqualTo(new Total(2, 0L, 35_000L));
         assertThat(summary.awaiting()).isEqualTo(new Total(1, 0L, 30_000L));
+    }
+
+    @Test
+    void by_year_sums_available_amounts_per_year_and_overridden_counts_by_verdict() {
+        // given: 두 해에 걸친 판정. 가능 하나와 불가 하나는 사용자가 직접 바꿨다
+        List<Row> rows = List.of(
+            new Row(Verdict.AVAILABLE, "소모품비", 3_000L, 3_000L, false, 2025, false),
+            new Row(Verdict.AVAILABLE, "소모품비", 5_000L, 5_000L, false, 2026, true),
+            new Row(Verdict.AVAILABLE, "소모품비", 7_000L, 7_000L, false, 2026, false),
+            new Row(Verdict.UNAVAILABLE, null, 0L, 9_000L, false, 2025, true),
+            new Row(Verdict.NEEDS_REVIEW, null, null, 1_000L, false, 2027, false)
+        );
+
+        // when
+        JudgmentSummary summary = JudgmentSummary.of(rows);
+
+        // then: 해마다 가능의 경비 가능 금액만 더한다. 가능이 없는 해도 0 으로 둔다. 연도 순이다
+        assertThat(summary.byYear()).containsExactly(
+            new YearTotal(2025, 3_000L), new YearTotal(2026, 12_000L), new YearTotal(2027, 0L));
+        // then: 직접 바꾼 판정은 바뀐 판정별로 센다
+        assertThat(summary.overridden().get(Verdict.AVAILABLE)).isEqualTo(new Total(1, 5_000L, 5_000L));
+        assertThat(summary.overridden().get(Verdict.UNAVAILABLE)).isEqualTo(new Total(1, 0L, 9_000L));
+        assertThat(summary.overridden().get(Verdict.NEEDS_REVIEW)).isEqualTo(new Total(0, 0L, 0L));
     }
 }
