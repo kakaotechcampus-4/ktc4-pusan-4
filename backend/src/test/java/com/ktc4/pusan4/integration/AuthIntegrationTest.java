@@ -2,6 +2,7 @@ package com.ktc4.pusan4.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ktc4.pusan4.auth.RecordingVerificationMailSender;
+import com.ktc4.pusan4.auth.AccessTokens;
 import com.ktc4.pusan4.auth.TestUser;
 import com.ktc4.pusan4.user.persistence.UserService;
 import jakarta.servlet.http.Cookie;
@@ -23,12 +24,14 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -48,7 +51,7 @@ class AuthIntegrationTest {
 
     private static final String MEMBER_EMAIL = "member@example.com";
     private static final String LOGIN_BODY = """
-        {"email": "member@example.com", "password": "test-password"}
+        {"email": "member@example.com", "password": "test-password1"}
         """;
 
     @Autowired
@@ -63,13 +66,16 @@ class AuthIntegrationTest {
     @Autowired
     private UserService userService;
 
+    @Autowired
+    private AccessTokens accessTokens;
+
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() throws Exception {
         mockMvc = MockMvcBuilders.webAppContextSetup(context).build();
         // 로그인 테스트가 쓸 계정. 컨텍스트를 같이 쓰는 다른 테스트가 먼저 만들었으면 409 다
-        int status = signup(MEMBER_EMAIL, "test-password").getResponse().getStatus();
+        int status = signup(MEMBER_EMAIL, "test-password1").getResponse().getStatus();
         assertThat(status).isIn(201, 409);
     }
 
@@ -137,7 +143,7 @@ class AuthIntegrationTest {
 
     @Test
     void signup_without_verification_returns_email_not_verified() throws Exception {
-        MvcResult result = signupWithToken("unverified@example.com", "new-password", "not-a-token");
+        MvcResult result = signupWithToken("unverified@example.com", "new-password1", "not-a-token");
 
         assertThat(result.getResponse().getStatus()).isEqualTo(400);
         assertThat(result.getResponse().getContentAsString()).contains("EMAIL_NOT_VERIFIED");
@@ -148,19 +154,19 @@ class AuthIntegrationTest {
         String token = verificationToken("owner@example.com");
 
         // 다른 이메일에는 쓸 수 없다
-        assertThat(signupWithToken("other@example.com", "new-password", token).getResponse().getStatus())
+        assertThat(signupWithToken("other@example.com", "new-password1", token).getResponse().getStatus())
             .isEqualTo(400);
         // 가입하면 토큰은 지워진다
-        assertThat(signupWithToken("owner@example.com", "new-password", token).getResponse().getStatus())
+        assertThat(signupWithToken("owner@example.com", "new-password1", token).getResponse().getStatus())
             .isEqualTo(201);
-        assertThat(signupWithToken("owner@example.com", "new-password", token).getResponse().getContentAsString())
+        assertThat(signupWithToken("owner@example.com", "new-password1", token).getResponse().getContentAsString())
             .contains("EMAIL_NOT_VERIFIED");
     }
 
     @Test
     void signup_creates_account_and_logs_in() throws Exception {
         // when
-        MvcResult result = signup("New@Example.com", "new-password");
+        MvcResult result = signup("New@Example.com", "new-password1");
 
         // then: 로그인과 같은 응답이고, 이메일은 소문자로 저장된다
         assertThat(result.getResponse().getStatus()).isEqualTo(201);
@@ -176,7 +182,7 @@ class AuthIntegrationTest {
         String token = verificationToken("late@example.com");
         assertThat(userService.registerEmailAccount("late@example.com", "already-hashed")).isPresent();
 
-        MvcResult result = signupWithToken("LATE@example.com", "other-password", token);
+        MvcResult result = signupWithToken("LATE@example.com", "other-password1", token);
 
         assertThat(result.getResponse().getStatus()).isEqualTo(409);
         assertThat(result.getResponse().getContentAsString()).contains("EMAIL_ALREADY_EXISTS");
@@ -184,16 +190,39 @@ class AuthIntegrationTest {
 
     @Test
     void signup_rejects_short_or_too_long_password() throws Exception {
-        assertThat(signup("short@example.com", "1234567").getResponse().getStatus()).isEqualTo(400);
-        // 25자지만 UTF-8 75바이트라 BCrypt 한계(72바이트)를 넘는다
-        assertThat(signup("long@example.com", "가나다라마바사아자차카타파하가나다라마바사아자차카")
-            .getResponse().getStatus()).isEqualTo(400);
+        assertThat(signup("short@example.com", "pw-123!").getResponse().getStatus()).isEqualTo(400);
+        // 73자라 BCrypt 한계(72바이트)를 넘는다. 비밀번호는 ASCII 라 글자 수가 바이트 수다
+        MvcResult tooLong = signup("long@example.com", "pw1!".repeat(18) + "a");
+        assertThat(tooLong.getResponse().getStatus()).isEqualTo(400);
+        assertThat(tooLong.getResponse().getContentAsString()).contains("72자 이하");
+    }
+
+    @Test
+    void signup_rejects_space_or_korean_in_password() throws Exception {
+        MvcResult result = signup("korean-pw@example.com", "비밀번호abc1!");
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(400);
+        assertThat(result.getResponse().getContentAsString()).contains("공백이나 한글");
+        assertThat(userService.isEmailRegistered("korean-pw@example.com")).isFalse();
+    }
+
+    @Test
+    void signup_rejects_password_without_letter_digit_and_symbol() throws Exception {
+        // when: 숫자가 없다
+        MvcResult result = signup("weak@example.com", "password-only");
+
+        // then: 이유를 알려 주고 계정은 생기지 않는다
+        assertThat(result.getResponse().getStatus()).isEqualTo(400);
+        assertThat(result.getResponse().getContentAsString())
+            .contains("VALIDATION_ERROR")
+            .contains("영문, 숫자, 기호");
+        assertThat(userService.isEmailRegistered("weak@example.com")).isFalse();
     }
 
     @Test
     void login_finds_email_regardless_of_case() throws Exception {
         assertThat(login("""
-            {"email": "MEMBER@EXAMPLE.COM", "password": "test-password"}
+            {"email": "MEMBER@EXAMPLE.COM", "password": "test-password1"}
             """).getResponse().getStatus()).isEqualTo(200);
     }
 
@@ -330,6 +359,118 @@ class AuthIntegrationTest {
     }
 
     @Test
+    void changing_password_logs_out_everywhere_and_only_new_password_works() throws Exception {
+        // given: 두 기기에서 로그인했다
+        MvcResult first = signup("changer@example.com", "old-password1");
+        MvcResult second = login(loginBody("changer@example.com", "old-password1"));
+
+        // when
+        changePassword(accessToken(first), "old-password1", "new-password2!")
+            .andExpect(status().isNoContent());
+
+        // then: 두 기기 모두 재발급이 안 되고, 새 비밀번호로만 들어온다
+        for (MvcResult device : List.of(first, second)) {
+            mockMvc.perform(post("/api/v1/auth/refresh").cookie(refreshCookie(device)))
+                .andExpect(status().isUnauthorized());
+        }
+        assertThat(login(loginBody("changer@example.com", "old-password1")).getResponse().getStatus()).isEqualTo(401);
+        assertThat(login(loginBody("changer@example.com", "new-password2!")).getResponse().getStatus()).isEqualTo(200);
+    }
+
+    @Test
+    void changing_password_with_wrong_current_password_keeps_it() throws Exception {
+        MvcResult signedUp = signup("wrong-current@example.com", "old-password1");
+
+        changePassword(accessToken(signedUp), "not-my-password1", "new-password2!")
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("INVALID_CURRENT_PASSWORD"));
+
+        // 로그인은 끊기지 않는다
+        mockMvc.perform(post("/api/v1/auth/refresh").cookie(refreshCookie(signedUp)))
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    void changing_to_weak_password_is_rejected_with_reason() throws Exception {
+        MvcResult signedUp = signup("weak-new@example.com", "old-password1");
+
+        changePassword(accessToken(signedUp), "old-password1", "onlyletters")
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("영문, 숫자, 기호")));
+
+        assertThat(login(loginBody("weak-new@example.com", "old-password1")).getResponse().getStatus()).isEqualTo(200);
+    }
+
+    @Test
+    void account_without_password_cannot_change_it() throws Exception {
+        // 비밀번호가 없는 계정(카카오로 가입, 예전 고정 사용자)이다
+        changePassword(accessTokens.issue(TestUser.ID), "anything-1!", "new-password2!")
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("PASSWORD_NOT_SET"));
+    }
+
+    @Test
+    void changing_password_requires_login() throws Exception {
+        mockMvc.perform(put("/api/v1/users/me/password").contentType(MediaType.APPLICATION_JSON)
+                .content(passwordChangeBody("old-password1", "new-password2!")))
+            .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void password_reset_request_is_202_but_mails_only_registered_email() throws Exception {
+        // 가입하지 않은 이메일도 202 라 가입 여부가 드러나지 않는다. 메일은 보내지 않는다
+        requestReset("nobody@example.com").andExpect(status().isAccepted());
+        assertThat(mailbox.lastCode("nobody@example.com")).isEmpty();
+    }
+
+    @Test
+    void password_reset_logs_out_everywhere_and_only_new_password_works() throws Exception {
+        // given: 로그인한 기기가 있다
+        MvcResult device = signup("resetter@example.com", "old-password1");
+
+        // when: 코드 받기 → 확인 → 새 비밀번호
+        requestReset("Resetter@Example.com").andExpect(status().isAccepted());
+        String token = confirmedResetToken("resetter@example.com");
+        completeReset("resetter@example.com", token, "new-password2!").andExpect(status().isNoContent());
+
+        // then
+        mockMvc.perform(post("/api/v1/auth/refresh").cookie(refreshCookie(device)))
+            .andExpect(status().isUnauthorized());
+        assertThat(login(loginBody("resetter@example.com", "old-password1")).getResponse().getStatus()).isEqualTo(401);
+        assertThat(login(loginBody("resetter@example.com", "new-password2!")).getResponse().getStatus()).isEqualTo(200);
+        // 같은 토큰은 다시 쓸 수 없다
+        completeReset("resetter@example.com", token, "other-password3!")
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("EMAIL_NOT_VERIFIED"));
+    }
+
+    @Test
+    void password_reset_code_cannot_be_confirmed_as_signup_code() throws Exception {
+        signup("mixed@example.com", "old-password1");
+        requestReset("mixed@example.com").andExpect(status().isAccepted());
+        String code = mailbox.lastCode("mixed@example.com").orElseThrow();
+
+        // 가입 인증 확인으로는 이 코드가 없다
+        confirmCode("mixed@example.com", code)
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("VERIFICATION_CODE_EXPIRED"));
+    }
+
+    @Test
+    void weak_new_password_keeps_reset_token_usable() throws Exception {
+        signup("weak-reset@example.com", "old-password1");
+        requestReset("weak-reset@example.com").andExpect(status().isAccepted());
+        String token = confirmedResetToken("weak-reset@example.com");
+
+        completeReset("weak-reset@example.com", token, "onlyletters")
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+        // 규칙을 맞춰 다시 보내면 된다
+        completeReset("weak-reset@example.com", token, "new-password2!").andExpect(status().isNoContent());
+    }
+
+    @Test
     void health_stays_public() throws Exception {
         mockMvc.perform(get("/actuator/health")).andExpect(status().isOk());
     }
@@ -370,6 +511,44 @@ class AuthIntegrationTest {
         throws Exception {
         return mockMvc.perform(post("/api/v1/auth/email-verification/confirm").contentType(MediaType.APPLICATION_JSON)
             .content(objectMapper.writeValueAsString(Map.of("email", email, "code", code))));
+    }
+
+    private ResultActions requestReset(String email) throws Exception {
+        return mockMvc.perform(post("/api/v1/auth/password-reset").contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(Map.of("email", email))));
+    }
+
+    private String confirmedResetToken(String email) throws Exception {
+        String code = mailbox.lastCode(email).orElseThrow();
+        MvcResult result = mockMvc.perform(post("/api/v1/auth/password-reset/confirm")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("email", email, "code", code))))
+            .andExpect(status().isOk())
+            .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).path("verificationToken").asText();
+    }
+
+    private ResultActions completeReset(String email, String token, String newPassword) throws Exception {
+        return mockMvc.perform(post("/api/v1/auth/password-reset/complete").contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(
+                Map.of("email", email, "verificationToken", token, "newPassword", newPassword))));
+    }
+
+    private ResultActions changePassword(String accessToken, String currentPassword, String newPassword)
+        throws Exception {
+        return mockMvc.perform(put("/api/v1/users/me/password")
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(passwordChangeBody(currentPassword, newPassword)));
+    }
+
+    private String passwordChangeBody(String currentPassword, String newPassword) throws Exception {
+        return objectMapper.writeValueAsString(
+            Map.of("currentPassword", currentPassword, "newPassword", newPassword));
+    }
+
+    private String loginBody(String email, String password) throws Exception {
+        return objectMapper.writeValueAsString(Map.of("email", email, "password", password));
     }
 
     private MvcResult login(String body) throws Exception {

@@ -76,8 +76,9 @@ TOOL_DEFS: dict[str, tuple[str, dict]] = {
         {"transaction": {"type": "string", "description": "거래 ref. 예: t6"}},
     ),
     "get_summary": (
-        ("판정별·계정별 합계, 남은 질문·미분류 집계, 과세연도별 접대비 한도(limits)를 가져온다. "
+        ("판정별·계정별 합계, 남은 질문·미분류 집계, 과세연도별 접대비 한도 집계(limits)를 가져온다. "
          "limits 의 totalAmount 는 그해 접대비의 한도 전 합계, excessAmount 는 한도 초과액이다. "
+         "한도 금액 자체는 없다. totalAmount 를 한도라고 말하지 않는다. "
          "limits 는 이번 업로드 몫이 아니라 그해 사용자 전체 기준이고, 직전연도 수입금액으로 계산한 잠정치다. "
          "year 의 '가능' 합계는 초과액을 이미 뺀 값이라 다시 빼지 않는다. "
          "batch 의 '가능' 합계는 초과액을 빼기 전 값이다. 초과액만큼 필요경비에서 빠지지만 직접 빼서 말하지 않는다."),
@@ -192,8 +193,34 @@ def target(transactions: list[dict], quote: str, presumed: bool = False) -> None
             raise Reject("AMBIGUOUS_TARGET", "소명 대기 건은 인용 문장에 그 건의 날짜나 금액이 있어야 합니다. "
                                              "조건에 맞는 건이 여러 개면 제안하지 말고 사용자에게 어느 건인지 물어보세요.")
     elif not all(identifies(t, quote) or names(t, quote) for t in transactions):
-        raise Reject("AMBIGUOUS_TARGET", "인용 문장에 그 가맹점 이름이나 날짜·금액이 있어야 합니다. "
+        raise Reject("AMBIGUOUS_TARGET", "인용 문장에 그 가맹점 이름이나 날짜, 금액이 있어야 합니다. "
                                          "남은 질문을 한꺼번에 말했다면 propose_bulk_answer 를 쓰고, 아니면 어느 건인지 물어보세요.")
+
+
+# 저장되는 답 값은 이미 받은 답과 맞아야 해서 바꾸지 않는다. 카드에는 질문 화면과 같은 이름을 쓴다.
+# frontend/src/components/questions/logic.ts 의 ANSWER_LABEL 과 같아야 한다(테스트가 본다).
+ANSWER_LABEL = {
+    "업무미팅": "거래처 접대",
+    "혼자작업": "혼자 일함",
+    "개인": "개인 용도",
+    "개인용": "개인 용도",
+    "업무·개인 혼용": "업무와 개인 둘 다",
+    "업무·개인 혼재": "업무와 개인 둘 다",
+    "업무·개인 섞임": "업무와 개인 둘 다",
+    "전용": "업무 전용",
+    "공용": "업무와 개인 둘 다",
+    "업무출장": "업무 출장",
+    "고의·중대한 과실": "고의 또는 중대한 과실",
+    "사업장 재산·배상책임": "사업장 재산 또는 배상책임",
+    "PC·휴대폰·가구 같은 물건이에요": "PC, 휴대폰, 가구 같은 물건",
+    "그 외 100만 원 넘는 물건이 있어요": "그 외 100만 원 넘는 물건",
+    "100만 원 넘는 물건은 없어요": "100만 원 넘는 물건 없음",
+}
+
+
+def shown(value: str) -> str:
+    """카드에 쓰는 답 이름. 표에 없는 값도 가운뎃점은 쉼표로 바꾼다."""
+    return ANSWER_LABEL.get(value, value.replace("·", ", "))
 
 
 def what(transactions: list[dict], total: int) -> str:
@@ -410,7 +437,7 @@ class Turn:
             raise Reject("NO_BASIS", "basis 는 user_said 나 previous_answer 여야 합니다.")
         return self._propose({"kind": "answer", "questionIds": g["questionIds"], "value": value,
                               "source": "PREVIOUS_ANSWER" if basis == "previous_answer" else "ASSISTANT",
-                              "card": f"{what(g['transactions'], g['totalAmount'])} → '{value}'"})
+                              "card": f"{what(g['transactions'], g['totalAmount'])} 답변: '{shown(value)}'"})
 
     def propose_bulk_answer(self, fact_type: str, value: str, quote: str) -> dict:
         self._check_quote(quote)
@@ -433,7 +460,7 @@ class Turn:
             raise Reject("INVALID_OPTION", "이 종류의 질문 모두가 받는 선택지가 아닙니다.", allowed=common)
         count, amount = sum(g["count"] for g in targets), sum(g["totalAmount"] for g in targets)
         return self._propose({"kind": "bulk_answer", "batchId": self.batch, "factType": fact_type, "value": value,
-                              "card": f"남은 '{fact_type}' 질문 {count}건 {amount:,}원 → '{value}'"})
+                              "card": f"남은 '{fact_type}' 질문 {count}건 {amount:,}원 답변: '{shown(value)}'"})
 
     def propose_classification(self, group: str, category: str, basis: str, quote: str | None) -> dict:
         g = self._get(group, "c", "분류 그룹")
@@ -449,13 +476,13 @@ class Turn:
         else:
             raise Reject("NO_BASIS", "basis 는 user_said 나 suggested_category 여야 합니다.")
         return self._propose({"kind": "classification", "reviewIds": g["reviewIds"], "merchantCategory": category,
-                              "card": f"{what(g['transactions'], g['totalAmount'])} → {category}"})
+                              "card": f"{what(g['transactions'], g['totalAmount'])} 분류: {category}"})
 
     def propose_override(self, transaction: str, to_verdict: str, quote: str) -> dict:
         self._check_quote(quote)
         tid = self._get(transaction, "t", "거래")["id"]
         if to_verdict not in OVERRIDE_VERDICTS:
-            raise Reject("INVALID_VERDICT", "판정은 가능·불가로만 바꿀 수 있습니다. 판단이 필요하면 세무대리인 질문을 제안하세요.",
+            raise Reject("INVALID_VERDICT", "판정은 가능이나 불가로만 바꿀 수 있습니다. 판단이 필요하면 세무대리인 질문을 제안하세요.",
                          allowed=OVERRIDE_VERDICTS)
         if self.be.get("/questions", transactionId=tid, status="PENDING")["items"]:
             raise Reject("USE_QUESTION", "이 거래에는 답하지 않은 질문이 있습니다. 판정을 바꾸지 말고 질문에 답하도록 "
@@ -469,7 +496,8 @@ class Turn:
             raise Reject("SAME_VERDICT", f"이미 {to_verdict} 판정입니다.")
         return self._propose({"kind": "override", "judgmentId": j["id"], "toVerdict": VERDICTS[to_verdict],
                               "reason": quote.strip(),
-                              "card": f"{what([tx], tx['amount'])} 판정 {j['verdict']['label']} → {to_verdict}"})
+                              "card": f"{what([tx], tx['amount'])} 판정을 {j['verdict']['label']}에서 "
+                                      f"{to_verdict}{'으로' if to_verdict == '가능' else '로'} 변경"})
 
     def add_handoff_note(self, text: str, transactions: list[str] | None, quote: str) -> dict:
         self._check_quote(quote)

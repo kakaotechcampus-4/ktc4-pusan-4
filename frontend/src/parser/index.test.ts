@@ -174,7 +174,7 @@ describe('parseCardBytes — IBK 샘플', () => {
       rawMerchant: '알라딘',
       status: '판정대상',
       needsReview: true,
-      reviewReason: '같은 상호·금액 취소가 63일 떨어져 있음 — 62일 밖이라 상계하지 않음'
+      reviewReason: '같은 상호와 금액 취소가 63일 떨어져 있음. 62일 밖이라 상계하지 않음'
     });
 
     expect(outcome.rows[0]).toMatchObject({
@@ -225,7 +225,7 @@ describe('parseCardBytes — 읽을 수 없는 입력', () => {
       kind: 'blocked',
       statement: '판별불가',
       code: 'UNKNOWN_FORMAT',
-      why: '형식 판별 실패 — 건너뜁니다',
+      why: '형식 판별 실패, 건너뜁니다',
       detected: 'unknown'
     });
   });

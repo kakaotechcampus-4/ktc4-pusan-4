@@ -132,7 +132,7 @@ describe('Run', () => {
     await mount();
 
     const counts = [...container.querySelectorAll('dl > div')].map((el) => el.textContent);
-    expect(counts).toEqual(['✓가능3건', '?확인 필요2건', '✕불가3건', '답변 대기1건']);
+    expect(counts).toEqual(['가능3건', '?확인 필요2건', '불가3건', '답변 대기1건']);
     expect(api.questions.list).toHaveBeenCalledWith({ batchId: 'batch-run', status: 'PENDING', page: 0, size: 100 });
   });
 
@@ -156,7 +156,7 @@ describe('Run', () => {
     await mount();
 
     const counts = [...container.querySelectorAll('dl > div')].map((el) => el.textContent);
-    expect(counts).toEqual(['✓가능0건', '?확인 필요0건', '✕불가20건', '답변 대기130건']);
+    expect(counts).toEqual(['가능0건', '?확인 필요0건', '불가20건', '답변 대기130건']);
   });
 
   it('진행 중 조회가 한 번 실패해도 진행 화면을 두고, 다시 올리라고 하지 않는다 (C63)', async () => {

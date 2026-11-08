@@ -247,7 +247,7 @@ function Panel({
           </div>
         }
         {entries.map((entry) => <Message key={entry.id} entry={entry} />)}
-        {pending && <p className="text-small text-muted">답을 만드는 중…</p>}
+        {pending && <p className="text-small text-muted">답을 만드는 중</p>}
         <div ref={end} />
       </div>
 
@@ -324,7 +324,7 @@ function Message({ entry }: {entry: ChatEntry;}) {
                 disabled={item.state === 'busy'}
                 onClick={() => void apply(entry.id, index)}>
 
-                  {item.state === 'busy' ? '적용 중…' : item.proposal.kind === 'navigation' ? '이동' : '적용'}
+                  {item.state === 'busy' ? '적용 중' : item.proposal.kind === 'navigation' ? '이동' : '적용'}
                 </Button>
                 {item.result &&
               <p

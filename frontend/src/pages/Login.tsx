@@ -12,6 +12,11 @@ interface LocationState {
   from?: string;
   /** RequireAuth 가 넘긴다. 로그인이 저절로 끝났을 때만 있다 */
   reason?: SessionEndReason | null;
+  /** 비밀번호 재설정(PasswordReset)이나 변경(Account)을 마치고 왔다. 새 비밀번호로 다시 들어간다 */
+  passwordReset?: boolean;
+  passwordChanged?: boolean;
+  /** 재설정한 이메일. 이메일 칸에 채워 둔다 */
+  email?: string;
 }
 
 /** 로그인이 왜 끝났는지 한 줄로 알린다 (C51·C44·C45) */
@@ -28,7 +33,7 @@ export function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const { status, signIn } = useSession();
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState((location.state as LocationState | null)?.email ?? '');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [errorField, setErrorField] = useState<ErrorField>(null);
@@ -38,7 +43,11 @@ export function Login() {
 
   const state = location.state as LocationState | null;
   const from = state?.from ?? '/';
-  const ended = state?.reason ? ENDED[state.reason] : null;
+  const ended = state?.reason ?
+  ENDED[state.reason] :
+  state?.passwordReset || state?.passwordChanged ?
+  '비밀번호를 바꿨습니다. 새 비밀번호로 로그인해 주세요.' :
+  null;
 
   // 서버 문장은 그대로 띄우지 않는다. code 로 고른다 (api.md 1.1)
   const complete = async (nextEmail: string, nextPassword: string) => {
@@ -169,6 +178,13 @@ export function Login() {
               className={AUTH_INPUT} />
 
             {fieldError('password')}
+            <Link
+              to="/password-reset"
+              state={email.includes('@') ? { email } : undefined}
+              className="mt-2 inline-block text-[12px] text-ink2 underline underline-offset-4 hover:text-ink">
+
+              비밀번호 재설정
+            </Link>
           </div>
         </div>
 
@@ -179,7 +195,7 @@ export function Login() {
         }
 
         <Button type="submit" disabled={busy} className="mt-5 w-full">
-          {busy ? '로그인 중…' : '로그인'}
+          {busy ? '로그인 중' : '로그인'}
         </Button>
       </form>
 

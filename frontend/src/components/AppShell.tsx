@@ -3,7 +3,7 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { CheckIcon } from 'lucide-react';
 import { DisclaimerBar } from './DisclaimerBar';
-import { Button } from './ui';
+import { Button, MAIN_ID } from './ui';
 import { BugReportButton } from './BugReport';
 import { Logo } from './Logo';
 import { STEPS, STEP_ALIAS, doneSteps, under } from './steps';
@@ -24,6 +24,7 @@ const CRUMB: Record<string, [string, string]> = {
   '/preview': ['카드내역', '분류 확인'],
   '/uploads': ['자료', '업로드 이력'],
   '/transactions': ['자료', '거래'],
+  '/yearly': ['자료', '연간 결과'],
   // 판정 흐름이 아니라 계정 설정이다. 고치는 길도 내 정보에 있다
   '/interview': ['내 정보', '사업자 문진'],
   '/confirm': ['판정', '판정 전 확인'],
@@ -237,17 +238,17 @@ export function AppShell({ children, showSteps = true, disclaimer = true, narrow
             */}
             {crumb[0] !== crumb[1] &&
           <>
-                <li>›</li>
+                <li>&gt;</li>
                 <li>{crumb[0]}</li>
               </>
           }
-            <li>›</li>
+            <li>&gt;</li>
             <li className="text-ink">{crumb[1]}</li>
           </ol>
         </nav>
       }
 
-      <main className={`mx-auto w-full max-w-page flex-1 pb-12 pt-5 ${gutter}`}>
+      <main id={MAIN_ID} tabIndex={-1} className={`mx-auto w-full max-w-page flex-1 pb-12 pt-5 outline-none ${gutter}`}>
         {narrow ? <div className={column}>{children}</div> : children}
       </main>
 

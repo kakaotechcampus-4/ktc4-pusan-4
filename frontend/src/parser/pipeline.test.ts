@@ -37,10 +37,10 @@ function resolve(records: RawRecord[]) {
 }
 
 const AMBIGUOUS = (n: number) =>
-`취소 대상 불확정 — 같은 상호·금액 결제가 ${n}건이라 어느 건이 취소됐는지 자동 판정 불가`;
-const UNPAIRED = '취소 행 (짝 후보 없음 — 원 결제가 조회 기간 밖일 수 있다)';
-const OUT_OF_WINDOW = '취소 행 (같은 상호·금액 결제가 62일 밖에만 있음 — 상계하지 않음)';
-const REFUNDED = (days: number) => `같은 상호·금액 취소가 ${days}일 떨어져 있음 — 62일 밖이라 상계하지 않음`;
+`취소 대상 불확정: 같은 상호와 금액 결제가 ${n}건이라 어느 건이 취소됐는지 자동 판정 불가`;
+const UNPAIRED = '취소 행 (짝 후보 없음. 원 결제가 조회 기간 밖일 수 있다)';
+const OUT_OF_WINDOW = '취소 행 (같은 상호와 금액 결제가 62일 밖에만 있어 상계하지 않음)';
+const REFUNDED = (days: number) => `같은 상호와 금액 취소가 ${days}일 떨어져 있음. 62일 밖이라 상계하지 않음`;
 
 describe('markNonTransactions', () => {
   it('사업자번호 없는 할인 · 포인트사용 행을 대상제외로 표시한다', () => {
@@ -137,7 +137,7 @@ describe('resolveCancellations', () => {
     for (const o of [o1, o2]) {
       expect(o).toMatchObject({ status: '판정대상', needsReview: true, reviewReason: AMBIGUOUS(2) });
     }
-    expect(c).toMatchObject({ status: '취소상계', reviewReason: '취소 행 (상계 대상 불확정 — 후보 2건)' });
+    expect(c).toMatchObject({ status: '취소상계', reviewReason: '취소 행 (상계 대상 불확정, 후보 2건)' });
     expect(stats).toMatchObject({ cancels: 1, cancelsPaired: 0, cancelsAmbiguous: 1, cancelsUnpaired: 0 });
   });
 
@@ -188,14 +188,14 @@ describe('resolveCancellations', () => {
     const plain = rec({ merchant: '교통카드' });
     const plainCancel = cancel({ merchant: '교통카드' });
     const stats = resolve([agg, aggCancel, plain, plainCancel]);
-    expect(aggCancel).toMatchObject({ status: '취소상계', reviewReason: '취소 행 (합산 행 — 개별 취소 대상이 없다)' });
+    expect(aggCancel).toMatchObject({ status: '취소상계', reviewReason: '취소 행 (합산 행이라 개별 취소 대상이 없다)' });
     expect(agg.status).toBe('판정대상');
     expect(plain.status).toBe('취소상계');
     expect(stats).toMatchObject({ cancels: 2, cancelsPaired: 1, cancelsUnpaired: 1 });
 
     const lone = cancel({ merchant: '교통_카드' });
     resolve([rec({ merchant: '교통_카드' }), lone]);
-    expect(lone.reviewReason).toBe('취소 행 (합산 행 — 개별 취소 대상이 없다)');
+    expect(lone.reviewReason).toBe('취소 행 (합산 행이라 개별 취소 대상이 없다)');
   });
 });
 
@@ -211,6 +211,18 @@ describe('MedicalMasker', () => {
 });
 
 describe('toRows', () => {
+  it('취소 행 금액은 음수로 내보내고, 키는 파일에 적힌 금액으로 만든다 (C35)', async () => {
+    // IBK 는 취소도 양수로 온다. KB 는 이미 음수다
+    const ibk = cancel({ source: 'ibk', amount: 12000, approvalNo: '30000001', when: '2026-02-01' });
+    const kb = cancel({ amount: -8000, approvalNo: '30000002', when: '2026-02-02' });
+    const paid = rec({ source: 'ibk', amount: 5000, approvalNo: '30000003', when: '2026-02-03' });
+    const rows = await toRows([ibk, kb, paid], newStats(3, 0));
+
+    expect(rows.map((r) => r.amount)).toEqual([-12000, -8000, 5000]);
+    expect(rows[0].naturalKey).toBe(await naturalKey('2026-02-01', '가짜상점', 12000, '30000001'));
+    expect(rows[1].naturalKey).toBe(await naturalKey('2026-02-02', '가짜상점', -8000, '30000002'));
+  });
+
   it('의료 행은 상호를 마스킹하고, 키도 의료_마스킹 으로 만든다', async () => {
     const records = [
     rec({ merchant: '가짜정형외과의원', amount: 15000, approvalNo: '10000002', when: '2026-01-05', memo: '메모', bizNo: '111-22-33333' }),

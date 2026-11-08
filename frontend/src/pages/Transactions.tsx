@@ -172,7 +172,8 @@ export function Transactions() {
   };
 
   /**
-   * 판정 대상 칸. 상태는 늘 같은 배지로, 바꾸는 동작은 늘 같은 버튼으로 보인다.
+   * 판정 대상 칸. 배지는 기본(판정대상)과 다른 행에만 단다. 모든 행에 같은 배지가 서 있으면
+   * 다른 것이 눈에 띄지 않는다. 바꾸는 동작은 늘 같은 버튼으로 보인다.
    * 취소상계는 바꿀 수 없어 버튼 자리를 비워 두고, 배지가 다른 행과 같은 줄에 서게 한다.
    * 좁은 화면에서는 가맹점 칸 아래로 옮긴다
    */
@@ -180,10 +181,11 @@ export function Transactions() {
     const canceled = row.sourceStatus.code === 'CANCELED_OFFSET';
     const excluded = row.effectiveStatus.code === 'EXCLUDED';
     return (
-      <span className="inline-flex items-center gap-3">
-        <Badge>{row.effectiveStatus.label}</Badge>
+      // 좁은 화면은 왼쪽 정렬이라 배지가 없는 행에서 버튼이 밀린다. 버튼을 앞에 두어 줄을 맞춘다
+      <span className="inline-flex flex-row-reverse items-center gap-3 sm:flex-row">
+        {row.effectiveStatus.code !== 'JUDGEABLE' && <Badge>{row.effectiveStatus.label}</Badge>}
         {canceled ?
-        <span aria-hidden="true" className="w-[6.5rem]" /> :
+        <span aria-hidden="true" className="hidden w-[6.5rem] sm:block" /> :
 
         <Button
           variant="secondary"
@@ -242,7 +244,7 @@ export function Transactions() {
     <Badge>분류 필요</Badge> :
     row.classificationStatus.code === 'CLASSIFIED' ?
     <span className="whitespace-nowrap text-ink2">{categoryLabel(row.merchantCategory)}</span> :
-    <span className="text-muted">—</span>
+    <span className="text-muted">-</span>
 
   },
   {

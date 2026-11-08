@@ -59,7 +59,7 @@ app:
     workers: 2
     queue-capacity: 50
     await-termination: 60s
-  # 비서 AI 서버 (api.md 3.14, docs/agent-secretary.md 9장). 내부망에만 있다. 운영은 http://ai:8000 (deploy/compose.yaml).
+  # 비서 AI 서버 (api.md 3.14, docs/agent-secretary.md 9장). 내부망에만 있다. 운영은 같은 색의 ai(http://ai-blue:8000 등, deploy/compose.yaml).
   # read-timeout 은 AI 서버의 한 턴 상한(30초)보다 길게 둔다.
   assistant:
     base-url: ${ASSISTANT_SERVER_URL:http://localhost:8000}
@@ -91,6 +91,10 @@ app:
     # 가입 인증 코드를 보내는 방법. smtp(spring.mail) 또는 log(로컬 전용, 백엔드 로그에 코드를 찍는다)
     email-verification:
       delivery: ${APP_AUTH_EMAIL_DELIVERY:smtp}
+  # 버그 신고(POST /bug-reports)를 받는 주소. 비면 보내는 계정(spring.mail.username)으로 받는다.
+  # 보내는 계정이 없으면(로컬) 신고는 503 BUG_REPORT_UNAVAILABLE 이다.
+  bug-report:
+    to: ${APP_BUG_REPORT_TO:}
 
 # 운영 로그는 한 줄에 JSON 하나다(logstash 형식). CloudWatch 메트릭 필터가 { $.status >= 500 } 처럼 필드로 걸고,
 # 스택 트레이스가 stack_trace 필드에 들어가 여러 이벤트로 쪼개지지 않는다. 로컬은 application-local.yml 에서 텍스트로 되돌린다.

@@ -13,7 +13,7 @@ import type {
 /** 백엔드 준비 전 목업. 모양은 API 명세 3.3~3.7 응답과 같다. */
 
 /** 응답 시점에 붙는 필드(거래 요약)는 목업이 읽을 때 채운다 */
-export type JudgmentSeed = Omit<Judgment, 'transaction'>;
+export type JudgmentSeed = Omit<Judgment, 'transaction' | 'accountLabel'>;
 
 /** 상태·답·거래 줄은 목업이 지금 상태에서 계산한다 */
 export type QuestionGroupSeed = Pick<
@@ -220,7 +220,7 @@ export const TRANSACTIONS: Transaction[] = [
     approvedAt: '2026-01-16',
     merchantRaw: '(주)이지스자산관리 관리비',
     merchantNorm: '자택 관리비',
-    merchantCategory: '주거·시설',
+    merchantCategory: '주거, 시설',
     classificationStatus: {
       code: 'CLASSIFIED',
       label: '분류 완료'
@@ -266,7 +266,7 @@ export const TRANSACTIONS: Transaction[] = [
     approvedAt: '2026-01-18',
     merchantRaw: '부산은퇴자골프클럽',
     merchantNorm: '골프장',
-    merchantCategory: '여가·스포츠',
+    merchantCategory: '여가, 스포츠',
     classificationStatus: {
       code: 'CLASSIFIED',
       label: '분류 완료'
@@ -404,7 +404,7 @@ export const TRANSACTIONS: Transaction[] = [
     approvedAt: '2026-01-24',
     merchantRaw: '한우마을 본점',
     merchantNorm: '한우마을',
-    merchantCategory: '접대·식음료',
+    merchantCategory: '접대, 식음료',
     classificationStatus: {
       code: 'CLASSIFIED',
       label: '분류 완료'
@@ -496,7 +496,7 @@ export const TRANSACTIONS: Transaction[] = [
     approvedAt: '2026-01-28',
     merchantRaw: 'NETFLIX.COM',
     merchantNorm: 'Netflix',
-    merchantCategory: '구독·미디어',
+    merchantCategory: '구독, 미디어',
     classificationStatus: {
       code: 'CLASSIFIED',
       label: '분류 완료'
@@ -875,7 +875,7 @@ export const JUDGMENTS: JudgmentSeed[] = [
     appliedRuleIds: ['R-037'],
     rulesCommitSha: '139f8189',
     userContextVersion: 4,
-    explanation: '취득가액 100만원을 초과하는 사업용 자산으로 감가상각 대상입니다. 승인 기준 원금 전액을 취득가액으로 보고, 2026년 귀속분은 내용연수 5년 정액법 · 사업연도 중 11개월분만 산입합니다.',
+    explanation: '취득가액 100만원을 초과하는 사업용 자산으로 감가상각 대상입니다. 승인 기준 원금 전액을 취득가액으로 보고, 2026년 귀속분은 내용연수 5년 정액법, 사업연도 중 11개월분만 산입합니다.',
     computedAt: '2026-09-12T14:05:00+09:00',
     citations: [
       {
@@ -1237,7 +1237,7 @@ export const JUDGMENTS: JudgmentSeed[] = [
     appliedRuleIds: ['R-225'],
     rulesCommitSha: '139f8189',
     userContextVersion: 4,
-    explanation: '업무 문서·일정 관리 도구 구독료로 사업에 직접 사용되는 용역의 대가에 해당합니다.',
+    explanation: '업무 문서와 일정 관리 도구 구독료로 사업에 직접 사용되는 용역의 대가에 해당합니다.',
     computedAt: '2026-09-12T14:05:00+09:00',
     citations: [
       {
@@ -1355,7 +1355,7 @@ export const JUDGMENTS: JudgmentSeed[] = [
     appliedRuleIds: ['R-311'],
     rulesCommitSha: '139f8189',
     userContextVersion: 4,
-    explanation: '주말·공휴일 음식점 결제는 개인 식사로 추정해 가사 관련 경비로 봅니다. 거래처 미팅이었다면 소명하면 평일과 같게 판정합니다.',
+    explanation: '주말이나 공휴일 음식점 결제는 개인 식사로 추정해 가사 관련 경비로 봅니다. 거래처 미팅이었다면 소명하면 평일과 같게 판정합니다.',
     computedAt: '2026-09-12T14:05:00+09:00',
     citations: [
       {
@@ -1688,7 +1688,7 @@ export const QUESTION_GROUPS: QuestionGroupSeed[] = [
     questionIds: ['0199a1b2-0000-7000-8000-00000000001016'],
     count: 1,
     totalAmount: 0,
-    questionText: '주말·공휴일 식사라 개인 식사로 보고 제외했어요. 거래처 미팅이었다면 알려주세요.',
+    questionText: '주말이나 공휴일 식사라 개인 식사로 보고 제외했어요. 거래처 미팅이었다면 알려주세요.',
     options: ['업무미팅', '개인']
   },
   {

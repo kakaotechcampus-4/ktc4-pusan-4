@@ -29,4 +29,19 @@ describe('bugReportMailto', () => {
     expect(href.length).toBeLessThanOrEqual(MAILTO_LIMIT);
     expect(href).toContain(encodeURIComponent('화면: /results'));
   });
+
+  it('서비스 안에서 못 보낸 글과 traceId 를 본문에 옮기고, 넘치면 글 끝을 줄인다', () => {
+    const params = (href: string) => new URLSearchParams(href.slice(href.indexOf('?') + 1)).get('body') ?? '';
+    const text = params(bugReportMailto({ ...base, message: '금액이 0원으로 나와요', traceId: 'tr-1' }));
+    expect(text.startsWith('금액이 0원으로 나와요')).toBe(true);
+    expect(text).not.toContain('무엇을 하려다:');
+    expect(text).toContain('trace id: tr-1');
+
+    const long = bugReportMailto({ ...base, message: '가'.repeat(2000) });
+    expect(long.length).toBeLessThanOrEqual(MAILTO_LIMIT);
+    expect(params(long)).toContain('계정 id: u-1');
+    expect(params(long).split('\n')[0].endsWith('(메일 링크 길이 때문에 뒤를 줄였습니다)')).toBe(true);
+    // 이모지(두 칸 글자)를 반으로 갈라도 링크를 만든다
+    expect(() => bugReportMailto({ ...base, message: '😀'.repeat(300) + 'a' })).not.toThrow();
+  });
 });

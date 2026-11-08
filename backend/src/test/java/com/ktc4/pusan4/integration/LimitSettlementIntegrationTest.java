@@ -284,11 +284,11 @@ class LimitSettlementIntegrationTest {
         List<LimitYearTotal> byBatch = queryService.limits(userId, batchId, null);
         List<LimitYearTotal> byYear = queryService.limits(userId, null, 2025);
 
-        // then
+        // then: 한도는 문진 수입금액(3,000만원)으로 정해져 해마다 같다
         assertThat(byBatch).containsExactly(
-            new LimitYearTotal("접대비", 2024, 50_000L, 0L),
-            new LimitYearTotal("접대비", 2025, 15_000_000L, 2_910_000L));
-        assertThat(byYear).containsExactly(new LimitYearTotal("접대비", 2025, 15_000_000L, 2_910_000L));
+            new LimitYearTotal("접대비", 2024, 12_090_000L, 50_000L, 0L),
+            new LimitYearTotal("접대비", 2025, 12_090_000L, 15_000_000L, 2_910_000L));
+        assertThat(byYear).containsExactly(new LimitYearTotal("접대비", 2025, 12_090_000L, 15_000_000L, 2_910_000L));
     }
 
     @Test
@@ -304,7 +304,7 @@ class LimitSettlementIntegrationTest {
 
         // then
         assertThat(queryService.limits(userId, null, 2025))
-            .containsExactly(new LimitYearTotal("접대비", 2025, 15_000_000L, 2_700_000L));
+            .containsExactly(new LimitYearTotal("접대비", 2025, 12_300_000L, 15_000_000L, 2_700_000L));
     }
 
     @Test
@@ -320,7 +320,7 @@ class LimitSettlementIntegrationTest {
         List<LimitYearTotal> limits = queryService.limits(userId, otherBatch, null);
 
         // then: 한도는 사용자의 한 해 전체라 2025년은 두 batch 를 합친 값이다
-        assertThat(limits).containsExactly(new LimitYearTotal("접대비", 2025, 15_000_000L, 2_910_000L));
+        assertThat(limits).containsExactly(new LimitYearTotal("접대비", 2025, 12_090_000L, 15_000_000L, 2_910_000L));
     }
 
     @Test

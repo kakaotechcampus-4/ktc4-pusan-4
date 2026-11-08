@@ -9,6 +9,7 @@ import { Faq } from './pages/Faq';
 import { BugReport } from './pages/BugReport';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
+import { PasswordReset } from './pages/PasswordReset';
 import { KakaoCallback } from './pages/KakaoCallback';
 import { Terms } from './pages/public/Terms';
 import { Privacy } from './pages/public/Privacy';
@@ -33,6 +34,7 @@ const RunEntry = page(() => import('./pages/Run'), 'RunEntry');
 const Results = page(() => import('./pages/Results'), 'Results');
 const Questions = page(() => import('./pages/Questions'), 'Questions');
 const Summary = page(() => import('./pages/Summary'), 'Summary');
+const Yearly = page(() => import('./pages/Yearly'), 'Yearly');
 /** 개발용 화면이다. 배포 빌드에는 넣지 않는다 */
 const Styleguide = import.meta.env.DEV ? page(() => import('./pages/Styleguide'), 'Styleguide') : null;
 const ClassificationPreview = page(() => import('./pages/ClassificationPreview'), 'ClassificationPreview');
@@ -45,7 +47,7 @@ function PageLoading() {
   return (
     <p role="status" className="flex min-h-full items-center justify-center gap-2 bg-canvas text-body text-muted">
       <Loader2Icon className="h-4 w-4 animate-spin text-accent" aria-hidden="true" />
-      화면을 불러오고 있습니다…
+      화면을 불러오고 있습니다
     </p>);
 
 }
@@ -63,6 +65,7 @@ const PROTECTED: { path: string; element: React.ReactElement }[] = [
 { path: '/results', element: <Results /> },
 { path: '/questions', element: <Questions /> },
 { path: '/summary', element: <Summary /> },
+{ path: '/yearly', element: <Yearly /> },
 { path: '/account', element: <Account /> },
 { path: '/admin', element: <Admin /> }];
 
@@ -109,6 +112,7 @@ export function AppRoutes() {
             <Route path="/faq" element={<Faq />} />
             <Route path="/bug-report" element={<BugReport />} />
             <Route path="/signup" element={<Signup />} />
+            <Route path="/password-reset" element={<PasswordReset />} />
             <Route path={KAKAO_CALLBACK_PATH} element={<KakaoCallback />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />

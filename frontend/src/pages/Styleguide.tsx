@@ -41,18 +41,18 @@ const COLORS: { name: string; cls: string; hex: string; use: string }[] = [
 { name: 'accent-line', cls: 'bg-accent-line', hex: '#DCE3EB', use: '테두리 버튼, 패널 안 구분선' },
 { name: 'link', cls: 'bg-link', hex: '#2C6AE8', use: '문장 속 링크' },
 { name: 'highlight', cls: 'bg-highlight', hex: '#FF5C9A', use: '한 화면에 한 번 쓰는 강조' },
-{ name: 'ok', cls: 'bg-ok', hex: '#00703D', use: '가능 — 글자' },
-{ name: 'ok-bg', cls: 'bg-ok-bg', hex: '#E8F6F0', use: '가능 — 박스 바탕' },
-{ name: 'ok-line', cls: 'bg-ok-line', hex: '#B2E3CE', use: '가능 — 박스 테두리' },
-{ name: 'ok-bar', cls: 'bg-ok-bar', hex: '#12B76A', use: '가능 — 막대, 점' },
-{ name: 'warn', cls: 'bg-warn', hex: '#8A5A10', use: '확인 필요 — 글자' },
-{ name: 'warn-bg', cls: 'bg-warn-bg', hex: '#FDF3E3', use: '확인 필요 — 박스 바탕' },
-{ name: 'warn-line', cls: 'bg-warn-line', hex: '#EFD7A4', use: '확인 필요 — 박스 테두리' },
-{ name: 'warn-bar', cls: 'bg-warn-bar', hex: '#F7A51B', use: '확인 필요 — 막대, 점' },
-{ name: 'deny', cls: 'bg-deny', hex: '#C5283D', use: '불가 — 글자' },
-{ name: 'deny-bg', cls: 'bg-deny-bg', hex: '#FDEDEF', use: '불가 — 박스 바탕' },
-{ name: 'deny-line', cls: 'bg-deny-line', hex: '#F7CDD4', use: '불가 — 박스 테두리' },
-{ name: 'deny-bar', cls: 'bg-deny-bar', hex: '#FF5A5A', use: '불가 — 막대, 점' }];
+{ name: 'ok', cls: 'bg-ok', hex: '#00703D', use: '가능: 글자' },
+{ name: 'ok-bg', cls: 'bg-ok-bg', hex: '#E8F6F0', use: '가능: 박스 바탕' },
+{ name: 'ok-line', cls: 'bg-ok-line', hex: '#B2E3CE', use: '가능: 박스 테두리' },
+{ name: 'ok-bar', cls: 'bg-ok-bar', hex: '#12B76A', use: '가능: 막대, 점' },
+{ name: 'warn', cls: 'bg-warn', hex: '#8A5A10', use: '확인 필요: 글자' },
+{ name: 'warn-bg', cls: 'bg-warn-bg', hex: '#FDF3E3', use: '확인 필요: 박스 바탕' },
+{ name: 'warn-line', cls: 'bg-warn-line', hex: '#EFD7A4', use: '확인 필요: 박스 테두리' },
+{ name: 'warn-bar', cls: 'bg-warn-bar', hex: '#F7A51B', use: '확인 필요: 막대, 점' },
+{ name: 'deny', cls: 'bg-deny', hex: '#C5283D', use: '불가: 글자' },
+{ name: 'deny-bg', cls: 'bg-deny-bg', hex: '#FDEDEF', use: '불가: 박스 바탕' },
+{ name: 'deny-line', cls: 'bg-deny-line', hex: '#F7CDD4', use: '불가: 박스 테두리' },
+{ name: 'deny-bar', cls: 'bg-deny-bar', hex: '#FF5A5A', use: '불가: 막대, 점' }];
 
 
 const TYPE: { token: string; cls: string; spec: string; use: string }[] = [
@@ -61,9 +61,9 @@ const TYPE: { token: string; cls: string; spec: string; use: string }[] = [
 { token: 'ir-panel', cls: 'text-ir-panel tracking-ir-sm', spec: '30/45, 자간 -0.8px', use: '랜딩 패널과 카드 제목, 큰 숫자' },
 { token: 'ir-num', cls: 'text-ir-num tracking-ir-sm', spec: '26/39', use: '띠 카드 숫자' },
 { token: 'ir-lead', cls: 'text-ir-lead font-normal tracking-ir-xs', spec: '22/33, 굵기 400', use: '큰 알약 글자' },
-{ token: 'h1 / h1-lg', cls: 'text-h1 sm:text-h1-lg', spec: '38/48 → 52/66', use: '앱 화면 큰 제목' },
-{ token: 'h2 / h2-lg', cls: 'text-h2 sm:text-h2-lg', spec: '28/38 → 36/48', use: '앱 페이지 제목, 좁은 화면 섹션 제목' },
-{ token: 'h3 / h3-lg', cls: 'text-h3 sm:text-h3-lg', spec: '22/30 → 26/36', use: '소섹션 제목, 큰 카드 제목' },
+{ token: 'h1 / h1-lg', cls: 'text-h1 sm:text-h1-lg', spec: '38/48, lg 52/66', use: '앱 화면 큰 제목' },
+{ token: 'h2 / h2-lg', cls: 'text-h2 sm:text-h2-lg', spec: '28/38, lg 36/48', use: '앱 페이지 제목, 좁은 화면 섹션 제목' },
+{ token: 'h3 / h3-lg', cls: 'text-h3 sm:text-h3-lg', spec: '22/30, lg 26/36', use: '소섹션 제목, 큰 카드 제목' },
 { token: 'h4', cls: 'text-h4', spec: '17/26', use: '카드 제목, 로고' },
 { token: 'stat', cls: 'text-stat', spec: '34/36', use: '숫자 강조' },
 { token: 'lead', cls: 'text-lead', spec: '17/30', use: '리드 문단' },
@@ -213,7 +213,7 @@ export function Styleguide() {
           </div>
         </Block>
 
-        <Block title="SectionHeading" note="eyebrow → title → description 순서 고정. page 는 로그인 뒤 화면의 h1, 나머지는 공개 화면 섹션 제목.">
+        <Block title="SectionHeading" note="eyebrow, title, description 순서 고정. page 는 로그인 뒤 화면의 h1, 나머지는 공개 화면 섹션 제목.">
           <div className="space-y-10">
             <SectionHeading size="page" as="h2" eyebrow="관리자" title="화면 제목 (page)" />
             <SectionHeading
@@ -264,7 +264,7 @@ export function Styleguide() {
           </div>
         </Block>
 
-        <Block title="Table, Pagination" note="정렬·페이지네이션은 서버가 한다. hideBelow 로 좁은 화면에서 숨길 열을 고르되 핵심 정보에는 쓰지 않는다.">
+        <Block title="Table, Pagination" note="정렬, 페이지네이션은 서버가 한다. hideBelow 로 좁은 화면에서 숨길 열을 고르되 핵심 정보에는 쓰지 않는다.">
           <Table
             caption="표 예시"
             rowKey={(row) => row.id}
@@ -286,7 +286,7 @@ export function Styleguide() {
             onRowClick={(row) => setPickedRow(row.id === pickedRow ? null : row.id)} />
 
           <p className="text-small text-muted">
-            행을 누르면 선택됩니다 — 지금 선택: {pickedRow ?? '없음'}. 행 클릭과 행 안
+            행을 누르면 선택됩니다. 지금 선택: {pickedRow ?? '없음'}. 행 클릭과 행 안
             버튼은 함께 쓰지 않습니다.
           </p>
 
@@ -391,7 +391,7 @@ export function Styleguide() {
           </div>
         </Block>
 
-        <Block title="StatuteCitation" note="GET /statutes/{id} 응답 그대로. 시행일과 원문 링크가 항상 붙고, hierarchy 로 근거와 참고(해석기준·사례)를 나눈다.">
+        <Block title="StatuteCitation" note="GET /statutes/{id} 응답 그대로. 시행일과 원문 링크가 항상 붙고, hierarchy 로 근거와 참고(해석기준, 사례)를 나눈다.">
           <div className="grid max-w-2xl gap-3">
             <StatuteCitation statuteVersionId={1435} />
             <StatuteCitation statuteVersionId={2071} />

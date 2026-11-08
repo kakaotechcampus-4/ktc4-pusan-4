@@ -2,6 +2,7 @@ import React from 'react';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { DISCLAIMER } from '../copy';
 import { Logo } from './Logo';
+import { MAIN_ID } from './ui';
 
 const PRINCIPLES = [
 '판정마다 근거 조문과 시행일을 붙입니다',
@@ -44,7 +45,7 @@ export function AuthLayout({ title, children }: {title: string;children: React.R
         <p className="max-w-md text-[12px] leading-6 text-white/60">{DISCLAIMER}</p>
       </aside>
 
-      <div className="flex flex-1 items-center justify-center px-6 py-14">
+      <main id={MAIN_ID} tabIndex={-1} className="flex flex-1 items-center justify-center px-6 py-14 outline-none">
         <div className="w-full max-w-[380px]">
           {/* 좁은 화면에서는 왼쪽 판이 없어 여기에 로고를 둔다 */}
           <div className="mb-10 lg:hidden">
@@ -52,7 +53,7 @@ export function AuthLayout({ title, children }: {title: string;children: React.R
           </div>
           {children}
         </div>
-      </div>
+      </main>
     </div>);
 
 }

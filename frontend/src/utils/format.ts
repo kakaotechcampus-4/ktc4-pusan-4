@@ -20,7 +20,7 @@ export const formatFullDate = (value: string): string => {
 };
 
 export const formatPeriod = (start: string, end: string): string =>
-`${formatFullDate(start)} – ${formatFullDate(end)}`;
+`${formatFullDate(start)} ~ ${formatFullDate(end)}`;
 
 const KST = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Asia/Seoul',

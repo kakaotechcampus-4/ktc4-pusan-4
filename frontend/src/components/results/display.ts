@@ -72,7 +72,8 @@ const ATTRIBUTES: [key: string, label: string, value: (value: unknown) => string
 ['내용연수', '내용연수', (value) => typeof value === 'number' ? `${value}년` : null],
 ['안분', '업무 비율', (value) => value === '작업공간비율' ? '작업 공간 면적 비율만큼' : null],
 ['선급비용', '선급비용', yes('기간에 나눠 처리')],
-['limit_bucket', '연간 한도', text]];
+// 값은 한도 묶음 ID(접대비)라 그대로 보이면 위 계정과목(기업업무추진비)과 이름이 달라진다
+['limit_bucket', '연간 한도', (value) => text(value) ? '대상' : null]];
 
 
 export const attributeRows = (attributes: Record<string, unknown>) =>

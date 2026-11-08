@@ -1,6 +1,7 @@
 package com.ktc4.pusan4.judgment.api;
 
 import com.ktc4.pusan4.judgment.domain.JudgmentSummary;
+import com.ktc4.pusan4.judgment.domain.RuleSet;
 import com.ktc4.pusan4.judgment.domain.LimitYearTotal;
 import com.ktc4.pusan4.judgment.domain.Verdict;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -18,13 +19,16 @@ public record JudgmentSummaryResponse(
     List<LimitYearResponse> limits
 ) {
 
-    static JudgmentSummaryResponse from(Scope scope, JudgmentSummary summary, List<LimitYearTotal> limits) {
+    static JudgmentSummaryResponse from(
+        Scope scope, JudgmentSummary summary, List<LimitYearTotal> limits, RuleSet rules
+    ) {
         Map<Verdict, VerdictSummary> byVerdict = new EnumMap<>(Verdict.class);
         summary.byVerdict().forEach((verdict, total) ->
             byVerdict.put(verdict, new VerdictSummary(total.count(), total.finalAmount())));
         return new JudgmentSummaryResponse(scope, summary.totalCount(), byVerdict, summary.byAccount().stream()
-            .map(account -> new AccountSummary(account.account(), account.count(), account.finalAmount()))
-            .toList(), LimitYearResponse.from(limits));
+            .map(account -> new AccountSummary(account.account(), rules.accountLabel(account.account()),
+                account.count(), account.finalAmount()))
+            .toList(), LimitYearResponse.from(limits, rules));
     }
 
     public record Scope(
@@ -36,6 +40,11 @@ public record JudgmentSummaryResponse(
     public record VerdictSummary(int count, long finalAmount) {
     }
 
-    public record AccountSummary(String account, int count, long finalAmount) {
+    public record AccountSummary(
+        @Schema(description = "계정과목 ID", example = "접대비") String account,
+        @Schema(description = "계정과목 화면 이름", example = "기업업무추진비") String accountLabel,
+        int count,
+        long finalAmount
+    ) {
     }
 }

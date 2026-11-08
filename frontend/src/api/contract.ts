@@ -5,6 +5,8 @@ import type {
   BulkAnswerResult,
   BusinessContext,
   BusinessContextRef,
+  BugReportRequest,
+  ChangePasswordRequest,
   EmailVerificationConfirmRequest,
   EmailVerificationConfirmed,
   EmailVerificationRequest,
@@ -26,6 +28,7 @@ import type {
   LimitYear,
   LoginRequest,
   OverrideRequest,
+  PasswordResetCompleteRequest,
   Page,
   Progress,
   Question,
@@ -122,6 +125,12 @@ export interface Api {
     confirmEmailVerification(body: EmailVerificationConfirmRequest): Promise<EmailVerificationConfirmed>;
     /** 가입하고 바로 로그인한다. 성공하면 login 과 같다 */
     signup(body: SignupRequest): Promise<void>;
+    /** 비밀번호 재설정 코드를 메일로 보낸다. 가입하지 않은 이메일도 성공(202)이고 메일만 가지 않는다 */
+    requestPasswordReset(body: EmailVerificationRequest): Promise<void>;
+    /** 재설정 코드를 확인하고 재설정에 쓸 토큰을 받는다. 오류는 가입 코드 확인과 같다 */
+    confirmPasswordReset(body: EmailVerificationConfirmRequest): Promise<EmailVerificationConfirmed>;
+    /** 새 비밀번호로 바꾸고 그 사용자의 모든 로그인을 끊는다. 로그인은 하지 않는다 */
+    completePasswordReset(body: PasswordResetCompleteRequest): Promise<void>;
     /** 카카오 인가 코드로 로그인한다 (#176). 처음 온 회원이면 서버가 계정을 만든다 */
     kakao(body: KakaoLoginRequest): Promise<void>;
     /** 새로고침 뒤 리프레시 쿠키로 로그인을 이어 간다. 이어 갈 수 없으면 false */
@@ -135,6 +144,12 @@ export interface Api {
   users: {
     me(): Promise<User>;
     remove(): Promise<void>;
+    /** 비밀번호를 바꾸고 지금 기기를 포함한 모든 로그인을 끊는다. 카카오 계정은 409 PASSWORD_NOT_SET */
+    changePassword(body: ChangePasswordRequest): Promise<void>;
+  };
+  /** 3.16 버그 신고. 로그인한 사람만, 한 시간에 5건. 메일 계정이 없는 서버는 503 BUG_REPORT_UNAVAILABLE */
+  bugReports: {
+    create(body: BugReportRequest): Promise<void>;
   };
   /** 3.2 사업자 Context */
   contexts: {
@@ -233,6 +248,17 @@ export interface Api {
     };
   };
 }
+
+/**
+ * 마지막으로 받은 오류 응답의 traceId. 버그 신고에 실어 서버 로그와 바로 잇는다 (#225).
+ * 적는 쪽은 http.ts 다. 로그인 실패나 신고 자체의 실패는 적지 않고, 로그인, 로그아웃, 신고를 보낸 뒤에는 지운다
+ */
+let lastTraceId: string | null = null;
+
+export const lastErrorTraceId = () => lastTraceId;
+export const rememberTraceId = (traceId: string | null) => {
+  lastTraceId = traceId;
+};
 
 /** 1.3 에러 응답을 그대로 던진다 */
 export class ApiRequestError extends Error {

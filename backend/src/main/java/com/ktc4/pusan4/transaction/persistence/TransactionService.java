@@ -90,7 +90,7 @@ public class TransactionService {
         TransactionRecordEntity transaction = lockOwned(userId, transactionId);
         if (transaction.sourceStatus() == SourceStatus.CANCELED_OFFSET) {
             throw new ApiException(HttpStatus.CONFLICT, "CANCELED_TRANSACTION_NOT_INCLUDABLE",
-                "취소·상계 거래는 판정 대상으로 포함할 수 없습니다.");
+                "취소나 상계 거래는 판정 대상으로 포함할 수 없습니다.");
         }
         transaction.changeInclusion(UserInclusion.INCLUDED);
         limitSettlement.settleProvisional(userId);
