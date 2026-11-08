@@ -317,8 +317,24 @@ Windows 명령, 테스트 구분, 관리자 계정 만드는 법은 [backend/REA
 
 #### Frontend
 
-<!-- TODO(@cho104 @Jaeseong22): 핵심 명령 한두 줄. 자세한 내용은 frontend/README.md 링크 -->
-> ✏️ 작성 필요
+Node 22 와 npm 만 있으면 됩니다(CI 와 같은 버전). 서버 없이도 돕니다 — 기본은 브라우저 안 목업이라 `npm run dev` 만으로 모든 화면을 볼 수 있습니다.
+
+```bash
+cd frontend
+npm install
+npm run dev                 # http://localhost:5173
+VITE_API=http npm run dev   # 목업 대신 실제 API 사용 (기본 대상: 배포 서버)
+npm run build               # 프로덕션 빌드. 끝에 공개 페이지를 미리 그린다
+npm test && npm run lint    # CI 는 build · test · lint 를 돌린다 (타입: npm run typecheck)
+```
+
+| 환경 변수 | 기능 | 비우면 |
+| --- | --- | --- |
+| `VITE_API` | `http` 면 실제 API, 그 밖에는 브라우저 안 목업 | 목업 |
+| `VITE_API_TARGET` | 개발 서버가 `/api/v1/*` 를 넘길 대상 | 배포 서버(`https://ktc4-pusan-4.duckdns.org`) |
+| `VITE_KAKAO_REST_API_KEY` | 카카오 로그인 | 카카오 로그인 안 됨 |
+
+폴더 구조, 공용 부품, 검색 노출(prerender) 구조는 [frontend/README.md](frontend/README.md), 색·타이포·문구 규칙은 [frontend/DESIGN.md](frontend/DESIGN.md)를 참고하세요.
 
 #### AI
 
