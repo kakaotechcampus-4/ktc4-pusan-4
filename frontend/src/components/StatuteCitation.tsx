@@ -2,6 +2,7 @@ import { ExternalLinkIcon } from 'lucide-react';
 import { api, ApiRequestError, useApi } from '../api';
 import type { StatuteHierarchy } from '../types/domain';
 import { formatFullDate } from '../utils/format';
+import { statuteTitle } from '../utils/statute';
 import { Badge } from './ui/Badge';
 
 interface StatuteCitationProps {
@@ -73,8 +74,8 @@ export function StatuteCitation({
     <article className="rounded-xl border border-line p-3.5">
       <header className="flex flex-wrap items-center gap-2">
         <Badge tone={tier.binding ? 'ink' : 'neutral'}>{tier.label}</Badge>
-        {/* 서버가 법령 제목에 조, 항, 호를 붙여 준다 (C8) */}
-        <h4 className="text-small font-bold text-ink">{statute.title}</h4>
+        {/* 서버는 법률, 시행령, 시행규칙 제목에만 조, 항, 호를 붙인다. 고시는 여기서 붙인다 (C8) */}
+        <h4 className="text-small font-bold text-ink">{statuteTitle(statute.statuteId, statute.title)}</h4>
       </header>
 
       {/*

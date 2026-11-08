@@ -99,7 +99,7 @@ const handoffText = ({ batch, summary, byYear, overridden, unclassified, unresol
   lines.push(
     `경비 가능 금액 중 ${limited.accountLabel}는 ${formatWon(limited.finalAmount)}이고 연간 한도 대상입니다.${
     limits.length > 0 ?
-    ` 올린 카드내역 전체 기준으로 ${limits.map(limitLine).join(', ')}입니다(${PROVISIONAL_NOTE}).` :
+    ` 올린 카드내역 전체 기준으로 ${limits.map(limitLine).join('이고, ')}입니다(${PROVISIONAL_NOTE}).` :
     ''}${
     limits.some((item) => item.excessAmount > 0) ?
     ' 초과액은 연 단위라 위 금액에서 빼지 않았습니다.' :

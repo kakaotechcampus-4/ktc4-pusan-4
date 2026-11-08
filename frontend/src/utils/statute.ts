@@ -10,11 +10,13 @@ const branch = (number: string | undefined) => number ? `의${number}` : '';
 
 /**
  * 조문 id 만 있을 때의 제목. 판정 내보내기와 규칙 후보는 Citation 에 statuteId 만 준다.
- * 조문 화면(GET /statutes)은 서버가 조, 항, 호를 붙인 title 을 주므로 그것을 그대로 쓴다.
+ * 조문 화면(GET /statutes)은 서버가 법률, 시행령, 시행규칙 title 에 조, 항, 호를 붙여 주므로 그것을 그대로 쓴다.
  * 소득세법-33-1-5 → 소득세법 제33조 제1항 제5호, 소득세법-81의6-1 → 소득세법 제81조의6 제1항.
  * 조가 없는 문서(심판례, 해석례)는 lawTitle 을 그대로 돌려준다
  */
 export function statuteTitle(statuteId: string, lawTitle: string): string {
+  // 서버가 법률, 시행령, 시행규칙 제목에는 조를 붙여 준다. 고시 같은 행정규칙은 이름뿐이라 여기서 붙인다
+  if (/제\d+조/.test(lawTitle)) return lawTitle;
   const law = LAW_ARTICLE.exec(statuteId);
   if (law) {
     const [, article, articleBranch, paragraph, item, itemBranch] = law;

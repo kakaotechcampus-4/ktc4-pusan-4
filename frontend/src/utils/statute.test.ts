@@ -25,4 +25,11 @@ describe('statuteTitle', () => {
     expect(statuteTitle('해석례-340535', ruling)).toBe(ruling);
   });
 
+  it('서버가 이미 조를 붙인 제목은 그대로 쓴다', () => {
+    expect(statuteTitle('소득세법-33-1-5', '소득세법 제33조 제1항 제5호')).toBe('소득세법 제33조 제1항 제5호');
+    expect(statuteTitle('업무용승용차운행기록방법에관한고시#2104628-3', '업무용승용차 운행기록 방법에 관한 고시')).toBe(
+      '업무용승용차 운행기록 방법에 관한 고시 제3조'
+    );
+  });
+
 });
