@@ -206,9 +206,7 @@ AWS 준비, 백업, 주간 배치 타이머 설치는 [docs/deployment.md](docs/
 
 #### CloudWatch
 
-<!-- 넣을지 검토 중 -->
-<!-- 도식화 자리: CloudWatch — 로그 · 지표 수집과 Discord 알람 흐름 (넣을지 검토 중). 그림은 docs/img/readme/ 에 넣고 아래 인용을 이미지로 바꿔 주세요 -->
-> 🖼️ **도식화 예정: CloudWatch**
+<p align="center"><img src="./docs/img/readme/cloudwatch.png" width="90%" alt="CloudWatch 대시보드 ktc4-backend" /></p>
 
 #### Langfuse (AI 에이전트 모니터링)
 
