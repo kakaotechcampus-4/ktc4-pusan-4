@@ -92,7 +92,7 @@ def classify_statement(headers: list) -> tuple:
         return "청구내역", "청구 컬럼(%s) 있고 가맹점명 없음" % ", ".join(has_billing[:3])
     if has_merchant and not has_approval:
         return "판별불가", "가맹점명은 있는데 승인정보 컬럼이 없다"
-    return "판별불가", "가맹점명·승인정보 컬럼을 찾지 못했다 (헤더: %s)" % (joined[:60] or "없음")
+    return "판별불가", "가맹점명, 승인정보 컬럼을 찾지 못했다 (헤더: %s)" % (joined[:60] or "없음")
 
 
 # 취소-원결제 폴백 매칭에서 허용하는 날짜 차이
@@ -299,7 +299,7 @@ def resolve_cancellations(records: list, st: Stats) -> list:
 
         if AGGREGATED_RE.match(c.merchant):
             st.unpaired_cancels += 1
-            c["review_reason"] = "취소 행 (합산 행 — 개별 취소 대상이 없다)"
+            c["review_reason"] = "취소 행 (합산 행이라 개별 취소 대상이 없다)"
             st.unpaired_log.append((c.merchant, c.amount,
                                     "합산 행 — 개별 취소 대상이 없다"))
             continue
@@ -335,23 +335,23 @@ def resolve_cancellations(records: list, st: Stats) -> list:
             st.pair_log.append((c.merchant, c.amount, how))
         elif len(cands) >= 2:
             st.ambiguous_cancels += 1
-            c["review_reason"] = "취소 행 (상계 대상 불확정 — 후보 %d건)" % len(cands)
+            c["review_reason"] = "취소 행 (상계 대상 불확정, 후보 %d건)" % len(cands)
             st.ambiguous_log.append((c.merchant, c.amount, len(cands)))
             for o in cands:
-                flagged[id(o)] = ("취소 대상 불확정 — 같은 상호·금액 결제가 %d건이라 "
+                flagged[id(o)] = ("취소 대상 불확정: 같은 상호와 금액 결제가 %d건이라 "
                                   "어느 건이 취소됐는지 자동 판정 불가" % len(cands))
         elif outside:
             st.unpaired_cancels += 1
             st.out_of_window_cancels += 1
-            c["review_reason"] = ("취소 행 (같은 상호·금액 결제가 %d일 밖에만 있음 — 상계하지 않음)"
+            c["review_reason"] = ("취소 행 (같은 상호와 금액 결제가 %d일 밖에만 있어 상계하지 않음)"
                                   % PAIR_WINDOW_DAYS)
             st.unpaired_log.append((c.merchant, c.amount, "같은 결제가 기간 밖에만 있음"))
             for o, d in outside:
-                flagged[id(o)] = ("같은 상호·금액 취소가 %d일 떨어져 있음 — %d일 밖이라 상계하지 않음"
+                flagged[id(o)] = ("같은 상호와 금액 취소가 %d일 떨어져 있음. %d일 밖이라 상계하지 않음"
                                   % (d, PAIR_WINDOW_DAYS))
         else:
             st.unpaired_cancels += 1
-            c["review_reason"] = "취소 행 (짝 후보 없음 — 원 결제가 조회 기간 밖일 수 있다)"
+            c["review_reason"] = "취소 행 (짝 후보 없음. 원 결제가 조회 기간 밖일 수 있다)"
             st.unpaired_log.append((
                 c.merchant, c.amount,
                 "짝 후보 없음 — 원 결제가 조회 기간 밖일 수 있다"))
