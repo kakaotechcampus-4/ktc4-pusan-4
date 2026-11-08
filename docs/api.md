@@ -103,6 +103,12 @@ Question
 │   │       └── POST                    가입 인증 코드 확인
 │   ├── signup/
 │   │   └── POST                        이메일 회원가입
+│   ├── password-reset/
+│   │   ├── POST                        비밀번호 재설정 코드 메일 보내기
+│   │   ├── confirm/
+│   │   │   └── POST                    재설정 코드 확인
+│   │   └── complete/
+│   │       └── POST                    비밀번호 재설정
 │   ├── login/
 │   │   └── POST                        로그인
 │   ├── kakao/
@@ -116,6 +122,8 @@ Question
 │   └── me/
 │       ├── GET                         내 정보 조회
 │       ├── DELETE                      회원 탈퇴
+│       ├── password/
+│       │   └── PUT                     비밀번호 변경
 │       │
 │       └── contexts/
 │           ├── POST                    사업자 Context 생성
@@ -190,6 +198,9 @@ Question
 ├── statutes/
 │   └── {statuteVersionId}/
 │       └── GET                         법령 원문 조회
+│
+├── bug-reports/
+│   └── POST                            버그 신고 (팀 메일로 보냄)
 │
 └── admin/
     └── rule-candidates/
@@ -298,15 +309,60 @@ refresh_token={token}; Path=/api/v1/auth; Max-Age=1209600; HttpOnly; Secure; Sam
 | 필드 | 제약 |
 | --- | --- |
 | email | 이메일 형식, 최대 320자. 인증한 이메일과 같아야 한다(대소문자·앞뒤 공백 무시) |
-| password | 8자 이상, UTF-8 72바이트 이하 |
+| password | 영문자, 숫자, 기호만 쓰고 셋을 각각 하나 이상 넣은 8~72자. 기호는 영문자와 숫자가 아닌 출력 가능한 ASCII 문자(`!`부터 `~`까지)다. 공백, 한글 등 그 밖의 문자는 쓸 수 없다. 대문자는 필수가 아니다 |
 | verificationToken | `email-verification/confirm` 응답의 값 |
 
 가입하고 바로 로그인한다. 응답은 로그인과 같고 상태만 `201` 이다. 가입하면 인증 토큰은 더 쓸 수 없다.
 
+비밀번호 규칙은 새 비밀번호를 정할 때만 본다. 로그인은 보지 않아, 규칙이 생기기 전에 가입한 사용자(공백이나 한글이 든 비밀번호 포함)도 그대로 로그인한다.
+
 ```
-400 VALIDATION_ERROR       형식·길이가 맞지 않음
+400 VALIDATION_ERROR       형식·길이가 맞지 않음. 비밀번호 규칙을 어기면 message 에 이유가 있다
 400 EMAIL_NOT_VERIFIED     인증 토큰이 없거나, 다른 이메일 것이거나, 만료됨 → 인증부터 다시
 409 EMAIL_ALREADY_EXISTS   이미 가입한 이메일
+```
+
+### `POST /api/v1/auth/password-reset`
+
+```
+{
+  "email": "user@example.com"
+}
+```
+
+비밀번호 재설정 코드를 메일로 보낸다. 응답 `202`. 가입하지 않은 이메일도 `202`이고 메일은 보내지 않는다. 가입 여부를 드러내지 않으려는 것이다.
+코드의 유효시간, 다시 받기 간격, 하루 횟수는 가입 인증과 같고, 가입 인증과 따로 센다. 가입 인증 코드와 섞어 쓸 수 없다.
+
+```
+400 VALIDATION_ERROR                 이메일 형식이 아님
+429 VERIFICATION_RESEND_TOO_SOON     60초 안에 다시 요청함 (가입한 이메일만)
+429 VERIFICATION_DAILY_LIMIT         오늘 이 이메일로 5번 보냄 (가입한 이메일만)
+502 EMAIL_SEND_FAILED                메일을 보내지 못함 (가입한 이메일만)
+503 EMAIL_VERIFICATION_UNAVAILABLE   서버에 메일 계정이 설정되지 않음
+```
+
+`429`와 `502`는 가입한 이메일에서만 나오므로, 같은 이메일로 60초 안에 두 번 요청하면 가입 여부를 알 수 있다. 그 정도는 가입 인증(`409 EMAIL_ALREADY_EXISTS`)에서도 이미 알 수 있어 막지 않는다.
+
+### `POST /api/v1/auth/password-reset/confirm`
+
+요청과 응답, 오류는 `email-verification/confirm`과 같다. 받은 토큰은 30분 동안 그 이메일의 비밀번호 재설정에만 쓸 수 있다.
+
+### `POST /api/v1/auth/password-reset/complete`
+
+```
+{
+  "email": "user@example.com",
+  "verificationToken": "...",
+  "newPassword": "..."
+}
+```
+
+비밀번호를 바꾸고 그 사용자의 모든 로그인(리프레시 토큰)을 끊는다. 응답 `204`. 새 비밀번호로 다시 로그인한다.
+`newPassword` 규칙은 가입과 같다(`signup`의 `password`). 규칙에 맞지 않으면 토큰은 그대로라 고쳐서 다시 보내면 된다. 바꾸고 나면 토큰은 더 쓸 수 없다.
+
+```
+400 VALIDATION_ERROR      새 비밀번호가 규칙에 맞지 않음. message 에 이유가 있다
+400 EMAIL_NOT_VERIFIED    토큰이 없거나, 다른 이메일 것이거나, 만료됐거나, 이미 씀 → 코드부터 다시
 ```
 
 ### `POST /api/v1/auth/login`
@@ -747,6 +803,28 @@ G6
 
 `email` 은 카카오 계정이면 `null` 이다.
 `role` 은 `USER` 또는 `ADMIN` 이다. `ADMIN` 이면 관리자 API(3.15)를 쓸 수 있다.
+
+### `PUT /api/v1/users/me/password`
+
+```
+{
+  "currentPassword": "...",
+  "newPassword": "..."
+}
+```
+
+현재 비밀번호를 확인하고 바꾼 뒤, 지금 기기를 포함한 모든 로그인(리프레시 토큰)을 끊는다. 화면은 `POST /auth/logout`으로 쿠키를 지우고 로그인으로 보낸다. 이미 받은 액세스 토큰은 만료(15분)까지 남는다.
+
+`newPassword` 규칙은 가입과 같다(1.1 `password`).
+
+응답:
+
+```
+204
+400 INVALID_CURRENT_PASSWORD   현재 비밀번호가 맞지 않음
+400 VALIDATION_ERROR           새 비밀번호가 규칙에 맞지 않음. message 에 이유가 있다
+409 PASSWORD_NOT_SET           비밀번호가 없는 계정(카카오 가입)
+```
 
 ### `DELETE /api/v1/users/me`
 
@@ -2876,6 +2954,40 @@ Query: `status`(없으면 전체), `page`, `size`(1.4). 정렬은 `createdAt` DE
 ```
 404 RULE_CANDIDATE_NOT_FOUND
 409 CONFLICT                   이미 승인·기각한 후보
+```
+
+---
+
+# 3.16 버그 신고
+
+## `POST /api/v1/bug-reports`
+
+```
+{
+  "message": "결과 화면에서 금액이 0원으로 나와요",
+  "pageUrl": "https://.../results?batch=...",
+  "userAgent": "Mozilla/5.0 ...",
+  "traceId": "..."
+}
+```
+
+| 필드 | 필수 | 제약 |
+| --- | --- | --- |
+| message | Y | 공백만은 안 됨, 최대 2000자 |
+| pageUrl | N | 최대 2000자 |
+| userAgent | N | 최대 500자 |
+| traceId | N | 최대 100자. 화면이 마지막으로 받은 에러 응답의 `traceId`. 로그와 바로 이을 수 있다 |
+
+로그인한 사용자만 보낸다. 팀 메일(`app.bug-report.to`, 비면 보내는 계정)로 보내고 저장하지 않는다. 메일에는 사용자 id와 위 내용만 넣고 이메일 주소는 넣지 않는다. 제목은 `message` 첫 줄 앞 50자다.
+사용자마다 한 시간(정시 기준)에 5건까지 받는다. 메일을 보내지 못한 신고도 센다.
+
+응답 `202`.
+
+```
+400 VALIDATION_ERROR          message 가 비었거나 길이를 넘음
+429 BUG_REPORT_RATE_LIMITED   한 시간에 5건을 넘음 (message 에 남은 분)
+502 BUG_REPORT_SEND_FAILED    메일을 보내지 못함 → 잠시 뒤 다시
+503 BUG_REPORT_UNAVAILABLE    서버에 메일 계정이 없음(로컬) → 화면은 메일 주소를 보인다
 ```
 
 ---

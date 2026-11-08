@@ -25,17 +25,17 @@ class SmtpVerificationMailSender implements VerificationMailSender {
     }
 
     @Override
-    public void send(String email, String code) {
+    public void send(String email, String code, VerificationPurpose purpose) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(from);
         message.setTo(email);
-        message.setSubject("[PreeT] 이메일 인증 코드");
+        message.setSubject(purpose.mailSubject());
         message.setText("""
             인증 코드: %s
 
-            %d분 안에 가입 화면에 입력해 주세요.
+            %d분 안에 %s에 입력해 주세요.
             직접 요청하지 않았다면 이 메일은 무시하셔도 됩니다.
-            """.formatted(code, EmailVerificationStore.CODE_TTL.toMinutes()));
+            """.formatted(code, EmailVerificationStore.CODE_TTL.toMinutes(), purpose.screen()));
         mailSender.send(message);
     }
 }

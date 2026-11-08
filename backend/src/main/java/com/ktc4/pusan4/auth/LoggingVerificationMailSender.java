@@ -18,7 +18,7 @@ class LoggingVerificationMailSender implements VerificationMailSender {
     }
 
     @Override
-    public void send(String email, String code) {
-        log.info("[메일 인증] {} 의 인증 코드: {}", email, code);
+    public void send(String email, String code, VerificationPurpose purpose) {
+        log.info("[메일 인증] {} 의 {} 코드: {}", email, purpose, code);
     }
 }

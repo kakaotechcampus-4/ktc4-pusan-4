@@ -44,6 +44,15 @@ interface AppUserRepository extends Repository<AppUserEntity, UUID> {
     int insertEmailAccount(@Param("id") UUID id, @Param("email") String email,
         @Param("passwordHash") String passwordHash);
 
+    /** @return 바꾼 행 수. 사용자가 없으면 0 */
+    @Modifying
+    @Query("""
+        update AppUserEntity appUser
+        set appUser.passwordHash = :passwordHash
+        where appUser.id = :userId
+        """)
+    int updatePasswordHash(@Param("userId") UUID userId, @Param("passwordHash") String passwordHash);
+
     /** 사용자 단위로 직렬화해야 하는 쓰기(Context 버전 채번 등) 앞에서 잡는다. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""

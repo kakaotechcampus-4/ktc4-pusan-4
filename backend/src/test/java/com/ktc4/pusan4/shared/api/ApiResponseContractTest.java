@@ -7,6 +7,7 @@ import com.ktc4.pusan4.auth.AuthService;
 import com.ktc4.pusan4.auth.EmailVerificationService;
 import com.ktc4.pusan4.auth.TestAuthentication;
 import com.ktc4.pusan4.auth.TestUser;
+import com.ktc4.pusan4.bugreport.BugReportService;
 import com.ktc4.pusan4.judgment.domain.Gate;
 import com.ktc4.pusan4.judgment.domain.JudgmentOrigin;
 import com.ktc4.pusan4.judgment.domain.JudgmentOriginType;
@@ -176,6 +177,9 @@ class ApiResponseContractTest {
 
     @MockitoBean
     private AdminPolicy adminPolicy;
+
+    @MockitoBean
+    private BugReportService bugReportService;
 
     @MockitoBean
     private RuleCandidateReviewService ruleCandidateReviewService;

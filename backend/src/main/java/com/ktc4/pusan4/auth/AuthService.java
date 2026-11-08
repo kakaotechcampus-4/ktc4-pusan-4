@@ -45,14 +45,44 @@ public class AuthService {
      * 같은 토큰으로 동시에 가입해도 UNIQUE(email) 때문에 하나만 남는다.
      */
     public IssuedTokens signup(String email, String password, String verificationToken) {
-        if (!Passwords.fitsBcrypt(password)) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "비밀번호는 72바이트를 넘을 수 없습니다.");
-        }
-        emailVerification.requireVerified(email, verificationToken);
+        Passwords.requireValid(password);
+        emailVerification.requireVerified(VerificationPurpose.SIGNUP, email, verificationToken);
         UUID userId = users.registerEmailAccount(email, passwordEncoder.encode(password))
             .orElseThrow(AuthService::emailAlreadyExists);
-        emailVerification.consume(email);
+        emailVerification.consume(VerificationPurpose.SIGNUP, email);
         return issue(userId);
+    }
+
+    /**
+     * 현재 비밀번호를 확인하고 새 비밀번호로 바꾼 뒤 모든 기기의 로그인을 끊는다(지금 기기도 다시 로그인한다).
+     * 로그인을 먼저 끊는다. 탈퇴와 같은 이유로, Redis 가 실패하면 비밀번호도 바꾸지 않아 옛 로그인이 남지 않는다.
+     */
+    public void changePassword(UUID userId, String currentPassword, String newPassword) {
+        String hash = users.findPasswordHash(userId).orElseThrow(() -> new ApiException(HttpStatus.CONFLICT,
+            "PASSWORD_NOT_SET", "비밀번호로 로그인하는 계정이 아닙니다."));
+        // 72바이트를 넘는 값은 BCrypt 가 비교하지 못하고, 그런 비밀번호로 가입할 수도 없었다
+        if (!Passwords.fitsBcrypt(currentPassword) || !passwordEncoder.matches(currentPassword, hash)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_CURRENT_PASSWORD", "현재 비밀번호가 맞지 않습니다.");
+        }
+        Passwords.requireValid(newPassword);
+        refreshTokens.revokeAll(userId);
+        users.changePasswordHash(userId, passwordEncoder.encode(newPassword));
+    }
+
+    /**
+     * 재설정 인증 토큰으로 비밀번호를 바꾸고 모든 기기의 로그인을 끊는다. 규칙에 맞지 않으면 토큰은 남아 다시 보낼 수 있다.
+     * 토큰은 지운 쪽만 이어 가서, 같은 토큰으로 동시에 와도 한 번만 바뀐다.
+     */
+    public void resetPassword(String email, String verificationToken, String newPassword) {
+        Passwords.requireValid(newPassword);
+        emailVerification.requireVerified(VerificationPurpose.PASSWORD_RESET, email, verificationToken);
+        // 인증한 뒤 탈퇴한 계정이다
+        UUID userId = users.findIdByEmail(email).orElseThrow(EmailVerificationService::notVerified);
+        if (!emailVerification.consume(VerificationPurpose.PASSWORD_RESET, email)) {
+            throw EmailVerificationService.notVerified();
+        }
+        refreshTokens.revokeAll(userId);
+        users.changePasswordHash(userId, passwordEncoder.encode(newPassword));
     }
 
     public IssuedTokens login(String email, String password) {
