@@ -175,9 +175,10 @@ export function Landing() {
               </div>
 
               {/* 하지 않는 일은 여기 두지 않는다. 히어로 3번 장면과 맨 아래 판이 말한다 (11/8 회의, 겹치는 내용 정리) */}
-              <div className="flex-1 rounded-2xl bg-surface p-5">
+              {/* 띠의 남은 높이를 이 판이 채운다. 세 갈래를 위에 몰지 않고 높이에 고루 나눈다 */}
+              <div className="flex flex-1 flex-col rounded-2xl bg-surface p-5">
                 <p className="text-caption text-muted">판정 세 갈래</p>
-                <ul className="mt-4 space-y-3.5">
+                <ul className="mt-4 flex flex-1 flex-col justify-evenly gap-3.5">
                   {VERDICTS.map((item) =>
                   <li key={item.label}>
                       <div className="flex items-center gap-1.5 text-small">
