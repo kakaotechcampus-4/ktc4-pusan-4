@@ -9,6 +9,7 @@ import { Faq } from './pages/Faq';
 import { BugReport } from './pages/BugReport';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
+import { PasswordReset } from './pages/PasswordReset';
 import { KakaoCallback } from './pages/KakaoCallback';
 import { Terms } from './pages/public/Terms';
 import { Privacy } from './pages/public/Privacy';
@@ -111,6 +112,7 @@ export function AppRoutes() {
             <Route path="/faq" element={<Faq />} />
             <Route path="/bug-report" element={<BugReport />} />
             <Route path="/signup" element={<Signup />} />
+            <Route path="/password-reset" element={<PasswordReset />} />
             <Route path={KAKAO_CALLBACK_PATH} element={<KakaoCallback />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />

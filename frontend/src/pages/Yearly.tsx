@@ -206,7 +206,7 @@ export function Yearly() {
               {transaction.installmentMonths > 0 && `, ${transaction.installmentMonths}개월 할부`}
             </span>
             {/* 계정과목 열은 좁은 화면에서 숨기므로 여기로 옮긴다 */}
-            {row.account && <span className="block truncate text-small text-ink2 md:hidden">{row.account}</span>}
+            {row.accountLabel && <span className="block truncate text-small text-ink2 md:hidden">{row.accountLabel}</span>}
           </span>);
 
     }
@@ -216,8 +216,8 @@ export function Yearly() {
     width: 'w-32',
     hideBelow: 'md',
     cell: (row) =>
-    row.account ?
-    <span className="whitespace-nowrap text-ink2">{row.account}</span> :
+    row.accountLabel ?
+    <span className="whitespace-nowrap text-ink2">{row.accountLabel}</span> :
     <span className="text-muted">—</span>
 
   },

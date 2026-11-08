@@ -9,10 +9,11 @@ import { Button, Modal } from '../components/ui';
 import { formatFullDate } from '../utils/format';
 import { accountLabel } from '../utils/account';
 import { contextRows } from '../utils/context';
+import { PasswordChange } from '../components/PasswordChange';
 
 /**
- * 내 정보 (FR-02·03). 계정과 사업자 문진, 내 자료로 가는 길, 탈퇴.
- * 비밀번호 바꾸기와 계정 연결은 BE API 가 생기면 붙인다
+ * 내 정보 (FR-02·03). 계정과 사업자 문진, 내 자료로 가는 길, 비밀번호, 탈퇴.
+ * 계정 연결은 BE API 가 생기면 붙인다
  */
 export function Account() {
   const navigate = useNavigate();
@@ -107,6 +108,13 @@ export function Account() {
             </li>
           </ul>
         </InfoPanel>
+
+        {me &&
+        <section className="mt-10">
+            <h2 className="text-h4 font-bold text-ink">비밀번호</h2>
+            <PasswordChange email={me.email} />
+          </section>
+        }
 
         <section className="mt-10">
           <h2 className="text-h4 font-bold text-ink">탈퇴</h2>

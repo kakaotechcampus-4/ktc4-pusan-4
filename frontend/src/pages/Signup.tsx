@@ -12,6 +12,8 @@ import {
 import { Button, Modal } from '../components/ui';
 import { TERMS_EFFECTIVE, TermsBody } from './public/Terms';
 import { PRIVACY_EFFECTIVE, PrivacyBody } from './public/Privacy';
+import { PASSWORD_RULE, passwordProblem } from '../utils/password';
+import { PasswordCheck } from '../components/PasswordCheck';
 
 /** 다시 받기 간격. 서버도 60초에 한 번만 보낸다 (#193) */
 const RESEND_SECONDS = 60;
@@ -47,7 +49,7 @@ const CONFIRM_ERRORS: Record<string, string> = {
 };
 
 const SIGNUP_ERRORS: Record<string, string> = {
-  VALIDATION_ERROR: '비밀번호는 8자 이상, 72바이트 이하로 입력해 주세요.',
+  VALIDATION_ERROR: `비밀번호는 ${PASSWORD_RULE}로 입력해 주세요.`,
   EMAIL_ALREADY_EXISTS: '이미 가입한 이메일입니다. 로그인해 주세요.'
 };
 
@@ -56,9 +58,6 @@ const secondsLeft = (message: string) => {
   const found = /(\d+)\s*초/.exec(message);
   return found ? Number(found[1]) : RESEND_SECONDS;
 };
-
-/** bcrypt 한도 때문에 서버는 UTF-8 72바이트까지만 받는다 */
-const byteLength = (text: string) => new TextEncoder().encode(text).length;
 
 /**
  * 코드를 보낸 이메일과 인증 토큰. 새로고침이나 뒤로 가기로 화면이 다시 떠도 이어 가게 탭 안에 둔다 (C69).
@@ -156,6 +155,15 @@ export function Signup() {
   const invalid = (field: ErrorField, message: string) => {
     setError(message);
     setErrorField(field);
+  };
+
+  /** 틀렸다고 한 비밀번호 칸을 고치기 시작하면 그 오류는 걷는다. 그래야 규칙 확인(PasswordCheck)이 다시 보인다 */
+  const editPassword = (field: 'password' | 'passwordAgain', set: (value: string) => void) => (event: React.ChangeEvent<HTMLInputElement>) => {
+    set(event.target.value);
+    if (errorField === field) {
+      setError(null);
+      setErrorField(null);
+    }
   };
 
   /** 새 코드를 보냈다(보냈을 수 있다). 코드 칸과 틀린 횟수를 새로 시작한다 */
@@ -257,12 +265,9 @@ export function Signup() {
   const submitSignup = (event: React.FormEvent) => {
     event.preventDefault();
     if (!sentTo || !verificationToken) return;
-    if (password.length < 8) {
-      invalid('password', '비밀번호는 8자 이상으로 입력해 주세요.');
-      return;
-    }
-    if (byteLength(password) > 72) {
-      invalid('password', '비밀번호가 너무 깁니다. 한글은 24자, 영문은 72자까지 쓸 수 있습니다.');
+    const problem = passwordProblem(password);
+    if (problem) {
+      invalid('password', problem);
       return;
     }
     if (password !== passwordAgain) {
@@ -292,9 +297,12 @@ export function Signup() {
           setError('이메일 인증이 만료됐습니다. 인증 코드를 다시 받아 주세요.');
           return;
         }
-        const message = describe(caught, SIGNUP_ERRORS, '가입하지 못했습니다. 잠시 후 다시 시도해 주세요.');
-        if (caught instanceof ApiRequestError && caught.code === 'VALIDATION_ERROR') invalid('password', message);
-        else setError(message);
+        // 비밀번호 규칙을 어기면 서버가 이유를 message 에 담는다. 그 문장을 그대로 보인다
+        if (caught instanceof ApiRequestError && caught.code === 'VALIDATION_ERROR') {
+          invalid('password', caught.message);
+          return;
+        }
+        setError(describe(caught, SIGNUP_ERRORS, '가입하지 못했습니다. 잠시 후 다시 시도해 주세요.'));
       }
     });
   };
@@ -436,19 +444,20 @@ export function Signup() {
             <div>
               {/* 조건은 placeholder 가 아니라 라벨에 둔다. placeholder 는 적기 시작하면 사라진다 (C70) */}
               <label htmlFor="signup-password" className={AUTH_LABEL}>
-                비밀번호 (8자 이상)
+                비밀번호 ({PASSWORD_RULE})
               </label>
               <input
               id="signup-password"
               type="password"
               autoComplete="new-password"
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              onChange={editPassword('password', setPassword)}
               aria-invalid={errorField === 'password'}
-              aria-describedby={describedBy('password')}
+              aria-describedby={describedBy('password') ?? (password ? 'signup-password-check' : undefined)}
               className={AUTH_INPUT} />
 
               {errorAt('password')}
+              <PasswordCheck id="signup-password-check" password={password} hidden={errorField === 'password'} />
             </div>
             <div>
               <label htmlFor="signup-password-again" className={AUTH_LABEL}>
@@ -459,7 +468,7 @@ export function Signup() {
               type="password"
               autoComplete="new-password"
               value={passwordAgain}
-              onChange={(event) => setPasswordAgain(event.target.value)}
+              onChange={editPassword('passwordAgain', setPasswordAgain)}
               aria-invalid={errorField === 'passwordAgain'}
               aria-describedby={describedBy('passwordAgain')}
               className={AUTH_INPUT} />

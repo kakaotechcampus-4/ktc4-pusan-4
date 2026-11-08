@@ -119,7 +119,7 @@ describe('attributeRows', () => {
     { label: '증빙', value: '카드매출전표' },
     { label: '증빙불비 가산세', value: '대상 아님' },
     { label: '즉시상각', value: '올해 경비로 처리' },
-    { label: '연간 한도', value: '접대비' }]
+    { label: '연간 한도', value: '대상' }]
     );
   });
 

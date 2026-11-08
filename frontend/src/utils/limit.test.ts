@@ -4,7 +4,9 @@ import { exceededLimitOf, excessNote, limitLine, limitsOf } from './limit';
 
 const limit = (taxYear: number, totalAmount: number, excessAmount: number, bucket = '접대비'): LimitYear => ({
   bucket,
+  bucketLabel: bucket === '접대비' ? '기업업무추진비' : bucket,
   taxYear,
+  limitAmount: 12_250_000,
   totalAmount,
   excessAmount
 });
@@ -48,17 +50,19 @@ describe('exceededLimitOf', () => {
 });
 
 describe('limitLine · excessNote', () => {
-  it('넘은 해는 총액과 초과액, 아니면 한도 안으로 적는다', () => {
-    expect(limitLine(limit(2026, 14_000_000, 1_750_000))).toBe('2026년 접대비 총 14,000,000원 중 한도 초과 1,750,000원');
-    expect(limitLine(limit(2025, 300_000, 0))).toBe('2025년 접대비 총 300,000원, 한도 안');
+  it('한도 안이면 한도 중 쓴 금액, 넘었으면 총액과 초과액을 화면 이름으로 적는다', () => {
+    expect(limitLine(limit(2025, 300_000, 0))).toBe('2025년 기업업무추진비 한도 12,250,000원 중 300,000원');
+    expect(limitLine(limit(2026, 14_000_000, 1_750_000))).toBe(
+      '2026년 기업업무추진비 14,000,000원, 한도 12,250,000원에서 1,750,000원 초과'
+    );
   });
 
   it('넘은 해만 연도별로 적고, 위 금액에서 빼지 않았다고 밝힌다', () => {
     expect(excessNote([limit(2026, 13_300_000, 1_051_000), limit(2025, 300_000, 0), limit(2026, 1, 1, '기부금')])).toBe(
-      '2026년 접대비가 연간 한도를 1,051,000원 넘었습니다. 넘은 금액은 경비에 들어가지 않지만 위 금액에서는 빼지 않았습니다.'
+      '2026년 기업업무추진비가 연간 한도를 1,051,000원 넘었습니다. 넘은 금액은 경비에 들어가지 않지만 위 금액에서는 빼지 않았습니다.'
     );
     expect(excessNote([limit(2026, 13_300_000, 1_051_000), limit(2025, 12_000_000, 200_000)])).toBe(
-      '2025년 접대비가 연간 한도를 200,000원 넘었습니다. 2026년 접대비가 연간 한도를 1,051,000원 넘었습니다. 넘은 금액은 경비에 들어가지 않지만 위 금액에서는 빼지 않았습니다.'
+      '2025년 기업업무추진비가 연간 한도를 200,000원 넘었습니다. 2026년 기업업무추진비가 연간 한도를 1,051,000원 넘었습니다. 넘은 금액은 경비에 들어가지 않지만 위 금액에서는 빼지 않았습니다.'
     );
   });
 

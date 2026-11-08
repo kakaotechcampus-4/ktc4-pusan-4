@@ -13,7 +13,7 @@
 |---|---|---|
 | `approved_at` | `approved_at` | 승인일. 청구일 아님. IBK 승인일시에서 날짜만, KB 이용일 |
 | `raw_merchant` | `merchant_raw` | **이름만 다름.** 파일 원문 그대로. 20바이트 절단된 상태도 그대로 |
-| `amount` | `amount` | 원화 승인금액(부가세 포함). 외화 전용 행은 현재 제외 |
+| `amount` | `amount` | 원화 승인금액(부가세 포함). 외화 전용 행은 현재 제외. 취소 행은 음수다(IBK 는 파일에 양수로 오지만 파서가 음수로 맞춘다). `natural_key` 는 맞추기 전 파일 값으로 만든다 |
 | `installment_months` | `installment_months` | 일시불이면 0. **실데이터 미검증** — 표본이 전부 일시불이다 |
 | `natural_key` | `natural_key` | **재료가 다르다.** 4장 참조 |
 | `status` | `status` | `판정대상` / `취소상계` / `대상제외`. 파서가 붙인다 |

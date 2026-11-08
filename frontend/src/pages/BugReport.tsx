@@ -1,12 +1,13 @@
 import { MarketingHeader } from '../components/MarketingHeader';
 import { MarketingFooter } from '../components/MarketingFooter';
 import { MAIN_ID, SectionHeading } from '../components/ui';
-import { BugReportAddress, BugReportMailButton } from '../components/BugReport';
+import { BugReportPanel } from '../components/BugReport';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { WHAT_TO_WRITE } from '../utils/bugReport';
 
 /**
- * 버그 신고. 레포가 공개라 GitHub 이슈 대신 메일로 받는다(받는 주소는 utils/contact.ts).
+ * 버그 신고. 로그인했으면 여기서 바로 보내고(POST /bug-reports), 아니면 메일로 받는다(받는 주소는 utils/contact.ts).
+ * 레포가 공개라 GitHub 이슈는 쓰지 않는다.
  * 머리말의 「버그 신고」는 같은 내용을 창으로 띄우고, 이 화면은 꼬리말 링크와 주소로 바로 들어올 때 쓴다.
  * 메뉴만 넣고 라우트가 없으면 `*` 가 없는 주소 화면으로 보내서 눌러도 아무 일이 없는 것처럼 보인다(#211)
  */
@@ -20,13 +21,7 @@ export function BugReport() {
         <SectionHeading as="h1" eyebrow="버그 신고" title="잘못 나온 것을 알려 주세요" />
 
         <div className="mt-12 max-w-2xl rounded-2xl border border-line px-8 py-10">
-          <p className="text-h4 font-bold text-ink">메일로 받습니다</p>
-          <div className="mt-6">
-            <BugReportMailButton />
-          </div>
-          <div className="mt-6">
-            <BugReportAddress />
-          </div>
+          <BugReportPanel />
         </div>
 
         <section className="mt-16 max-w-2xl">

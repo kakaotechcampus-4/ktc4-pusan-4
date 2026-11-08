@@ -2965,7 +2965,7 @@ Query: `status`(없으면 전체), `page`, `size`(1.4). 정렬은 `createdAt` DE
 ```
 {
   "message": "결과 화면에서 금액이 0원으로 나와요",
-  "pageUrl": "https://.../results?batch=...",
+  "pageUrl": "/results?batchId=...",
   "userAgent": "Mozilla/5.0 ...",
   "traceId": "..."
 }
@@ -2974,9 +2974,9 @@ Query: `status`(없으면 전체), `page`, `size`(1.4). 정렬은 `createdAt` DE
 | 필드 | 필수 | 제약 |
 | --- | --- | --- |
 | message | Y | 공백만은 안 됨, 최대 2000자 |
-| pageUrl | N | 최대 2000자 |
+| pageUrl | N | 최대 2000자. 프론트는 도메인 없이 경로와 쿼리를 보낸다 |
 | userAgent | N | 최대 500자 |
-| traceId | N | 최대 100자. 화면이 마지막으로 받은 에러 응답의 `traceId`. 로그와 바로 이을 수 있다 |
+| traceId | N | 최대 100자. 화면이 마지막으로 받은 에러 응답의 `traceId`. 로그와 바로 이을 수 있다. 프론트는 `/auth/*`와 신고 자체의 실패는 적지 않고, 로그인, 로그아웃, 신고를 보낸 뒤에는 지운다 |
 
 로그인한 사용자만 보낸다. 팀 메일(`app.bug-report.to`, 비면 보내는 계정)로 보내고 저장하지 않는다. 메일에는 사용자 id와 위 내용만 넣고 이메일 주소는 넣지 않는다. 제목은 `message` 첫 줄 앞 50자다.
 사용자마다 한 시간(정시 기준)에 5건까지 받는다. 메일을 보내지 못한 신고도 센다.
@@ -2987,7 +2987,7 @@ Query: `status`(없으면 전체), `page`, `size`(1.4). 정렬은 `createdAt` DE
 400 VALIDATION_ERROR          message 가 비었거나 길이를 넘음
 429 BUG_REPORT_RATE_LIMITED   한 시간에 5건을 넘음 (message 에 남은 분)
 502 BUG_REPORT_SEND_FAILED    메일을 보내지 못함 → 잠시 뒤 다시
-503 BUG_REPORT_UNAVAILABLE    서버에 메일 계정이 없음(로컬) → 화면은 메일 주소를 보인다
+503 BUG_REPORT_UNAVAILABLE    서버에 메일 계정이 없음(로컬) → 화면은 메일 주소를 보이고, 적은 글과 traceId 를 메일 본문에 옮긴다
 ```
 
 ---

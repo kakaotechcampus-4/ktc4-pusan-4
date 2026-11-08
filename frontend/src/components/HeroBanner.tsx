@@ -388,11 +388,12 @@ export function HeroBanner({ autoplay = true }: {autoplay?: boolean;}) {
           <OrbitStage paused={stopped} />
           {/* 글은 궤도 위에 올린다 */}
           <div className="relative z-10 px-8 pt-12 sm:px-16 sm:pt-16">
-            <p className="text-body text-white">
+            {/* data-hero-eyebrow, data-hero-title: 인트로가 걷힐 때 같은 글이 이 자리로 옮겨 온다(IntroOverlay) */}
+            <p data-hero-eyebrow className="text-body text-white">
               1인 IT 개발 사업자를 위한 경비 판정
             </p>
             {/* 페이지의 h1. 프리렌더가 공개 페이지마다 h1 이 하나인지 본다(scripts/prerender.mjs) */}
-            <h1 className="mt-5 block text-h2 font-normal leading-tight tracking-ir text-white [word-break:keep-all] lg:text-h2-lg xl:text-ir-display">
+            <h1 data-hero-title className="mt-5 block text-h2 font-normal leading-tight tracking-ir text-white [word-break:keep-all] lg:text-h2-lg xl:text-ir-display">
               이 카드값이 경비인지,
               <br />
               조문까지 붙여 답합니다
