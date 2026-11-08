@@ -332,7 +332,10 @@ export interface Judgment {
   /** 룰엔진 판정 범위 밖(핸드오프). NEEDS_REVIEW 일 때만 true 일 수 있다 */
   outOfScope: boolean;
   blockedAtGate: GateId | null;
+  /** 계정과목 ID. 비교와 집계는 이 값으로 한다(rules/accounts.yaml) */
   account: string | null;
+  /** 계정과목 화면 이름. 사람에게 보일 때는 이 값이다. 따로 없으면 account 와 같다(접대비 → 기업업무추진비) */
+  accountLabel: string | null;
   /** 안분·상각·한도 적용 후 인정 금액 */
   finalAmount: number | null;
   /** 룰로 확정하지 못해 fallback 인지 */
@@ -377,9 +380,13 @@ export type SummaryScopeType = 'BATCH' | 'YEAR' | 'RUN';
  * 직전연도 수입금액으로 계산한 잠정치다
  */
 export interface LimitYear {
-  /** 판정 attributes.limit_bucket 과 같은 값(접대비) */
+  /** 판정 attributes.limit_bucket 과 같은 값(접대비). 비교는 이 값으로 한다 */
   bucket: string;
+  /** 한도 묶음 화면 이름(기업업무추진비) */
+  bucketLabel: string;
   taxYear: number;
+  /** 그해 한도. 최신 문진의 직전연도 수입금액으로 계산한 잠정치 */
+  limitAmount: number;
   /** 그해 이 묶음 판정 금액의 합(한도 전) */
   totalAmount: number;
   /** 한도를 넘어 필요경비에 넣지 않는 금액. 넘지 않았으면 0 */
@@ -390,7 +397,7 @@ export interface JudgmentSummary {
   scope: { type: SummaryScopeType; id: string };
   totalCount: number;
   byVerdict: Record<Verdict, VerdictSummary>;
-  byAccount: { account: string; count: number; finalAmount: number }[];
+  byAccount: { account: string; accountLabel: string; count: number; finalAmount: number }[];
   /** 범위에 접대비 판정이 있는 과세연도마다 하나. runId 범위는 빈 배열 */
   limits: LimitYear[];
 }

@@ -29,6 +29,7 @@ describe('judgmentsCsv', () => {
       },
       verdict: { code: 'AVAILABLE', label: '가능' },
       account: '소모품비',
+      accountLabel: '소모품비',
       finalAmount: 1000,
       origin: { type: 'RUN', id: 'r' },
       outOfScope: false,
@@ -143,15 +144,15 @@ describe('judgmentsCsv', () => {
     const lines = judgmentsCsv(
       [{ judgment, allowedAmount: null, answers: [] }],
       [
-      { bucket: '접대비', taxYear: 2026, totalAmount: 14011000, excessAmount: 1750000 },
+      { bucket: '접대비', bucketLabel: '기업업무추진비', taxYear: 2026, limitAmount: 12261000, totalAmount: 14011000, excessAmount: 1750000 },
       // 한도 안인 해는 적지 않는다
-      { bucket: '접대비', taxYear: 2025, totalAmount: 100000, excessAmount: 0 }]
+      { bucket: '접대비', bucketLabel: '기업업무추진비', taxYear: 2025, limitAmount: 12261000, totalAmount: 100000, excessAmount: 0 }]
 
     ).split('\r\n');
     expect(lines[1]).toBe('2026-04-06,카페,,3500000,0,가능,,,,,,');
     expect(lines.slice(2)).toEqual([
     '',
-    '"2026년 접대비 총 14,011,000원 중 1,750,000원은 한도를 넘어 필요경비에 넣지 않습니다(직전연도 수입금액 기준 잠정). 거래별로 나눌 수 없어 이 해 가능 접대비 행의 경비 가능 금액은 비웠습니다(승인취소와 환불 행은 빼고)."']
+    '"2026년 기업업무추진비 14,011,000원은 한도 12,261,000원을 넘어 1,750,000원을 필요경비에 넣지 않습니다(직전연도 수입금액 기준 잠정). 거래별로 나눌 수 없어 이 해 가능 기업업무추진비 행의 경비 가능 금액은 비웠습니다(승인취소와 환불 행은 빼고)."']
     );
   });
 });

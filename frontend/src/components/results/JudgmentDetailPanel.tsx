@@ -179,7 +179,7 @@ export function JudgmentDetailPanel({
   const hasReason = Boolean(reviewState || overridden || because);
   const note = verdictNote(judgment, reviewState === 'PRESUMED');
   const details = [
-  ...(judgment.account ? [{ label: '계정과목', value: judgment.account }] : []),
+  ...(judgment.accountLabel ? [{ label: '계정과목', value: judgment.accountLabel }] : []),
   ...attributeRows(judgment.attributes)];
 
   const booking = bookingNote(judgment.attributes);
@@ -308,7 +308,7 @@ export function JudgmentDetailPanel({
           <dd className="mt-1">
               <span className="block text-h4 font-bold text-ink">연간 한도 대상</span>
               <span className="mt-1 block text-caption text-ink2">
-                {exceededLimit.taxYear}년 접대비가 한도를 {formatWon(exceededLimit.excessAmount)} 넘어 거래마다 금액을
+                {exceededLimit.taxYear}년 {exceededLimit.bucketLabel}가 한도 {formatWon(exceededLimit.limitAmount)}을 {formatWon(exceededLimit.excessAmount)} 넘어 거래마다 금액을
                 정하지 않습니다.
               </span>
             </dd> :

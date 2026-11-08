@@ -299,10 +299,17 @@ const summaryOf = (t: Transaction): TransactionSummary => ({
   installmentMonths: t.installmentMonths
 });
 
-/** 판정에 거래 요약을 붙인다. 판정 당시가 아니라 응답 시점의 거래 값이다 (3.4 거래 요약) */
+/** 계정과목 화면 이름. 서버는 rules/accounts.yaml 의 label 을 붙이고, 없으면 ID 그대로다 (3.7 accountLabel) */
+const ACCOUNT_LABELS: Record<string, string> = { 접대비: '기업업무추진비' };
+const labelOf = (account: string) => ACCOUNT_LABELS[account] ?? account;
+
+/** 목업 한도. 서버는 최신 문진의 직전연도 수입금액으로 계산한다(api.md 3.7 limitAmount 예시 값) */
+const MOCK_LIMIT_AMOUNT = 12_090_000;
+
+/** 판정에 거래 요약과 계정과목 화면 이름을 붙인다. 판정 당시가 아니라 응답 시점의 거래 값이다 (3.4 거래 요약) */
 const withTransaction = (j: JudgmentSeed): Judgment | null => {
   const t = transactionOf(j.transactionId);
-  return t ? { ...j, transaction: summaryOf(t) } : null;
+  return t ? { ...j, accountLabel: j.account && labelOf(j.account), transaction: summaryOf(t) } : null;
 };
 
 /** §5 판정 대상: 판정대상이면서 분류가 끝난 거래 */
@@ -323,7 +330,9 @@ const limitsFor = (rows: JudgmentSeed[]): LimitYear[] => {
   const years = [...new Set(rows.filter(limited).map(yearOf))].filter((y): y is string => y !== undefined).sort();
   return years.map((year) => ({
     bucket: '접대비',
+    bucketLabel: labelOf('접대비'),
     taxYear: Number(year),
+    limitAmount: MOCK_LIMIT_AMOUNT,
     totalAmount: currentAll().
     filter((j) => limited(j) && yearOf(j) === year).
     reduce((sum, j) => sum + (j.finalAmount ?? 0), 0),
@@ -1116,7 +1125,7 @@ export const mockApi: Api = {
         totalCount: rows.length,
         byVerdict: by,
         byAccount: [...accounts].
-        map(([account, v]) => ({ account, ...v })).
+        map(([account, v]) => ({ account, accountLabel: labelOf(account), ...v })).
         sort((a, b) => b.finalAmount - a.finalAmount || a.account.localeCompare(b.account)),
         // 과거 Run 범위는 그 시점 한도가 남아 있지 않아 빈 배열이다 (api.md 3.7)
         limits: scope.runId ? [] : limitsFor(rows)
@@ -1218,7 +1227,7 @@ export const mockApi: Api = {
         judgmentId: next.id,
         active: true
       });
-      return delay({ ...next, transaction: summaryOf(t) });
+      return delay({ ...next, accountLabel: next.account && labelOf(next.account), transaction: summaryOf(t) });
     },
     removeOverride: (overrideId) => {
       const found = store.overrides.get(overrideId);

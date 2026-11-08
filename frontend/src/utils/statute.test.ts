@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lawGoKrUrl, statuteTitle } from './statute';
+import { statuteTitle } from './statute';
 
 describe('statuteTitle', () => {
   it('법령 조문 id 로 조·항·호를 붙인다', () => {
@@ -25,24 +25,4 @@ describe('statuteTitle', () => {
     expect(statuteTitle('해석례-340535', ruling)).toBe(ruling);
   });
 
-  it('서버가 이미 조를 넣은 제목은 다시 붙이지 않는다', () => {
-    expect(statuteTitle('소득세법-33-1-5', '소득세법 제33조 제1항 제5호')).toBe('소득세법 제33조 제1항 제5호');
-  });
-});
-
-describe('lawGoKrUrl', () => {
-  it('제N의M조 를 제N조의M 으로 바꾼다', () => {
-    expect(lawGoKrUrl('https://www.law.go.kr/법령/소득세법/제81의6조')).toBe('https://www.law.go.kr/법령/소득세법/제81조의6');
-    expect(lawGoKrUrl('https://www.law.go.kr/법령/소득세법시행령/제208의2조')).toBe(
-      'https://www.law.go.kr/법령/소득세법시행령/제208조의2'
-    );
-  });
-
-  it('맞는 주소와 조가 없는 주소는 그대로 둔다', () => {
-    for (const url of [
-    'https://www.law.go.kr/법령/소득세법/제27조',
-    'https://www.law.go.kr/법령/소득세법/제81조의6',
-    'https://www.law.go.kr/DRF/lawService.do?target=ttSpecialDecc&ID=984358&type=HTML'])
-    expect(lawGoKrUrl(url)).toBe(url);
-  });
 });

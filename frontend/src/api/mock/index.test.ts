@@ -66,6 +66,10 @@ describe('판정 (3.7)', () => {
     expect(summary.limits).toHaveLength(1);
     expect(summary.limits[0].totalAmount).toBe(entertainment?.finalAmount);
     expect(summary.limits[0].excessAmount).toBe(0);
+    // 비교는 ID(접대비)로, 화면은 이름(기업업무추진비)으로 한다 (api.md 3.7)
+    expect(entertainment?.accountLabel).toBe('기업업무추진비');
+    expect(summary.limits[0].bucketLabel).toBe('기업업무추진비');
+    expect(summary.limits[0].limitAmount).toBeGreaterThan(0);
   });
 });
 

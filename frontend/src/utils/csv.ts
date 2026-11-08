@@ -69,7 +69,7 @@ export function judgmentsCsv(rows: JudgmentExportRow[], limits: LimitYear[]): st
   judgment.transaction.amount,
   judgment.transaction.installmentMonths,
   judgment.verdict.label,
-  judgment.account,
+  judgment.accountLabel,
   // 「확인 필요」는 아직 금액을 정하지 않았다. 0 이면 세무사가 「인정 안 됨」으로 읽으니 비워 둔다(#214 리뷰).
   // 한도를 넘은 해의 접대비는 서버가 null 을 준다(#226)
   judgment.verdict.code === 'NEEDS_REVIEW' ? null : allowedAmount,
@@ -84,8 +84,8 @@ export function judgmentsCsv(rows: JudgmentExportRow[], limits: LimitYear[]): st
   const notes = exceeded.length > 0 ?
   [
   [],
-  ...exceeded.map(({ taxYear, totalAmount, excessAmount }) => [
-  `${taxYear}년 접대비 총 ${formatWon(totalAmount)} 중 ${formatWon(excessAmount)}은 한도를 넘어 필요경비에 넣지 않습니다(직전연도 수입금액 기준 잠정). 거래별로 나눌 수 없어 이 해 가능 접대비 행의 경비 가능 금액은 비웠습니다(승인취소와 환불 행은 빼고).`]
+  ...exceeded.map(({ taxYear, bucketLabel, limitAmount, totalAmount, excessAmount }) => [
+  `${taxYear}년 ${bucketLabel} ${formatWon(totalAmount)}은 한도 ${formatWon(limitAmount)}을 넘어 ${formatWon(excessAmount)}을 필요경비에 넣지 않습니다(직전연도 수입금액 기준 잠정). 거래별로 나눌 수 없어 이 해 가능 ${bucketLabel} 행의 경비 가능 금액은 비웠습니다(승인취소와 환불 행은 빼고).`]
   )] :
 
   [];

@@ -19,6 +19,7 @@ export function AccountBreakdown({ summary, loading }: {summary: JudgmentSummary
     if (rest > 0)
     accountRows.push({
       account: '계정과목 미지정',
+      accountLabel: '계정과목 미지정',
       count: Math.max(0, summary.byVerdict.AVAILABLE.count - listed.count),
       finalAmount: rest
     });
@@ -41,7 +42,7 @@ export function AccountBreakdown({ summary, loading }: {summary: JudgmentSummary
           return (
             <li key={row.account}>
                   <div className="flex items-baseline gap-3">
-                    <span className="min-w-0 flex-1 truncate text-body text-ink">{row.account}</span>
+                    <span className="min-w-0 flex-1 truncate text-body text-ink">{row.accountLabel}</span>
                     <span className="whitespace-nowrap text-small tabular-nums text-ink2">
                       {formatNumber(row.count)}건
                     </span>
