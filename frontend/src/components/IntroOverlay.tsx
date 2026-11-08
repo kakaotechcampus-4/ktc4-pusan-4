@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { OrbitStage } from './OrbitStage';
 
 /**
@@ -36,12 +36,28 @@ const rectOf = (el: Element): Box => {
 const TEXTS = ['eyebrow', 'title'] as const;
 type Text = (typeof TEXTS)[number];
 
-/** 글이 갈 자리. 판 왼쪽 위에서 얼마나 떨어졌는지와 글자 크기 */
-type Spot = {top: number;left: number;size: number;};
+/** 글이 갈 자리. 판 왼쪽 위에서 얼마나 떨어졌는지, 글줄 폭, 글자 크기 */
+type Spot = {top: number;left: number;width: number;size: number;};
+
+const fontSizeOf = (el: Element) => parseFloat(getComputedStyle(el).fontSize);
 
 const spotOf = (el: Element, panel: Box): Spot => {
   const box = rectOf(el);
-  return { top: box.top - panel.top, left: box.left - panel.left, size: parseFloat(getComputedStyle(el).fontSize) };
+  return { top: box.top - panel.top, left: box.left - panel.left, width: box.width, size: fontSizeOf(el) };
+};
+
+/**
+ * 전면 화면 안에서 글이 transform 없이 있는 자리. offsetTop, offsetLeft 는 transform 을 보지 않아
+ * 줄어드는 중에 다시 재도 처음 자리가 나온다. 전면 화면은 fixed 라 거기서 offsetParent 가 끝난다
+ */
+const restOf = (el: HTMLElement) => {
+  let top = 0;
+  let left = 0;
+  for (let node: HTMLElement | null = el; node; node = node.offsetParent as HTMLElement | null) {
+    top += node.offsetTop;
+    left += node.offsetLeft;
+  }
+  return { top, left, size: fontSizeOf(el) };
 };
 
 /** 줄어들 자리. 메인 배너(HeroBanner)의 판과 그 안의 글이다. 못 찾으면 그냥 흐려진다 */
@@ -72,6 +88,24 @@ export function IntroOverlay({ onDone }: {onDone: () => void;}) {
   const [moves, setMoves] = useState<Moves | null>(null);
   const texts = useRef<Partial<Record<Text, HTMLElement | null>>>({});
 
+  /**
+   * 글줄 폭을 배너 글과 같게 해서 같은 자리에서 줄을 바꾸게 한다. 좁은 화면에서 전면 글은 두 줄, 배너 글은 네 줄이라
+   * 줄어들 때 폭을 맞추면 그 순간 줄이 바뀌며 튄다. 처음 그릴 때부터 맞춰 두고, 창 크기가 바뀌면 다시 맞춘다
+   */
+  const fit = (target: ReturnType<typeof heroTarget>) => {
+    if (target === null) return;
+    for (const key of TEXTS) {
+      const el = texts.current[key];
+      if (el) el.style.width = `${target.spots[key].width / (target.spots[key].size / fontSizeOf(el))}px`;
+    }
+  };
+  useLayoutEffect(() => {
+    const refit = () => fit(heroTarget());
+    refit();
+    window.addEventListener('resize', refit);
+    return () => window.removeEventListener('resize', refit);
+  }, []);
+
   useEffect(() => {
     // 건너뛰기로 이미 걷는 중이면 되돌리지 않는다. 앞으로만 간다
     const timer = window.setTimeout(() => setPhase(leave), HOLD_MS);
@@ -82,16 +116,13 @@ export function IntroOverlay({ onDone }: {onDone: () => void;}) {
     if (phase === 'show') return;
     if (phase === 'shrink') {
       const size = { width: window.innerWidth, height: window.innerHeight };
-      // 줄이기 전, 판이 화면 전체일 때 글이 있는 자리
-      const from: Partial<Record<Text, Spot>> = {};
-      for (const key of TEXTS) {
-        const el = texts.current[key];
-        if (el) from[key] = spotOf(el, { top: 0, left: 0, width: 0, height: 0 });
-      }
       const aim = () => {
         const target = heroTarget();
         if (target === null) return false;
         const { box } = target;
+        // 폭을 먼저 맞추고 나서 자리를 잰다(윗글 줄 수가 바뀌면 아랫글 자리도 바뀐다).
+        // 창 크기가 바뀌면 글자 크기와 여백도 바뀌므로 겨눌 때마다 새로 잰다
+        fit(target);
         const sx = box.width / size.width;
         const sy = box.height / size.height;
         const next: Moves = {
@@ -105,9 +136,11 @@ export function IntroOverlay({ onDone }: {onDone: () => void;}) {
           texts: {}
         };
         for (const key of TEXTS) {
-          const a = from[key];
+          const el = texts.current[key];
+          if (!el) continue;
+          const a = restOf(el);
           const b = target.spots[key];
-          if (a) next.texts[key] = `translate(${box.left + b.left - a.left}px, ${box.top + b.top - a.top}px) scale(${b.size / a.size})`;
+          next.texts[key] = `translate(${box.left + b.left - a.left}px, ${box.top + b.top - a.top}px) scale(${b.size / a.size})`;
         }
         setMoves(next);
         return true;
@@ -196,7 +229,7 @@ export function IntroOverlay({ onDone }: {onDone: () => void;}) {
             texts.current.title = el;
           }}
           style={{ transform: moves?.texts.title }}
-          className={`mt-5 block text-h2 font-normal leading-tight tracking-ir text-white [word-break:keep-all] lg:text-ir-display ${textMotion}`}>
+          className={`mt-5 block text-h2 font-normal leading-tight tracking-ir text-white [word-break:keep-all] lg:text-h2-lg xl:text-ir-display ${textMotion}`}>
           이 카드값이 경비인지,
           <br />
           조문까지 붙여 답합니다
