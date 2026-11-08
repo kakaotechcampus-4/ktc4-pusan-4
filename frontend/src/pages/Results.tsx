@@ -398,7 +398,7 @@ export function Results() {
           onClick={() => void exportCsv()}>
 
               <DownloadIcon className="h-4 w-4" aria-hidden="true" />
-              {exporting ? 'CSV 만드는 중…' : 'CSV 내려받기'}
+              {exporting ? 'CSV 만드는 중' : 'CSV 내려받기'}
             </Button>
         }
           <Button to="/summary" variant="secondary" size="sm" className="whitespace-nowrap">

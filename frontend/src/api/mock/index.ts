@@ -658,13 +658,13 @@ const mockChat = async ({ message, context }: AssistantChatRequest): Promise<Ass
       return reply('남은 질문이 많거나 소명 대기가 섞여 있어 한 번에 답할 수 없습니다. 하나씩 답해 주세요.');
       const count = sameType.reduce((sum, g) => sum + g.count, 0);
       const amount = sameType.reduce((sum, g) => sum + g.totalAmount, 0);
-      return reply(`남은 「${target.factType}」 질문 ${count}건에 같은 답을 넣는 카드를 만들었습니다.`, [
+      return reply(`남은 ${target.factType} 질문 ${count}건에 같은 답을 넣는 카드를 만들었습니다.`, [
       {
         kind: 'bulk_answer',
         batchId,
         factType: target.factType,
         value,
-        card: `남은 '${target.factType}' 질문 ${count}건 ${amount.toLocaleString('ko-KR')}원 → '${value}'`
+        card: `남은 '${target.factType}' 질문 ${count}건 ${amount.toLocaleString('ko-KR')}원 답변: '${value}'`
       }]
       );
     }
@@ -679,7 +679,7 @@ const mockChat = async ({ message, context }: AssistantChatRequest): Promise<Ass
       questionIds: group.questionIds,
       value,
       source: 'ASSISTANT',
-      card: `${cardTarget(group.transactions[0])} → '${value}'`
+      card: `${cardTarget(group.transactions[0])} 답변: '${value}'`
     }]
     );
   }
@@ -694,7 +694,7 @@ const mockChat = async ({ message, context }: AssistantChatRequest): Promise<Ass
       kind: 'classification',
       reviewIds: group.reviewIds,
       merchantCategory: category,
-      card: `${cardTarget(group.transactions[0])} → ${category}`
+      card: `${cardTarget(group.transactions[0])} 분류: ${category}`
     }]
     );
   }
@@ -716,14 +716,14 @@ const mockChat = async ({ message, context }: AssistantChatRequest): Promise<Ass
       judgmentId: current.id,
       toVerdict,
       reason: message.trim(),
-      card: `${cardTarget(summaryOf(t))} 판정 ${current.verdict.label} → ${LABEL[toVerdict]}`
+      card: `${cardTarget(summaryOf(t))} 판정을 ${current.verdict.label}에서 ${LABEL[toVerdict]}${toVerdict === 'AVAILABLE' ? '으로' : '로'} 변경`
     }]
     );
   }
 
   const next = batchId ? (await mockApi.progress.get(batchId)).next : null;
   return next ?
-  reply(`다음 할 일은 「${next.label}」입니다.`, [
+  reply(`다음 할 일은 ${next.label}입니다.`, [
   { kind: 'navigation', route: next.route, card: `다음 할 일: ${next.label}` }]
   ) :
   reply('카드내역을 올리면 분류 확인부터 차례로 안내합니다.', [
@@ -963,7 +963,7 @@ export const mockApi: Api = {
       // 2.3 취소상계는 사용자가 포함으로 바꿀 수 없다
       if (t.sourceStatus.code === 'CANCELED_OFFSET')
       return Promise.reject(
-        new ApiRequestError(409, 'CANCELED_TRANSACTION_NOT_INCLUDABLE', '취소·상계 거래는 판정 대상으로 포함할 수 없습니다.')
+        new ApiRequestError(409, 'CANCELED_TRANSACTION_NOT_INCLUDABLE', '취소나 상계 거래는 판정 대상으로 포함할 수 없습니다.')
       );
       return delay(applyInclusion(t, 'INCLUDED'));
     },
@@ -1072,7 +1072,7 @@ export const mockApi: Api = {
       );
       if (given.length !== 1)
       return Promise.reject(
-        new ApiRequestError(400, 'INVALID_SUMMARY_SCOPE', 'batchId·year·runId 중 하나만 지정해야 합니다.')
+        new ApiRequestError(400, 'INVALID_SUMMARY_SCOPE', 'batchId, year, runId 중 하나만 지정해야 합니다.')
       );
       const type = scope.batchId ? 'BATCH' : scope.year ? 'YEAR' : 'RUN';
       const id = String(scope.batchId ?? scope.year ?? scope.runId);
@@ -1160,7 +1160,7 @@ export const mockApi: Api = {
     // 대상은 같은 조건의 현재 판정이고 페이지가 없다(#214). 목업은 한도를 넘지 않아 인정 금액이 finalAmount 다
     export: (scope) => {
       if ((scope.batchId === undefined) === (scope.year === undefined))
-      return Promise.reject(new ApiRequestError(400, 'INVALID_EXPORT_SCOPE', 'batchId·year 중 하나만 지정해야 합니다.'));
+      return Promise.reject(new ApiRequestError(400, 'INVALID_EXPORT_SCOPE', 'batchId, year 중 하나만 지정해야 합니다.'));
       const answersOf = (transactionId: string) =>
       liveGroups().
       filter((g) => g.pairs.some((p) => p.transaction.id === transactionId) && store.answers.has(g.seed.groupKey)).
@@ -1394,7 +1394,7 @@ export const mockApi: Api = {
     respond: ({ reviewIds, merchantCategory }) => {
       if (merchantCategory === '미분류')
       return Promise.reject(
-        new ApiRequestError(422, 'UNCLASSIFIED_CATEGORY_NOT_ALLOWED', '「미분류」는 답변으로 제출할 수 없습니다.')
+        new ApiRequestError(422, 'UNCLASSIFIED_CATEGORY_NOT_ALLOWED', '미분류는 답변으로 제출할 수 없습니다.')
       );
       const rows = store.reviews.filter((r) => reviewIds.includes(r.id));
       if (rows.length === 0)
@@ -1442,7 +1442,7 @@ export const mockApi: Api = {
           appliedRuleIds: [],
           rulesCommitSha: RULES_SHA,
           userContextVersion: completedRun.contextVersion,
-          explanation: `가맹점 업종을 「${merchantCategory}」로 확인한 뒤 다시 판정했습니다.`,
+          explanation: `가맹점 업종을 ${merchantCategory}로 확인한 뒤 다시 판정했습니다.`,
           computedAt: now(),
           citations: []
         });
@@ -1508,7 +1508,7 @@ export const mockApi: Api = {
       return delay({
         batch: {
           id: batch.id,
-          label: `${batch.cardIssuer} · ${start === end ? start : `${start}~${end}`}`,
+          label: `${batch.cardIssuer} ${start === end ? start : `${start}~${end}`}`,
           transactionCount: store.transactions.filter((t) => t.batchId === batchId).length
         },
         context: context ?

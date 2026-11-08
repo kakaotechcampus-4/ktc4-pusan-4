@@ -2677,7 +2677,7 @@ Question을 삭제하지 않고 상태를 남겨 판정 이력을 보존한다.
 
 ```json
 {
-  "batch": { "id": "0199aa11-...", "label": "국민 · 2026-09", "transactionCount": 18 },
+  "batch": { "id": "0199aa11-...", "label": "국민 2026-09", "transactionCount": 18 },
   "context": { "version": 4, "bookkeeping": "복식부기", "hasEmployee": false },
   "classification": { "pendingCount": 2, "pendingAmount": 97000 },
   "run": { "id": "0199b2...", "status": { "code": "COMPLETED", "label": "완료" } },

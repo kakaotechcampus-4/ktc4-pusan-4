@@ -367,7 +367,7 @@ export function Signup() {
             {errorAt('email')}
             {errorAt(null)}
             <Button type="submit" disabled={busy} className="mt-4 w-full">
-              {busy ? '보내는 중…' : '인증 코드 받기'}
+              {busy ? '보내는 중' : '인증 코드 받기'}
             </Button>
           </> :
 
@@ -416,7 +416,7 @@ export function Signup() {
             </p>
         }
           <Button type="submit" disabled={busy} className="mt-4 w-full">
-            {busy ? '확인 중…' : '코드 확인'}
+            {busy ? '확인 중' : '코드 확인'}
           </Button>
           <Button
           variant="secondary"
@@ -536,7 +536,7 @@ export function Signup() {
 
           {errorAt(null)}
           <Button type="submit" disabled={busy} className="mt-5 w-full">
-            {busy ? '가입하는 중…' : '가입하기'}
+            {busy ? '가입하는 중' : '가입하기'}
           </Button>
         </form>
       }

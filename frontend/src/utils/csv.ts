@@ -77,7 +77,7 @@ export function judgmentsCsv(rows: JudgmentExportRow[], limits: LimitYear[]): st
   judgment.outOfScope ? '예' : '',
   judgment.citations.map((citation) => citationTitle(citation.statuteId)).join(', '),
   // 답은 화면의 선택지 이름으로 쓴다(개인 → 개인 용도)
-  answers.map((item) => `${item.question} → ${answerLabel(item.answer)}`).join(' / ')]
+  answers.map((item) => `${item.question}: ${answerLabel(item.answer)}`).join(' / ')]
   );
   const exceeded = limitsOf(limits).filter((item) => item.excessAmount > 0);
   // 빈 줄로 표와 떼어, 표만 골라 합계를 내도 섞이지 않게 한다

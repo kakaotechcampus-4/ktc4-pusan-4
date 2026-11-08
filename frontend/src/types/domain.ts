@@ -591,7 +591,7 @@ export type NextStep = 'CLASSIFY' | 'INTERVIEW' | 'CONFIRM' | 'QUESTIONS' | 'RES
 
 /** GET /progress?batchId. 비서 도구 get_status 가 읽는 필드 */
 export interface Progress {
-  /** label 은 「국민 · 2026-09」, 여러 달이면 「국민 · 2026-01~2026-03」 */
+  /** label 은 「국민 2026-09」, 여러 달이면 「국민 2026-01~2026-03」 */
   batch: { id: string; label: string; transactionCount: number };
   /** 수입·이름·이메일은 담지 않는다 */
   context: { version: number; bookkeeping: BookkeepingDuty; hasEmployee: boolean } | null;

@@ -297,7 +297,7 @@ export function Questions() {
 
   /** 선택지 바로 아래 한 줄. 위가 아니라 아래에 붙여야 누른 자리 밑의 선택지가 움직이지 않는다 */
   const statusLine = (key: string) => {
-    if (busy === key) return <p className="mt-3 text-small text-ink2">저장하는 중…</p>;
+    if (busy === key) return <p className="mt-3 text-small text-ink2">저장하는 중</p>;
     if (error?.at === key)
     return (
       <p ref={statusRef(key)} role="alert" tabIndex={-1} className="mt-3 text-small text-deny outline-none">
@@ -475,7 +475,7 @@ export function Questions() {
               disabled={locked || carryChosen.length === 0}
               onClick={() => void applyCarryOver()}>
 
-                {busy === 'carry' ? '적용하는 중…' : `${formatNumber(carryChosen.length)}개 적용`}
+                {busy === 'carry' ? '적용하는 중' : `${formatNumber(carryChosen.length)}개 적용`}
               </Button>
             </div>
           </section>
@@ -617,7 +617,7 @@ export function Questions() {
           pending.length > 0 ?
           `남은 질문 ${formatNumber(pendingTotal)}개 중 ${formatNumber(
             shownPage * BATCH_SIZE + 1
-          )}–${formatNumber(shownPage * BATCH_SIZE + pending.length)}번째` :
+          )}~${formatNumber(shownPage * BATCH_SIZE + pending.length)}번째` :
           `남은 질문 ${formatNumber(pendingTotal)}개`
           } />
 
@@ -653,7 +653,7 @@ export function Questions() {
                       onClick={() => void answerAll(target.factType, only ?? bulkChoice[target.factType])}>
 
                         {busy === `bulk|${target.factType}` ?
-                      '답하는 중…' :
+                      '답하는 중' :
                       only ?
                       `${formatNumber(target.groups.length)}개 전부 ${answeredAs(only)} 답하기` :
                       `${formatNumber(target.groups.length)}개 한 번에 답하기`}

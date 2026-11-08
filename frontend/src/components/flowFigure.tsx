@@ -7,7 +7,7 @@
  * 바탕색이 달라서 색만 두 벌이다. 연파랑(#E4EDFB) 위에서 흰색은 대비 1.18 이라 안 보이고
  * accent(#2C6AE8)는 4.11 이다. 그래서 light 는 흰색 대신 파랑으로 그린다
  */
-import { cn } from './ui';
+import { SymbolIcon, cn } from './ui';
 
 export type FlowTone = 'blue' | 'light';
 
@@ -128,12 +128,13 @@ export function VerdictCard({ tone = 'blue' }: {tone?: FlowTone;}) {
         <div className="flex items-start justify-between gap-2">
           <p className="text-small font-bold leading-5 text-ink">AWS</p>
           <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-ok-line bg-ok-bg px-2 py-0.5 text-caption font-bold text-ok">
-            ✓ 가능
+            <SymbolIcon symbol="check" />
+            가능
           </span>
         </div>
         <p className="mt-0.5 text-body font-bold tabular-nums text-ink">128,000원</p>
         <p className="mt-2.5 border-t border-line pt-2 text-caption text-muted">
-          소득세법 제27조 ①
+          소득세법 제27조 제1항
         </p>
       </div>
     </div>);

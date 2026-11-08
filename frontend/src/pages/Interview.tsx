@@ -78,7 +78,7 @@ export function Interview() {
         못 읽었는데 빈 폼을 열면 저장된 답을 모른 채 새 버전을 만든다 (C57)
       */}
       {contextStatus === 'loading' ?
-      <p role="status" className="mt-6 text-body text-ink2">불러오는 중…</p> :
+      <p role="status" className="mt-6 text-body text-ink2">불러오는 중</p> :
       contextStatus === 'error' ?
       <Empty
         className="mt-6"
@@ -381,7 +381,7 @@ function InterviewBody() {
 
           <div className="mt-8 flex flex-wrap items-center gap-2">
             <Button type="submit" size="md" disabled={saving}>
-              {saving ? '저장하는 중…' : '저장'}
+              {saving ? '저장하는 중' : '저장'}
             </Button>
             <Button variant="secondary" size="md" onClick={back}>
               {welcome ? '나중에 하기' : '돌아가기'}

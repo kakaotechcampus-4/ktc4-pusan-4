@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRightIcon } from 'lucide-react';
 import type { Judgment, JudgmentOriginType, LimitYear, Verdict } from '../../types/domain';
 import { api, ApiRequestError, useApi } from '../../api';
-import { Badge, Button, ChoiceGroup, Input, cn } from '../ui';
+import { Badge, Button, ChoiceGroup, Input, SymbolIcon, cn } from '../ui';
 import { VerdictBadge } from '../VerdictBadge';
 import { StatuteCitation } from '../StatuteCitation';
 import { VERDICT_LABEL, VERDICT_META } from '../../utils/verdict';
@@ -187,7 +187,7 @@ export function JudgmentDetailPanel({
   const targets: Target[] = (['AVAILABLE', 'UNAVAILABLE'] as const).filter(
     (code) => code !== judgment.verdict.code
   );
-  const reason = [preset, memo.trim()].filter(Boolean).join(' — ');
+  const reason = [preset, memo.trim()].filter(Boolean).join(', ');
 
   const open = (next: Target) => {
     setTarget(next);
@@ -271,7 +271,7 @@ export function JudgmentDetailPanel({
             VERDICT_TEXT[judgment.verdict.code]}`
             }>
 
-            <span aria-hidden="true">{VERDICT_META[judgment.verdict.code].symbol}</span>
+            <SymbolIcon symbol={VERDICT_META[judgment.verdict.code].symbol} className="h-4 w-4" />
             {judgment.verdict.label}
           </p>
           {note && <span className="shrink-0 whitespace-nowrap text-small text-ink2">{note}</span>}
@@ -321,7 +321,7 @@ export function JudgmentDetailPanel({
               {/* 서버는 가능이 아니면 0 을 준다(#184). 「0원」은 확인 필요를 금액이 정해진 것처럼 보이게 해 비워 둔다 */}
               {judgment.verdict.code === 'AVAILABLE' && judgment.finalAmount !== null ?
             `${formatWon(judgment.finalAmount)}${asset ? '까지' : ''}` :
-            '—'}
+            '-'}
             </dd>
           }
         </div>
@@ -440,7 +440,7 @@ export function JudgmentDetailPanel({
                 취소
               </Button>
               <Button size="sm" disabled={!reason || busy} onClick={() => void save()}>
-                {busy ? '저장 중…' : '저장'}
+                {busy ? '저장 중' : '저장'}
               </Button>
             </div>
           </div>

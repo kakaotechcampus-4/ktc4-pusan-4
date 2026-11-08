@@ -179,7 +179,7 @@ export function Login() {
         }
 
         <Button type="submit" disabled={busy} className="mt-5 w-full">
-          {busy ? '로그인 중…' : '로그인'}
+          {busy ? '로그인 중' : '로그인'}
         </Button>
       </form>
 

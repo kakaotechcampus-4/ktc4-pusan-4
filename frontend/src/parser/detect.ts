@@ -51,5 +51,5 @@ export function classifyStatement(headers: readonly string[]): StatementVerdict 
   }
   // Python 의 joined[:60] 은 코드 포인트 단위다
   const shown = Array.from(joined).slice(0, 60).join('');
-  return verdict('판별불가', 'NO_COLUMNS', `가맹점명·승인정보 컬럼을 찾지 못했다 (헤더: ${shown || '없음'})`);
+  return verdict('판별불가', 'NO_COLUMNS', `가맹점명, 승인정보 컬럼을 찾지 못했다 (헤더: ${shown || '없음'})`);
 }

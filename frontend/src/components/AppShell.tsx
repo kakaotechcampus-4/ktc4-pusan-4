@@ -238,11 +238,11 @@ export function AppShell({ children, showSteps = true, disclaimer = true, narrow
             */}
             {crumb[0] !== crumb[1] &&
           <>
-                <li>›</li>
+                <li>&gt;</li>
                 <li>{crumb[0]}</li>
               </>
           }
-            <li>›</li>
+            <li>&gt;</li>
             <li className="text-ink">{crumb[1]}</li>
           </ol>
         </nav>

@@ -60,7 +60,7 @@ export function Account() {
         </header>
 
         <InfoPanel title="계정">
-          {meQ.loading && !me && <PanelNote>불러오는 중…</PanelNote>}
+          {meQ.loading && !me && <PanelNote>불러오는 중</PanelNote>}
           {!meQ.loading && !me &&
           <PanelFailed onRetry={meQ.reload}>가입 정보를 불러오지 못했습니다.</PanelFailed>
           }
@@ -77,7 +77,7 @@ export function Account() {
           null
           }>
 
-          {contextStatus === 'loading' && <PanelNote>불러오는 중…</PanelNote>}
+          {contextStatus === 'loading' && <PanelNote>불러오는 중</PanelNote>}
           {/* 못 읽은 것을 문진 전으로 그리지 않는다 (C57) */}
           {contextStatus === 'error' && <PanelFailed onRetry={reloadContext}>문진을 불러오지 못했습니다.</PanelFailed>}
           {contextStatus === 'none' && <PanelNote>아직 문진을 하지 않았습니다.</PanelNote>}
@@ -146,7 +146,7 @@ export function Account() {
               disabled={removing}
               onClick={() => void remove()}>
 
-                {removing ? '탈퇴하는 중…' : '탈퇴하기'}
+                {removing ? '탈퇴하는 중' : '탈퇴하기'}
               </Button>
             </>
           }>

@@ -55,10 +55,10 @@ export function ChoiceGroup<T extends string | boolean>({
   const onKeyDown = (event: React.KeyboardEvent, index: number) => {
     const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
     const edge = { Home: enabled[0], End: enabled[enabled.length - 1] }[event.key];
-    if (step === undefined && edge === undefined) return;
-    event.preventDefault();
     const at = enabled.indexOf(index);
-    const next = edge ?? enabled[(at + step! + enabled.length) % enabled.length];
+    const next = edge ?? (step === undefined ? undefined : enabled[(at + step + enabled.length) % enabled.length]);
+    if (next === undefined) return;
+    event.preventDefault();
     buttons.current[next]?.focus();
     onChange(options[next].value);
   };

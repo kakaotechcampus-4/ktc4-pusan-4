@@ -500,7 +500,7 @@ function RunProgress() {
               variant={judged ? 'secondary' : 'primary'}
               disabled={retrying}
               onClick={() => void retry()}>
-                {retrying ? '다시 판정하는 중…' : '다시 판정하기'}
+                {retrying ? '다시 판정하는 중' : '다시 판정하기'}
               </Button>
               {retryFailed &&
               <p role="alert" className="text-small text-deny">

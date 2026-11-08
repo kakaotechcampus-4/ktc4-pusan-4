@@ -45,7 +45,7 @@ function PageLoading() {
   return (
     <p role="status" className="flex min-h-full items-center justify-center gap-2 bg-canvas text-body text-muted">
       <Loader2Icon className="h-4 w-4 animate-spin text-accent" aria-hidden="true" />
-      화면을 불러오고 있습니다…
+      화면을 불러오고 있습니다
     </p>);
 
 }

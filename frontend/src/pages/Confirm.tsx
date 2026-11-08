@@ -105,7 +105,7 @@ export function Confirm() {
           null
           }>
 
-          {batchState === 'loading' && <PanelNote>불러오는 중…</PanelNote>}
+          {batchState === 'loading' && <PanelNote>불러오는 중</PanelNote>}
           {batchState === 'error' &&
           <PanelFailed onRetry={batchStatus === 'error' ? reloadBatch : batchQ.reload}>
               카드내역을 불러오지 못했습니다.
@@ -141,7 +141,7 @@ export function Confirm() {
           null
           }>
 
-          {contextStatus === 'loading' && <PanelNote>불러오는 중…</PanelNote>}
+          {contextStatus === 'loading' && <PanelNote>불러오는 중</PanelNote>}
           {contextStatus === 'error' && <PanelFailed onRetry={reloadContext}>문진을 불러오지 못했습니다.</PanelFailed>}
           {contextStatus === 'none' && <PanelNote>아직 문진을 하지 않았습니다.</PanelNote>}
           {contextStatus === 'ready' && context && <InfoRows rows={contextRows(context)} />}
@@ -183,7 +183,7 @@ export function Confirm() {
             onClick={() => void start()}>
 
             <PlayIcon className="h-4 w-4" aria-hidden="true" />
-            {starting ? '판정을 시작하는 중…' : '판정 시작'}
+            {starting ? '판정을 시작하는 중' : '판정 시작'}
           </Button>
         </div>
       </div>

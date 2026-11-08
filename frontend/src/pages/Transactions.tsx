@@ -243,7 +243,7 @@ export function Transactions() {
     <Badge>분류 필요</Badge> :
     row.classificationStatus.code === 'CLASSIFIED' ?
     <span className="whitespace-nowrap text-ink2">{categoryLabel(row.merchantCategory)}</span> :
-    <span className="text-muted">—</span>
+    <span className="text-muted">-</span>
 
   },
   {

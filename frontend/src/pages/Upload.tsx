@@ -538,12 +538,12 @@ function PreviewCard({
 
   const merchantCell = (merchant: string) =>
   <span className="block max-w-xs truncate whitespace-nowrap" title={merchant || undefined}>
-      {merchant || '—'}
+      {merchant || '-'}
     </span>;
 
 
   const unsentColumns: Column<UnsendableRow>[] = [
-  { header: '승인일', cell: (u) => <span className="whitespace-nowrap tabular-nums">{u.row.approvedAt ? formatFullDate(u.row.approvedAt) : '—'}</span> },
+  { header: '승인일', cell: (u) => <span className="whitespace-nowrap tabular-nums">{u.row.approvedAt ? formatFullDate(u.row.approvedAt) : '-'}</span> },
   { header: '가맹점명', cell: (u) => merchantCell(merchantName(u.row.rawMerchant)) },
   {
     header: '금액',
@@ -553,7 +553,7 @@ function PreviewCard({
         {u.row.foreignAmount !== null ?
       formatDollar(u.row.foreignAmount) :
       u.row.amount === null ?
-      '—' :
+      '-' :
       formatWon(u.row.amount)}
       </span>
 
@@ -565,12 +565,12 @@ function PreviewCard({
   const unsentIndex = new Set(unsendable.map((u) => u.index));
   const head = rows.filter((_, index) => !unsentIndex.has(index)).slice(0, 10);
   const rowColumns: Column<ParsedRow>[] = [
-  { header: '승인일', cell: (r) => <span className="whitespace-nowrap tabular-nums">{r.approvedAt ? formatFullDate(r.approvedAt) : '—'}</span> },
+  { header: '승인일', cell: (r) => <span className="whitespace-nowrap tabular-nums">{r.approvedAt ? formatFullDate(r.approvedAt) : '-'}</span> },
   { header: '가맹점명', cell: (r) => merchantCell(merchantName(r.rawMerchant)) },
   {
     header: '금액',
     align: 'right',
-    cell: (r) => <span className="whitespace-nowrap">{r.amount === null ? '—' : formatWon(r.amount)}</span>
+    cell: (r) => <span className="whitespace-nowrap">{r.amount === null ? '-' : formatWon(r.amount)}</span>
   },
   { header: '상태', cell: (r) => <Badge>{r.status}</Badge> }];
 
@@ -663,7 +663,7 @@ function PreviewCard({
           다른 파일 올리기
         </Button>
         <Button className="whitespace-nowrap" disabled={!canSend} onClick={onSend}>
-          {send === 'sending' ? '올리는 중…' : view?.retry ?? `${formatNumber(sent.length)}건 올리기`}
+          {send === 'sending' ? '올리는 중' : view?.retry ?? `${formatNumber(sent.length)}건 올리기`}
         </Button>
       </Actions>
     </section>);
