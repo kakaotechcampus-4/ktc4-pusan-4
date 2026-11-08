@@ -2,7 +2,7 @@ import React from 'react';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { DISCLAIMER } from '../copy';
 import { Logo } from './Logo';
-import { MAIN_ID, SkipLink } from './ui';
+import { MAIN_ID, BackLink } from './ui';
 
 const PRINCIPLES = [
 '판정마다 근거 조문과 시행일을 붙입니다',
@@ -15,7 +15,7 @@ export function AuthLayout({ title, children }: {title: string;children: React.R
   useDocumentTitle(title);
   return (
     <div className="flex min-h-full w-full flex-col bg-canvas">
-      <SkipLink />
+      <BackLink />
       <div className="flex w-full flex-1">
         {/* 좌측 브랜드 패널 */}
         <aside className="hidden w-[46%] flex-col justify-between bg-ink px-12 py-12 lg:flex">

@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useSession } from '../contexts/SessionContext';
-import { Button, Container, SkipLink, cn } from './ui';
+import { Button, Container, BackLink, cn } from './ui';
 import { Logo } from './Logo';
 import { BugReportButton } from './BugReport';
 
@@ -30,7 +30,7 @@ export function MarketingHeader() {
 
   return (
     <>
-      <SkipLink />
+      <BackLink />
       <header className="sticky top-0 z-30 border-b border-line bg-canvas/95 shadow-header backdrop-blur">
         <Container className="flex h-[72px] items-center gap-6 lg:gap-10">
           <Logo />

@@ -7,7 +7,7 @@ export { SectionHeading } from './SectionHeading';
 export { Container } from './Container';
 export { Input, Select, Field } from './Input';
 export { ChoiceGroup } from './ChoiceGroup';
-export { SkipLink, MAIN_ID } from './SkipLink';
+export { BackLink, MAIN_ID } from './BackLink';
 export { Empty } from './Empty';
 export { Table, Pagination } from './Table';
 export type { Column } from './Table';
