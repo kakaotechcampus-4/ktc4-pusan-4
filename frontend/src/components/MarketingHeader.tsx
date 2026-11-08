@@ -17,7 +17,7 @@ const NAV = [{ to: '/faq', label: 'FAQ' }];
  * 폭·여백(max-w-page px-6)과 높이(72px)는 원래 같았다 — 알약만 달랐다
  */
 const NAV_LINK =
-'shrink-0 whitespace-nowrap rounded-full px-2.5 py-1.5 text-small font-bold transition-colors duration-150 ease-snap sm:px-3';
+'inline-block shrink-0 whitespace-nowrap rounded-full px-2.5 py-1.5 text-small font-bold transition-colors duration-150 ease-snap sm:px-3';
 const NAV_ON = 'bg-accent text-white';
 const NAV_OFF = 'text-ink2 hover:bg-surface';
 

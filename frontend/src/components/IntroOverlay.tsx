@@ -15,21 +15,28 @@ import { OrbitStage } from './OrbitStage';
 const HOLD_MS = 3500;
 
 /**
- * 걷힐 때 파란 판이 메인 배너 자리로 줄어든다. 줄어드는 시간과 다 줄어든 뒤 사라지는 시간.
- * 아래 duration-700, duration-200 과 같아야 한다
+ * 걷힐 때 파란 판이 안의 글과 궤도를 품은 채 메인 배너 자리로 줄어든다. 줄어드는 시간과
+ * 다 줄어든 뒤 사라지는 시간. 아래 duration-700, duration-200 과 같아야 한다
  */
 const SHRINK_MS = 700;
 const FADE_MS = 200;
 
+type Box = {top: number;left: number;width: number;height: number;};
+
 /** 줄어들 자리. 메인 배너(HeroBanner)의 판이다. 못 찾으면 그냥 흐려진다 */
-function heroInset() {
+function heroBox(): Box | null {
   const hero = document.querySelector('[data-hero-panel]');
   if (!hero) return null;
-  const r = hero.getBoundingClientRect();
-  const right = window.innerWidth - r.right;
-  const bottom = window.innerHeight - r.bottom;
-  return `inset(${r.top}px ${right}px ${bottom}px ${r.left}px round 20px)`;
+  const { top, left, width, height } = hero.getBoundingClientRect();
+  return { top, left, width, height };
 }
+
+/**
+ * 판의 자리와 크기를 바꾼다. clip-path 로 자르기만 하면 안의 글과 궤도는 제자리에 남아 잘려 나간다.
+ * 안의 글과 궤도는 판을 따라 다시 배치하지 않고 통째로 같은 비율로 줄인다. 다시 배치하면
+ * 판이 납작해지는 동안 궤도가 제목 위로 밀려 들어온다
+ */
+const FULL = { top: 0, left: 0, width: '100%', height: '100%', borderRadius: 0 };
 
 /** 보이는 중일 때만 걷기 시작한다 */
 const leave = (phase: 'show' | 'shrink' | 'fade') => phase === 'show' ? 'shrink' : phase;
@@ -38,7 +45,9 @@ const leave = (phase: 'show' | 'shrink' | 'fade') => phase === 'show' ? 'shrink'
 export function IntroOverlay({ onDone }: {onDone: () => void;}) {
   /** shrink: 배너 자리로 줄어드는 중. fade: 다 줄어 배너 위에 겹쳐 있다가 사라지는 중 */
   const [phase, setPhase] = useState<'show' | 'shrink' | 'fade'>('show');
-  const [clip, setClip] = useState<string | null>(null);
+  const [box, setBox] = useState<Box | null>(null);
+  /** 줄이기 시작할 때의 화면 크기. 안의 글과 궤도는 이 크기로 그린 채 줄인다 */
+  const [view, setView] = useState<{width: number;height: number;} | null>(null);
 
   useEffect(() => {
     // 건너뛰기로 이미 걷는 중이면 되돌리지 않는다. 앞으로만 간다
@@ -49,15 +58,16 @@ export function IntroOverlay({ onDone }: {onDone: () => void;}) {
   useEffect(() => {
     if (phase === 'show') return;
     if (phase === 'shrink') {
-      const target = heroInset();
+      const target = heroBox();
       // 자리를 못 찾으면 줄이지 않고 바로 흐린다
       if (target === null) {
         setPhase('fade');
         return;
       }
-      setClip(target);
+      setView({ width: window.innerWidth, height: window.innerHeight });
+      setBox(target);
       // 줄어드는 동안 창 크기가 바뀌면 배너 자리도 바뀐다. 새 자리로 다시 겨눈다
-      const retarget = () => setClip(heroInset());
+      const retarget = () => setBox(heroBox());
       window.addEventListener('resize', retarget);
       const timer = window.setTimeout(() => setPhase('fade'), SHRINK_MS);
       return () => {
@@ -83,19 +93,27 @@ export function IntroOverlay({ onDone }: {onDone: () => void;}) {
 
   return (
     <div
-      style={{ clipPath: clip ?? 'inset(0px 0px 0px 0px round 0px)' }}
-      className={`fixed inset-0 z-50 overflow-hidden bg-surface2 transition-[clip-path,opacity] ease-snap ${
+      style={box ? { ...box, borderRadius: 20 } : FULL}
+      className={`fixed z-50 overflow-hidden bg-surface2 transition-[top,left,width,height,border-radius,opacity] ease-snap ${
       phase === 'fade' ? 'pointer-events-none opacity-0 duration-200' : 'opacity-100 duration-700'}`
       }>
 
-      {/* 판이 줄어드는 동안 안의 궤도와 글은 먼저 걷는다. 배너에는 배너의 그림이 따로 있다 */}
-      <div className={`absolute inset-0 transition-opacity duration-300 ${phase === 'show' ? 'opacity-100' : 'opacity-0'}`}>
+      {/* 궤도와 글은 판과 함께 줄어든다. 다 줄어들면 판째 흐려지며 같은 자리의 배너가 드러난다 */}
+      <div
+        className="absolute left-0 top-0 h-full w-full origin-top-left transition-transform duration-700 ease-snap"
+        style={box && view ?
+        {
+          width: view.width,
+          height: view.height,
+          transform: `scale(${Math.min(box.width / view.width, box.height / view.height)})`
+        } :
+        undefined}>
         <OrbitStage intro full />
 
         <button
           type="button"
           onClick={() => setPhase(leave)}
-          className="absolute right-6 top-6 z-20 rounded-full border border-white/20 px-4 py-1.5 text-small text-white transition-colors hover:border-white/40 hover:text-white sm:right-8 sm:top-8">
+          className={`absolute right-6 top-6 z-20 rounded-full border border-white/20 px-4 py-1.5 text-small text-white transition-colors hover:border-white/40 hover:text-white sm:right-8 sm:top-8 ${phase === 'show' ? '' : 'invisible'}`}>
 
           건너뛰기
         </button>
