@@ -53,3 +53,25 @@
 
 - 캡처는 2026-11-09 기준 최근 3시간 화면이라 값은 그때 것이다
 - Redis, Blue/Green 도식화 자리는 아직 비어 있음
+
+## 02:38 README Redis, Blue/Green 시퀀스 다이어그램 추가
+
+- 커밋: 1ca4470d (1개)
+- 주요파일: README.md
+
+### 한 일
+
+- 「Redis」 자리를 리프레시 토큰 교체 mermaid 시퀀스 다이어그램으로 채우고 소제목을 「Redis (리프레시 토큰 교체)」로 바꿈. 로그인 때 발급, 재발급 때 Lua 스크립트로 해시 비교와 교체, 이미 쓴 토큰이면 그 family 삭제, 로그아웃을 그림(`RedisRefreshTokenStore`, `AuthService`)
+- 「Blue / Green 배포」 자리를 deploy.sh 기준 전환 시퀀스로 채움. 쉬는 색 기동과 Flyway, healthy 뒤 upstream.caddy 교체와 caddy reload, 성공하면 옛 색 stop, 실패하면 되돌림(`deploy/deploy.sh`)
+- 각 그림 아래에 한두 문장 설명을 붙임
+
+### 왜 이렇게 했나
+
+- Redis 는 이미지 출처나 띄우는 방식보다 토큰 교체 흐름이 코드만으로 잘 안 읽혀서 그쪽을 그렸다
+- 아키텍처 그림이 두 쌍의 구조는 이미 보여 줘서, Blue/Green 은 시간 순서를 시퀀스로 그렸다
+- 두 그림 모두 PNG 대신 mermaid 로 두어 코드가 바뀌면 텍스트로 고칠 수 있게 했다
+
+### 남은 것 · 아는 문제
+
+- mermaid 11.4.1 로 렌더링은 확인했지만 GitHub 화면에서는 아직 보지 않았다
+- Redis 다이어그램이 「배포 · CI/CD」 섹션 안에 있어 위치가 어색할 수 있다
