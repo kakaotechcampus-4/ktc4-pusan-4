@@ -83,6 +83,10 @@ export interface JudgmentQuery extends PageQuery {
   verdict?: Verdict;
   /** 기본 true(현재 판정만). transactionId 와 false 로 쓰면 revision 이력 전체. runId 와 함께 쓰지 않는다 */
   latestOnly?: boolean;
+  /** true 면 답변 대기만, false 면 답변 대기를 뺀다. 없으면 거르지 않는다 */
+  awaiting?: boolean;
+  /** 기본 COMPUTED_AT(판정한 시각 최근 순). APPROVED_AT 은 승인일 최근 순 */
+  sort?: 'COMPUTED_AT' | 'APPROVED_AT';
 }
 
 /** batchId · year 중 정확히 하나. 0개거나 2개면 400 INVALID_EXPORT_SCOPE */

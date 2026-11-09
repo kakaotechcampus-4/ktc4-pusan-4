@@ -44,6 +44,44 @@ describe('판정 (3.7)', () => {
     });
   });
 
+  it('답변 대기는 목록 표지와 거르기, 요약 건수가 서로 맞고, 결제 금액은 판정마다 더한다', async () => {
+    const all = (await api.judgments.list({ batchId, size: 100 })).items;
+    const summary = await api.judgments.summary({ batchId });
+
+    // 1016 은 소명 대기 시드다. 표지는 불가에만 붙는다
+    expect(all.find((j) => j.transactionId === tx('1016'))?.awaitingAnswer).toBe(true);
+    expect(all.filter((j) => j.awaitingAnswer).every((j) => j.verdict.code === 'UNAVAILABLE')).toBe(true);
+
+    const awaiting = (await api.judgments.list({ batchId, awaiting: true, size: 100 })).items;
+    const otherUnavailable = (await api.judgments.list({ batchId, verdict: 'UNAVAILABLE', awaiting: false, size: 100 })).items;
+    expect(awaiting.map((j) => j.id).sort()).toEqual(all.filter((j) => j.awaitingAnswer).map((j) => j.id).sort());
+    expect(summary.awaiting.count).toBe(awaiting.length);
+    expect(otherUnavailable.length).toBe(summary.byVerdict.UNAVAILABLE.count - summary.awaiting.count);
+
+    const spend = (verdict: string) =>
+    all.filter((j) => j.verdict.code === verdict).reduce((sum, j) => sum + j.transaction.amount, 0);
+    expect(summary.byVerdict.AVAILABLE.spendAmount).toBe(spend('AVAILABLE'));
+    expect(summary.byVerdict.UNAVAILABLE.spendAmount).toBe(spend('UNAVAILABLE'));
+    expect(summary.awaiting.spendAmount).toBe(awaiting.reduce((sum, j) => sum + j.transaction.amount, 0));
+  });
+
+  it('sort=APPROVED_AT 이면 승인일 최근 순으로 준다', async () => {
+    const items = (await api.judgments.list({ batchId, sort: 'APPROVED_AT', size: 100 })).items;
+    const dates = items.map((j) => j.transaction.approvedAt);
+    expect(dates).toEqual([...dates].sort().reverse());
+  });
+
+  it('요약은 직접 바꾼 판정을 바뀐 판정별로 세고, 해마다 나눈 금액의 합은 경비 가능 금액이다', async () => {
+    const before = await api.judgments.summary({ batchId });
+    expect(before.overridden.AVAILABLE.count).toBe(0);
+    expect(before.byYear.reduce((sum, row) => sum + row.finalAmount, 0)).toBe(before.byVerdict.AVAILABLE.finalAmount);
+
+    await api.judgments.override((await currentOf(tx('1005'))).id, { toVerdict: 'AVAILABLE', reason: '업무' }, 'k1');
+    const after = await api.judgments.summary({ batchId });
+    expect(after.overridden.AVAILABLE.count).toBe(1);
+    expect(after.overridden.AVAILABLE.finalAmount).toBe((await currentOf(tx('1005'))).finalAmount ?? 0);
+  });
+
   it('제외한 거래는 현재 결과·요약에서 빠지지만 transactionId 로는 읽힌다', async () => {
     const before = await api.judgments.summary({ batchId });
     const excluded = await api.transactions.exclude(tx('1005'));

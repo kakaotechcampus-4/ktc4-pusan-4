@@ -353,10 +353,20 @@ const labelOf = (account: string) => ACCOUNT_LABELS[account] ?? account;
 /** 목업 한도. 서버는 최신 문진의 직전연도 수입금액으로 계산한다(api.md 3.7 limitAmount 예시 값) */
 const MOCK_LIMIT_AMOUNT = 12_090_000;
 
-/** 판정에 거래 요약과 계정과목 화면 이름을 붙인다. 판정 당시가 아니라 응답 시점의 거래 값이다 (3.4 거래 요약) */
+/**
+ * 판정에 거래 요약과 계정과목 화면 이름, 답변 대기 표지를 붙인다. 판정 당시가 아니라 응답 시점의 거래 값이다 (3.4 거래 요약).
+ * 답변 대기는 불가인데 그 거래에 답하지 않은 질문이 남은 것이다 (3.7 awaitingAnswer)
+ */
 const withTransaction = (j: JudgmentSeed): Judgment | null => {
   const t = transactionOf(j.transactionId);
-  return t ? { ...j, accountLabel: j.account && labelOf(j.account), transaction: summaryOf(t) } : null;
+  return t ?
+  {
+    ...j,
+    accountLabel: j.account && labelOf(j.account),
+    awaitingAnswer: j.verdict.code === 'UNAVAILABLE' && hasPendingQuestion(j.transactionId),
+    transaction: summaryOf(t)
+  } :
+  null;
 };
 
 /** §5 판정 대상: 판정대상이면서 분류가 끝난 거래 */
@@ -513,6 +523,10 @@ map((g) => ({ ...g, pairs: g.pairs.filter((p) => isJudgeable(p.transaction)) }))
 filter((g) => g.pairs.length > 0);
 
 const isAnswered = (g: LiveGroup) => store.answers.has(g.seed.groupKey);
+
+/** 답하지 않은 질문이 남은 거래인지. 질문 목록처럼 판정 대상인 거래만 본다 */
+const hasPendingQuestion = (transactionId: string) =>
+visibleGroups().some((g) => !isAnswered(g) && g.pairs.some((p) => p.transaction.id === transactionId));
 
 /**
  * 소명 대기 (3.11). Override 를 뺀 최신 자동 판정이 불가인데 PENDING 질문이 남은 거래.
@@ -1184,16 +1198,37 @@ const mockGroups: Api = {
         return true;
       });
 
-      const by: Record<Verdict, { count: number; finalAmount: number }> = {
-        AVAILABLE: { count: 0, finalAmount: 0 },
-        UNAVAILABLE: { count: 0, finalAmount: 0 },
-        NEEDS_REVIEW: { count: 0, finalAmount: 0 }
+      const by: Record<Verdict, { count: number; finalAmount: number; spendAmount: number }> = {
+        AVAILABLE: { count: 0, finalAmount: 0, spendAmount: 0 },
+        UNAVAILABLE: { count: 0, finalAmount: 0, spendAmount: 0 },
+        NEEDS_REVIEW: { count: 0, finalAmount: 0, spendAmount: 0 }
       };
+      const awaiting = { count: 0, spendAmount: 0 };
+      const overridden: Record<Verdict, { count: number; finalAmount: number; spendAmount: number }> = {
+        AVAILABLE: { count: 0, finalAmount: 0, spendAmount: 0 },
+        UNAVAILABLE: { count: 0, finalAmount: 0, spendAmount: 0 },
+        NEEDS_REVIEW: { count: 0, finalAmount: 0, spendAmount: 0 }
+      };
+      const years = new Map<number, number>();
       const accounts = new Map<string, { count: number; finalAmount: number }>();
       for (const j of rows) {
         const slot = by[j.verdict.code];
+        const spend = transactionOf(j.transactionId)?.amount ?? 0;
         slot.count += 1;
         slot.finalAmount += j.finalAmount ?? 0;
+        slot.spendAmount += spend;
+        if (j.verdict.code === 'UNAVAILABLE' && hasPendingQuestion(j.transactionId)) {
+          awaiting.count += 1;
+          awaiting.spendAmount += spend;
+        }
+        if (j.origin.type === 'OVERRIDE') {
+          const changed = overridden[j.verdict.code];
+          changed.count += 1;
+          changed.finalAmount += j.finalAmount ?? 0;
+          changed.spendAmount += spend;
+        }
+        const year = Number(transactionOf(j.transactionId)?.approvedAt.slice(0, 4));
+        years.set(year, (years.get(year) ?? 0) + (j.verdict.code === 'AVAILABLE' ? j.finalAmount ?? 0 : 0));
         if (j.verdict.code !== 'AVAILABLE' || !j.account) continue;
         const acc = accounts.get(j.account) ?? { count: 0, finalAmount: 0 };
         acc.count += 1;
@@ -1209,7 +1244,10 @@ const mockGroups: Api = {
         map(([account, v]) => ({ account, accountLabel: labelOf(account), ...v })).
         sort((a, b) => b.finalAmount - a.finalAmount || a.account.localeCompare(b.account)),
         // 과거 Run 범위는 그 시점 한도가 남아 있지 않아 빈 배열이다 (api.md 3.7)
-        limits: scope.runId ? [] : limitsFor(rows)
+        limits: scope.runId ? [] : limitsFor(rows),
+        awaiting,
+        overridden,
+        byYear: [...years].sort(([a], [b]) => a - b).map(([year, finalAmount]) => ({ year, finalAmount }))
       });
     },
     list: (q) => {
@@ -1239,7 +1277,12 @@ const mockGroups: Api = {
       const out = items.
       map(withTransaction).
       filter((j): j is Judgment => j !== null).
-      sort((a, b) => b.computedAt.localeCompare(a.computedAt) || b.id.localeCompare(a.id));
+      filter((j) => q?.awaiting === undefined || j.awaitingAnswer === q.awaiting).
+      sort((a, b) =>
+      (q?.sort === 'APPROVED_AT' ?
+      b.transaction.approvedAt.localeCompare(a.transaction.approvedAt) :
+      b.computedAt.localeCompare(a.computedAt)) || b.id.localeCompare(a.id)
+      );
       return delay(paginate(out, q?.page, q?.size ?? 20));
     },
     get: (id) => {
@@ -1308,7 +1351,12 @@ const mockGroups: Api = {
         judgmentId: next.id,
         active: true
       });
-      return delay({ ...next, accountLabel: next.account && labelOf(next.account), transaction: summaryOf(t) });
+      return delay({
+        ...next,
+        accountLabel: next.account && labelOf(next.account),
+        awaitingAnswer: next.verdict.code === 'UNAVAILABLE' && hasPendingQuestion(next.transactionId),
+        transaction: summaryOf(t)
+      });
     },
     removeOverride: (overrideId) => {
       const found = store.overrides.get(overrideId);

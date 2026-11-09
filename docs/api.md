@@ -1815,6 +1815,8 @@ transactionId
 batchId
 year
 verdict
+awaiting
+sort
 latestOnly
 runId
 page
@@ -1832,6 +1834,10 @@ true
 조건은 모두 AND로 건다. `transactionId`·`batchId`·`year`·`runId`가 하나도 없으면 오류 없이 본인 전체의 현재 Judgment를 반환한다.
 
 다른 사용자의 `transactionId`·`batchId`·`runId`를 넘기면 404가 아니라 빈 목록이다.
+
+`awaiting`은 답변 대기(아래 `awaitingAnswer`)로 거른다. `true`면 답변 대기만, `false`면 답변 대기를 뺀 것만 남긴다. 보내지 않으면 거르지 않는다. 불가 가운데 답변 대기가 아닌 것은 `verdict=UNAVAILABLE&awaiting=false`다.
+
+`sort`는 `COMPUTED_AT`(기본)이나 `APPROVED_AT`이다. 화면 표처럼 승인일 최근 순으로 받을 때 `APPROVED_AT`을 쓴다.
 
 ### batchId / year
 
@@ -1878,7 +1884,8 @@ R1 이후 QuestionResponse나 Override로 생성된 revision은 포함하지 않
 정렬:
 
 ```
-computedAt DESC, id DESC
+sort=COMPUTED_AT (기본)   computedAt DESC, id DESC
+sort=APPROVED_AT         transaction.approvedAt DESC, id DESC
 ```
 
 응답:
@@ -1936,17 +1943,50 @@ GET /api/v1/judgments/summary?runId=R1
   "byVerdict": {
     "AVAILABLE": {
       "count": 180,
-      "finalAmount": 4820000
+      "finalAmount": 4820000,
+      "spendAmount": 5310000
     },
     "UNAVAILABLE": {
       "count": 62,
-      "finalAmount": 0
+      "finalAmount": 0,
+      "spendAmount": 1840000
     },
     "NEEDS_REVIEW": {
       "count": 30,
-      "finalAmount": 0
+      "finalAmount": 0,
+      "spendAmount": 760000
     }
   },
+
+  "awaiting": {
+    "count": 12,
+    "spendAmount": 410000
+  },
+
+  "overridden": {
+    "AVAILABLE": {
+      "count": 3,
+      "finalAmount": 85000,
+      "spendAmount": 85000
+    },
+    "UNAVAILABLE": {
+      "count": 1,
+      "finalAmount": 0,
+      "spendAmount": 12000
+    },
+    "NEEDS_REVIEW": {
+      "count": 0,
+      "finalAmount": 0,
+      "spendAmount": 0
+    }
+  },
+
+  "byYear": [
+    {
+      "year": 2026,
+      "finalAmount": 4820000
+    }
+  ],
 
   "byAccount": [
     {
@@ -1970,7 +2010,13 @@ GET /api/v1/judgments/summary?runId=R1
 }
 ```
 
-`byVerdict`는 세 verdict를 늘 담는다. 판정이 없는 verdict는 `count`·`finalAmount`가 0이다. `finalAmount`가 아직 없는 Judgment(금액 계산 전)는 0으로 더한다.
+`byVerdict`는 세 verdict를 늘 담는다. 판정이 없는 verdict는 `count`·`finalAmount`·`spendAmount`가 0이다. `finalAmount`가 아직 없는 Judgment(금액 계산 전)는 0으로 더한다. `spendAmount`는 그 판정이 난 거래의 결제 금액(`transaction.amount`) 합이다. 경비 가능 금액을 결제 금액과 견주어 보이는 바탕이다.
+
+`awaiting`은 답변 대기(`GET /judgments/{judgmentId}`의 `awaitingAnswer`가 `true`인 판정)의 건수와 결제 금액 합이다. 답변 대기는 불가에 붙는 표지라 `byVerdict.UNAVAILABLE`에도 들어 있다. 답변 대기를 따로 보이려면 불가에서 뺀다. 범위(`batchId`, `year`, `runId`)는 위와 같다.
+
+`overridden`은 사용자가 직접 바꾼(3.8 Override) 판정을 바뀐 판정별로 센다. `byVerdict`와 같은 모양이고 `byVerdict`에도 들어 있다. 현재 판정이 수정 revision(`origin.type = OVERRIDE`)인 것만 세고, 해제한 수정은 세지 않는다. 수정은 확인 필요로 가지 않아 `NEEDS_REVIEW`는 늘 0이다.
+
+`byYear`는 범위의 판정이 있는 해(거래 `approvedAt`)마다 가능 판정의 경비 가능 금액 합이다. 해 순이고, 가능이 없는 해는 0이다. 금액은 `byVerdict.AVAILABLE.finalAmount`와 같은 기준이다(`year` 집계만 접대비 한도 인정액). 신고는 해마다 따로 해서 두 해에 걸친 업로드를 나눠 보인다.
 
 접대비 한도(소득세법 §35 3항)는 사용자의 한 해 전체 지출로 정해지고, 어느 거래가 초과분인지는 법이 정하지 않는다. 그래서 거래별·batch별로 한도를 나누지 않고 연 단위로만 다룬다(#15, `CONTEXT.md` G6 "건별로 계산하지 않는다").
 
@@ -2058,6 +2104,7 @@ Query: `batchId` 또는 `year` 중 정확히 하나. 0개거나 2개면 `400 INV
     "code": "AVAILABLE",
     "label": "가능"
   },
+  "awaitingAnswer": false,
 
   "outOfScope": false,
   "blockedAtGate": null,
@@ -2103,6 +2150,7 @@ Query: `batchId` 또는 `year` 중 정확히 하나. 0개거나 2개면 `400 INV
 | transaction | 판정한 거래의 거래 요약(3.4). 판정 당시가 아니라 응답 시점의 거래 값이다 |
 | revision | Transaction 재판정마다 증가 |
 | origin | 이 revision이 생성된 직접 원인 |
+| awaitingAnswer | 답변 대기. `verdict = UNAVAILABLE`이면서 이 거래에 답하지 않은(`PENDING`) 질문이 남았으면 `true`다. 판정의 네 번째 값이 아니라 불가에 붙는 표지라 `verdict`는 그대로 불가다. 질문은 revision마다 생기므로 거래의 모든 revision의 질문을 본다. 3.9처럼 지금 판정 대상인 거래만 `true`가 된다 |
 | outOfScope | 룰엔진 판정 범위 밖(핸드오프)인지. `verdict = NEEDS_REVIEW`일 때만 `true`일 수 있고 그 외 verdict에서는 항상 `false` |
 | account | 계정과목 ID. 비교와 집계는 이 값으로 한다. 허용 값은 `rules/accounts.yaml`이다 |
 | accountLabel | 계정과목 화면 이름. 사람에게 보일 때는 이 값을 쓴다. 이름이 따로 없으면 `account`와 같다(`접대비` → `기업업무추진비`, 소득세법 §35) |
@@ -2337,6 +2385,8 @@ Question 개별 항목을 반환한다. `unresolved` 집계는 grouped 여부와
 `answer`는 답한 값이다. 3.10 요청의 `answer`와 같은 모양(`{ "value": "개인" }`)이고, `ANSWERED`가 아니면 `null`이다. 정정했으면 마지막 답이다.
 
 `code`는 질문을 만든 규칙 카드의 질문 코드(`question.code`)다. 다른 업로드의 같은 질문을 찾는 데 쓴다(3.14 지난번 답). 같은 `factType`이라도 카드마다 선택지가 달라서 `factType`이 아니라 `code`로 맞춘다. 저장 값은 `question_queue.reason_code`다. `grouped=true` 그룹에도 같은 값이 붙는다.
+
+`grouped=false`는 요청한 쪽만 DB에서 읽는다. `grouped=true`는 그룹 순서(건수, 금액)가 질문 전부로 정해져서, 묶기와 순서에 쓰는 값(그룹 키, 상태, 거래 승인일, 금액)만 전부 읽고 그 쪽의 그룹에 든 질문에만 거래, 답, 수정 여부를 붙인다. 미해소 집계나 건수만 필요하면 `grouped=false&size=1`이 더 가볍다.
 
 ### grouped=true
 

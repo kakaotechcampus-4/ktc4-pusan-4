@@ -1,4 +1,4 @@
-import type { Judgment, Verdict } from '../types/domain';
+import type { JudgmentSummary, Verdict } from '../types/domain';
 
 export type ShareKey = Verdict | 'AWAITING';
 
@@ -17,21 +17,20 @@ export const SHARE_BAR: Record<ShareKey, string> = {
   AWAITING: 'bg-edge'
 };
 
-const spendOf = (judgments: Judgment[]) => judgments.reduce((sum, judgment) => sum + judgment.transaction.amount, 0);
+/** 범위의 결제 금액 합. 경비 가능 금액의 바탕이다 */
+export const spendOf = ({ byVerdict }: JudgmentSummary) =>
+byVerdict.AVAILABLE.spendAmount + byVerdict.NEEDS_REVIEW.spendAmount + byVerdict.UNAVAILABLE.spendAmount;
 
 /**
- * 현재 판정 전부에서 판정별 건수와 결제 금액을 센다. 답을 기다리는 불가는 불가에서 빼서 따로 센다 (C12).
- * awaiting 을 못 읽었으면(null) 답변 대기를 따로 두지 않는다
+ * 요약에서 판정별 건수와 결제 금액을 꺼낸다. 답을 기다리는 불가는 불가에서 빼서 따로 센다 (C12).
+ * 서버 요약의 불가에는 답변 대기가 들어 있다(api.md 3.7 summary 의 awaiting)
  */
-export const sharesOf = (judgments: Judgment[], awaiting: Judgment[] | null): Share[] => {
-  const waiting = new Set(awaiting ?? []);
-  const of = (key: Verdict) =>
-  judgments.filter((judgment) => judgment.verdict.code === key && !waiting.has(judgment));
-  return [
-  ...(['AVAILABLE', 'NEEDS_REVIEW', 'UNAVAILABLE'] as const).map((key) => {
-    const rows = of(key);
-    return { key, count: rows.length, amount: spendOf(rows) };
-  }),
-  ...(waiting.size > 0 ? [{ key: 'AWAITING' as const, count: waiting.size, amount: spendOf([...waiting]) }] : [])];
-
-};
+export const sharesOf = ({ byVerdict, awaiting }: JudgmentSummary): Share[] => [
+{ key: 'AVAILABLE', count: byVerdict.AVAILABLE.count, amount: byVerdict.AVAILABLE.spendAmount },
+{ key: 'NEEDS_REVIEW', count: byVerdict.NEEDS_REVIEW.count, amount: byVerdict.NEEDS_REVIEW.spendAmount },
+{
+  key: 'UNAVAILABLE',
+  count: byVerdict.UNAVAILABLE.count - awaiting.count,
+  amount: byVerdict.UNAVAILABLE.spendAmount - awaiting.spendAmount
+},
+...(awaiting.count > 0 ? [{ key: 'AWAITING' as const, count: awaiting.count, amount: awaiting.spendAmount }] : [])];
