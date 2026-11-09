@@ -298,7 +298,7 @@ export function Upload() {
 
             {/* 1만 건이면 서버가 저장하고 분류하는 데 10초 넘게 걸린다(#274). 미리보기 대신 올리는 중임을 크게 보인다 (11/8 회의) */}
             {phase.kind === 'preview' && phase.send === 'sending' && phase.outcome.request &&
-            <SendingCard request={phase.outcome.request} since={draft.sendingSince} />
+            <SendingCard request={phase.outcome.request} since={draft.sendingSince} onReset={reset} />
             }
 
             {phase.kind === 'preview' && phase.send !== 'sending' &&
@@ -436,8 +436,18 @@ function ParsingCard({ file }: {file: File;}) {
  * 올리는 중. 서버는 한 요청 안에서 거래를 저장하고 가맹점을 분류한 뒤 답한다. 얼마나 남았는지 알 길이 없어
  * 진행 막대 대신 지난 시간을 센다. 멈춘 것이 아니라는 것만 보인다
  */
-function SendingCard({ request, since }: {request: UploadBatchRequest;since: number;}) {
+function SendingCard({
+  request,
+  since,
+  onReset
+
+
+
+}: {request: UploadBatchRequest;since: number;onReset: () => void;}) {
   const [now, setNow] = useState(() => Date.now());
+  // 누른 버튼이 사라지므로 초점을 제목으로 옮긴다. body 로 떨어지면 키보드로 이어 갈 자리를 잃는다
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => heading.current?.focus(), []);
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
@@ -448,7 +458,9 @@ function SendingCard({ request, since }: {request: UploadBatchRequest;since: num
     <section className={BOX} aria-busy="true">
       <div className="flex items-center gap-2.5">
         <Loader2Icon className="h-4 w-4 animate-spin text-ink2" aria-hidden="true" />
-        <h2 className="text-body-lg font-bold text-ink">카드내역을 올리고 있습니다</h2>
+        <h2 ref={heading} tabIndex={-1} className="text-body-lg font-bold text-ink outline-none">
+          카드내역을 올리고 있습니다
+        </h2>
       </div>
       <Identity request={request} />
       <p className="mt-4 text-body text-ink">
@@ -457,6 +469,15 @@ function SendingCard({ request, since }: {request: UploadBatchRequest;since: num
         <span className="tabular-nums text-ink2">{formatNumber(seconds)}초</span>
       </p>
       <p className="mt-1.5 text-body text-ink2">다른 화면으로 가도 올리기는 이어집니다.</p>
+      {/*
+        서버가 오래 답하지 않을 때 빠져나갈 길이다. 보낸 요청을 거두지는 못한다 — 서버가 끝내면 업로드 이력에 남는다.
+        reset 은 이 업로드의 결과를 버리고 다음 파일을 받는다
+      */}
+      <Actions>
+        <Button variant="secondary" className="whitespace-nowrap" onClick={onReset}>
+          다른 파일 올리기
+        </Button>
+      </Actions>
     </section>);
 
 }
@@ -528,7 +549,13 @@ function PreviewCard({
   const error = send instanceof ApiRequestError ? send : null;
   const view = error ? sendErrorView(error) : null;
   // 같은 요청은 같은 오류로 끝나므로, 다시 보낼 수 있는 오류에서만 버튼을 살린다
-  const canSend = request !== null && send !== 'sending' && (view === null || view.retry !== undefined);
+  // 보내는 동안은 SendingCard 가 대신 그려져 여기서 sending 을 볼 일이 없다
+  const canSend = request !== null && (view === null || view.retry !== undefined);
+  // 보내다 실패하면 이 카드가 새로 그려져 누른 버튼의 초점이 사라진다. 오류 문구로 옮겨 읽히고 바로 다시 시도로 갈 수 있게 한다
+  const errorBox = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (error) errorBox.current?.focus();
+  }, [error]);
 
   const counts = [
   { term: '읽은 행', value: rows.length },
@@ -682,7 +709,7 @@ function PreviewCard({
       {request === null && <p className="mt-6 text-body text-deny">보낼 수 있는 거래가 없습니다.</p>}
 
       {error && view &&
-      <div role="alert" className="mt-6 text-body text-deny">
+      <div ref={errorBox} tabIndex={-1} role="alert" className="mt-6 text-body text-deny outline-none">
           <p>{view.message}</p>
           {view.trace && error.traceId &&
         <p className="mt-1 text-caption tabular-nums text-muted">추적 번호 {error.traceId}</p>
@@ -700,7 +727,7 @@ function PreviewCard({
           다른 파일 올리기
         </Button>
         <Button className="whitespace-nowrap" disabled={!canSend} onClick={onSend}>
-          {send === 'sending' ? '올리는 중' : view?.retry ?? `${formatNumber(sent.length)}건 올리기`}
+          {view?.retry ?? `${formatNumber(sent.length)}건 올리기`}
         </Button>
       </Actions>
     </section>);
