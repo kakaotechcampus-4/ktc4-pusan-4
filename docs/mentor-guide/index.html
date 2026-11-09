@@ -134,6 +134,8 @@ ol.points li{counter-increment:pt;position:relative;padding:10px 0 10px 34px;bor
 ol.points li:last-child{border-bottom:0}
 ol.points li::before{content:counter(pt);position:absolute;left:0;top:13px;width:22px;height:22px;border-radius:50%;background:#E5243B;color:#fff;font-size:12px;font-weight:700;line-height:22px;text-align:center;font-variant-numeric:tabular-nums}
 ol.points b{color:var(--ink)}
+table.example{margin-top:12px}
+table.example td:first-child{color:var(--muted);white-space:normal;width:44%}
 </style>
 </head>
 <body>
@@ -198,6 +200,18 @@ ol.points b{color:var(--ink)}
       <div class="body">
         <h2>사업자 문진</h2>
         <p>프리랜서 본인이라고 생각하고 상황에 맞게 넣은 뒤 「저장」을 누릅니다. 여기서 넣은 값이 뒤 단계의 금액에 그대로 반영됩니다.</p>
+        <p class="sub">무엇을 넣을지 망설여지시면 아래 예시를 그대로 쓰셔도 됩니다.</p>
+        <table class="example">
+          <thead><tr><th>항목</th><th>예시</th></tr></thead>
+          <tbody>
+            <tr><td>업종</td><td>프리랜서, 인적용역 (미리 골라져 있음)</td></tr>
+            <tr><td>직전연도 수입금액을 알고 있나요?</td><td>예</td></tr>
+            <tr><td>직전연도 수입금액</td><td>50,000,000원 → 기장의무 간편장부</td></tr>
+            <tr><td>개업일</td><td>2024. 03. 01 (과거 날짜면 아무거나)</td></tr>
+            <tr><td>직원</td><td>없음 (1인) (미리 골라져 있음)</td></tr>
+            <tr><td>자택에서 작업하나요?</td><td>예, 작업 공간 비율 20%</td></tr>
+          </tbody>
+        </table>
         <figure class="shot"><a href="img/02-interview.jpg" target="_blank"><img src="img/02-interview.jpg" alt="사업자 문진 화면" loading="lazy"></a></figure>
         <ol class="points">
           <li><b>직전연도 수입금액을 알고 있는지</b> 먼저 고릅니다. 모른다고 하면 기준을 보여 주고 기장의무를 직접 고르게 합니다.</li>
