@@ -159,6 +159,9 @@ Question
 ├── judgment-runs/
 │   ├── POST                            Batch 전체 판정 실행
 │   │
+│   ├── active/
+│   │   └── GET                         진행 중인 판정 실행 조회
+│   │
 │   └── {runId}/
 │       ├── GET                         판정 실행 상태 조회
 │       └── failures/
@@ -1663,10 +1666,10 @@ classificationStatus = CLASSIFIED
 409 RUN_ALREADY_ACTIVE
 ```
 
-같은 Batch에 진행 중(`QUEUED`, `RUNNING`)인 Run이 있으면 `409 RUN_ALREADY_ACTIVE`다. 본문 `runId`가 그 Run이라 화면은 그 Run의 진행 화면으로 가면 된다. 두 Run이 같은 거래를 동시에 판정하면 늦게 쓴 쪽이 최신이 되어 다른 문진의 결과가 섞이기 때문이다(#187).
+이 사용자에게 진행 중(`QUEUED`, `RUNNING`)인 Run이 있으면 Batch와 상관없이 `409 RUN_ALREADY_ACTIVE`다. 본문 `runId`가 그 Run이라 화면은 그 Run의 진행 화면으로 가면 된다. 두 Run이 같은 거래를 동시에 판정하면 늦게 쓴 쪽이 최신이 되어 다른 문진의 결과가 섞이기 때문이다(#187). 같은 파일을 다시 올리면 Batch가 새로 생기므로 Batch 기준으로는 막히지 않는다.
 
 - 마지막 진행 뒤 5분이 지난 Run은 진행 중으로 보지 않는다. 서버가 내려가 남은 Run이고, 정리 작업이 곧 `RUN_INTERRUPTED`로 끝낸다.
-- 다른 Batch의 Run과는 상관없다.
+- 화면은 판정을 시작하기 전에 `GET /judgment-runs/active`로 진행 중인 Run을 확인한다.
 
 ### 재실행
 
@@ -1680,6 +1683,16 @@ T1 rev2 ← Run R2
 ```
 
 각 revision은 자신을 실제 생성한 Run만 참조한다.
+
+---
+
+## `GET /api/v1/judgment-runs/active`
+
+이 사용자의 진행 중(`QUEUED`, `RUNNING`)인 Run을 준다. 진행 화면을 떠났다가 돌아올 길과, 판정 시작을 막을 근거로 쓴다.
+
+- 있으면 `200`, 본문은 아래 `GET /judgment-runs/{runId}`와 같다.
+- 없으면 `204`, 본문 없음.
+- 진행 중의 기준은 `POST`의 `409 RUN_ALREADY_ACTIVE`와 같다(마지막 진행 뒤 5분이 지난 Run은 뺀다).
 
 ---
 

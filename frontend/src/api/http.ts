@@ -369,6 +369,8 @@ export const httpApi: Api = {
   runs: {
     create: (body) => post('/judgment-runs', body),
     get: (runId) => get(`/judgment-runs/${runId}`),
+    // 204 는 본문이 없어 null 로 온다
+    active: () => get('/judgment-runs/active'),
     failures: (runId, query) => get(`/judgment-runs/${runId}/failures`, page(query))
   },
 

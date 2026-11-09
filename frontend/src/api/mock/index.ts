@@ -628,6 +628,10 @@ transactionId?: string)
 const notFound = (code: string, message: string) =>
 Promise.reject(new ApiRequestError(404, code, message, nextId('mock-trace')));
 
+/** 진행 중인 실행. 체험 화면은 한 사용자라 전부에서 찾는다. 가장 새것을 준다 */
+const activeRun = () =>
+[...store.runs.values()].filter((r) => r.status.code === 'QUEUED' || r.status.code === 'RUNNING').at(-1) ?? null;
+
 /** 승인·기각. 검토한 사람과 시각을 남긴다. 이미 처리한 후보는 다시 바꾸지 않는다 */
 const reviewCandidate = (id: number, status: RuleCandidate['status']) => {
   if (!isAdminEmail(store.email))
@@ -1056,6 +1060,12 @@ const mockGroups: Api = {
       return notFound('BATCH_NOT_FOUND', '업로드를 찾을 수 없습니다.');
       const context = store.contexts.find((c) => c.id === contextId);
       if (!context) return notFound('CONTEXT_NOT_FOUND', '사업자 문진을 찾을 수 없습니다.');
+      // 진행 중인 실행이 있으면 업로드와 상관없이 막는다 (api.md 3.6)
+      const active = activeRun();
+      if (active)
+      return Promise.reject(
+        new ApiRequestError(409, 'RUN_ALREADY_ACTIVE', '이미 판정 중인 업로드가 있습니다. 끝난 뒤 다시 실행해 주세요.', '', undefined, active.id)
+      );
       // 판정 대상은 JUDGEABLE 이면서 분류가 끝난 거래다. 미분류는 엔진에 넘기지 않는다(api.md 3.3)
       const judgeable = (t: Transaction) =>
       t.batchId === batchId &&
@@ -1131,6 +1141,10 @@ const mockGroups: Api = {
         }
       }
       return delay({ ...run });
+    },
+    active: () => {
+      const run = activeRun();
+      return delay(run ? { ...run } : null);
     },
     failures: (runId, q) => {
       const run = store.runs.get(runId);

@@ -18,6 +18,11 @@ beforeEach(async () => {
 /** 시드: 1016 은 소명 대기(자동 판정 불가인데 「용도」 질문이 남음), 1005 는 카페 「용도」 질문 */
 const tx = (suffix: string) => `0199c8f2-0000-7000-8000-0000000000${suffix}`;
 const currentOf = async (transactionId: string) => (await api.judgments.list({ transactionId })).items[0];
+/** 목업 실행은 조회할 때마다 나아간다. 끝날 때까지 조회한다 */
+const finish = async (runId: string) => {
+  let run = await api.runs.get(runId);
+  while (run.status.code === 'QUEUED' || run.status.code === 'RUNNING') run = await api.runs.get(runId);
+};
 const pendingGroups = () => api.questions.grouped({ batchId, status: 'PENDING', size: 50 });
 const groupOf = async (transactionId: string) => {
   const group = (await pendingGroups()).items.find((g) => g.transactions.some((t) => t.transactionId === transactionId));
@@ -338,9 +343,27 @@ describe('문진·판정 실행', () => {
     controls.failNextRun(1, 'RUN_START_FAILED');
     const run = await api.runs.create({ batchId, contextId: seed.id });
     expect((await api.runs.failures(run.id)).items.map((f) => f.errorCode)).toEqual(['RUN_START_FAILED']);
+    await finish(run.id);
 
     const next = await api.runs.create({ batchId, contextId: seed.id });
     expect((await api.runs.failures(next.id)).items).toHaveLength(0);
+  });
+
+  it('진행 중인 실행이 있으면 active 가 그것을 주고, 새 실행은 409 로 그 실행을 알려 준다 (3.6)', async () => {
+    const seed = await api.contexts.current();
+    if (!seed) throw new Error('시드 문진이 없다');
+    expect(await api.runs.active()).toBeNull();
+
+    const run = await api.runs.create({ batchId, contextId: seed.id });
+    expect((await api.runs.active())?.id).toBe(run.id);
+    await expect(api.runs.create({ batchId, contextId: seed.id })).rejects.toMatchObject({
+      status: 409,
+      code: 'RUN_ALREADY_ACTIVE',
+      runId: run.id
+    });
+
+    await finish(run.id);
+    expect(await api.runs.active()).toBeNull();
   });
 });
 

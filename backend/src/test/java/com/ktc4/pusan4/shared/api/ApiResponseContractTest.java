@@ -526,7 +526,7 @@ class ApiResponseContractTest {
     void active_run_conflict_names_the_active_run() throws Exception {
         // given
         given(runService.create(any(), any(), any())).willThrow(new ApiException(
-            org.springframework.http.HttpStatus.CONFLICT, "RUN_ALREADY_ACTIVE", "이 업로드는 이미 판정 중입니다.", ID));
+            org.springframework.http.HttpStatus.CONFLICT, "RUN_ALREADY_ACTIVE", "이미 판정 중인 업로드가 있습니다.", ID));
 
         // when / then: api.md 1.3·3.6 — 409 RUN_ALREADY_ACTIVE 는 진행 중인 run 의 id 를 함께 준다
         mockMvc.perform(request(HttpMethod.POST, "/api/v1/judgment-runs")
