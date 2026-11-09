@@ -126,8 +126,9 @@
 > **AI가 규칙 카드 초안 작성 → 관리자 승인 → 자동 PR**
 > 승인된 후보를 규칙 카드 파일로 만들어 매주 develop에 PR을 올립니다
 
+> 후보 카드 디스코드 알림 → 관리자 화면에서 후보 확인 · 승인 → 카드제작PR 생성 디스코드 알림 → 자동으로 열린 카드 PR
+
 <p align="center"><img src="./docs/img/readme/rule-candidate.gif" width="80%" alt="규칙 후보 자동 승격" /></p>
-<p align="center">디스코드 후보 알림 → 관리자 화면에서 후보 확인 · 승인 → 주간 배치 알림 → 자동으로 열린 카드 PR</p>
 
 <br/>
 
