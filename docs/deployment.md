@@ -325,6 +325,17 @@ systemctl list-timers ktc4-rule-candidates.timer
 
 실패하면 서비스가 failed로 남고 `journalctl`에 원인이 있다. 원인을 고친 뒤 `systemctl start ktc4-rule-candidates.service`로 다시 돌린다. 후보 추출은 이미 행이 있는 조합을 건너뛰고, promote는 PR에 올린 후보를 다시 올리지 않는다.
 
+**조합을 정해 후보 만들기.** 미판정 집계 없이 (카테고리 × 업종) 하나로 후보를 만들려면 `--key`를 준다. 사용자 수·빈도는 0으로 들어가고, 이미 같은 조합의 후보가 있어도 하나 더 만든다. 이미지 태그와 마운트는 `deploy/rule-candidates.sh`와 같다.
+
+```bash
+sudo -i
+repo=/opt/ktc4/repo; sha=$(cat /opt/ktc4/current-sha)
+set -a; source /etc/ktc4/production.env; set +a
+export IMAGE_TAG=$sha POSTGRES_TAG=$(git -C "$repo" rev-parse "$sha:docker/postgres" | cut -c1-12)
+docker compose --env-file /etc/ktc4/production.env -f "$repo/deploy/compose.yaml" run --rm --no-deps -T \
+  -v "$repo/docs:/docs:ro" -v "$repo/profiles:/profiles:ro" ai-job python -m pipeline.candidates --key 카페/940909
+```
+
 ## 12. 관리자 지정
 
 규칙 후보 관리자 API(api.md 3.15)는 `app_user.role`이 `ADMIN`인 사용자만 부른다. 가입하면 `USER`이고, 앱에는 role을 바꾸는 API가 없다. 관리자는 운영 서버에서 DB로 지정한다.
