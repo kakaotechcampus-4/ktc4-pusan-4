@@ -3,7 +3,7 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { Link, useLocation } from 'react-router-dom';
 import { CheckIcon } from 'lucide-react';
 import { DisclaimerBar } from './DisclaimerBar';
-import { MAIN_ID } from './ui';
+import { Button, MAIN_ID } from './ui';
 import { BugReportButton } from './BugReport';
 import { Logo } from './Logo';
 import { AccountMenu } from './AccountMenu';
@@ -85,6 +85,14 @@ export function AppShell({ children, showSteps = true, disclaimer = true, narrow
   const progress = progressQ.error ? null : fresh ?? (lastProgress?.batch.id === batchId ? lastProgress : null);
   const done = doneSteps(progress);
 
+  /**
+   * 진행 중인 판정. 진행 화면을 떠나도 어느 화면에서든 돌아갈 길을 띠로 준다. 단계 표시는 좁은 화면에서 숨어서
+   * 그것만으로는 길이 없다. 진행 화면과, 그리로 보내는 판정 전 확인에서는 띄우지 않는다. 못 읽으면 띄우지 않는다
+   */
+  const onRunFlow = under(pathname, '/run') || under(pathname, '/confirm');
+  const activeRunQ = useApi(() => onRunFlow ? Promise.resolve(null) : api.runs.active(), [onRunFlow]);
+  const activeRun = activeRunQ.error ? null : activeRunQ.data;
+
   return (
     <div className="flex min-h-full w-full flex-col bg-canvas">
       <header className="sticky top-0 z-30 border-b border-line bg-canvas/95 shadow-header backdrop-blur print:hidden">
@@ -142,6 +150,17 @@ export function AppShell({ children, showSteps = true, disclaimer = true, narrow
           <AccountMenu />
         </div>
       </header>
+
+      {activeRun &&
+      <div role="status" className="border-b border-line bg-surface print:hidden">
+          <div className="mx-auto flex max-w-page items-center gap-3 px-6 py-2">
+            <p className="min-w-0 flex-1 text-small text-ink [word-break:keep-all]">판정하고 있습니다.</p>
+            <Button to={`/run/${activeRun.id}`} size="sm" variant="secondary" className="shrink-0">
+              진행 보기
+            </Button>
+          </div>
+        </div>
+      }
 
       {disclaimer && <DisclaimerBar />}
 

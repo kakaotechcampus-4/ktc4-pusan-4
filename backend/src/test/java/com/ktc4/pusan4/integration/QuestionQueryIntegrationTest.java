@@ -88,6 +88,19 @@ class QuestionQueryIntegrationTest {
                 .param("status", "ANSWERED"))
             .andExpect(jsonPath("$.items[*].id", contains(answered.toString())))
             .andExpect(jsonPath("$.unresolved.count").value(2));
+
+        // when / then: 쪽은 status 를 건 뒤에 나누고, 미해소 집계는 쪽과 상관없다
+        mockMvc.perform(get("/api/v1/questions")
+                .param("batchId", batchId.toString())
+                .param("status", "PENDING")
+                .param("page", "1")
+                .param("size", "1"))
+            .andExpect(jsonPath("$.items[*].id", contains(otherPending.toString())))
+            .andExpect(jsonPath("$.items[0].transactionId").value(second.toString()))
+            .andExpect(jsonPath("$.page.totalElements").value(2))
+            .andExpect(jsonPath("$.page.hasNext").value(false))
+            .andExpect(jsonPath("$.unresolved.count").value(2))
+            .andExpect(jsonPath("$.unresolved.amount").value(9_500));
     }
 
     @Test
@@ -128,6 +141,60 @@ class QuestionQueryIntegrationTest {
             .andExpect(jsonPath("$.items[1].bulkAnswerable").value(false))
             .andExpect(jsonPath("$.unresolved.count").value(3))
             .andExpect(jsonPath("$.page.totalElements").value(2));
+    }
+
+    @Test
+    void grouped_list_pages_keep_group_order_and_whole_groups() throws Exception {
+        // given: 대기 그룹 셋(질문 3, 2, 1개)과 답한 그룹 하나. 둘째 그룹의 한 거래는 자동 판정이 불가(소명 대기)다
+        UUID factId = insertFact(batchId, "merchant:편의점", "용도", "사업");
+        for (int day = 1; day <= 3; day++) {
+            UUID transaction = insertTransaction(batchId, "2025-10-0" + day, 1_000L);
+            insertQuestion(insertJudgment(transaction, "NEEDS_REVIEW"), "merchant:카페", "용도", "PENDING", null,
+                "2025-10-20T10:0" + day + ":00+09:00");
+        }
+        UUID second = insertTransaction(batchId, "2025-10-05", 2_000L);
+        UUID secondQuestion = insertQuestion(insertJudgment(second, "NEEDS_REVIEW"), "merchant:식당", "용도", "PENDING",
+            null, "2025-10-20T11:00:00+09:00");
+        UUID awaiting = insertTransaction(batchId, "2025-10-06", 2_000L);
+        UUID awaitingQuestion = insertQuestion(insertJudgment(awaiting, "UNAVAILABLE"), "merchant:식당", "용도",
+            "PENDING", null, "2025-10-20T11:01:00+09:00");
+        UUID third = insertTransaction(batchId, "2025-10-07", 9_000L);
+        UUID thirdQuestion = insertQuestion(insertJudgment(third, "NEEDS_REVIEW"), "merchant:서점", "용도", "PENDING",
+            null, "2025-10-20T12:00:00+09:00");
+        UUID answered = insertTransaction(batchId, "2025-10-08", 1_000L);
+        insertQuestion(insertJudgment(answered, "NEEDS_REVIEW"), "merchant:편의점", "용도", "ANSWERED", factId,
+            "2025-10-20T13:00:00+09:00");
+
+        // when / then: 한 쪽에 한 그룹씩. 순서는 건수 순이고, 그룹은 질문을 모두 담는다
+        mockMvc.perform(get("/api/v1/questions")
+                .param("batchId", batchId.toString())
+                .param("status", "PENDING")
+                .param("grouped", "true")
+                .param("page", "1")
+                .param("size", "1"))
+            .andExpect(jsonPath("$.items[*].groupKey", contains("merchant:식당")))
+            .andExpect(jsonPath("$.items[0].questionIds", contains(secondQuestion.toString(), awaitingQuestion.toString())))
+            .andExpect(jsonPath("$.items[0].totalAmount").value(4_000))
+            .andExpect(jsonPath("$.items[0].bulkAnswerable").value(false))
+            .andExpect(jsonPath("$.page.totalElements").value(3))
+            .andExpect(jsonPath("$.unresolved.count").value(6));
+        mockMvc.perform(get("/api/v1/questions")
+                .param("batchId", batchId.toString())
+                .param("status", "PENDING")
+                .param("grouped", "true")
+                .param("page", "2")
+                .param("size", "1"))
+            .andExpect(jsonPath("$.items[0].questionIds", contains(thirdQuestion.toString())))
+            .andExpect(jsonPath("$.items[0].bulkAnswerable").value(true))
+            .andExpect(jsonPath("$.page.hasNext").value(false));
+
+        // when / then: 답한 그룹은 답을 담는다
+        mockMvc.perform(get("/api/v1/questions")
+                .param("batchId", batchId.toString())
+                .param("status", "ANSWERED")
+                .param("grouped", "true"))
+            .andExpect(jsonPath("$.items[*].groupKey", contains("merchant:편의점")))
+            .andExpect(jsonPath("$.items[0].answer.value").value("사업"));
     }
 
     @Test

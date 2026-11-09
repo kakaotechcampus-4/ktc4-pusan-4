@@ -75,8 +75,9 @@ public class JudgmentRunService {
      * 대상(판정대상이면서 분류 완료)을 run 항목으로 고정하고 QUEUED 로 만든다.
      * 실행은 이 트랜잭션이 커밋된 뒤 시작된다(JudgmentRunner).
      *
-     * <p>같은 batch 에 진행 중인 run 이 있으면 409 다(api.md 3.6). 두 run 이 같은 거래를 동시에 판정하면
-     * 늦게 쓴 쪽이 최신이 되어 다른 문진의 결과가 섞인다(#187). 끝난 run 뒤의 재실행은 막지 않는다.
+     * <p>이 사용자에게 진행 중인 run 이 있으면 업로드와 상관없이 409 다(api.md 3.6). 두 run 이 같은 거래를
+     * 동시에 판정하면 늦게 쓴 쪽이 최신이 되어 다른 문진의 결과가 섞이고(#187), 같은 파일을 다시 올리면
+     * batch 가 달라 batch 기준으로는 막히지 않는다. 끝난 run 뒤의 재실행은 막지 않는다.
      * 동시 요청은 사용자 락으로 차례로 세운다.
      */
     @Transactional
@@ -86,10 +87,10 @@ public class JudgmentRunService {
         }
         BusinessContext context = contextService.find(userId, contextId);
         limitSettlement.lockUser(userId);
-        List<UUID> active = runRepository.findActiveIds(batchId, now().minus(STALE_AFTER));
-        if (!active.isEmpty()) {
+        Optional<JudgmentRunEntity> active = findActive(userId);
+        if (active.isPresent()) {
             throw new ApiException(HttpStatus.CONFLICT, "RUN_ALREADY_ACTIVE",
-                "이 업로드는 이미 판정 중입니다. 끝난 뒤 다시 실행해 주세요.", active.getFirst().toString());
+                "이미 판정 중인 업로드가 있습니다. 끝난 뒤 다시 실행해 주세요.", active.get().id().toString());
         }
         List<UUID> targetIds = transactionRepository.findRunTargetIds(batchId);
 
@@ -102,6 +103,19 @@ public class JudgmentRunService {
             .toList());
         eventPublisher.publishEvent(new JudgmentRunCreated(runId));
         return run.toDomain();
+    }
+
+    /**
+     * 이 사용자의 진행 중인 run. 화면이 진행 화면으로 돌아가거나 판정 시작을 막을 때 쓴다(api.md 3.6).
+     * 사용자당 하나만 있도록 만들지만, 이 규칙 전에 겹쳐 만든 run 이 남아 있으면 가장 새것을 준다.
+     */
+    @Transactional(readOnly = true)
+    public Optional<JudgmentRun> active(UUID userId) {
+        return findActive(userId).map(JudgmentRunEntity::toDomain);
+    }
+
+    private Optional<JudgmentRunEntity> findActive(UUID userId) {
+        return runRepository.findActiveForUser(userId, now().minus(STALE_AFTER)).stream().findFirst();
     }
 
     @Transactional(readOnly = true)

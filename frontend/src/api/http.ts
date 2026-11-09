@@ -369,6 +369,8 @@ export const httpApi: Api = {
   runs: {
     create: (body) => post('/judgment-runs', body),
     get: (runId) => get(`/judgment-runs/${runId}`),
+    // 204 는 본문이 없어 null 로 온다
+    active: () => get('/judgment-runs/active'),
     failures: (runId, query) => get(`/judgment-runs/${runId}/failures`, page(query))
   },
 
@@ -387,7 +389,9 @@ export const httpApi: Api = {
       transactionId: query?.transactionId,
       runId: query?.runId,
       verdict: query?.verdict,
-      latestOnly: query?.latestOnly
+      latestOnly: query?.latestOnly,
+      awaiting: query?.awaiting,
+      sort: query?.sort
     }),
     get: (judgmentId) => get(`/judgments/${judgmentId}`),
     export: (scope) => get('/judgments/export', { batchId: scope.batchId, year: scope.year }),

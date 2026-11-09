@@ -147,6 +147,30 @@ class JudgmentQueryIntegrationTest {
         mockMvc.perform(get("/api/v1/judgments").param("batchId", batchId.toString()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.items[*].id", contains(overrideRevision.toString(), automatic.toString())));
+
+        // when / then: 요약은 현재 판정 가운데 사용자가 바꾼 것만 바뀐 판정별로 센다. 해제한 수정은 세지 않는다
+        mockMvc.perform(get("/api/v1/judgments/summary").param("batchId", batchId.toString()))
+            .andExpect(jsonPath("$.overridden.UNAVAILABLE.count").value(1))
+            .andExpect(jsonPath("$.overridden.AVAILABLE.count").value(0))
+            .andExpect(jsonPath("$.overridden.NEEDS_REVIEW.count").value(0));
+    }
+
+    @Test
+    void summary_splits_available_amount_by_approval_year() throws Exception {
+        // given: 두 해에 걸친 가능 판정과, 가능이 없는 해의 불가 판정
+        UUID december = insertTransaction(batchId, "2025-12-30", "JUDGEABLE", "AUTO");
+        UUID decemberJudgment = insertJudgment(december, 1, "AVAILABLE", "run_id", runId, "2026-01-02T10:00:00+09:00");
+        UUID january = insertTransaction(batchId, "2026-01-03", "JUDGEABLE", "AUTO");
+        UUID januaryJudgment = insertJudgment(january, 1, "AVAILABLE", "run_id", runId, "2026-01-04T10:00:00+09:00");
+        jdbcTemplate.update("update judgment set final_amount = 4000 where id = ?", decemberJudgment);
+        jdbcTemplate.update("update judgment set final_amount = 6500 where id = ?", januaryJudgment);
+        UUID later = insertTransaction(batchId, "2027-02-01", "JUDGEABLE", "AUTO");
+        insertJudgment(later, 1, "UNAVAILABLE", "run_id", runId, "2027-02-02T10:00:00+09:00");
+
+        // when / then: 해 순이고, 가능이 없는 해는 0 이다
+        mockMvc.perform(get("/api/v1/judgments/summary").param("batchId", batchId.toString()))
+            .andExpect(jsonPath("$.byYear[*].year", contains(2025, 2026, 2027)))
+            .andExpect(jsonPath("$.byYear[*].finalAmount", contains(4000, 6500, 0)));
     }
 
     @Test
@@ -250,6 +274,56 @@ class JudgmentQueryIntegrationTest {
             .andExpect(jsonPath("$.byVerdict.NEEDS_REVIEW.count").value(1))
             .andExpect(jsonPath("$.byVerdict.UNAVAILABLE.count").value(1))
             .andExpect(jsonPath("$.byAccount").isEmpty());
+    }
+
+    @Test
+    void awaiting_answer_marks_unavailable_with_pending_question_and_narrows_sorts_and_sums() throws Exception {
+        // given: 질문이 남은 불가(답변 대기), 질문 없는 불가, 질문이 남은 가능
+        UUID awaitingTx = insertTransaction(batchId, "2025-01-05", "JUDGEABLE", "AUTO");
+        UUID awaiting = insertJudgment(awaitingTx, 1, "UNAVAILABLE", "run_id", runId, "2025-02-01T10:00:00+09:00");
+        insertPendingQuestion(awaiting);
+        UUID plainTx = insertTransaction(batchId, "2025-01-20", "JUDGEABLE", "AUTO");
+        UUID plain = insertJudgment(plainTx, 1, "UNAVAILABLE", "run_id", runId, "2025-02-01T09:00:00+09:00");
+        UUID availableTx = insertTransaction(batchId, "2025-01-10", "JUDGEABLE", "AUTO");
+        UUID available = insertJudgment(availableTx, 1, "AVAILABLE", "run_id", runId, "2025-02-01T11:00:00+09:00");
+        insertPendingQuestion(available);
+
+        // when / then: 기본은 판정한 시각 순, APPROVED_AT 은 승인일 순이다. 표지는 불가에만 붙는다
+        mockMvc.perform(get("/api/v1/judgments").param("batchId", batchId.toString()))
+            .andExpect(jsonPath("$.items[*].id", contains(available.toString(), awaiting.toString(), plain.toString())))
+            .andExpect(jsonPath("$.items[*].awaitingAnswer", contains(false, true, false)));
+        mockMvc.perform(get("/api/v1/judgments").param("batchId", batchId.toString()).param("sort", "APPROVED_AT"))
+            .andExpect(jsonPath("$.items[*].id", contains(plain.toString(), available.toString(), awaiting.toString())));
+
+        // when / then: awaiting 은 답변 대기만 또는 그것을 뺀 것만 남긴다
+        mockMvc.perform(get("/api/v1/judgments").param("batchId", batchId.toString()).param("awaiting", "true"))
+            .andExpect(jsonPath("$.items[*].id", contains(awaiting.toString())))
+            .andExpect(jsonPath("$.page.totalElements").value(1));
+        mockMvc.perform(get("/api/v1/judgments")
+                .param("batchId", batchId.toString())
+                .param("verdict", "UNAVAILABLE")
+                .param("awaiting", "false"))
+            .andExpect(jsonPath("$.items[*].id", contains(plain.toString())));
+        mockMvc.perform(get("/api/v1/judgments/{id}", awaiting))
+            .andExpect(jsonPath("$.awaitingAnswer").value(true));
+
+        // when / then: 요약은 판정별 결제 금액과 답변 대기를 함께 준다. 답변 대기는 불가에도 들어 있다
+        mockMvc.perform(get("/api/v1/judgments/summary").param("batchId", batchId.toString()))
+            .andExpect(jsonPath("$.byVerdict.UNAVAILABLE.count").value(2))
+            .andExpect(jsonPath("$.byVerdict.UNAVAILABLE.spendAmount").value(13_000))
+            .andExpect(jsonPath("$.byVerdict.AVAILABLE.spendAmount").value(6_500))
+            .andExpect(jsonPath("$.awaiting.count").value(1))
+            .andExpect(jsonPath("$.awaiting.spendAmount").value(6_500));
+        mockMvc.perform(get("/api/v1/judgments/summary").param("runId", runId.toString()))
+            .andExpect(jsonPath("$.awaiting.count").value(1));
+    }
+
+    private void insertPendingQuestion(UUID judgmentId) {
+        jdbcTemplate.update("""
+            insert into question_queue(
+                id, judgment_id, reason_code, question_text, group_key, fact_type, options, status
+            ) values (?, ?, 'Q-TEST', '용도가 무엇인가요?', 'merchant:스타벅스', '용도', '["사업", "개인"]', 'PENDING')
+            """, UUID.randomUUID(), judgmentId);
     }
 
     private UUID insertUser() {

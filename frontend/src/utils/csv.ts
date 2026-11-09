@@ -1,6 +1,6 @@
 import { categoryLabel, merchantTitle } from '../components/results/display';
 import { answerLabel } from '../components/questions/logic';
-import type { Judgment, JudgmentExportRow, LimitYear } from '../types/domain';
+import type { JudgmentExportRow, LimitYear } from '../types/domain';
 import { formatWon } from './format';
 import { limitsOf } from './limit';
 import { statuteTitle } from './statute';
@@ -40,16 +40,6 @@ const citationTitle = (statuteId: string) => {
   const title = statuteTitle(statuteId, law);
   return title === law ? statuteId : title;
 };
-
-/**
- * 내보내기 API 가 없는 서버에서 판정 목록으로 같은 모양을 만든다. 경비 가능 금액은 한도(접대비)를 반영하지 않은
- * finalAmount 이고, 답한 내용은 비어 있다
- */
-export const exportRowOf = (judgment: Judgment): JudgmentExportRow => ({
-  judgment,
-  allowedAmount: judgment.verdict.code === 'AVAILABLE' ? judgment.finalAmount ?? 0 : 0,
-  answers: []
-});
 
 /**
  * 세무사에게 넘길 CSV (2026-10-05 협업 미팅의 칸: 상품 이름, 판정 결과, 근거 조문, 사용 목적, 사용 날짜).

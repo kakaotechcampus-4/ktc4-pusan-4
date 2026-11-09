@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { DownloadIcon, SearchXIcon } from 'lucide-react';
+import { DownloadIcon, Loader2Icon, SearchXIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { JudgmentDetailPanel } from '../components/results/JudgmentDetailPanel';
 import { AmountHero } from '../components/results/AmountHero';
@@ -11,16 +11,13 @@ import { BottomSheet, Button, Empty, FilterBar, IconButton, Pagination, Table, t
 import { useAssistantSubject } from '../components/assistant/context';
 import { api, useApi } from '../api';
 import { readAll } from '../api/readAll';
-import type { Judgment, UploadBatch, Verdict } from '../types/domain';
+import type { Judgment, UploadBatch } from '../types/domain';
 import { formatFullDate } from '../utils/format';
-import { sharesOf } from '../utils/shares';
-import { AWAITING_ANSWER, awaitingOf } from '../utils/verdict';
+import { sharesOf, spendOf } from '../utils/shares';
+import { AWAITING_ANSWER, verdictFilterQuery, type VerdictFilter } from '../utils/verdict';
 import { download, judgmentsCsv } from '../utils/csv';
 import { exceededLimitOf, limitLine, limitsOf, PROVISIONAL_NOTE } from '../utils/limit';
 import { useMediaQuery } from '../hooks/useMediaQuery';
-
-/** 답변 대기는 판정이 아니라 불가에 붙는 표지라 서버 필터가 없다. 불가를 읽어 화면에서 가른다 (C12) */
-type Filter = 'ALL' | Verdict | 'AWAITING';
 
 const PAGE_SIZE = 20;
 
@@ -43,11 +40,12 @@ const head = (text: string) => <span className="whitespace-nowrap">{text}</span>
 /**
  * 한 해 전체의 판정 결과. 결과와 요약은 올린 파일 하나만 보여서, 카드를 여러 장 올리면 그해를 합쳐 볼 곳이 없었다.
  * 신고는 해마다 하므로 year 로 읽는다(api.md 3.7). 접대비 한도는 year 집계에서만 경비 가능 금액에 반영된다.
- * 목록, 판정별 몫, CSV 는 내보내기(현재 판정 전부, 페이지 없음) 한 번으로 그린다
+ * 표는 결과 화면처럼 한 쪽씩 서버에서 받고, 건수와 금액은 요약에서 받는다. 한 해는 수천 건이라 전부 읽지 않는다.
+ * CSV 는 누를 때 내보내기(현재 판정 전부)를 읽는다
  */
 export function Yearly() {
   const [pickedYear, setPickedYear] = useState<number | null>(null);
-  const [filter, setFilter] = useState<Filter>('ALL');
+  const [filter, setFilter] = useState<VerdictFilter>('ALL');
   const [page, setPage] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [focusKey, setFocusKey] = useState(0);
@@ -63,50 +61,25 @@ export function Yearly() {
     () => year ? api.judgments.summary({ year }).then((data) => ({ year, data })) : Promise.resolve(null),
     [year]
   );
-  const exportQ = useApi(
-    () => year ? api.judgments.export({ year }).then((data) => ({ year, data })) : Promise.resolve(null),
-    [year]
-  );
-  // 답을 기다리는 질문. 해마다 거르는 조건이 없어 전부 읽고 그해 판정과 맞춘다. 못 읽으면 답변 대기 표지만 빠진다
-  const pendingQ = useApi(
+  // 표의 한 쪽. 서버가 필터로 거르고 승인일 최근 순으로 세워 준다. 해를 바꾸는 동안 앞 해의 쪽은 그리지 않는다
+  const listQ = useApi(
     () =>
-    readAll((page, size) => api.questions.list({ status: 'PENDING', page, size })).then(
-      (pending) => new Set(pending.map((question) => question.transactionId))
-    ),
-    []
+    year ?
+    api.judgments.
+    list({ year, ...verdictFilterQuery(filter), sort: 'APPROVED_AT', page, size: PAGE_SIZE }).
+    then((data) => ({ year, data })) :
+    Promise.resolve(null),
+    [year, filter, page]
   );
+  const [exporting, setExporting] = useState(false);
+  const [exportFailed, setExportFailed] = useState(false);
 
   const summary = summaryQ.data?.year === year ? summaryQ.data.data : null;
-  const exported = exportQ.data?.year === year ? exportQ.data.data : null;
+  const listed = listQ.data?.year === year ? listQ.data.data : null;
   const limits = summary?.limits ?? [];
-
-  // 서버는 판정한 시각 순으로 준다. 결과 화면처럼 승인일 최근 순으로 세운다
-  const all = exported ?
-  exported.items.
-  map((row) => row.judgment).
-  sort((a, b) => b.transaction.approvedAt.localeCompare(a.transaction.approvedAt) || b.id.localeCompare(a.id)) :
-  null;
-  const awaiting = pendingQ.data ?? new Set<string>();
-  const unavailable = all?.filter((judgment) => judgment.verdict.code === 'UNAVAILABLE') ?? [];
-  const awaitingRows = awaitingOf(unavailable, awaiting);
-  const awaitingCount = awaitingRows.length;
-  const spend = all ? all.reduce((sum, judgment) => sum + judgment.transaction.amount, 0) : null;
-  const filtered =
-  filter === 'ALL' ?
-  all ?? [] :
-  filter === 'AWAITING' ?
-  awaitingRows :
-  filter === 'UNAVAILABLE' ?
-  unavailable.filter((judgment) => !awaiting.has(judgment.transactionId)) :
-  all?.filter((judgment) => judgment.verdict.code === filter) ?? [];
-  const listPage = {
-    number: page,
-    size: PAGE_SIZE,
-    totalElements: filtered.length,
-    totalPages: Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)),
-    hasNext: (page + 1) * PAGE_SIZE < filtered.length
-  };
-  const judgments: Judgment[] = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const awaitingCount = summary?.awaiting.count ?? 0;
+  const judgments: Judgment[] = listed?.items ?? [];
+  const listPage = listed?.page;
 
   const panelQ = useApi(
     () => {
@@ -131,7 +104,7 @@ export function Yearly() {
     if (!wide) setSelectedId(null);
   }, [wide]);
 
-  const pageEmpty = Boolean(all) && judgments.length === 0;
+  const pageEmpty = Boolean(listed) && judgments.length === 0;
   useEffect(() => {
     if (page > 0 && pageEmpty) setPage(0);
   }, [page, pageEmpty]);
@@ -143,8 +116,7 @@ export function Yearly() {
 
   const changed = () => {
     summaryQ.reload();
-    exportQ.reload();
-    pendingQ.reload();
+    listQ.reload();
     panelQ.reload();
   };
 
@@ -160,9 +132,18 @@ export function Yearly() {
     setSelectedId(null);
   };
 
-  const exportCsv = () => {
-    if (!exported || !year) return;
-    download(`PreeT-판정결과-${year}.csv`, judgmentsCsv(exported.items, exported.limits));
+  const exportCsv = async () => {
+    if (!year || exporting) return;
+    setExporting(true);
+    setExportFailed(false);
+    try {
+      const { items, limits: exportLimits } = await api.judgments.export({ year });
+      download(`PreeT-판정결과-${year}.csv`, judgmentsCsv(items, exportLimits));
+    } catch {
+      setExportFailed(true);
+    } finally {
+      setExporting(false);
+    }
   };
 
   const filters = [
@@ -172,14 +153,14 @@ export function Yearly() {
   {
     value: 'UNAVAILABLE' as const,
     label: '불가',
-    count: summary && all && (pendingQ.data || pendingQ.error) ? summary.byVerdict.UNAVAILABLE.count - awaitingCount : undefined
+    count: summary ? summary.byVerdict.UNAVAILABLE.count - awaitingCount : undefined
   },
   ...(awaitingCount > 0 || filter === 'AWAITING' ?
   [{ value: 'AWAITING' as const, label: AWAITING_ANSWER, count: awaitingCount }] :
   [])];
 
   const yearLimits = limitsOf(limits);
-  const firstLoad = Boolean(year) && (!summary && !summaryQ.error || !exported && !exportQ.error);
+  const firstLoad = Boolean(year) && (!summary && !summaryQ.error || !listed && !listQ.error);
 
   const columns: Column<Judgment>[] = [
   {
@@ -230,7 +211,7 @@ export function Yearly() {
     header: head('판정'),
     align: 'right',
     cell: (row) => {
-      const note = verdictNote(row, awaiting.has(row.transactionId));
+      const note = verdictNote(row, row.awaitingAnswer);
       return (
         <span className="inline-flex flex-col items-end gap-1">
             <VerdictBadge verdict={row.verdict} />
@@ -255,8 +236,20 @@ export function Yearly() {
 
       }
       </div>
-      {exported && exported.items.length > 0 &&
-    <IconButton icon={DownloadIcon} label="CSV 내려받기" onClick={exportCsv} />
+      {summary && summary.totalCount > 0 &&
+    <div className="flex flex-col items-end gap-1">
+          <IconButton
+        icon={exporting ? Loader2Icon : DownloadIcon}
+        spin={exporting}
+        label={exporting ? 'CSV 만드는 중' : 'CSV 내려받기'}
+        busy={exporting}
+        onClick={() => void exportCsv()} />
+          {exportFailed &&
+      <p role="alert" className="text-small text-deny">
+              CSV를 만들지 못했습니다. 잠시 후 다시 시도해 주세요.
+            </p>
+      }
+        </div>
     }
     </header>;
 
@@ -283,7 +276,7 @@ export function Yearly() {
         </Button>
     } /> :
 
-  summaryQ.error || exportQ.error ?
+  summaryQ.error || listQ.error ?
   <Empty
     tone="error"
     icon={<SearchXIcon className="h-5 w-5" />}
@@ -294,7 +287,7 @@ export function Yearly() {
       variant="secondary"
       onClick={() => {
         summaryQ.reload();
-        exportQ.reload();
+        listQ.reload();
       }}>
 
           다시 시도
@@ -324,17 +317,6 @@ export function Yearly() {
 
 
   const empty =
-  filter === 'AWAITING' && pendingQ.error ?
-  <Empty
-    inTable
-    icon={<SearchXIcon className="h-5 w-5" />}
-    title="답을 기다리는 질문을 불러오지 못했습니다"
-    action={
-    <Button size="sm" variant="secondary" onClick={pendingQ.reload}>
-          다시 시도
-        </Button>
-    } /> :
-
   filter === 'NEEDS_REVIEW' ?
   <Empty icon={<SearchXIcon className="h-5 w-5" />} inTable title="확인이 필요한 거래가 없습니다" /> :
 
@@ -380,8 +362,8 @@ export function Yearly() {
         className="mt-6"
         label={`${year}년 경비 가능 금액`}
         amount={summary.byVerdict.AVAILABLE.finalAmount}
-        spend={spend}
-        shares={all ? sharesOf(all, pendingQ.error ? null : awaitingRows) : null}
+        spend={spendOf(summary)}
+        shares={sharesOf(summary)}
         counts={false}>
 
           {/* 한 해 집계는 접대비 한도를 넘은 금액을 위 금액에서 이미 뺐다(api.md 3.7 summary) */}
@@ -420,12 +402,12 @@ export function Yearly() {
             columns={columns}
             rows={firstLoad ? [] : judgments}
             rowKey={(row) => row.id}
-            loading={firstLoad}
+            loading={firstLoad || listQ.loading}
             selectedKey={judgments.find((row) => row.transactionId === selectedId)?.id}
             onRowClick={(row) => select(row.transactionId)}
             empty={empty} />
 
-          {!firstLoad && judgments.length > 0 && <Pagination page={listPage} onChange={setPage} />}
+          {!firstLoad && listPage && judgments.length > 0 && <Pagination page={listPage} onChange={setPage} />}
         </section>
       </div>
 

@@ -6,14 +6,12 @@ import { StepEyebrow } from '../components/StepEyebrow';
 import { Button, Card, Empty, IconButton } from '../components/ui';
 import { AmountHero } from '../components/results/AmountHero';
 import { AccountBreakdown } from '../components/results/AccountBreakdown';
-import type { Share } from '../utils/shares';
+import { sharesOf, spendOf } from '../utils/shares';
 import { useSession } from '../contexts/SessionContext';
 import { api, useApi } from '../api';
-import { readAll } from '../api/readAll';
 import { uploadName } from '../copy';
 import type {
   BookkeepingDuty,
-  Judgment,
   JudgmentSummary,
   StoredBusinessContext,
   UploadBatch,
@@ -21,10 +19,8 @@ import type {
 '../types/domain';
 import { formatNumber, formatPeriod, formatWon } from '../utils/format';
 import { excessNote, LIMITED_ACCOUNT, limitLine, limitsOf, PROVISIONAL_NOTE } from '../utils/limit';
-import { AWAITING_ANSWER, awaitingOf } from '../utils/verdict';
+import { AWAITING_ANSWER } from '../utils/verdict';
 import { industryName } from '../utils/context';
-
-const spendOf = (judgments: Judgment[]) => judgments.reduce((sum, judgment) => sum + judgment.transaction.amount, 0);
 
 /* 접대비 한도는 연 단위로만 다룬다(#15, #226). batch 요약의 접대비는 한도 전 금액이고, 그해 초과액은 limits 로 따로 온다 */
 
@@ -44,8 +40,6 @@ const yearsOf = (batch: UploadBatch) => {
   return Array.from({ length: to - from + 1 }, (_, index) => from + index);
 };
 
-const amountOf = (judgments: Judgment[]) => judgments.reduce((sum, judgment) => sum + (judgment.finalAmount ?? 0), 0);
-
 /** 「2025년 120,000원, 2026년 434,500원」 */
 const yearAmounts = (byYear: [number, number][]) =>
 byYear.map(([year, amount]) => `${year}년 ${formatWon(amount)}`).join(', ');
@@ -60,10 +54,8 @@ const DUTY: Record<BookkeepingDuty, string> = {
 interface Handoff {
   batch: UploadBatch | null;
   summary: JudgmentSummary;
-  /** 해마다 나눈 경비 가능 금액. 한 해에 든 배치거나 아직 못 읽었으면 null */
+  /** 해마다 나눈 경비 가능 금액. 한 해에 든 배치면 null */
   byYear: [number, number][] | null;
-  /** 사용자가 직접 바꾼 현재 판정. 못 읽었으면 null */
-  overridden: Judgment[] | null;
   unclassified: number;
   unresolved: UnresolvedSummary | undefined;
   /** 불가 가운데 답을 기다리는 거래 수 (C12) */
@@ -75,7 +67,7 @@ interface Handoff {
  * 세무사에게 넘길 문장. 화면에 보이는 숫자와 문진 응답만으로 만든다.
  * 판정하지 않은 것을 판정한 것처럼 말하지 않는다.
  */
-const handoffText = ({ batch, summary, byYear, overridden, unclassified, unresolved, awaiting, context }: Handoff) => {
+const handoffText = ({ batch, summary, byYear, unclassified, unresolved, awaiting, context }: Handoff) => {
   const { AVAILABLE, UNAVAILABLE, NEEDS_REVIEW } = summary.byVerdict;
   // 답을 받기 전이라 일단 불가로 둔 거래는 확정된 불가와 따로 적는다 (C12)
   const lines = [
@@ -83,15 +75,12 @@ const handoffText = ({ batch, summary, byYear, overridden, unclassified, unresol
   `가능 ${formatNumber(AVAILABLE.count)}건(경비 가능 금액 ${formatWon(AVAILABLE.finalAmount)}), 불가 ${formatNumber(UNAVAILABLE.count - awaiting)}건, ${
   awaiting > 0 ? `${AWAITING_ANSWER} ${formatNumber(awaiting)}건, ` : ''}확인 필요 ${formatNumber(NEEDS_REVIEW.count)}건입니다.`];
   // 사용자가 바꾼 판정은 규칙이 낸 것이 아니다. 세무사가 따로 볼 수 있게 몇 건을 어느 쪽으로 바꿨는지 적는다 (C27)
-  if (overridden) {
-    const toAvailable = overridden.filter((judgment) => judgment.verdict.code === 'AVAILABLE');
-    const toUnavailable = overridden.filter((judgment) => judgment.verdict.code === 'UNAVAILABLE');
-    const changed = [
-    toAvailable.length > 0 && `가능으로 바꾼 것이 ${formatNumber(toAvailable.length)}건(${formatWon(amountOf(toAvailable))})`,
-    toUnavailable.length > 0 && `불가로 바꾼 것이 ${formatNumber(toUnavailable.length)}건`].
-    filter(Boolean);
-    if (changed.length > 0) lines.push(`이 가운데 판정을 직접 ${changed.join(', ')}입니다.`);
-  }
+  const { AVAILABLE: toAvailable, UNAVAILABLE: toUnavailable } = summary.overridden;
+  const changed = [
+  toAvailable.count > 0 && `가능으로 바꾼 것이 ${formatNumber(toAvailable.count)}건(${formatWon(toAvailable.finalAmount)})`,
+  toUnavailable.count > 0 && `불가로 바꾼 것이 ${formatNumber(toUnavailable.count)}건`].
+  filter(Boolean);
+  if (changed.length > 0) lines.push(`이 가운데 판정을 직접 ${changed.join(', ')}입니다.`);
   if (byYear) lines.push(`경비 가능 금액을 해마다 나누면 ${yearAmounts(byYear)}입니다.`);
   const limited = summary.byAccount.find((row) => row.account === LIMITED_ACCOUNT);
   const limits = limitsOf(summary.limits);
@@ -131,7 +120,7 @@ const handoffText = ({ batch, summary, byYear, overridden, unclassified, unresol
  * 3.7 판정 결과 요약.
  * batchId 로 거래별 현재 판정을 집계한다. 한도 잔량·감가상각 스케줄은 API 가 없어
  * 보여주지 않는다 — 응답에 없는 숫자를 화면에 두지 않는다.
- * 집계에 없는 것(직접 바꾼 판정, 해마다 나눈 금액)은 내보내기(#214)의 현재 판정에서 센다.
+ * 직접 바꾼 판정과 해마다 나눈 금액도 요약(overridden, byYear)에서 받는다. 판정 전부를 읽지 않는다.
  */
 export function Summary() {
   const { batchId, batchStatus, reloadBatch } = useSession();
@@ -145,29 +134,19 @@ export function Summary() {
     () => batchId ? api.judgments.summary({ batchId }) : Promise.resolve(null),
     [batchId]
   );
-  const exportQ = useApi(
-    () => batchId ? api.judgments.export({ batchId }) : Promise.resolve(null),
-    [batchId]
-  );
+  // 미해소 집계(unresolved)만 쓴다. 집계는 쪽과 상관없이 오므로 한 개만 읽는다
   const questionsQ = useApi(
     () =>
     batchId ?
-    api.questions.grouped({ batchId, status: 'PENDING', size: 1 }) :
+    api.questions.list({ batchId, status: 'PENDING', size: 1 }) :
     Promise.resolve(null),
     [batchId]
   );
-  // 불가 가운데 답변 대기를 따로 센다 (C12). 질문을 끝까지 읽어야 몇 건이어도 맞는다
-  const pendingQ = useApi(
-    () =>
-    batchId ?
-    readAll((page, size) => api.questions.list({ batchId, status: 'PENDING', page, size })) :
-    Promise.resolve(null),
-    [batchId]
-  );
+  // 답한 질문이 있는지만 본다
   const answeredQ = useApi(
     () =>
     batchId ?
-    api.questions.grouped({ batchId, status: 'ANSWERED', size: 1 }) :
+    api.questions.list({ batchId, status: 'ANSWERED', size: 1 }) :
     Promise.resolve(null),
     [batchId]
   );
@@ -272,42 +251,13 @@ export function Summary() {
       </AppShell>);
 
 
-  const judgments = exportQ.data?.items.map((row) => row.judgment) ?? null;
-  const awaitingRows =
-  judgments && pendingQ.data ? awaitingOf(judgments, pendingQ.data.map((question) => question.transactionId)) : null;
-  const awaitingCount = awaitingRows?.length ?? 0;
-  const awaitingSet = new Set(awaitingRows);
-  /** 판정별 결제 금액. 현재 판정 전부(내보내기)에서 더한다. 못 읽었으면 건수만 보인다 */
-  const amountBy = (key: Share['key']) =>
-  judgments && awaitingRows ?
-  spendOf(
-    key === 'AWAITING' ?
-    awaitingRows :
-    judgments.filter((judgment) => judgment.verdict.code === key && !awaitingSet.has(judgment))
-  ) :
-  null;
-  const shares: Share[] = [
-  ...(['AVAILABLE', 'NEEDS_REVIEW', 'UNAVAILABLE'] as const).map((key) => ({
-    key,
-    count: (summary?.byVerdict[key].count ?? 0) - (key === 'UNAVAILABLE' ? awaitingCount : 0),
-    amount: amountBy(key)
-  })),
-  ...(awaitingCount > 0 ? [{ key: 'AWAITING' as const, count: awaitingCount, amount: amountBy('AWAITING') }] : [])];
+  const awaitingCount = summary?.awaiting.count ?? 0;
 
-  const spend = judgments ? spendOf(judgments) : null;
-
-  // 신고는 해마다 따로 한다. 두 해에 걸친 업로드는 합계를 해마다 나눠 보인다 (C20)
+  // 신고는 해마다 따로 한다. 두 해에 걸친 업로드는 합계를 해마다 나눠 보인다 (C20). 판정이 없는 해는 0 이다
   const years = batch ? yearsOf(batch) : [];
   const byYear: [number, number][] | null =
-  years.length > 1 && judgments ?
-  years.map((year) => [
-  year,
-  amountOf(
-    judgments.filter(
-      (judgment) => judgment.verdict.code === 'AVAILABLE' && judgment.transaction.approvedAt.startsWith(String(year))
-    )
-  )]
-  ) :
+  years.length > 1 && summary ?
+  years.map((year) => [year, summary.byYear.find((row) => row.year === year)?.finalAmount ?? 0]) :
   null;
   const spanLine =
   years.length > 1 ?
@@ -316,15 +266,13 @@ export function Summary() {
   `${years.map((year) => `${year}년`).join(', ')} 거래를 합친 금액입니다.` :
   null;
 
-  const answeredGroups = answeredQ.data?.page.totalElements ?? 0;
+  const answeredCount = answeredQ.data?.page.totalElements ?? 0;
   // 문장에 들어갈 건수를 아직 다 읽지 못했으면 복사하지 않는다. 빠진 채로 넘기면 「남은 것 없음」으로 읽힌다
   const settling =
-  batchQ.loading || exportQ.loading || questionsQ.loading || pendingQ.loading || unclassifiedQ.loading || contextQ.loading || notesQ.loading;
+  batchQ.loading || questionsQ.loading || unclassifiedQ.loading || contextQ.loading || notesQ.loading;
   const omitted = [
   batchQ.error && '기간',
-  exportQ.error && '직접 바꾼 판정',
-  exportQ.error && years.length > 1 && '해마다 나눈 금액',
-  (questionsQ.error || pendingQ.error) && '답하지 않은 질문',
+  questionsQ.error && '답하지 않은 질문',
   unclassifiedQ.error && '분류하지 못한 거래 수',
   contextQ.error && '문진 응답',
   notesQ.error && '따로 물을 질문'].
@@ -333,10 +281,9 @@ export function Summary() {
   const notesText =
   notes.length > 0 ? ` 따로 여쭐 것: ${notes.map((note, index) => `${index + 1}) ${note.text}`).join(' ')}` : '';
   const unclassified = unclassifiedQ.data?.page.totalElements ?? 0;
-  const overridden = judgments?.filter((judgment) => judgment.origin.type === 'OVERRIDE') ?? null;
   // 못 읽은 항목은 화면에만 알리지 않고, 붙여 넣은 문장에도 남긴다
   const text = summary ?
-  `${handoffText({ batch, summary, byYear, overridden, unclassified, unresolved, awaiting: awaitingCount, context: contextQ.data })}${notesText}${
+  `${handoffText({ batch, summary, byYear, unclassified, unresolved, awaiting: awaitingCount, context: contextQ.data })}${notesText}${
   omitted.length > 0 ? ` (불러오지 못해 빠진 항목: ${omitted.join(', ')})` : ''}` :
   '';
 
@@ -359,8 +306,8 @@ export function Summary() {
         className="mt-8"
         label="이 업로드의 경비 가능 금액"
         amount={summary.byVerdict.AVAILABLE.finalAmount}
-        spend={spend}
-        shares={shares}>
+        spend={summary ? spendOf(summary) : null}
+        shares={summary ? sharesOf(summary) : null}>
 
           {spanLine && <p className="tabular-nums">{spanLine}</p>}
           {/* 초과액은 그해 사용자 전체 기준이라 이 업로드 몫을 정할 수 없다(#15). 합계에서 빼지 않고 따로 알린다 */}
@@ -412,7 +359,7 @@ export function Summary() {
               질문에 답하기
               <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
             </Button> :
-          answeredGroups > 0 &&
+          answeredCount > 0 &&
           <Button to="/questions" variant="secondary" size="sm">
               답한 질문 보기
             </Button>

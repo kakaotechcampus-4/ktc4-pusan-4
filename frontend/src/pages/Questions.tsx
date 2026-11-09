@@ -16,6 +16,8 @@ import { formatFullDate, formatNumber, formatWon, ro } from '../utils/format';
 
 /** F1-a. 한 번에 보여주는 질문 수(잠정). 다 답하면 다음 질문이 이어서 나온다 */
 const BATCH_SIZE = 15;
+/** 답한 질문 목록 한 쪽의 그룹 수. 전에는 100개만 받아 그 뒤의 답은 고칠 수 없었다 */
+const ANSWERED_SIZE = 20;
 /** F1-c. 남은 질문이 이만큼 이하일 때만 일괄 답변을 연다. 첫 화면부터 전부 닫아버리지 않게 */
 const BULK_THRESHOLD = 5;
 /** 카드마다 보여주는 거래 수. 넘으면 「외 N건」 */
@@ -87,6 +89,7 @@ export function Questions() {
   const [skipped, setSkipped] = useState<Record<string, boolean>>({});
   /** 건너뛴 질문이 앞자리를 막아도 뒤 질문에 닿을 수 있게 페이지를 넘긴다 */
   const [page, setPage] = useState(0);
+  const [answeredPage, setAnsweredPage] = useState(0);
   const noticeRef = useRef<HTMLParagraphElement>(null);
 
   const pendingQ = useApi(
@@ -99,9 +102,9 @@ export function Questions() {
   const answeredQ = useApi(
     () =>
     batchId ?
-    api.questions.grouped({ batchId, status: 'ANSWERED', size: 100 }) :
+    api.questions.grouped({ batchId, status: 'ANSWERED', page: answeredPage, size: ANSWERED_SIZE }) :
     Promise.resolve(null),
-    [batchId]
+    [batchId, answeredPage]
   );
   // 지난번 답 (FR-5, agent-secretary.md 3.1). 못 읽으면 지난번 답 없이 그대로 그린다
   const suggestionsQ = useApi(
@@ -136,6 +139,12 @@ export function Questions() {
   const shown = withHeld(unanswered, held.map((entry) => ({ ...entry, item: latest(entry.item) })));
   /** 제자리에 남긴 카드는 답한 질문 목록에 또 그리지 않는다 */
   const answeredRows = answered.filter((group) => !heldKeys.has(groupId(group)));
+
+  // 답한 질문 목록의 마지막 쪽이 비면(정정으로 그룹이 합쳐지는 등) 첫 쪽으로 돌아간다
+  const answeredEmpty = Boolean(answeredQ.data) && answered.length === 0;
+  useEffect(() => {
+    if (answeredPage > 0 && answeredEmpty) setAnsweredPage(0);
+  }, [answeredPage, answeredEmpty]);
 
   // 마지막 질문에 답해 그 페이지가 비면 첫 페이지로 돌아간다
   useEffect(() => {
@@ -821,6 +830,9 @@ export function Questions() {
 
             })}
             </ul>
+            {answeredQ.data && answeredQ.data.page.totalPages > 1 &&
+          <Pagination page={answeredQ.data.page} onChange={setAnsweredPage} />
+          }
           </section>
         }
 
