@@ -57,6 +57,9 @@ const UNSENT_REASON: Record<UnsendableCode, string> = {
 const formatDollar = (amount: number) =>
 `${amount.toLocaleString('ko-KR', { maximumFractionDigits: 2 })}달러`;
 
+/** 미리보기 표마다 보이는 행 수. 보낼 거래와 보내지 않는 행이 같다 */
+const PREVIEW_ROWS = 10;
+
 /** 카드 모양 상자. 흰 바탕에 괘선만 두른다 */
 const BOX = 'animate-rise rounded-2xl border border-line bg-canvas p-6';
 
@@ -627,7 +630,9 @@ function PreviewCard({
 
   // 보내지 않는 행은 위 표에 따로 있다. 여기에는 서버로 갈 행만 보인다
   const unsentIndex = new Set(unsendable.map((u) => u.index));
-  const head = rows.filter((_, index) => !unsentIndex.has(index)).slice(0, 10);
+  const head = rows.filter((_, index) => !unsentIndex.has(index)).slice(0, PREVIEW_ROWS);
+  // 보내지 않는 행도 처음 몇 건만 보인다. 수백 건이 다 그려지면 올리기 버튼이 한참 아래로 밀린다(#276 리뷰). 전체 수는 위 숫자에 있다
+  const unsentHead = unsendable.slice(0, PREVIEW_ROWS);
   const rowColumns: Column<ParsedRow>[] = [
   { header: '승인일', cell: (r) => <span className="whitespace-nowrap tabular-nums">{r.approvedAt ? formatFullDate(r.approvedAt) : '-'}</span> },
   { header: '가맹점명', cell: (r) => merchantCell(merchantName(r.rawMerchant)) },
@@ -678,13 +683,15 @@ function PreviewCard({
       {unsendable.length > 0 &&
       <div className="mt-8">
           <h3 className="text-body font-bold text-ink">
-            보내지 않는 행 {formatNumber(unsendable.length)}건
+            {unsendable.length > unsentHead.length ?
+          `보내지 않는 행 ${formatNumber(unsendable.length)}건 중 처음 ${formatNumber(unsentHead.length)}건` :
+          `보내지 않는 행 ${formatNumber(unsendable.length)}건`}
           </h3>
           <Table
           className="mt-3"
           caption="보내지 않는 행"
           columns={unsentColumns}
-          rows={unsendable}
+          rows={unsentHead}
           rowKey={(u) => String(u.index)} />
 
         </div>
