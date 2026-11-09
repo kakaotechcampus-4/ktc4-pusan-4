@@ -86,6 +86,8 @@ data/
 *.xlsx
 *.csv
 !seeds/*.csv
+# 멘토 테스트 가이드 샘플. 이용고객명 홍길동 · 데모카드 · 가짜 승인번호로 만든 파일이다
+!docs/mentor-guide/demo_kb_2026Q1.xls
 
 # 스크린샷 (루트에 떨군 것)
 /*.jpg
