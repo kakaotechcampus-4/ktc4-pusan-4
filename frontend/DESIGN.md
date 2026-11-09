@@ -97,6 +97,7 @@
 
 - **굵기는 400 과 700 둘뿐이다.** `font-medium`·`font-semibold` 를 쓰지 않는다.
 - **큰 제목은 가늘게 쓴다.** `ir-display`·`ir-section` 은 `font-normal` + `tracking-ir`(-1px). 굵게 하면 흔한 화면이 된다. 굵은 700 은 `ir-panel` 이하의 작은 제목과 숫자에만 쓴다.
+  - 예외: 랜딩 히어로 세 장면의 제목(과 같은 글을 쓰는 인트로 제목)은 `font-bold` + `tracking-ir-sm` 이다. 아래 주요현황 카드 제목과 글꼴을 맞췄다(11/9).
 - 자간 토큰은 셋: `tracking-ir`(-1px, 48px 제목) · `tracking-ir-sm`(-0.8px, 30px 안팎) · `tracking-ir-xs`(-0.6px, 22px). 본문에는 자간을 건드리지 않는다.
 - `ir-*` 는 넓은 화면 전용이다. 좁은 화면에서는 `h2`·`h3` 로 떨어뜨린다: `text-h2 lg:text-ir-section`.
 - **한글 제목에는 `[word-break:keep-all]` 을 붙인다.** 안 붙이면 좁은 화면에서 음절 단위로 꺾인다(「이 카드값이 경 / 비인지,」).

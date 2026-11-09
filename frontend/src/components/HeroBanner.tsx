@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon, PauseIcon, PlayIcon } from 'lucide-react';
 import { OrbitStage } from './OrbitStage';
 import { InterviewCard, UploadRows, VerdictCard } from './flowFigure';
-import { FLOW_STEPS, NOT_DOING } from '../mock/marketing';
+import { FLOW_STEPS, NOT_DOING, VERDICTS } from '../mock/marketing';
 
 /**
  * 메인 맨 위 큰 판. 세 장을 좌우로 넘겨 본다.
@@ -237,7 +237,7 @@ function TextSlide({
       <RingBackdrop variant={backdrop} />
       {/* 밝은 파랑 판 위에서 핑크는 대비 1.60 이라 안 읽힌다. eyebrow 는 흰색으로 둔다 */}
       <p className="relative text-body text-white">{eyebrow}</p>
-      <strong className="mt-5 block whitespace-pre-line relative text-h2 font-normal leading-tight tracking-ir text-white [word-break:keep-all] lg:text-ir-display">
+      <strong className="mt-5 block whitespace-pre-line relative text-h2 font-bold leading-tight tracking-ir-sm text-white [word-break:keep-all] lg:text-ir-display">
         {title}
       </strong>
       {/* 도식은 제목과 항목 사이 빈 자리를 채운다. 좁은 화면에서는 자리가 없어 숨는다 */}
@@ -390,14 +390,33 @@ export function HeroBanner({ autoplay = true }: {autoplay?: boolean;}) {
           <div className="relative z-10 px-8 pt-12 sm:px-16 sm:pt-16">
             {/* data-hero-eyebrow, data-hero-title: 인트로가 걷힐 때 같은 글이 이 자리로 옮겨 온다(IntroOverlay) */}
             <p data-hero-eyebrow className="text-body text-white">
-              1인 IT 개발 사업자를 위한 경비 판정
+              1인 사업자를 위한 종합소득세 경비 판정 서비스
             </p>
             {/* 페이지의 h1. 프리렌더가 공개 페이지마다 h1 이 하나인지 본다(scripts/prerender.mjs) */}
-            <h1 data-hero-title className="mt-5 block text-h2 font-normal leading-tight tracking-ir text-white [word-break:keep-all] lg:text-h2-lg xl:text-ir-display">
+            <h1 data-hero-title className="mt-5 block text-h2 font-bold leading-tight tracking-ir-sm text-white [word-break:keep-all] lg:text-h2-lg xl:text-ir-display">
               이 카드값이 경비인지,
               <br />
               조문까지 붙여 답합니다
             </h1>
+            {/*
+              제목 아래가 비어 보였다 (11/9). 무엇을 올리면 무엇이 나오는지 둔다.
+              좁은 화면은 이 자리에 작은 궤도 판이 들어가서 lg 부터 보인다.
+              폭은 궤도 판이 제목 몫으로 비워 둔 자리(OrbitStage: lg 424px, xl 520px)에서 좌우 여백을 뺀 만큼이다
+            */}
+            <div className="hidden lg:block lg:max-w-[360px] xl:max-w-[456px]">
+              <p className="mt-6 text-lead text-white [word-break:keep-all]">
+                카드사에서 받은 승인내역 파일 하나면 됩니다.
+              </p>
+              <ul className="mt-6">
+                {VERDICTS.map((item) =>
+                <li key={item.label} className="flex items-center gap-3 border-t border-white/20 py-2.5">
+                    <span className={`h-2 w-2 shrink-0 rounded-full ${item.bar}`} aria-hidden="true" />
+                    <strong className="w-16 shrink-0 text-body font-bold text-white">{item.label}</strong>
+                    <span className="text-body text-white [word-break:keep-all]">{item.body}</span>
+                  </li>
+                )}
+              </ul>
+            </div>
           </div>
         </Slide>
 

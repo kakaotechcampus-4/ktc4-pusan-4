@@ -41,7 +41,7 @@ export const DEV_EXPENSES = [
 
 
 /**
- * 판정이 내는 세 갈래. 랜딩 오른쪽 띠와 히어로 도식이 같은 것을 본다.
+ * 판정이 내는 세 갈래. 히어로 1번 장면 목록과 2번 장면 도식이 같은 것을 본다.
  * 건수는 쓰지 않는다 — 로그인 전 방문자에게 보여 줄 수 있는 실제 수치가 없다
  */
 export const VERDICTS = [
@@ -49,9 +49,6 @@ export const VERDICTS = [
 { label: '확인 필요', body: '사실을 더 물어야 갈립니다', bar: 'bg-warn-bar', dot: '#F7A51B' },
 { label: '불가', body: '안 되는 이유를 조문으로 답합니다', bar: 'bg-deny-bar', dot: '#FF5A5A' }] as
 const;
-
-/** rules/cards 의 실제 장 수. `ls rules/cards/*.yaml | wc -l` */
-export const RULE_CARD_COUNT = 53;
 
 export const SYSTEM_FEATURES = [
 {
