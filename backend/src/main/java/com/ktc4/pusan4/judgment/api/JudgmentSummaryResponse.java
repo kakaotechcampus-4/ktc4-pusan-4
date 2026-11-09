@@ -16,19 +16,32 @@ public record JudgmentSummaryResponse(
     Map<Verdict, VerdictSummary> byVerdict,
     List<AccountSummary> byAccount,
     @Schema(description = "범위에 접대비 판정이 있는 과세연도마다 한도 합계와 초과액. 과세연도 순. runId 범위는 빈 배열")
-    List<LimitYearResponse> limits
+    List<LimitYearResponse> limits,
+    @Schema(description = "답변 대기(불가인데 답하지 않은 질문이 걸린 거래). 판정이 아니라 불가에 붙는 표지라 byVerdict.UNAVAILABLE 에도 들어 있다")
+    AwaitingSummary awaiting,
+    @Schema(description = "사용자가 직접 바꾼(override) 판정을 바뀐 판정별로 센다. byVerdict 에도 들어 있다")
+    Map<Verdict, VerdictSummary> overridden,
+    @Schema(description = "판정이 있는 해(거래 승인일)마다 가능 판정의 경비 가능 금액. 해 순")
+    List<YearSummary> byYear
 ) {
 
     static JudgmentSummaryResponse from(
         Scope scope, JudgmentSummary summary, List<LimitYearTotal> limits, RuleSet rules
     ) {
-        Map<Verdict, VerdictSummary> byVerdict = new EnumMap<>(Verdict.class);
-        summary.byVerdict().forEach((verdict, total) ->
-            byVerdict.put(verdict, new VerdictSummary(total.count(), total.finalAmount())));
-        return new JudgmentSummaryResponse(scope, summary.totalCount(), byVerdict, summary.byAccount().stream()
+        return new JudgmentSummaryResponse(scope, summary.totalCount(), byVerdict(summary.byVerdict()), summary.byAccount().stream()
             .map(account -> new AccountSummary(account.account(), rules.accountLabel(account.account()),
                 account.count(), account.finalAmount()))
-            .toList(), LimitYearResponse.from(limits, rules));
+            .toList(), LimitYearResponse.from(limits, rules),
+            new AwaitingSummary(summary.awaiting().count(), summary.awaiting().spendAmount()),
+            byVerdict(summary.overridden()),
+            summary.byYear().stream().map(year -> new YearSummary(year.year(), year.finalAmount())).toList());
+    }
+
+    private static Map<Verdict, VerdictSummary> byVerdict(Map<Verdict, JudgmentSummary.Total> totals) {
+        Map<Verdict, VerdictSummary> byVerdict = new EnumMap<>(Verdict.class);
+        totals.forEach((verdict, total) ->
+            byVerdict.put(verdict, new VerdictSummary(total.count(), total.finalAmount(), total.spendAmount())));
+        return byVerdict;
     }
 
     public record Scope(
@@ -37,7 +50,17 @@ public record JudgmentSummaryResponse(
     ) {
     }
 
-    public record VerdictSummary(int count, long finalAmount) {
+    public record VerdictSummary(
+        int count,
+        long finalAmount,
+        @Schema(description = "그 판정이 난 거래의 결제 금액 합") long spendAmount
+    ) {
+    }
+
+    public record AwaitingSummary(int count, @Schema(description = "답변 대기 거래의 결제 금액 합") long spendAmount) {
+    }
+
+    public record YearSummary(int year, @Schema(description = "그해 가능 판정의 경비 가능 금액 합") long finalAmount) {
     }
 
     public record AccountSummary(

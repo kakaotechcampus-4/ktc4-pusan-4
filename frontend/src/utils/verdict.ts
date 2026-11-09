@@ -1,4 +1,5 @@
-import type { Judgment, Verdict } from '../types/domain';
+import type { Verdict } from '../types/domain';
+import type { JudgmentQuery } from '../api/contract';
 import type { BadgeSymbol, BadgeTone } from '../components/ui/Badge';
 
 /**
@@ -24,14 +25,15 @@ export const VERDICT_LABEL: Record<Verdict, string> = {
  */
 export const AWAITING_ANSWER = '답변 대기';
 
-/**
- * 답변 대기 거래만 고른다. 불가 판정 가운데 답을 기다리는 질문이 걸린 거래다.
- * 결과, 실행, 요약이 불가와 따로 센다 (C12)
- */
-export const awaitingOf = <T extends Pick<Judgment, 'transactionId' | 'verdict'>>(
-judgments: T[],
-pendingTransactionIds: Iterable<string>)
-: T[] => {
-  const pending = new Set(pendingTransactionIds);
-  return judgments.filter((judgment) => judgment.verdict.code === 'UNAVAILABLE' && pending.has(judgment.transactionId));
-};
+/** 결과 표의 필터. 답변 대기는 판정이 아니라 불가에 붙는 표지라 불가 필터는 답변 대기를 뺀 불가다 (C12) */
+export type VerdictFilter = 'ALL' | Verdict | 'AWAITING';
+
+/** 필터를 판정 목록 조건으로 바꾼다. 표는 한 쪽씩 서버에서 받고 화면에서 거르거나 세지 않는다 */
+export const verdictFilterQuery = (filter: VerdictFilter): JudgmentQuery =>
+filter === 'ALL' ?
+{} :
+filter === 'AWAITING' ?
+{ awaiting: true } :
+filter === 'UNAVAILABLE' ?
+{ verdict: 'UNAVAILABLE', awaiting: false } :
+{ verdict: filter };

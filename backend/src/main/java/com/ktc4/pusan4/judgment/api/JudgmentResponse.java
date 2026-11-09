@@ -23,6 +23,8 @@ public record JudgmentResponse(
     @Schema(description = "Transaction 재판정마다 증가") int revision,
     JudgmentOrigin origin,
     Coded<Verdict> verdict,
+    @Schema(description = "답변 대기. 불가인데 이 거래에 답하지 않은 질문이 남았다. 판정이 아니라 불가에 붙는 표지다 (api.md 2.1)")
+    boolean awaitingAnswer,
     @Schema(description = "차단된 경우에만 값이 있다") Gate blockedAtGate,
     @Schema(description = "범위 밖 핸드오프. true 면 판정하지 않고 세무사에게 넘긴 건이다. "
         + "verdict 는 항상 NEEDS_REVIEW 이고, 되묻기 대기와 달리 답할 질문이 없다 (docs/rule-card-fields.md)")
@@ -45,12 +47,13 @@ public record JudgmentResponse(
 ) {
 
     /** explanation 은 출처(RuleCard reason)가 아직 없어 비워 둔다. */
-    static JudgmentResponse from(JudgmentRevision judgment, RuleSet rules) {
+    static JudgmentResponse from(JudgmentRevision judgment, RuleSet rules, boolean pendingQuestion) {
         JudgedTransaction transaction = judgment.transaction();
         return new JudgmentResponse(judgment.id(), judgment.transactionId(),
             new TransactionSummary(transaction.approvedAt(), transaction.merchantRaw(), transaction.merchantNorm(),
                 transaction.merchantCategory(), transaction.amount(), transaction.installmentMonths()),
-            judgment.revision(), judgment.origin(), verdict(judgment.verdict()), judgment.blockedAtGate(),
+            judgment.revision(), judgment.origin(), verdict(judgment.verdict()),
+            judgment.verdict() == Verdict.UNAVAILABLE && pendingQuestion, judgment.blockedAtGate(),
             judgment.outOfScope(), judgment.account(), rules.accountLabel(judgment.account()), judgment.finalAmount(), judgment.inference(),
             judgment.unmatchedReason(), judgment.attributes(), judgment.ruleCardId(), judgment.ruleCardVersion(),
             judgment.appliedRuleIds(), judgment.rulesCommitSha(), judgment.userContextVersion(),

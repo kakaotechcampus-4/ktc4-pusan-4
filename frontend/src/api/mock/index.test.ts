@@ -18,6 +18,11 @@ beforeEach(async () => {
 /** 시드: 1016 은 소명 대기(자동 판정 불가인데 「용도」 질문이 남음), 1005 는 카페 「용도」 질문 */
 const tx = (suffix: string) => `0199c8f2-0000-7000-8000-0000000000${suffix}`;
 const currentOf = async (transactionId: string) => (await api.judgments.list({ transactionId })).items[0];
+/** 목업 실행은 조회할 때마다 나아간다. 끝날 때까지 조회한다 */
+const finish = async (runId: string) => {
+  let run = await api.runs.get(runId);
+  while (run.status.code === 'QUEUED' || run.status.code === 'RUNNING') run = await api.runs.get(runId);
+};
 const pendingGroups = () => api.questions.grouped({ batchId, status: 'PENDING', size: 50 });
 const groupOf = async (transactionId: string) => {
   const group = (await pendingGroups()).items.find((g) => g.transactions.some((t) => t.transactionId === transactionId));
@@ -37,6 +42,44 @@ describe('판정 (3.7)', () => {
       amount: transaction.amount,
       installmentMonths: transaction.installmentMonths
     });
+  });
+
+  it('답변 대기는 목록 표지와 거르기, 요약 건수가 서로 맞고, 결제 금액은 판정마다 더한다', async () => {
+    const all = (await api.judgments.list({ batchId, size: 100 })).items;
+    const summary = await api.judgments.summary({ batchId });
+
+    // 1016 은 소명 대기 시드다. 표지는 불가에만 붙는다
+    expect(all.find((j) => j.transactionId === tx('1016'))?.awaitingAnswer).toBe(true);
+    expect(all.filter((j) => j.awaitingAnswer).every((j) => j.verdict.code === 'UNAVAILABLE')).toBe(true);
+
+    const awaiting = (await api.judgments.list({ batchId, awaiting: true, size: 100 })).items;
+    const otherUnavailable = (await api.judgments.list({ batchId, verdict: 'UNAVAILABLE', awaiting: false, size: 100 })).items;
+    expect(awaiting.map((j) => j.id).sort()).toEqual(all.filter((j) => j.awaitingAnswer).map((j) => j.id).sort());
+    expect(summary.awaiting.count).toBe(awaiting.length);
+    expect(otherUnavailable.length).toBe(summary.byVerdict.UNAVAILABLE.count - summary.awaiting.count);
+
+    const spend = (verdict: string) =>
+    all.filter((j) => j.verdict.code === verdict).reduce((sum, j) => sum + j.transaction.amount, 0);
+    expect(summary.byVerdict.AVAILABLE.spendAmount).toBe(spend('AVAILABLE'));
+    expect(summary.byVerdict.UNAVAILABLE.spendAmount).toBe(spend('UNAVAILABLE'));
+    expect(summary.awaiting.spendAmount).toBe(awaiting.reduce((sum, j) => sum + j.transaction.amount, 0));
+  });
+
+  it('sort=APPROVED_AT 이면 승인일 최근 순으로 준다', async () => {
+    const items = (await api.judgments.list({ batchId, sort: 'APPROVED_AT', size: 100 })).items;
+    const dates = items.map((j) => j.transaction.approvedAt);
+    expect(dates).toEqual([...dates].sort().reverse());
+  });
+
+  it('요약은 직접 바꾼 판정을 바뀐 판정별로 세고, 해마다 나눈 금액의 합은 경비 가능 금액이다', async () => {
+    const before = await api.judgments.summary({ batchId });
+    expect(before.overridden.AVAILABLE.count).toBe(0);
+    expect(before.byYear.reduce((sum, row) => sum + row.finalAmount, 0)).toBe(before.byVerdict.AVAILABLE.finalAmount);
+
+    await api.judgments.override((await currentOf(tx('1005'))).id, { toVerdict: 'AVAILABLE', reason: '업무' }, 'k1');
+    const after = await api.judgments.summary({ batchId });
+    expect(after.overridden.AVAILABLE.count).toBe(1);
+    expect(after.overridden.AVAILABLE.finalAmount).toBe((await currentOf(tx('1005'))).finalAmount ?? 0);
   });
 
   it('제외한 거래는 현재 결과·요약에서 빠지지만 transactionId 로는 읽힌다', async () => {
@@ -338,9 +381,27 @@ describe('문진·판정 실행', () => {
     controls.failNextRun(1, 'RUN_START_FAILED');
     const run = await api.runs.create({ batchId, contextId: seed.id });
     expect((await api.runs.failures(run.id)).items.map((f) => f.errorCode)).toEqual(['RUN_START_FAILED']);
+    await finish(run.id);
 
     const next = await api.runs.create({ batchId, contextId: seed.id });
     expect((await api.runs.failures(next.id)).items).toHaveLength(0);
+  });
+
+  it('진행 중인 실행이 있으면 active 가 그것을 주고, 새 실행은 409 로 그 실행을 알려 준다 (3.6)', async () => {
+    const seed = await api.contexts.current();
+    if (!seed) throw new Error('시드 문진이 없다');
+    expect(await api.runs.active()).toBeNull();
+
+    const run = await api.runs.create({ batchId, contextId: seed.id });
+    expect((await api.runs.active())?.id).toBe(run.id);
+    await expect(api.runs.create({ batchId, contextId: seed.id })).rejects.toMatchObject({
+      status: 409,
+      code: 'RUN_ALREADY_ACTIVE',
+      runId: run.id
+    });
+
+    await finish(run.id);
+    expect(await api.runs.active()).toBeNull();
   });
 });
 

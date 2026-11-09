@@ -6,7 +6,7 @@ import { api, ApiRequestError, useApi } from '../api';
 import { useSession } from '../contexts/SessionContext';
 import { Button, Empty, cn } from '../components/ui';
 import { MERCHANT_CATEGORIES } from '../types/domain';
-import { categoryLabel, merchantName } from '../components/results/display';
+import { categoryLabel, merchantName, suggestionReason } from '../components/results/display';
 import type { ClassificationReviewGroup } from '../types/domain';
 import { uploadName } from '../copy';
 import { formatFullDate, formatNumber, formatPeriod, formatWon } from '../utils/format';
@@ -366,8 +366,14 @@ function ReviewCard({
       {/*
         건별 목록은 접어 둔다. 그룹 카드가 여러 장 쌓이는데 카드마다 거래가 네 줄씩
         붙어 있어 「어떤 지출인가요?」까지 내려가기도 전에 화면이 찬다 (#242 리뷰).
-        고르는 일은 늘 보이고, 떠올릴 거리만 열어서 본다
+        고르는 일은 늘 보이고, 떠올릴 거리만 열어서 본다. 한 건이면 펼칠 것 없이 날짜만 보인다
       */}
+      {group.count === 1 && rows.length === 1 ?
+      <p className="mt-1 text-small tabular-nums text-ink2">
+          {formatFullDate(rows[0].approvedAt)}
+          {rows[0].installmentMonths > 0 && `, ${rows[0].installmentMonths}개월 할부`}
+        </p> :
+
       <details className="mt-1">
         <summary className="cursor-pointer text-small text-ink2 hover:text-ink">
           건별 보기 ({formatNumber(group.count)}건)
@@ -396,10 +402,13 @@ function ReviewCard({
           }
         </ul>
       </details>
+      }
 
       <p className="mt-5 text-body font-bold text-ink">
         {group.count > 1 ? `이 ${formatNumber(group.count)}건은 어떤 지출인가요?` : '어떤 지출인가요?'}
       </p>
+      {/* 추천의 근거(11/8 회의). 모델은 가맹점 이름만 받는다. 이유 문장은 주지 않아 지어내지 않는다 */}
+      <p className="mt-1 text-small text-ink2">{suggestionReason(suggested[0])}</p>
       {suggested.length > 0 &&
       <div role="group" aria-label={`${title} 카테고리`} className="mt-3 flex flex-wrap gap-2">
           {suggested.map((category, index) => choice(category, index === 0))}

@@ -6,6 +6,7 @@ import { api, ApiRequestError, useApi } from '../../api';
 import { Badge, Button, ChoiceGroup, Input, SymbolIcon, cn } from '../ui';
 import { VerdictBadge } from '../VerdictBadge';
 import { StatuteCitation } from '../StatuteCitation';
+import { ExcludeConfirm } from './ExcludeConfirm';
 import { VERDICT_LABEL, VERDICT_META } from '../../utils/verdict';
 import { formatFullDate, formatWon, ro } from '../../utils/format';
 import {
@@ -95,7 +96,8 @@ export function JudgmentDetailPanel({
   const [memo, setMemo] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  /** 빼기 실패는 빼기 버튼 옆에 알린다. 판정 바꾸기의 실패와 자리가 다르다 */
+  /** 빼기는 확인 창에서 한 번 더 묻는다. 실패도 그 창 안에 알린다 */
+  const [confirmingExclude, setConfirmingExclude] = useState(false);
   const [excludeError, setExcludeError] = useState<string | null>(null);
   const [done, setDone] = useState('');
   const title = useRef<HTMLHeadingElement>(null);
@@ -255,6 +257,7 @@ export function JudgmentDetailPanel({
     setExcludeError(null);
     try {
       await api.transactions.exclude(judgment.transactionId);
+      setConfirmingExclude(false);
       onExcluded(merchantTitle(transaction));
     } catch (caught) {
       setExcludeError(errorMessage(caught, '판정 대상에서 빼지 못했습니다. 잠시 후 다시 시도해 주세요.'));
@@ -427,6 +430,7 @@ export function JudgmentDetailPanel({
             columns={2}
             value={preset}
             onChange={setPreset}
+            onClear={() => setPreset('')}
             options={REASONS[target].map((text) => ({ value: text, label: text }))} />
 
             <Input
@@ -472,16 +476,21 @@ export function JudgmentDetailPanel({
             size="sm"
             className="flex-1 whitespace-nowrap"
             disabled={busy}
-            onClick={() => void exclude()}>
+            onClick={() => {
+              setExcludeError(null);
+              setConfirmingExclude(true);
+            }}>
 
               판정 대상에서 빼기
             </Button>
           </div>
-          {excludeError &&
-        <p role="alert" className="mt-2 text-small text-deny">
-              {excludeError}
-            </p>
-        }
+          <ExcludeConfirm
+          transaction={confirmingExclude ? transaction : null}
+          busy={busy}
+          error={excludeError}
+          onConfirm={() => void exclude()}
+          onClose={() => setConfirmingExclude(false)} />
+
         </section>
       }
 

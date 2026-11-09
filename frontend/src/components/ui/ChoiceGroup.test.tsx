@@ -91,3 +91,54 @@ describe('ChoiceGroup 키보드', () => {
     expect(spy).not.toHaveBeenCalled();
   });
 });
+
+describe('ChoiceGroup 다시 눌러 거두기', () => {
+  const renderClearable = (onClear?: () => void) => {
+    const spy = vi.fn();
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+    act(() => root.render(<ChoiceGroup name="묶음" options={OPTIONS} value="a" onChange={spy} onClear={onClear} />));
+    return spy;
+  };
+
+  it('onClear 가 있으면 고른 칸을 다시 누를 때 거둔다', () => {
+    const clear = vi.fn();
+    const spy = renderClearable(clear);
+    act(() => radios()[0].click());
+    expect(clear).toHaveBeenCalledTimes(1);
+    expect(spy).not.toHaveBeenCalled();
+    act(() => radios()[2].click());
+    expect(spy).toHaveBeenLastCalledWith('c');
+  });
+
+  it('onClear 가 없으면 다시 눌러도 고른 값을 다시 알릴 뿐이다', () => {
+    const spy = renderClearable();
+    act(() => radios()[0].click());
+    expect(spy).toHaveBeenLastCalledWith('a');
+  });
+});
+
+describe('ChoiceGroup 화살표로 고른 뒤 Space', () => {
+  it('화살표로 고른 칸에서 Space(click)를 눌러도 거두지 않는다', () => {
+    const clear = vi.fn();
+    const spy = vi.fn();
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+    function Clearable() {
+      const [value, setValue] = useState('a');
+      return <ChoiceGroup name="묶음" options={OPTIONS} value={value} onChange={(next) => {spy(next);setValue(next);}} onClear={clear} />;
+    }
+    act(() => root.render(<Clearable />));
+    radios()[0].focus();
+    press('ArrowRight');
+    expect(spy).toHaveBeenLastCalledWith('c');
+    // 버튼에서 Space 를 떼면 브라우저가 click 을 보낸다
+    act(() => radios()[2].click());
+    expect(clear).not.toHaveBeenCalled();
+    // 그 뒤에 다시 누르면 거둔다
+    act(() => radios()[2].click());
+    expect(clear).toHaveBeenCalledTimes(1);
+  });
+});

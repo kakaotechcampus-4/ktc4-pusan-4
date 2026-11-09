@@ -7,7 +7,6 @@ import com.ktc4.pusan4.judgment.domain.JudgmentOriginType;
 import com.ktc4.pusan4.judgment.domain.JudgmentRevision;
 import com.ktc4.pusan4.judgment.domain.JudgmentRevision.CitedStatute;
 import com.ktc4.pusan4.judgment.domain.JudgmentRevision.JudgedTransaction;
-import com.ktc4.pusan4.judgment.domain.JudgmentSummary;
 import com.ktc4.pusan4.judgment.domain.UnmatchedReason;
 import com.ktc4.pusan4.judgment.domain.Verdict;
 import jakarta.persistence.CollectionTable;
@@ -201,12 +200,6 @@ class JudgmentEntity extends AssignedIdEntity<UUID> {
             unmatchedReason == null ? null : UnmatchedReason.valueOf(unmatchedReason),
             attributes, ruleCardId, ruleCardVersion, appliedRuleIds, rulesCommitSha, userContextVersion,
             computedAt, citations);
-    }
-
-    /** limitAllowedAmount 가 있으면(한도 항목이 있는 판정) finalAmount 대신 그 금액으로 더한다. */
-    JudgmentSummary.Row toSummaryRow(Long limitAllowedAmount) {
-        return new JudgmentSummary.Row(Verdict.valueOf(verdict), account,
-            limitAllowedAmount == null ? finalAmount : limitAllowedAmount);
     }
 
     private JudgmentOrigin origin() {
