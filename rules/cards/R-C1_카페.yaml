@@ -1,0 +1,17 @@
+# 카페 결제는 거래처 미팅 등 업무 관련 지출이면 통상성·업무 관련성이 확인되는 범위에서 필요경비 산입 가능하나, 혼자 작업하며 개인적으로 소비한 음료·식사 등은 가사 관련 경비로 불산입한다. 결제 내역만으로 용도를 구분할 수 없어 결제별 용도 확인이 필요하다.
+#
+# 규칙 후보 #1 에서 승격. 승인 2026-11-09
+id: R-C1
+version: 1
+gate: G2
+priority: 410
+effective_period: { start: 2026-11-09, end: null }
+match:
+  category: [카페]
+  industry: ["940909"]
+verdict: 확인필요
+citations:
+  - { id: 소득세법-27-1, verified: true }
+  - { id: 소득세법-33-1-5, verified: true }
+  - { id: 소득세법시행령-61-1-1, verified: true }
+review: { by: 관리자, date: 2026-11-09 }
