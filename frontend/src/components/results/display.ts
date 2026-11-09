@@ -71,13 +71,14 @@ const CATEGORY_EXAMPLES: Record<string, string> = {
 
 /**
  * 분류 확인에서 추천이 왜 나왔는지 한 줄. 모델은 가맹점 이름만 받고 이유 문장은 주지 않아서
- * 무엇을 보고 골랐는지와 그 업종이 어떤 곳인지만 말한다. 추천이 없으면 없는 까닭이다
+ * 무엇을 보고 골랐는지와 그 업종의 예만 말한다. 예에는 가게가 아닌 것(조세, 과태료)도 있어 「같은 곳」이라 하지 않는다.
+ * 추천이 비는 까닭은 여럿이다(모델이 꺼졌거나 실패, 시간 초과, 거절. api.md 3.5). 까닭을 짐작해 적지 않는다
  */
 export const suggestionReason = (category: string | undefined) => {
-  if (!category) return '가맹점 이름만으로는 업종을 고르지 못했습니다.';
+  if (!category) return '추천할 업종이 없습니다. 아래에서 골라 주세요.';
   const label = categoryLabel(category);
   const examples = CATEGORY_EXAMPLES[category];
-  return `가맹점 이름으로 보아 ${label}${ro(label)} 추천합니다.${examples ? ` ${examples} 같은 곳입니다.` : ''}`;
+  return `가맹점 이름으로 보아 ${label}${ro(label)} 추천합니다.${examples ? ` 예를 들면 ${examples}입니다.` : ''}`;
 };
 
 /**
