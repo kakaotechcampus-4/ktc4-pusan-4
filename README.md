@@ -36,24 +36,38 @@
 
 ### 📋 프로젝트 정보
 
+- **[기술 스택](#기술-스택)**
 - **[주요 기능](#주요-기능)**
 - **[아키텍처](#아키텍처)**
-- **[기술 스택](#기술-스택)**
-- **[디렉터리 구조](#디렉터리-구조)**
+- **[RAG · 코퍼스 동기화](#rag--코퍼스-동기화)**
+- **[배포 · CI/CD](#배포--cicd)**
 
 </td>
 <td width="50%">
 
-### 🤝 협업 가이드
+### 🤝 팀이&nbsp;개발한&nbsp;방법
 
+- **[디렉터리 구조](#디렉터리-구조)**
 - **[Git 규칙](#git-규칙)**
 - **[코드 컨벤션](#코드-컨벤션)**
-- **[실행 · 배포](#실행--배포)**
+- **[실행](#실행)**
 - **[팀원](#팀원)**
 
 </td>
 </tr>
 </table>
+
+---
+
+## 기술 스택
+
+| 분류 | 기술 |
+| --- | --- |
+| **Frontend** | ![React](https://img.shields.io/badge/React_18-61DAFB?style=for-the-badge&logo=react&logoColor=black) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white) ![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white) ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white) ![React Router](https://img.shields.io/badge/React_Router-CA4245?style=for-the-badge&logo=reactrouter&logoColor=white) |
+| **Backend** | ![Java](https://img.shields.io/badge/Java_21-007396?style=for-the-badge&logo=openjdk&logoColor=white) ![Spring Boot](https://img.shields.io/badge/Spring_Boot_3.5-6DB33F?style=for-the-badge&logo=springboot&logoColor=white) ![Flyway](https://img.shields.io/badge/Flyway-CC0200?style=for-the-badge&logo=flyway&logoColor=white) |
+| **AI** | ![Python](https://img.shields.io/badge/Python_3.12-3776AB?style=for-the-badge&logo=python&logoColor=white) ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white) ![uv](https://img.shields.io/badge/uv-DE5FE9?style=for-the-badge&logo=uv&logoColor=white) ![Langfuse](https://img.shields.io/badge/Langfuse-0A0A0A?style=for-the-badge&logoColor=white) |
+| **DB** | ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white) ![pgvector](https://img.shields.io/badge/pgvector-336791?style=for-the-badge&logo=postgresql&logoColor=white) ![pg_bigm](https://img.shields.io/badge/pg__bigm-336791?style=for-the-badge&logo=postgresql&logoColor=white) ![Redis](https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white) |
+| **Infra** | ![AWS](https://img.shields.io/badge/AWS_EC2-FF9900?style=for-the-badge&logo=amazonec2&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white) ![Caddy](https://img.shields.io/badge/Caddy-1F88C0?style=for-the-badge&logo=caddy&logoColor=white) ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white) |
 
 ---
 
@@ -112,6 +126,12 @@
 > **AI가 규칙 카드 초안 작성 → 관리자 승인 → 자동 PR**
 > 승인된 후보를 규칙 카드 파일로 만들어 매주 develop에 PR을 올립니다
 
+> 후보 카드 디스코드 알림 → 관리자 화면에서 후보 확인 · 승인 → 카드제작PR 생성 디스코드 알림 → 자동으로 열린 카드 PR
+
+<p align="center"><img src="./docs/img/readme/rule-candidate.gif" width="80%" alt="규칙 후보 자동 승격" /></p>
+
+<br/>
+
 ---
 
 ## 아키텍처
@@ -146,15 +166,108 @@
 
 ---
 
-## 기술 스택
+## RAG · 코퍼스 동기화
 
-| 분류 | 기술 |
-| --- | --- |
-| **Frontend** | ![React](https://img.shields.io/badge/React_18-61DAFB?style=for-the-badge&logo=react&logoColor=black) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white) ![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white) ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white) ![React Router](https://img.shields.io/badge/React_Router-CA4245?style=for-the-badge&logo=reactrouter&logoColor=white) |
-| **Backend** | ![Java](https://img.shields.io/badge/Java_21-007396?style=for-the-badge&logo=openjdk&logoColor=white) ![Spring Boot](https://img.shields.io/badge/Spring_Boot_3.5-6DB33F?style=for-the-badge&logo=springboot&logoColor=white) ![Flyway](https://img.shields.io/badge/Flyway-CC0200?style=for-the-badge&logo=flyway&logoColor=white) |
-| **AI** | ![Python](https://img.shields.io/badge/Python_3.12-3776AB?style=for-the-badge&logo=python&logoColor=white) ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white) ![uv](https://img.shields.io/badge/uv-DE5FE9?style=for-the-badge&logo=uv&logoColor=white) ![Langfuse](https://img.shields.io/badge/Langfuse-0A0A0A?style=for-the-badge&logoColor=white) |
-| **DB** | ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white) ![pgvector](https://img.shields.io/badge/pgvector-336791?style=for-the-badge&logo=postgresql&logoColor=white) ![pg_bigm](https://img.shields.io/badge/pg__bigm-336791?style=for-the-badge&logo=postgresql&logoColor=white) ![Redis](https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white) |
-| **Infra** | ![AWS](https://img.shields.io/badge/AWS_EC2-FF9900?style=for-the-badge&logo=amazonec2&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white) ![Caddy](https://img.shields.io/badge/Caddy-1F88C0?style=for-the-badge&logo=caddy&logoColor=white) ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white) |
+### RAG
+
+<p align="center"><img src="./docs/img/readme/rag.png" width="90%" alt="RAG 룰카드 후보 생성" /></p>
+
+> 하이브리드 검색 기반 RAG로 규칙 카드 자동 생성
+
+### 코퍼스 동기화
+
+<p align="center"><img src="./docs/img/readme/corpus-sync.png" width="90%" alt="코퍼스 동기화" /></p>
+
+> 매주 국가법령정보 API에서 바뀐 법령만 다시 임베딩해 코퍼스를 최신으로 유지하고, 영향받는 규칙 카드를 알림
+
+---
+
+## 배포 · CI/CD
+
+### CI/CD 파이프라인
+
+<p align="center"><img src="./docs/img/readme/cicd.png" width="90%" alt="CI/CD 파이프라인" /></p>
+
+`develop` → `release` PR 이 머지되면 GitHub Actions(`aws-release.yml`)가 자동으로 배포합니다.
+
+1. 백엔드 · AI · 프런트 검증 후 이미지를 빌드해 ECR 에 올립니다
+2. SSM 으로 EC2 의 `deploy/deploy.sh` 에 커밋 SHA 를 넘깁니다
+3. EC2 가 이미지를 받아 `deploy/compose.yaml` 로 다시 띄우고, 백엔드가 기동하면서 Flyway 마이그레이션을 적용합니다
+
+`release` 로 가는 PR 은 이 레포의 `develop` 에서만 열 수 있습니다. 문제가 생기면 이전 SHA 로 되돌립니다: `sudo bash /opt/ktc4/repo/deploy/deploy.sh <이전 SHA> --rollback`
+
+AWS 준비, 백업, 주간 배치 타이머 설치는 [docs/deployment.md](docs/deployment.md)를 참고하세요.
+
+### Redis (리프레시 토큰 교체)
+
+```mermaid
+sequenceDiagram
+    participant B as 브라우저
+    participant A as API 서버
+    participant R as Redis
+
+    Note over B,R: 로그인
+    B->>A: POST /api/v1/auth/login 또는 /auth/kakao
+    A->>R: refresh:{familyId} 에 사용자와 토큰 해시 저장 (TTL 14일)
+    A-->>B: 액세스 토큰(15분) + refresh_token 쿠키
+
+    Note over B,R: 액세스 토큰이 만료되면 재발급
+    B->>A: POST /api/v1/auth/refresh (쿠키)
+    A->>R: Lua 스크립트로 저장된 해시와 비교
+    alt 해시가 같음
+        R-->>A: 새 토큰 해시로 교체
+        A-->>B: 새 액세스 토큰 + 새 쿠키
+    else 해시가 다름 (이미 쓴 토큰을 다시 보냄)
+        R-->>A: 그 family 삭제
+        A-->>B: 401, 그 기기는 다시 로그인
+    else family 없음 (만료, 로그아웃)
+        A-->>B: 401
+    end
+
+    Note over B,R: 로그아웃
+    B->>A: POST /api/v1/auth/logout
+    A->>R: refresh:{familyId} 삭제
+```
+
+로그인 한 번에 family가 하나 생성되며, 토큰을 해싱해 저장합니다. Lua 스크립트로 토큰 비교와 교체를 구현해 두 요청이 동시에 같은 토큰으로 재발급 받는 상황을 방지했습니다. 이메일 인증 코드, AI 비서 Really의 사용량 한도, 버그 신고 한도도 Redis에 저장되어 있으며, TTL 키를 통해 기한을 관리합니다.
+
+### Blue / Green 배포
+
+```mermaid
+sequenceDiagram
+    participant D as deploy.sh
+    participant C as Caddy
+    participant B as blue (API, AI)
+    participant G as green (API, AI)
+    participant P as PostgreSQL
+
+    Note over C,B: 평소에는 /api/v1 을 blue 가 받음<br/>green 은 멈춰 있음
+    D->>G: 새 이미지로 기동 (up --wait)
+    G->>P: Flyway 마이그레이션
+    Note over C,B: 그동안에도 blue 가 계속 받음
+    G-->>D: healthy
+    D->>C: upstream.caddy 를 green 으로 바꾸고 caddy reload
+    alt reload 성공
+        Note over C,G: 이제 /api/v1 은 green 이 받음 (연결은 끊기지 않음)
+        D->>B: stop
+        Note over B: 하던 요청과 판정을 마치고 멈춤 (최대 60초)
+    else reload 실패
+        D->>D: upstream.caddy 를 되돌리고 배포 실패
+        Note over C,B: blue 가 계속 받음
+    end
+```
+
+이전 버전과 신규 버전이 혼용되지 않도록 같은 색끼리만 호출하도록 하였습니다. Blue/Green이 같은 DB를 사용하므로 마이그레이션은 직전 릴리스와도 호환되어야 합니다. 배포 시에는 idle인 색을 새 버전으로 교체해 live로 사용합니다.
+
+### 모니터링
+
+#### CloudWatch
+
+<p align="center"><img src="./docs/img/readme/cloudwatch.png" width="90%" alt="CloudWatch 대시보드 ktc4-backend" /></p>
+
+#### Langfuse (AI 에이전트 모니터링)
+
+<p align="center"><img src="./docs/img/readme/langfuse.gif" width="90%" alt="Langfuse AI 에이전트 모니터링" /></p>
 
 ---
 
@@ -219,7 +332,7 @@ fix: 카드사 CSV 헤더 공백 처리
 #### 리뷰 규칙
 
 - `feature/*` → `develop` 으로 PR을 올립니다
-- 팀원 1명 이상 리뷰 후 PM이 머지합니다
+- 팀원 1명 이상 승인을 받으면 PR을 올린 사람이 머지합니다
 - 매주 `develop` → `main` PR로 멘토 리뷰를 받습니다
 
 </td>
@@ -251,7 +364,7 @@ fix: 카드사 CSV 헤더 공백 처리
 
 ---
 
-## 실행 · 배포
+## 실행
 
 ### 빠른 시작
 
@@ -355,18 +468,6 @@ uv run ruff check . && uv run pytest               # CI 와 같은 검사
 | `LANGFUSE_*` | LLM 호출 추적 | 꺼짐 |
 
 주간 배치는 직접 돌려 볼 수 있습니다: `uv run python -m pipeline.candidates --dry-run`, `uv run python -m pipeline.promote --dry-run`
-
-### 배포
-
-`develop` → `release` PR 이 머지되면 GitHub Actions(`aws-release.yml`)가 자동으로 배포합니다.
-
-1. 백엔드 · AI · 프런트 검증 후 이미지를 빌드해 ECR 에 올립니다
-2. SSM 으로 EC2 의 `deploy/deploy.sh` 에 커밋 SHA 를 넘깁니다
-3. EC2 가 이미지를 받아 `deploy/compose.yaml` 로 다시 띄우고, 백엔드가 기동하면서 Flyway 마이그레이션을 적용합니다
-
-`release` 로 가는 PR 은 이 레포의 `develop` 에서만 열 수 있습니다. 문제가 생기면 이전 SHA 로 되돌립니다: `sudo bash /opt/ktc4/repo/deploy/deploy.sh <이전 SHA> --rollback`
-
-AWS 준비, 백업, 주간 배치 타이머 설치는 [docs/deployment.md](docs/deployment.md)를 참고하세요.
 
 ---
 
