@@ -77,6 +77,7 @@ class ApiContractIntegrationTest {
         "POST /api/v1/assistant/chat",
         "POST /api/v1/questions/bulk-answer",
         "POST /api/v1/question-responses",
+        "POST /api/v1/question-responses/withdraw",
         "GET /api/v1/handoff-notes",
         "POST /api/v1/handoff-notes",
         "GET /api/v1/statutes/{statuteVersionId}",
