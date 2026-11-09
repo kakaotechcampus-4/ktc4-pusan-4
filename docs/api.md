@@ -192,7 +192,9 @@ Question
 │       └── POST                        미해소 질문 일괄 응답
 │
 ├── question-responses/
-│   └── POST                            확인 질문 응답 및 부분 재판정
+│   ├── POST                            확인 질문 응답 및 부분 재판정
+│   └── withdraw/
+│       └── POST                        답 취소 및 부분 재판정
 │
 ├── handoff-notes/
 │   ├── GET                             세무대리인 질문 목록
@@ -669,6 +671,8 @@ sourceStatus = CANCELED_OFFSET
 `CANCELED`는 사용자가 직접 선택하는 상태가 아니다.
 
 재판정 결과 해당 Question이 더 이상 필요하지 않을 때 시스템이 변경한다.
+
+답을 취소하면(3.10 답 취소) 답한 Question은 잠깐 `PENDING`으로 돌아갔다가 같은 요청의 재판정에서 `CANCELED`가 되고, 새 revision이 같은 질문을 새 Question으로 다시 묻는다.
 
 ---
 
@@ -2673,6 +2677,67 @@ T3 rev2 → F10
 422 INVALID_ANSWER_VALUE                options에 없는 값이다
 ```
 
+## `POST /api/v1/question-responses/withdraw`
+
+한 답을 취소한다. 화면에서 이미 고른 선택지를 다시 누르면 부른다.
+
+```
+{
+  "questionIds": [
+    "0199a1..."
+  ]
+}
+```
+
+같은 요청의 Question은 응답과 같이 동일 Batch, `groupKey`, `factType`에 속해야 한다.
+
+처리 순서:
+
+```
+1. Question 검증
+2. 같은 Batch·groupKey·factType 의 CANCELED가 아닌 Question 중 ANSWERED가 없으면 여기서 끝낸다
+3. 답 취소를 UserFact 새 version으로 남긴다 (withdrawn = true, value = {})
+4. ANSWERED Question → PENDING, answeredFactId·answeredAt 비움
+5. 응답과 같은 Transaction을 재판정한다 (3.10 4단계)
+6. 각 Transaction에 새 Judgment revision 저장
+7. 4단계에서 돌린 Question은 이전 revision의 대기 질문이라 CANCELED가 된다
+8. 새 revision이 같은 질문을 새 Question으로 다시 만든다
+```
+
+응답의 거울이다. 답한 Question만이 아니라 같은 그룹의 답한 Question을 모두 돌리고, 가맹점 단위 Question이면 그 가맹점에서 판정한 적 있는 판정 대상 Transaction도 다시 판정한다. 새 JudgmentRun은 만들지 않고, 접대비 한도는 응답과 같이 다시 집계한다. 활성 JudgmentOverride는 그대로다.
+
+취소한 Question은 7단계에서 `CANCELED`가 되므로, 다시 답할 때는 목록을 다시 읽어 새 Question의 id로 3.10을 부른다.
+
+UserFact는 고치지 않는다. 최신 version이 취소이면 그 (Batch, `scopeKey`, `factType`)에는 답이 없는 것으로 판정하고, 취소보다 앞선 답은 다시 살아나지 않는다. 다시 답하면 취소 다음 version이 된다. 재판정한 revision의 `origin`은 `USER_FACT`이고 `id`는 취소를 남긴 UserFact다.
+
+응답 `200`:
+
+```
+{
+  "withdrawnCount": 2,
+  "rejudgedTransactionCount": 3
+}
+```
+
+| 필드 | 설명 |
+| --- | --- |
+| withdrawnCount | `ANSWERED`에서 `PENDING`으로 돌린 Question 수. 함께 돌린 같은 그룹 Question까지 센다 |
+| rejudgedTransactionCount | 다시 판정한 Transaction 수 |
+
+이미 답이 없는 그룹(모두 `PENDING`)이면 아무것도 바꾸지 않고 `withdrawnCount = 0`, `rejudgedTransactionCount = 0`이다. 에러가 아니다.
+
+에러는 아래 순서로 검사해 처음 걸린 것을 반환한다.
+
+```
+400 VALIDATION_ERROR                    questionIds가 비었다
+404 QUESTION_NOT_FOUND                  없거나 다른 사용자의 Question이 있다
+422 QUESTIONS_FROM_DIFFERENT_BATCHES
+409 QUESTION_GROUP_MISMATCH             groupKey·factType이 다른 Question이 있다
+409 QUESTION_NOT_ANSWERABLE             요청한 Question이 모두 CANCELED다
+```
+
+요청에 `CANCELED` Question이 섞여 있어도 하나라도 살아 있으면 그 그룹을 취소한다. 응답(3.10)은 하나라도 `CANCELED`면 막는 것과 다르다. 화면이 들고 있던 목록이 오래되어도 취소는 같은 결과가 되기 때문이다.
+
 ---
 
 # 3.11 Question 일괄 응답
@@ -3365,6 +3430,14 @@ batch_id
 ```
 source  USER | ASSISTANT | PREVIOUS_ANSWER | BULK
 ```
+
+답 취소(3.10 답 취소, V23):
+
+```
+withdrawn  boolean, 기본 false. true면 value = {} 이고 출처는 USER
+```
+
+최신 version만 판정에 쓰고, 최신 version이 취소이면 답이 없다.
 
 ---
 

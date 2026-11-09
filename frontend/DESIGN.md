@@ -10,7 +10,7 @@
 | 층 | 어디에 | 무엇 |
 |---|---|---|
 | 토큰 | `tailwind.config.js` | 색·타이포·폭·그림자·이징. 화면에서는 이름으로만 쓴다 |
-| 부품 | `src/components/ui/` | Button, Card, Badge, SectionHeading, Container, Input/Select/Field, ChoiceGroup, Empty, Table/Pagination, FilterBar, Modal |
+| 부품 | `src/components/ui/` | Button, IconButton, Card, Badge, SectionHeading, Container, Input/Select/Field, ChoiceGroup, Empty, Table/Pagination, FilterBar, Modal |
 | 도메인 부품 | `src/components/` | VerdictBadge, StatuteCitation, OrbitStage — ui 부품 위에 도메인 의미를 얹은 것 |
 | 타입 | `src/types/domain.ts` | API 명세와 1:1. 화면 편의 필드를 여기 추가하지 않는다 |
 | 데이터 | `src/api/` | 화면은 `api.*`만 호출. 서버 상태를 화면·Context에 두지 않는다 |
@@ -106,7 +106,7 @@
 ### 간격·형태
 
 - 페이지 폭 `max-w-page`(1440px). 좌우 여백은 `px-6 lg:px-gutter`(62px) — 레퍼런스에서 잰 값이다.
-- **한 줄로 읽어 내려가는 화면은 가운데 한 단이다.** 사업자 문진, 분류 확인, 판정 전 확인, 판정, 질문, 내 정보는 `<AppShell narrow>` 로 빵부스러기와 내용을 `max-w-3xl` 한 단에 두고 가운데 놓는다. 1440px 바탕의 왼쪽에 붙이면 오른쪽 절반이 비어 화면이 기운다(11/7 치오). 표와 상세 패널이 나란한 결과, 거래, 업로드 이력과 두 칸인 요약은 넓게 쓴다.
+- **한 줄로 읽어 내려가는 화면은 가운데 한 단이다.** 사업자 문진, 분류 확인, 판정 전 확인, 판정, 질문, 내 정보는 `<AppShell narrow>` 로 내용을 `max-w-3xl` 한 단에 두고 가운데 놓는다. 공개 화면의 버그 신고도 같은 식으로 가운데 한 단이다. 1440px 바탕의 왼쪽에 붙이면 오른쪽 절반이 비어 화면이 기운다(11/7 치오). 표와 상세 패널이 나란한 결과, 거래, 업로드 이력과 두 칸인 요약은 넓게 쓴다.
 - 섹션 세로 여백: 랜딩 `pt-28`, 구분 띠(숫자) `py-16`.
 - 라운드: 패널·카드 `rounded-2xl`(24px), 큰 판 `rounded-[20px]`, 중간 `rounded-xl`(16px)·`rounded-lg`(12px), **버튼·알약은 `rounded-full`**.
 - 초점 테(`:focus-visible`, index.css)는 모서리를 건드리지 않는다. 요소의 `rounded-*` 를 따라 그려지므로 버튼마다 `focus-visible:rounded-*` 를 덧붙이지 않는다. `html` 의 `scroll-padding-top` 이 sticky 머리띠(72px)만큼 띄워서 Tab 으로 옮긴 초점이 머리띠 밑에 숨지 않는다.
@@ -133,13 +133,25 @@
 ```
 - `variant`: `primary`(파란 알약) · `secondary`(테두리 알약) · `soft`(연회색) · `ghost`(밑줄 친 텍스트 링크) · `danger`(빨강)
 - `danger` 는 **되돌릴 수 없는 동작에만**, 한 화면에 하나. 그런 동작은 항상 `Modal` 로 한 번 더 묻는다.
+  - 지금은 내 정보의 탈퇴하기와 그 확인 버튼(11/8 회의), 관리자 후보 기각의 확인 버튼이다. 업로드 지우기는 `secondary` 로 열고 `Modal` 에서 묻는다.
 - `size`: `sm` 헤더·표 안(36px) · `md` 폼과 화면의 주 버튼(48px) · `lg` 랜딩 CTA(56px) · `inline` 문장 속 링크(ghost 전용)
 - **모양은 알약 하나, 높이는 이 셋뿐이다.** 화면에서 `rounded-xl`·`h-*`·`disabled:bg-line` 으로 버튼을 따로 만들지 않는다. 폼 제출은 `<Button type="submit">`, 꽉 채우려면 `className="w-full"`.
 - 막힌 버튼은 모든 variant 가 `opacity-40` 하나다. 회색으로 바꾸거나 다른 불투명도를 쓰지 않는다.
 - 둘을 나란히 둘 때는 `[secondary][primary]` 순서로 오른쪽에 붙인다(`justify-end`).
 - 한 뷰포트 안에 `primary`는 하나. 나머지 행동은 `secondary`/`soft`. 예외: 랜딩 끝의 CTA가 히어로 CTA와 같은 목적지를 반복하는 것은 허용 (스크롤로 떨어져 있고 행동이 하나이므로).
-- 되돌릴 수 없는 동작은 현재 **업로드 배치 삭제 하나뿐**이다(`/uploads`). 지우면 그 배치에서 나온 거래·판정·되묻기 답변·사용자 수정까지 함께 사라진다(api.md 3.3). 그래서 `Modal` 로 한 번 더 묻고, 무엇이 함께 사라지는지 `description` 에 적는다.
+- 되돌릴 수 없는 동작은 현재 **업로드 배치 삭제**(`/uploads`), **탈퇴**(`/account`), **관리자 후보 처리**(`/admin`)다. 업로드를 지우면 그 배치에서 나온 거래·판정·되묻기 답변·사용자 수정까지 함께 사라진다(api.md 3.3). 그래서 `Modal` 로 한 번 더 묻고, 무엇이 함께 사라지는지 `description` 에 적는다.
 - 제출·외부 발송처럼 돌이킬 수 없는 동작은 아직 없다. 새로 생기면 **이 문서를 먼저 고치고** 버튼을 만든다.
+
+### IconButton
+```tsx
+<IconButton icon={Trash2Icon} label="KB국민카드 승인내역 업로드 삭제" onClick={...} />
+<IconButton to="/interview" icon={PencilIcon} label="문진 고치기" className={PANEL_ICON} />
+```
+- **글자로 쓸 수 있는 동작은 그림으로 바꾼다(11/9 치오).** 보기(눈), 삭제(휴지통), 고치기(연필), 닫기(X), 복사, 내려받기, 인쇄, 빼기와 넣기(−, +), 페이지 이전과 다음(화살표).
+- 글자로 남기는 것: 바꿀 대상을 글자로 말해야 하는 동작(「불가로 바꾸기」), 화면 이동(「요약 보기」, 「질문에 답하기」), 오류 화면의 「다시 시도」, 확인 창의 「취소」와 「지우기」, 폼의 주 버튼(「저장」).
+- `label` 은 화면 읽기와 마우스를 올렸을 때의 이름이다. 표나 목록 안이면 어느 줄인지 넣는다(가맹점, 파일, 질문).
+- 36px 알약 하나다. `secondary` 는 테두리, `ghost` 는 바탕만 바뀐다. 표 안에서 저장하는 동안은 `disabled` 대신 `busy` 를 써 초점을 놓지 않는다.
+- 그림만 바뀌는 확인(복사했습니다)은 `role="status"` 문구를 같이 둔다.
 
 ### Card
 `tone` canvas(흰 상자 + `border-line`, 기본)·ink(검정), `padding` sm(28)·md(32)·lg(40/48), `as` div·article·section·li.
@@ -165,7 +177,7 @@
 `eyebrow → title → description` 순서 고정. `size` page·lg·md(기본)·sm. 다크 배경은 `inverse`.
 - `size="page"` 는 로그인 뒤 화면의 머리다. 작은 accent eyebrow + 28px **h1**(기본 태그) — 흐름 화면의 `StepEyebrow` + h1 과 같은 모양이다. 내 정보·관리자처럼 단계가 없는 화면이 쓴다.
 - lg(h1)·md(h2)·sm(h3) 는 공개 화면(FAQ·버그 신고)과 랜딩 섹션 제목이다.
-- 화면마다 h1 은 하나다. 빵부스러기, 탭 제목, eyebrow, h1 은 같은 화면 이름을 쓴다.
+- 화면마다 h1 은 하나다. 탭 제목과 h1 은 같은 화면 이름을 쓴다. 빵부스러기(홈 > …)는 두지 않는다(11/9 치오).
 - `description` 은 없어도 되면 넣지 않는다(아래 문구 규칙).
 
 ### Container
@@ -181,6 +193,8 @@
 
 ### Modal
 - **되돌릴 수 없는 동작 앞에서만** 쓴다. 단순 안내나 부가 정보에는 쓰지 않는다.
+  - 예외는 판정 대상에서 빼기다(11/8 회의). 거래 화면에서 다시 넣을 수 있지만 결과와 합계에서 거래가 사라져 한 번 묻는다(`ExcludeConfirm`). 되돌릴 수 있으니 제목은 `ink`, 확인 버튼은 `primary` 다.
+  - 바텀시트 안에서도 열 수 있다. Esc 와 Tab 은 위에 뜬 `Modal` 이 먼저 받는다.
 - `description` 에 **무엇이 함께 사라지는지** 적는다. "정말 삭제하시겠습니까?" 만으로는 부족하다.
 - Esc·바깥 클릭으로 닫힌다. 열리면 첫 조작 요소로 초점이 가고, Tab 은 대화상자 안에서만 돈다. 닫으면 열었던 버튼으로 초점이 돌아간다. 확인 버튼은 `variant="danger"`.
 - 조회·저장 실패 문구는 **대화상자 안에** 둔다. 뒤 화면에 두면 백드롭에 가려 보이지 않는다.
@@ -251,7 +265,7 @@
 
 ## 화면을 새로 만들 때
 
-- **라우트를 추가하면 그 화면으로 가는 링크도 같이 넣는다.** 5단계 흐름에 속하면 `AppShell` 의 `STEPS`(또는 `STEP_ALIAS`), 흐름 밖의 자료 화면이면 내 정보(`Account`)의 내 자료 목록에 넣는다. 머리말 `REFS`(거래, 업로드 이력)는 768px 근처에서 이미 로그아웃 버튼을 밀어내므로 더 늘리지 않는다. 주소를 직접 쳐야만 닿는 화면은 없는 화면이다.
+- **라우트를 추가하면 그 화면으로 가는 링크도 같이 넣는다.** 5단계 흐름에 속하면 `AppShell` 의 `STEPS`(또는 `STEP_ALIAS`), 흐름 밖의 자료 화면이면 내 정보(`Account`)의 내 자료 목록과 사용자 이름을 누르면 여는 메뉴(`AccountMenu`: 내 정보, 거래, 업로드 이력, 로그아웃)에 넣는다. 머리말에 자료 화면 링크를 따로 두지 않는다(11/9 치오). 주소를 직접 쳐야만 닿는 화면은 없는 화면이다.
 - 검증할 때 `history.pushState` 로 건너뛰지 말고 **링크를 눌러서** 들어가 본다. 그러지 않으면 닿을 수 없는 화면을 "동작한다"고 적게 된다.
 
 ## 새 부품이 필요할 때

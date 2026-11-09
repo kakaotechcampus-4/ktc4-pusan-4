@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { CheckIcon } from 'lucide-react';
+import { CheckIcon, ChevronRightIcon } from 'lucide-react';
 import { SignedUpError, useSession } from '../contexts/SessionContext';
 import { api, ApiRequestError, mockVerificationCode } from '../api';
 import {
@@ -9,19 +9,18 @@ import {
   AUTH_LABEL,
   AuthLayout } from
 '../components/AuthLayout';
-import { Button, Modal } from '../components/ui';
+import { Button, IconButton, Modal } from '../components/ui';
 import { TERMS_EFFECTIVE, TermsBody } from './public/Terms';
 import { PRIVACY_EFFECTIVE, PrivacyBody } from './public/Privacy';
 import { PASSWORD_RULE, passwordProblem } from '../utils/password';
 import { PasswordCheck } from '../components/PasswordCheck';
+import { KakaoStart } from '../components/KakaoStart';
 
 /** 다시 받기 간격. 서버도 60초에 한 번만 보낸다 (#193) */
 const RESEND_SECONDS = 60;
 /** 서버는 코드 하나에 5번까지 받고, 5번째로 틀리면 코드를 지운다. 그래도 응답은 「틀림」이라 여기서 센다 (C69) */
 const MAX_CODE_ATTEMPTS = 5;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-/** 약관·처리방침을 여는 「보기」 */
-const DOC_LINK = 'shrink-0 text-[12px] text-ink2 underline underline-offset-4 hover:text-ink';
 
 interface LocationState {
   from?: string;
@@ -309,7 +308,7 @@ export function Signup() {
 
   // 이미 로그인했으면 로그인 뒤에 갈 곳으로 보낸다 (C52). 이어 가는 중에는 폼을 그리지 않는다
   if (status === 'signedIn' && !signingUp.current) return <Navigate to={from ?? '/'} replace />;
-  if (status === 'restoring') return <AuthLayout title="이메일로 가입">{null}</AuthLayout>;
+  if (status === 'restoring') return <AuthLayout title="회원가입">{null}</AuthLayout>;
 
   const step = verificationToken ? 3 : sentTo ? 2 : 1;
   /** 그 칸 바로 아래 둘 오류. 칸이 정해지지 않은 오류는 field 를 null 로 불러 그 자리에 둔다 */
@@ -323,10 +322,12 @@ export function Signup() {
   error && errorField === field ? `signup-${field}-error` : undefined;
 
   return (
-    <AuthLayout title="이메일로 가입">
+    <AuthLayout title="회원가입">
       <h1 className="text-[26px] font-bold tracking-tight text-ink">
-        이메일로 가입
+        회원가입
       </h1>
+
+      <KakaoStart from={from ?? '/'} label="카카오로 시작하기" divider="또는 이메일로" disabled={busy} />
 
       <ol className="mt-6 flex gap-2 text-[12px]" aria-label="가입 단계">
         {['이메일 인증', '코드 확인', '비밀번호'].map((label, index) =>
@@ -506,9 +507,7 @@ export function Signup() {
                 <input id="agree-terms" type="checkbox" checked={agreeTerms} onChange={(event) => setAgreeTerms(event.target.checked)} />
                 [필수] 이용약관 동의
               </label>
-              <button type="button" onClick={() => setDoc('terms')} className={DOC_LINK}>
-                보기
-              </button>
+              <IconButton icon={ChevronRightIcon} label="이용약관 보기" onClick={() => setDoc('terms')} />
             </div>
             <div className="flex items-center gap-2 text-ink2">
               <label htmlFor="agree-privacy" className="flex flex-1 items-center gap-2">
@@ -520,9 +519,7 @@ export function Signup() {
 
                 [필수] 개인정보 수집 및 이용 동의
               </label>
-              <button type="button" onClick={() => setDoc('privacy')} className={DOC_LINK}>
-                보기
-              </button>
+              <IconButton icon={ChevronRightIcon} label="개인정보 수집 및 이용 동의 보기" onClick={() => setDoc('privacy')} />
             </div>
           </fieldset>
           {errorAt('terms')}

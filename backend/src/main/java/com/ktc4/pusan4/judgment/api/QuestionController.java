@@ -25,7 +25,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
 
-@Tag(name = "questions", description = "룰엔진 확인 질문 (api.md 3.9~3.12). 사용자가 질문을 직접 취소하는 API 는 없다")
+@Tag(name = "questions", description = "룰엔진 확인 질문 (api.md 3.9~3.12). 사용자가 질문을 직접 취소하는 API 는 없다. "
+    + "답을 거두는 것은 POST /question-responses/withdraw 다")
 @RestController
 public class QuestionController {
 
@@ -102,6 +103,23 @@ public class QuestionController {
             answerService.answer(currentUser.id(), request.questionIds(), request.answer().value(),
                 request.source() == null ? AnswerSource.USER : request.source())
         );
+    }
+
+    @Operation(summary = "답 취소 및 부분 재판정",
+        description = "같은 Batch·groupKey·factType 의 ANSWERED 질문을 모두 PENDING 으로 돌리고, 취소를 UserFact 새 version 으로 "
+            + "남긴 뒤 응답과 같은 거래를 재판정한다. 재판정한 revision 은 같은 질문을 새 id 로 다시 묻고, 돌려 둔 질문은 "
+            + "재판정이 CANCELED 로 바꾼다. 답한 질문이 없으면 withdrawnCount = 0 (에러 아님). api.md 3.10 답 취소")
+    @ApiResponse(responseCode = "404", description = "QUESTION_NOT_FOUND",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode = "409", description = "QUESTION_NOT_ANSWERABLE, QUESTION_GROUP_MISMATCH",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode = "422", description = "QUESTIONS_FROM_DIFFERENT_BATCHES",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @PostMapping("/question-responses/withdraw")
+    public QuestionWithdrawResponse withdraw(
+        CurrentUser currentUser, @Valid @RequestBody QuestionWithdrawRequest request
+    ) {
+        return QuestionWithdrawResponse.from(answerService.withdraw(currentUser.id(), request.questionIds()));
     }
 
     @Operation(summary = "미해소 질문 일괄 응답",

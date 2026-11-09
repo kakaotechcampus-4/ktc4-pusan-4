@@ -53,24 +53,6 @@ const;
 /** rules/cards 의 실제 장 수. `ls rules/cards/*.yaml | wc -l` */
 export const RULE_CARD_COUNT = 53;
 
-/**
- * 규칙 카드가 citations 로 다는 조문 수(중복 제거).
- * awk '/citations:/{f=1;next} /^[a-z_]+:/{f=0} f' rules/cards/*.yaml | grep -o 'id: *[^,} ]*' | sort -u | wc -l
- */
-export const CITED_STATUTE_COUNT = 28;
-
-/**
- * 「허용하는 오탐 0건」은 뺐다 — 재 본 적이 없고, 확신이 없으면 「확인 필요」로
- * 내리는 제품이라 0 이라고 말할 수 있는 수가 아니다
- */
-export const STATS = [
-// 53장 가운데 52장이 아직 `미검수` 다. 「검수를 마친」이라고 쓰면 FAQ 와 반대가 된다 (#254 리뷰)
-{ value: `${RULE_CARD_COUNT}장`, label: '조문을 읽고 만든 규칙 카드' },
-// 「60건 적재된 조문」은 첫 디자인 때 박아 둔 숫자였다. 셀 수 있는 것으로 바꾼다
-{ value: `${CITED_STATUTE_COUNT}개`, label: '규칙이 근거로 다는 조문' },
-{ value: '100%', label: '판정에 붙는 근거 조문' }];
-
-
 export const SYSTEM_FEATURES = [
 {
   title: '판정은 규칙 엔진이 하고,\nAI는 분류까지만 합니다',
@@ -79,7 +61,7 @@ export const SYSTEM_FEATURES = [
 },
 {
   title: '조문은 그날 시행 중인\n버전을 고정합니다',
-  body: '국가법령정보 API에서 매일 개정을 감지해 새 버전으로 쌓습니다. 판정은 그때 읽은 버전 번호를 그대로 붙들고 있어, 작년 결과를 다시 열어도 근거가 조용히 바뀌지 않습니다.'
+  body: '국가법령정보 API에서 일주일마다 개정을 확인해 새 버전으로 쌓습니다. 판정은 그때 읽은 버전 번호를 그대로 붙들고 있어, 작년 결과를 다시 열어도 근거가 조용히 바뀌지 않습니다.'
 },
 {
   title: '원본 파일은\n서버로 올라가지 않습니다',
@@ -91,7 +73,7 @@ export const FLOW_STEPS = [
 {
   step: '01',
   title: '카드내역 올리기',
-  body: '국민카드와 기업카드 이용내역 파일. 브라우저에서 파싱하고 카드번호는 그 자리에서 버립니다.'
+  body: '국민카드와 기업카드에서 내려받은 승인내역 파일을 그대로 올립니다.'
 },
 {
   step: '02',
@@ -101,7 +83,7 @@ export const FLOW_STEPS = [
 {
   step: '03',
   title: '건별 판정과 근거',
-  body: '가능, 확인 필요, 불가 세 갈래로 나누고 조문 원문과 준비할 증빙을 함께 보여줍니다.'
+  body: '거래마다 조문 원문과 준비할 증빙을 함께 보여줍니다.'
 },
 {
   step: '04',

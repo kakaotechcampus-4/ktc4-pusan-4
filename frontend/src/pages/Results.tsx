@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRightIcon, CircleHelpIcon, DownloadIcon, SearchXIcon } from 'lucide-react';
+import { ArrowRightIcon, CircleHelpIcon, DownloadIcon, Loader2Icon, SearchXIcon, XIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { StepEyebrow } from '../components/StepEyebrow';
 import { JudgmentDetailPanel } from '../components/results/JudgmentDetailPanel';
@@ -14,6 +14,7 @@ import {
   Button,
   Empty,
   FilterBar,
+  IconButton,
   Pagination,
   Table,
   type Column } from
@@ -298,7 +299,7 @@ export function Results() {
       </div>
       <div className="flex flex-col items-end gap-1">
         <div className="flex flex-wrap items-center gap-2">
-          {/* 판정이 끝난 뒤 나가는 길. 빵부스러기의 「홈」만으로는 눈에 띄지 않는다 (#242 리뷰) */}
+          {/* 판정이 끝난 뒤 나가는 길 (#242 리뷰) */}
           <Button to="/" variant="ghost" size="sm" className="whitespace-nowrap">
             홈으로
           </Button>
@@ -309,16 +310,12 @@ export function Results() {
             </Button>
         }
           {batchId && summary && summary.totalCount > 0 &&
-        <Button
-          variant="ghost"
-          size="sm"
-          className="whitespace-nowrap"
-          disabled={exporting}
-          onClick={() => void exportCsv()}>
-
-              <DownloadIcon className="h-4 w-4" aria-hidden="true" />
-              {exporting ? 'CSV 만드는 중' : 'CSV 내려받기'}
-            </Button>
+        <IconButton
+          icon={exporting ? Loader2Icon : DownloadIcon}
+          spin={exporting}
+          label={exporting ? 'CSV 만드는 중' : 'CSV 내려받기'}
+          busy={exporting}
+          onClick={() => void exportCsv()} />
         }
           <Button to="/summary" variant="secondary" size="sm" className="whitespace-nowrap">
             요약 보기
@@ -466,17 +463,16 @@ export function Results() {
       {excludedName &&
       <p
         role="status"
-        className="mt-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl border border-line px-4 py-3 text-small text-ink2">
+        className="mt-4 flex items-start justify-between gap-3 rounded-xl border border-line px-4 py-3 text-small text-ink2">
 
-          <span>
+          {/* 닫기 그림은 줄이 꺾여도 오른쪽 위에 둔다. 버튼 안 여백만큼 당겨 그림 끝을 상자 여백에 맞춘다 */}
+          <span className="min-w-0 flex-1 py-0.5">
             {excludedName} 거래를 판정 대상에서 뺐습니다.{' '}
             <Link to="/transactions" className="font-bold text-accent hover:underline">
               거래에서 다시 넣기
             </Link>
           </span>
-          <button type="button" onClick={() => setExcludedName(null)} className="shrink-0 py-1 text-ink2 hover:text-ink">
-            닫기
-          </button>
+          <IconButton icon={XIcon} label="알림 닫기" className="-my-1.5 -mr-2.5" onClick={() => setExcludedName(null)} />
         </p>
       }
 

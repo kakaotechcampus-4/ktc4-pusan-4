@@ -14,7 +14,6 @@ import {
   FLOW_STEPS,
   NOT_DOING,
   RULE_CARD_COUNT,
-  STATS,
   SYSTEM_FEATURES,
   VERDICTS } from
 '../mock/marketing';
@@ -175,9 +174,11 @@ export function Landing() {
                 </p>
               </div>
 
-              <div className="rounded-2xl bg-surface p-5">
+              {/* 하지 않는 일은 여기 두지 않는다. 히어로 3번 장면과 맨 아래 판이 말한다 (11/8 회의, 겹치는 내용 정리) */}
+              {/* 띠의 남은 높이를 이 판이 채운다. 세 갈래를 위에 몰지 않고 높이에 고루 나눈다 */}
+              <div className="flex flex-1 flex-col rounded-2xl bg-surface p-5">
                 <p className="text-caption text-muted">판정 세 갈래</p>
-                <ul className="mt-4 space-y-3.5">
+                <ul className="mt-4 flex flex-1 flex-col justify-evenly gap-3.5">
                   {VERDICTS.map((item) =>
                   <li key={item.label}>
                       <div className="flex items-center gap-1.5 text-small">
@@ -193,17 +194,6 @@ export function Landing() {
                     </li>
                   )}
                 </ul>
-              </div>
-
-              <div className="flex-1 rounded-2xl bg-surface p-5">
-                <p className="text-caption text-muted">되돌릴 수 없는 동작</p>
-                <p className="mt-2 text-h4 font-bold tracking-ir-sm text-ink">
-                  만들지 않습니다
-                </p>
-                <p className="mt-2 text-small leading-6 text-ink2 [word-break:keep-all]">
-                  신고, 제출, 발송은 하지 않습니다. 답을 고치면 그 자리에서 다시
-                  판정합니다.
-                </p>
               </div>
             </div>
           </div>
@@ -261,44 +251,17 @@ export function Landing() {
             )}
           </ul>
 
-          <div className="mt-10 flex justify-center">
-            <Link
-              to={startTo}
-              className="inline-flex h-[79px] items-center gap-4 rounded-full bg-surface px-10 text-ir-lead font-normal tracking-ir-xs text-ink transition-colors hover:bg-accent-line">
-
-              판정 흐름 전체보기
-              <ArrowDot />
-            </Link>
-          </div>
         </section>
 
         {/* 지출 예시 — 가로로 넘겨 본다 */}
         <section className={`${SHELL} pt-28`}>
           <IrHeading>이런 지출을 이렇게 봅니다</IrHeading>
           <p className="mt-5 max-w-xl text-body-lg text-ink2 [word-break:keep-all]">
-            1인 개발 사업자가 자주 쓰는 항목입니다. 같은 지출도 상황에 따라
-            결과가 달라집니다.
+            1인 개발 사업자가 자주 쓰는 항목입니다.
           </p>
           <div className="mt-10">
             <ExampleCarousel />
           </div>
-        </section>
-
-        {/* 숫자 줄 — 위아래 괘선만 */}
-        <section id="evidence" className="mt-28 border-y border-line">
-          <dl className={`${SHELL} grid grid-cols-2 gap-10 py-16 md:grid-cols-3`}>
-            {STATS.map((stat) =>
-            <div key={stat.label}>
-                <dt className="sr-only">{stat.label}</dt>
-                <dd>
-                  <p className="text-h3 font-bold tracking-ir tabular-nums text-ink lg:text-ir-panel">
-                    {stat.value}
-                  </p>
-                  <p className="mt-2.5 text-small text-muted">{stat.label}</p>
-                </dd>
-              </div>
-            )}
-          </dl>
         </section>
 
         {/* 지키는 것 — 회색 패널 3장 */}

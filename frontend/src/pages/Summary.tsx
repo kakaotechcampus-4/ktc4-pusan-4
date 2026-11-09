@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRightIcon, CopyCheckIcon, CopyIcon, PrinterIcon, SearchXIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { StepEyebrow } from '../components/StepEyebrow';
-import { Button, Card, Empty } from '../components/ui';
+import { Button, Card, Empty, IconButton } from '../components/ui';
 import { AmountHero } from '../components/results/AmountHero';
 import { AccountBreakdown } from '../components/results/AccountBreakdown';
 import { sharesOf, spendOf } from '../utils/shares';
@@ -188,10 +188,7 @@ export function Summary() {
       </div>
       {/* PDF 는 서버에서 만들지 않는다. 인쇄용 스타일(index.css)로 화면 틀을 빼고 브라우저 인쇄로 저장한다 */}
       {summary && summary.totalCount > 0 &&
-    <Button variant="secondary" size="sm" className="print:hidden" onClick={() => window.print()}>
-          <PrinterIcon className="h-4 w-4" aria-hidden="true" />
-          PDF로 저장
-        </Button>
+    <IconButton variant="secondary" icon={PrinterIcon} label="PDF로 저장" className="print:hidden" onClick={() => window.print()} />
     }
     </header>;
 
@@ -351,12 +348,12 @@ export function Summary() {
           </p>
         }
         <div className="mt-4 flex flex-wrap items-center gap-3 print:hidden">
-          <Button variant="secondary" size="sm" disabled={!text || settling} onClick={() => void copyText()}>
-            {copy === 'done' ?
-            <CopyCheckIcon className="h-4 w-4" aria-hidden="true" /> :
-            <CopyIcon className="h-4 w-4" aria-hidden="true" />}
-            {copy === 'done' ? '복사했습니다' : '문장 복사'}
-          </Button>
+          <IconButton
+            variant="secondary"
+            icon={copy === 'done' ? CopyCheckIcon : CopyIcon}
+            label={copy === 'done' ? '복사했습니다' : '문장 복사'}
+            disabled={!text || settling}
+            onClick={() => void copyText()} />
           {unresolved && unresolved.count > 0 ?
           <Button to="/questions" variant="secondary" size="sm">
               질문에 답하기

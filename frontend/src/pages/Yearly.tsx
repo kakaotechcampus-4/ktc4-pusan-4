@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { DownloadIcon, SearchXIcon } from 'lucide-react';
+import { DownloadIcon, Loader2Icon, SearchXIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { JudgmentDetailPanel } from '../components/results/JudgmentDetailPanel';
 import { AmountHero } from '../components/results/AmountHero';
@@ -7,7 +7,7 @@ import { AccountBreakdown } from '../components/results/AccountBreakdown';
 import { JudgmentAmount } from '../components/results/JudgmentAmount';
 import { categoryLabel, merchantTitle, verdictNote } from '../components/results/display';
 import { VerdictBadge } from '../components/VerdictBadge';
-import { BottomSheet, Button, Empty, FilterBar, Pagination, Table, type Column } from '../components/ui';
+import { BottomSheet, Button, Empty, FilterBar, IconButton, Pagination, Table, type Column } from '../components/ui';
 import { useAssistantSubject } from '../components/assistant/context';
 import { api, useApi } from '../api';
 import { readAll } from '../api/readAll';
@@ -238,16 +238,12 @@ export function Yearly() {
       </div>
       {summary && summary.totalCount > 0 &&
     <div className="flex flex-col items-end gap-1">
-          <Button
-        variant="ghost"
-        size="sm"
-        className="whitespace-nowrap"
-        disabled={exporting}
-        onClick={() => void exportCsv()}>
-
-            <DownloadIcon className="h-4 w-4" aria-hidden="true" />
-            {exporting ? 'CSV 만드는 중' : 'CSV 내려받기'}
-          </Button>
+          <IconButton
+        icon={exporting ? Loader2Icon : DownloadIcon}
+        spin={exporting}
+        label={exporting ? 'CSV 만드는 중' : 'CSV 내려받기'}
+        busy={exporting}
+        onClick={() => void exportCsv()} />
           {exportFailed &&
       <p role="alert" className="text-small text-deny">
               CSV를 만들지 못했습니다. 잠시 후 다시 시도해 주세요.

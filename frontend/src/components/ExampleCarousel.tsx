@@ -79,13 +79,13 @@ export function ExampleCarousel() {
         })}
       </ul>
 
-      {/* 좌우 끝에 걸치는 동그란 버튼 */}
+      {/* 좌우 끝에 걸치는 동그란 버튼. 흰 바탕에 테만 두면 카드 위에서 묻혀 회색으로 칠한다 */}
       <button
         type="button"
         aria-label="이전 예시"
         disabled={atStart}
         onClick={() => move(-1)}
-        className="absolute -left-4 top-1/2 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-accent-line bg-canvas text-ink transition-opacity hover:border-ink disabled:pointer-events-none disabled:opacity-0 lg:flex">
+        className="absolute -left-4 top-1/2 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-surface text-ink transition-[opacity,background-color] duration-150 ease-snap hover:bg-accent-line disabled:pointer-events-none disabled:opacity-0 lg:flex">
 
         <ChevronLeftIcon className="h-5 w-5" aria-hidden="true" />
       </button>
@@ -94,7 +94,7 @@ export function ExampleCarousel() {
         aria-label="다음 예시"
         disabled={atEnd}
         onClick={() => move(1)}
-        className="absolute -right-4 top-1/2 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-accent-line bg-canvas text-ink transition-opacity hover:border-ink disabled:pointer-events-none disabled:opacity-0 lg:flex">
+        className="absolute -right-4 top-1/2 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-surface text-ink transition-[opacity,background-color] duration-150 ease-snap hover:bg-accent-line disabled:pointer-events-none disabled:opacity-0 lg:flex">
 
         <ChevronRightIcon className="h-5 w-5" aria-hidden="true" />
       </button>

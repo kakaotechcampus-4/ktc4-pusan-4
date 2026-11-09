@@ -33,6 +33,7 @@ import com.ktc4.pusan4.judgment.persistence.JudgmentOverrideService;
 import com.ktc4.pusan4.judgment.persistence.JudgmentQueryService;
 import com.ktc4.pusan4.judgment.persistence.JudgmentRunService;
 import com.ktc4.pusan4.judgment.persistence.QuestionAnswerResult;
+import com.ktc4.pusan4.judgment.persistence.QuestionWithdrawResult;
 import com.ktc4.pusan4.judgment.persistence.QuestionAnswerService;
 import com.ktc4.pusan4.judgment.persistence.QuestionQueryService;
 import com.ktc4.pusan4.judgment.persistence.QuestionSuggestionService;
@@ -258,6 +259,7 @@ class ApiResponseContractTest {
             new PendingTotal(9, 1_038_100), 2, NextStep.QUESTIONS));
         given(questionAnswerService.answer(any(), any(), any(), any()))
             .willReturn(new QuestionAnswerResult(1, UUID.fromString(ID), 1));
+        given(questionAnswerService.withdraw(any(), any())).willReturn(new QuestionWithdrawResult(1, 1));
         given(questionAnswerService.bulkAnswer(any(), any(), any(), any()))
             .willReturn(new BulkAnswerResult(1, 0, 0, List.of(UUID.fromString(ID)), 1, new PendingTotal(0, 0L)));
 
@@ -354,6 +356,9 @@ class ApiResponseContractTest {
                 """.formatted(ID), 200),
             Arguments.of("POST", "/api/v1/question-responses", """
                 {"questionIds": ["%s"], "answer": {"value": "사업"}}
+                """.formatted(ID), 200),
+            Arguments.of("POST", "/api/v1/question-responses/withdraw", """
+                {"questionIds": ["%s"]}
                 """.formatted(ID), 200),
             Arguments.of("GET", "/api/v1/statutes/1523", null, 200),
             Arguments.of("GET", "/api/v1/admin/rule-candidates", null, 200),

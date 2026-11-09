@@ -19,11 +19,16 @@ interface ChoiceGroupProps<T extends string | boolean> {
   options: ChoiceOption<T>[];
   value: T;
   onChange: (value: T) => void;
+  /** 있으면 고른 칸을 다시 눌러 고른 것을 거둔다(판정, 질문). 없으면 다시 눌러도 그대로다 */
+  onClear?: () => void;
   /**
    * 화살표로 옮길 때 바로 고르는지. 기본은 고른다(라디오 묶음 관례).
    * 고르는 순간 서버에 저장하는 곳(질문 답)은 끈다. 화살표는 초점만 옮기고 Space, Enter 로 고른다
    */
   selectOnFocus?: boolean;
+  /** 고르지 않아 저장을 막았다. 칸 테두리를 빨갛게 하고 오류 문구(describedBy)를 잇는다 */
+  invalid?: boolean;
+  describedBy?: string;
   /** 한 줄에 놓을 개수 (sm 이상). 기본 3 */
   columns?: 2 | 3 | 4;
   className?: string;
@@ -45,7 +50,10 @@ export function ChoiceGroup<T extends string | boolean>({
   options,
   value,
   onChange,
+  onClear,
   selectOnFocus = true,
+  invalid = false,
+  describedBy,
   columns = 3,
   className
 }: ChoiceGroupProps<T>) {
@@ -61,6 +69,11 @@ export function ChoiceGroup<T extends string | boolean>({
    * Shift+Tab 한 번에 묶음을 벗어난다. 묶음을 벗어나면 다시 고른 칸으로 돌아간다
    */
   const [focused, setFocused] = useState<number | null>(null);
+  /**
+   * 화살표로 막 고른 칸. 거기서 Space, Enter 를 누르면 버튼의 click 이 한 번 더 온다.
+   * 그 click 은 고른 것을 거두는 게 아니라 고른 것을 확정하는 누름이다
+   */
+  const arrowPicked = useRef<number | null>(null);
   const tabStop = !selectOnFocus && focused !== null ? focused : selectedIndex >= 0 ? selectedIndex : enabled[0];
 
   const onKeyDown = (event: React.KeyboardEvent, index: number) => {
@@ -73,7 +86,10 @@ export function ChoiceGroup<T extends string | boolean>({
     if (next === undefined) return;
     event.preventDefault();
     buttons.current[next]?.focus();
-    if (selectOnFocus) onChange(options[next].value);else
+    if (selectOnFocus) {
+      arrowPicked.current = next;
+      onChange(options[next].value);
+    } else
     setFocused(next);
   };
 
@@ -81,8 +97,13 @@ export function ChoiceGroup<T extends string | boolean>({
     <div
       role="radiogroup"
       aria-label={name}
+      aria-invalid={invalid || undefined}
+      aria-describedby={describedBy}
       onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) setFocused(null);
+        if (event.currentTarget.contains(event.relatedTarget)) return;
+        setFocused(null);
+        // 묶음을 떠났으면 화살표로 고른 것은 확정된 것이다. 다음 누름은 거두기다
+        arrowPicked.current = null;
       }}
       className={cn('grid gap-2', COLUMNS[columns], className)}>
 
@@ -101,13 +122,20 @@ export function ChoiceGroup<T extends string | boolean>({
             disabled={option.disabled}
             tabIndex={index === tabStop ? 0 : -1}
             onKeyDown={(event) => onKeyDown(event, index)}
-            onClick={() => onChange(option.value)}
+            onClick={() => {
+              const confirming = arrowPicked.current === index;
+              arrowPicked.current = null;
+              if (selected && onClear && !confirming) onClear();else
+              onChange(option.value);
+            }}
             className={cn(
               'rounded-xl border px-3.5 py-3 text-left transition-colors duration-150 ease-snap',
               selected ?
               'border-accent bg-accent-soft' :
               option.disabled ?
               'cursor-not-allowed border-dashed border-edge bg-canvas opacity-60' :
+              invalid ?
+              'border-deny bg-canvas hover:bg-surface' :
               'border-edge bg-canvas hover:bg-surface'
             )}>
 

@@ -1,4 +1,5 @@
 export { Button } from './Button';
+export { IconButton } from './IconButton';
 export type { ButtonProps, ButtonVariant, ButtonSize } from './Button';
 export { Card } from './Card';
 export { Badge, SymbolIcon } from './Badge';

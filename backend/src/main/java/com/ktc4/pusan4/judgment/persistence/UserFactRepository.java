@@ -19,6 +19,8 @@ interface UserFactRepository extends Repository<UserFactEntity, UUID> {
         UUID userId, UUID batchId, String scopeKey, String factType
     );
 
+    // 최신 version 이 답 취소(withdrawn)면 그 답은 없다. 취소보다 앞선 version 이 다시 살아나지 않게
+    // 최신을 먼저 고른 뒤 취소를 거른다.
     @Query("""
         select fact
         from UserFactEntity fact
@@ -33,6 +35,7 @@ interface UserFactRepository extends Repository<UserFactEntity, UUID> {
               and newer.factType = fact.factType
               and newer.version > fact.version
           )
+          and fact.withdrawn = false
         order by fact.scopeKey, fact.factType
         """)
     List<UserFactEntity> findAllLatest(@Param("userId") UUID userId, @Param("batchId") UUID batchId);

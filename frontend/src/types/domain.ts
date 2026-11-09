@@ -534,6 +534,17 @@ export interface QuestionResponseResult {
   rejudgedTransactionCount: number;
 }
 
+/** 답 거두기. 답한 질문을 다시 대기로 돌린다 (api.md POST /question-responses/withdraw) */
+export interface QuestionWithdrawRequest {
+  questionIds: string[];
+}
+
+export interface QuestionWithdrawResult {
+  /** 대기로 돌린 질문 수. 이미 대기였으면 0 이다 */
+  withdrawnCount: number;
+  rejudgedTransactionCount: number;
+}
+
 export interface BulkAnswerRequest {
   batchId: string;
   factType: string;
