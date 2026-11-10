@@ -135,7 +135,7 @@ ol.points li:last-child{border-bottom:0}
 ol.points li::before{content:counter(pt);position:absolute;left:0;top:13px;width:22px;height:22px;border-radius:50%;background:#E5243B;color:#fff;font-size:12px;font-weight:700;line-height:22px;text-align:center;font-variant-numeric:tabular-nums}
 ol.points b{color:var(--ink)}
 table.example{margin-top:12px}
-table.example td:first-child{color:var(--muted);white-space:normal;width:44%}
+table.example td:first-child{color:var(--muted);white-space:normal;width:50%}
 </style>
 </head>
 <body>
@@ -144,6 +144,7 @@ table.example td:first-child{color:var(--muted);white-space:normal;width:44%}
   <p>PreeT는 1인 프리랜서(업종코드 940909)의 카드 승인내역을 올리면, 거래마다 경비로 넣을 수 있는지 판정하고 근거 조문을 보여주는 서비스입니다. 업로드 화면에 준비된 샘플 파일로 아래 순서를 따라가시면 서비스 전체 흐름을 한 번 보실 수 있습니다.</p>
   <ul class="facts">
     <li><b>주소</b><span>ktc4-pusan-4.duckdns.org</span></li>
+    <li><b>계정</b><span>직접 가입 (어려우면 샘플 계정, 1단계)</span></li>
     <li><b>샘플</b><span>업로드 화면의 「샘플 파일로 해 보기」</span></li>
     <li><b>소요 시간</b><span>10~15분</span></li>
   </ul>
@@ -176,7 +177,8 @@ table.example td:first-child{color:var(--muted);white-space:normal;width:44%}
       <div class="num">1</div>
       <div class="body">
         <h2>회원가입 · 로그인</h2>
-        <p>주소로 들어가면 짧은 소개 화면이 나온 뒤 메인페이지가 열립니다. 소개는 오른쪽 위 「건너뛰기」로 넘길 수 있습니다.</p>
+        <p><b>가급적 직접 회원가입해서 써 주세요.</b> 내 계정으로 처음부터 써 보셔야 실제 사용자가 겪는 흐름 그대로 보실 수 있습니다. 카카오로 가입하면 몇 초면 됩니다.</p>
+        <p class="sub">주소로 들어가면 짧은 소개 화면이 나온 뒤 메인페이지가 열립니다. 소개는 오른쪽 위 「건너뛰기」로 넘길 수 있습니다.</p>
         <figure class="shot"><a href="img/01-home.jpg" target="_blank"><img src="img/01-home.jpg" alt="메인페이지" loading="lazy"></a></figure>
         <ol class="points">
           <li>오른쪽 위에 <b>로그인 · 회원가입</b>이 있습니다.</li>
@@ -189,9 +191,20 @@ table.example td:first-child{color:var(--muted);white-space:normal;width:44%}
         </ol>
         <figure class="shot"><a href="img/01-login.jpg" target="_blank"><img src="img/01-login.jpg" alt="로그인 화면" loading="lazy"></a></figure>
         <ol class="points">
-          <li>로그인 화면에서도 카카오로 바로 들어갈 수 있습니다.</li>
-          <li>이메일로 가입했다면 이메일과 비밀번호로 로그인합니다. 로그인하면 사업자 문진 화면이 바로 나옵니다.</li>
+          <li>다음부터는 로그인 화면에서 카카오로 바로 들어갈 수 있습니다.</li>
+          <li>이메일로 가입했다면 이메일과 비밀번호로 로그인합니다. 처음 들어가면 사업자 문진 화면이 바로 나옵니다.</li>
         </ol>
+        <p class="sub">가입이 어려우시면 샘플 계정을 쓰셔도 됩니다.</p>
+        <p>로그인 화면의 이메일 · 비밀번호 칸에 넣으시면 됩니다. 같은 계정에서 답한 내용은 다음 판정에도 이어지므로, 여럿이 한 계정을 같이 쓰지 않도록 <b>멘토님마다 하나씩</b> 골라 주세요.</p>
+        <table class="example">
+          <thead><tr><th>계정(이메일)</th><th>비밀번호</th></tr></thead>
+          <tbody>
+            <tr><td>demo1@example.com</td><td>kakaotech4</td></tr>
+            <tr><td>demo2@example.com</td><td>kakaotech4</td></tr>
+            <tr><td>demo3@example.com</td><td>kakaotech4</td></tr>
+            <tr><td>demo4@example.com</td><td>kakaotech4</td></tr>
+          </tbody>
+        </table>
       </div>
     </section>
 
