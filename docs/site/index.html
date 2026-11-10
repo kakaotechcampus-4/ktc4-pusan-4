@@ -62,9 +62,12 @@
   article h3 { font-size:16px; margin-top:28px; color:var(--blue-d); }
   p, li { line-height:1.8; color:var(--ink2); }
   blockquote { margin:14px 0; padding:14px 18px; border-left:3px solid var(--blue); background:var(--surface); border-radius:0 12px 12px 0; }
-  code { background:var(--blue-l); color:var(--blue-d); padding:2px 6px; border-radius:6px; font-size:.88em; }
+  code { background:var(--blue-l); color:var(--blue-d); padding:2px 6px; border-radius:6px; font-size:.88em; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; }
   pre { background:#191F28; color:#E5E8EB; padding:18px 20px; border-radius:14px; overflow-x:auto; font-size:13px; line-height:1.65; }
   pre code { background:none; color:inherit; padding:0; }
+  pre:has(> code.bash) { position:relative; }
+  pre:has(> code.bash)::before { content:"bash"; position:absolute; top:8px; right:14px; font-size:11px; color:#8B95A1; }
+  .sh-c { color:#7FB4FF; } .sh-f { color:#F5B97A; } .sh-s { color:#9FD98B; } .sh-v { color:#E7A6D8; } .sh-n { color:#8B95A1; }
   table { border-collapse:collapse; width:100%; margin:14px 0; font-size:14px; border-top:2px solid var(--text); }
   th, td { padding:10px 12px; text-align:left; vertical-align:top; border-bottom:1px solid var(--line); }
   th { font-size:13px; color:var(--muted); font-weight:700; }
@@ -806,44 +809,64 @@ docs: 커밋 컨벤션 추가</code></pre>
 </ol>
 `],
 ['07f-Test', '7. 테스트', `
-<h2>백엔드</h2>
-<table><tr><th style="width:22%">종류</th><th>명령</th><th>내용</th></tr>
-<tr><td>단위</td><td><code>gradlew -p backend test</code></td><td>도메인 규칙 · 계산 · 검증 · 변환. Docker 불필요</td></tr>
-<tr><td>통합</td><td><code>gradlew -p backend integrationTest</code></td><td>PostgreSQL · JPA · Flyway · 트랜잭션. Testcontainers 가 테스트용 DB 를 띄우고 끝나면 지움</td></tr>
-<tr><td>전체</td><td><code>gradlew -p backend check</code></td><td>위 둘 다</td></tr></table>
+<h2>CI</h2>
+<table><tr><th style="width:22%">워크플로</th><th>언제</th><th>검사</th></tr>
+<tr><td>Backend CI</td><td><code>backend</code> · <code>rules</code> · <code>profiles</code> · <code>eval</code> 이 바뀐 PR, develop · main push</td><td>단위 테스트 → 통합 테스트 (평가셋 포함)</td></tr>
+<tr><td>AI CI</td><td><code>ai</code> 가 바뀐 PR, develop · main push</td><td>ruff · pytest</td></tr>
+<tr><td>AWS release</td><td>develop · release 로 가는 모든 PR</td><td>백엔드 단위 · 통합, AI ruff · pytest, 웹 build · test · lint, 운영 compose 설정, 세 이미지 빌드</td></tr>
+<tr><td>Backend Code Health</td><td>백엔드 쪽 PR</td><td>커버리지(JaCoCo) · PMD · 중복 코드(CPD) · Codelens 리포트를 PR 댓글로 남김. 참고용이라 막지 않음</td></tr></table>
+<ul>
+  <li>배포 브랜치(release)로의 머지는 backend · ai · web · release-source 통과가 필수입니다.</li>
+</ul>
+<h2>로컬에서 돌리기</h2>
+<p>PR 을 올리기 전에 CI 와 같은 검사를 직접 돌릴 수 있습니다. 백엔드는 저장소 루트, 프론트엔드는 <code>frontend/</code>, AI 서버는 <code>ai/</code> 에서 실행합니다.</p>
+<table><tr><th style="width:18%">대상</th><th>명령</th><th>내용</th><th style="width:7%">CI</th></tr>
+<tr><td>백엔드 단위</td><td><code>./backend/gradlew -p backend test</code></td><td>도메인 규칙 · 계산 · 검증 · 변환, 판정 평가셋 포함. Docker 불필요</td><td>✓</td></tr>
+<tr><td>백엔드 통합</td><td><code>./backend/gradlew -p backend integrationTest</code></td><td>PostgreSQL · JPA · Flyway · 트랜잭션. Testcontainers 가 테스트용 DB 를 띄우고 끝나면 지움(Docker 필요)</td><td>✓</td></tr>
+<tr><td>AI 서버</td><td><code>uv run ruff check .</code> · <code>uv run pytest</code></td><td>린트와 단위 테스트. 모델은 가짜로 바꿔 부름</td><td>✓</td></tr>
+<tr><td>프론트 테스트</td><td><code>npm test</code> · <code>npm run lint</code></td><td>vitest, ESLint</td><td>✓</td></tr>
+<tr><td>프론트 빌드</td><td><code>npm run build</code></td><td>타입 검사, 카테고리 목록이 <code>rules/categories.yaml</code> 과 같은지, 공개 페이지 프리렌더(h1 1개 · 본문 200자 이상)까지 확인. 하나라도 어긋나면 빌드 실패</td><td>✓</td></tr>
+<tr><td>디자인 토큰</td><td><code>npm run check:tokens</code></td><td>Tailwind 토큰과 <code>frontend/DESIGN.md</code> · 스타일가이드 화면이 같은지 확인</td><td>–</td></tr></table>
+<ul>
+  <li>백엔드 단위 · 통합을 한 번에 돌리려면 <code>./backend/gradlew -p backend check</code>. PMD 리포트도 함께 만듭니다.</li>
+</ul>
 <h2>판정 평가셋 (회귀 검사)</h2>
 <ul>
   <li><code>eval/cases/E-*.yaml</code> 한 건 = 거래 하나와 받아야 할 판정. 지금 60건.</li>
   <li><strong>기대값은 규칙 카드가 아니라 조문에서 뽑습니다.</strong> 케이스마다 근거 조문 요지를 먼저 쓰고 기대값을 거기서 도출합니다.</li>
   <li>백엔드 <code>test</code> 에 포함돼 CI 에서 돕니다. 리포트는 빌드 후 <code>build/reports/eval/eval-report.md</code> (백엔드 폴더 안)에 생깁니다.</li>
+  <li>커밋 전 규칙 카드로 재려면 <code>EVAL_RULES_DIR=&lt;경로&gt;/rules</code> 를 주고 <code>--tests com.ktc4.pusan4.eval.EvalHarnessTest</code> 로 돌립니다.</li>
 </ul>
 <p class="why"><span class="why-label">파일</span> <code>eval/README.md</code></p>
-<h2>AI 서버 · 프론트엔드</h2>
-<table><tr><th style="width:22%">대상</th><th>명령</th></tr>
-<tr><td>AI 서버</td><td><code>uv run ruff check .</code> · <code>uv run pytest</code></td></tr>
-<tr><td>프론트엔드</td><td><code>npm test</code>(vitest) · <code>npm run lint</code> · <code>npx tsc --noEmit</code></td></tr></table>
+<h2>모델 평가 (CI 밖)</h2>
+<p>실제 모델이나 법령 DB 가 필요하고 결과가 매번 같지 않아 CI 에 넣지 않습니다. 프롬프트 · 모델 · 검색 방식을 바꿀 때 <code>ai/</code> 에서 돌립니다.</p>
+<table><tr><th style="width:22%">대상</th><th>명령</th><th>내용</th></tr>
+<tr><td>Really 에이전트</td><td><code>uv run python -m eval.run_assistant</code></td><td>가짜 백엔드 위에서 실제 모델로 대화를 돌려 채점</td></tr>
+<tr><td>법령 검색</td><td><code>uv run python -m eval.run_search</code></td><td>검색 골든셋으로 청킹 · 검색 전략 비교</td></tr>
+<tr><td>규칙 카드 초안</td><td><code>uv run python -m eval.run_draft</code></td><td>규칙 카드를 정답지로 근거 선택과 초안 채점</td></tr></table>
 `],
 ['09-Local', '8. 로컬 실행', `
-<h2>백엔드</h2>
-<p>JDK 21과 Docker가 필요합니다. 로그인할 때 리프레시 토큰을 Redis에 저장하므로 PostgreSQL과 Redis를 함께 띄웁니다.</p>
-<pre><code>docker compose up -d postgres redis
-
-# Windows
-.\\backend\\gradlew.bat -p backend bootRun --args="--spring.profiles.active=local"
-
-# macOS / Linux
-bash ./backend/gradlew -p backend bootRun --args='--spring.profiles.active=local'</code></pre>
-<p>확인: <code>GET http://localhost:8080/actuator/health</code>. Redis는 health 검사에서 빠져 있어 Redis가 없어도 UP으로 나옵니다.</p>
 <h2>프론트엔드</h2>
-<pre><code>cd frontend
+<pre><code class="bash">cd frontend
 npm install
 npm run dev   # http://localhost:5173</code></pre>
 <p>기본은 <b>인메모리 목업</b> API로 동작합니다. 실제 백엔드에 붙이려면 <code>VITE_API=http npm run dev</code>로 실행합니다 (<code>frontend/src/api/index.ts</code>).</p>
-<h2>테스트</h2>
-<table><tr><th>종류</th><th>명령</th><th>Docker</th></tr>
-<tr><td>단위</td><td><code>gradlew -p backend test</code></td><td>불필요</td></tr>
-<tr><td>통합 (<code>*IntegrationTest</code>)</td><td><code>gradlew -p backend integrationTest</code></td><td>필요</td></tr>
-<tr><td>프론트</td><td><code>npm test</code></td><td>-</td></tr></table>
+<h2>백엔드</h2>
+<p>JDK 21과 Docker가 필요합니다. 로그인할 때 리프레시 토큰을 Redis에 저장하므로 PostgreSQL과 Redis를 함께 띄웁니다.</p>
+<pre><code class="bash">docker compose up -d postgres redis
+bash ./backend/gradlew -p backend bootRun --args='--spring.profiles.active=local'</code></pre>
+<p>Windows PowerShell 에서는 <code>.\\backend\\gradlew.bat -p backend bootRun --args="--spring.profiles.active=local"</code> 로 실행합니다.</p>
+<p>확인: <code>GET http://localhost:8080/actuator/health</code>. Redis는 health 검사에서 빠져 있어 Redis가 없어도 UP으로 나옵니다.</p>
+<h2>AI 서버</h2>
+<p>Python 3.12 와 <code>uv</code> 가 필요합니다. 저장소 루트의 <code>.env</code> 를 읽고(<code>.env.example</code> 참고), 키가 없는 기능은 꺼진 채로 뜹니다. 백엔드는 기본으로 <code>http://localhost:8000</code> 의 AI 서버를 부릅니다.</p>
+<pre><code class="bash">cd ai
+uv sync
+uv run uvicorn app.main:app --reload --port 8000   # 확인: curl localhost:8000/health</code></pre>
+<table><tr><th style="width:34%">환경 변수</th><th>기능</th><th>비우면</th></tr>
+<tr><td><code>ASSISTANT_*</code></td><td>AI 비서 Really</td><td>안내 문구로만 답함</td></tr>
+<tr><td><code>CLASSIFY_*</code></td><td>가맹점 업종 분류</td><td>503</td></tr>
+<tr><td><code>AGENT_*</code> · <code>EMBEDDING_*</code> · <code>LAW_API_OC</code></td><td>규칙 후보 파이프라인 · 조문 검색</td><td>배치 실패</td></tr>
+<tr><td><code>LANGFUSE_*</code></td><td>LLM 호출 추적</td><td>꺼짐</td></tr></table>
 `],
 ['09b-Deploy', '9. 배포', `
 <p>원본은 <code>docs/deployment.md</code> 입니다. 여기는 흐름만 요약합니다.</p>
@@ -913,8 +936,24 @@ const DESC = {   // 홈 카드 한 줄 설명
   '09b-Deploy': 'EC2 · compose 구성, release 배포 흐름, 백업 · 롤백',
   '07-Architecture': '입력 검증부터 집계까지, 6관문 판정 흐름',
   '08-Stack': '프론트 · 백엔드 · AI 서버 · DB 구성과 디렉터리',
-  '09-Local': '백엔드·프론트 로컬 실행과 테스트 명령',
+  '09-Local': '백엔드·프론트 로컬 실행',
 };
+// bash 코드 블록(<code class="bash">)에 색을 입힌다. 줄마다 명령 · 옵션 · 문자열 · 주석 · 환경 변수를 나눈다
+const escHtml = t => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const hlBash = text => text.split('\n').map(line => {
+  let cmd = true;   // 줄 처음이나 | && ; 뒤의 첫 단어가 명령
+  const span = (c, t) => `<span class="sh-${c}">${escHtml(t)}</span>`;
+  return line.replace(/(\s+)|(#.*)|((?:[^\s"']+|"[^"]*"|'[^']*')+)/g, (t, sp, note, w) => {
+    if (sp) return sp;
+    if (note) return span('n', note);
+    if (/^(\||&&|;)$/.test(w)) { cmd = true; return escHtml(w); }
+    if (cmd && /^[A-Z_][A-Z0-9_]*=/.test(w)) return span('v', w);
+    if (cmd) { cmd = false; return span('c', w); }
+    if (/^["']/.test(w)) return span('s', w);
+    if (w[0] === '-') return span('f', w);
+    return escHtml(w);
+  });
+}).join('\n');
 // 본문의 저장소 경로(<code>docs/x.md</code> 등)를 GitHub 링크로
 const REPO = 'https://github.com/kakaotechcampus-4/ktc4-pusan-4';
 const repoLink = html => html.replace(/<code>((?:\.github|\.githooks|\.claude|tools|worklog|deploy|docker|eval|rules|profiles|db|docs|backend|frontend|ai)\/[\w.\-\/]*|[\w\-]+\.md)<\/code>/g,
@@ -954,6 +993,7 @@ function doc(i) {
       ${repoLink(d.html)}
       <nav class="pager" aria-label="다른 문서">${pagerItems(d, prev, next)}</nav>
     </article><aside class="toc" id="toc"></aside></div>`;
+  view.querySelectorAll('pre code.bash').forEach(c => { c.innerHTML = hlBash(c.textContent); });
   const hs = [...view.querySelectorAll('article h2')];
   const toc = document.getElementById('toc');
   if (hs.length) toc.innerHTML = '<p>이 페이지에서</p><span class="toc-ind"></span>';
