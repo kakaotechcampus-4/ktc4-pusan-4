@@ -124,7 +124,7 @@ flowchart TD
     end
 
     subgraph EXTRACT["규칙 후보 추출 · candidates.py (주 1회 EC2 timer, 자동, 후보당 LLM 3회)"]
-        AGG["① 집계 (SQL)<br/>unmatched_log(RULE_NOT_FOUND)<br/>merchant_category × industry_code<br/>distinct_users ≥ 2 로 자르고, 빈도는 상위 N 정렬에만 쓴다<br/>이미 후보 행이 있는 조합은 건너뛴다"]
+        AGG["① 집계 (SQL)<br/>unmatched_log(RULE_NOT_FOUND)<br/>merchant_category × industry_code<br/>distinct_users ≥ 2 로 자르고, 빈도는 상위 N 정렬에만 쓴다<br/>이미 후보 행이 있는 조합은 건너뛴다 (--key 로 만든 빈도 0 행은 세지 않는다)"]
         PLAN["② 질의 작성 (에이전트 ①)<br/>SearchPlan: 의미질의 + 정확일치 키워드"]
         SEARCH["③ 4개 위계 동시 검색 (코드)<br/>법령 · 행정규칙 · 심판례해석 · 판례 각 top-k<br/>하이브리드: 벡터 + LIKE(pg_bigm) → RRF<br/>법령은 조 단위로 뽑아 형제 잎까지 라벨을 붙여 넘긴다<br/>임베딩 호출은 여기 한 번뿐"]
         FRAME["기본 조문 · search.retrieve() (코드)<br/>소득세법 27조 · 33조 잎을 검색 없이 항상 붙인다<br/>시행령 61조 · 78조(33조1항 5호 · 13호의 범위)도 같이 붙인다<br/>33-1-9 는 뺀다 (페르소나가 면세라 9호 단서에 해당)<br/>27조 2·3항 · 33조 3항도 뺀다 (전기 비용 귀속 · 위임이라 근거가 아니다)"]

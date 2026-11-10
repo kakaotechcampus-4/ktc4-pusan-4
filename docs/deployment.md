@@ -323,9 +323,9 @@ journalctl -u ktc4-rule-candidates.service -n 50
 systemctl list-timers ktc4-rule-candidates.timer
 ```
 
-실패하면 서비스가 failed로 남고 `journalctl`에 원인이 있다. 원인을 고친 뒤 `systemctl start ktc4-rule-candidates.service`로 다시 돌린다. 후보 추출은 이미 행이 있는 조합을 건너뛰고, promote는 PR에 올린 후보를 다시 올리지 않는다.
+실패하면 서비스가 failed로 남고 `journalctl`에 원인이 있다. 원인을 고친 뒤 `systemctl start ktc4-rule-candidates.service`로 다시 돌린다. 후보 추출은 집계로 만든 행이 이미 있는 조합을 건너뛰고, promote는 PR에 올린 후보를 다시 올리지 않는다.
 
-**조합을 정해 후보 만들기.** 미판정 집계 없이 (카테고리 × 업종) 하나로 후보를 만들려면 `--key`를 준다. 사용자 수·빈도는 0으로 들어가고, 이미 같은 조합의 후보가 있어도 하나 더 만든다. 이미지 태그와 마운트는 `deploy/rule-candidates.sh`와 같다.
+**조합을 정해 후보 만들기.** 미판정 집계 없이 (카테고리 × 업종) 하나로 후보를 만들려면 `--key`를 준다. 사용자 수·빈도는 0으로 들어가고, 이미 같은 조합의 후보가 있어도 하나 더 만든다. 빈도 0인 후보는 자동 배치가 건너뛸 조합으로 세지 않으므로, 기각해 행이 남아도 나중에 그 조합에 실제 미판정이 쌓이면 자동 후보가 따로 생긴다. 이미지 태그와 마운트는 `deploy/rule-candidates.sh`와 같다.
 
 ```bash
 sudo -i

@@ -49,9 +49,11 @@ SELECT u.merchant_category, u.industry_code,
   JOIN transaction t  ON t.id = j.transaction_id
   JOIN upload_batch b ON b.id = t.batch_id
  WHERE u.reason = %(reason)s
+   -- --key 로 만든 빈도 0 후보는 세지 않는다. 기각해도 행이 남아 이 조합의 자동 후보를 막는다
    AND NOT EXISTS (SELECT 1 FROM rule_candidate c
                     WHERE c.merchant_category = u.merchant_category
-                      AND c.industry_code = u.industry_code)
+                      AND c.industry_code = u.industry_code
+                      AND c.occurrence_count > 0)
  GROUP BY u.merchant_category, u.industry_code
 HAVING count(DISTINCT b.user_id) >= %(min_users)s
  ORDER BY occurrence_count DESC
