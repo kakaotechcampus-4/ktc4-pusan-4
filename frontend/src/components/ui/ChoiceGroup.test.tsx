@@ -4,6 +4,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ChoiceGroup, type ChoiceOption } from './ChoiceGroup';
 
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
 const OPTIONS: ChoiceOption<string>[] = [
 { value: 'a', label: '가' },
 { value: 'b', label: '나', disabled: true },

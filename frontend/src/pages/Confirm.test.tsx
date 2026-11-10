@@ -62,7 +62,7 @@ let root: Root;
 const mount = async () => {
   await act(async () => {
     root.render(
-      <MemoryRouter initialEntries={['/confirm']}>
+      <MemoryRouter initialEntries={['/confirm']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
           <Route path="/confirm" element={<Confirm />} />
           <Route path="/run/:runId" element={<RunPage />} />

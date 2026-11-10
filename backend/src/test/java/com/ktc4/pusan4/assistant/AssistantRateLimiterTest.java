@@ -2,6 +2,7 @@ package com.ktc4.pusan4.assistant;
 
 import com.ktc4.pusan4.shared.api.ApiException;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
@@ -45,7 +46,7 @@ class AssistantRateLimiterTest {
         assertThatThrownBy(() -> limiter.acquire(USER))
             .isInstanceOfSatisfying(ApiException.class,
                 e -> assertThat(e.getCode()).isEqualTo("ASSISTANT_UNAVAILABLE"));
-        verify(redis).execute(any(RedisScript.class), eq(RUNNING_KEY), anyString());
+        verify(redis).execute(ArgumentMatchers.<RedisScript<Long>>any(), eq(RUNNING_KEY), anyString());
     }
 
     @Test
@@ -53,7 +54,7 @@ class AssistantRateLimiterTest {
         when(redis.opsForValue()).thenReturn(values);
         when(values.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenReturn(true);
         when(values.increment(anyString())).thenReturn(1L);
-        when(redis.execute(any(RedisScript.class), eq(RUNNING_KEY), anyString()))
+        when(redis.execute(ArgumentMatchers.<RedisScript<Long>>any(), eq(RUNNING_KEY), anyString()))
             .thenThrow(new RedisConnectionFailureException("redis down"));
 
         AssistantRateLimiter.Lease lease = limiter.acquire(USER);

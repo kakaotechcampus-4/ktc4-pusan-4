@@ -336,6 +336,7 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
 
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- Provider 와 짝인 훅이라 같이 둔다. 이 파일을 고치면 HMR 이 새로고침으로 바뀔 뿐이다
 export function useSession(): SessionValue {
   const value = useContext(SessionContext);
   if (!value) {

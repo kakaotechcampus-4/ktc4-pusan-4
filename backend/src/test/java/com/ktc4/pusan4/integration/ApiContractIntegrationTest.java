@@ -100,7 +100,7 @@ class ApiContractIntegrationTest {
             .andReturn().getResponse().getContentAsString();
 
         Set<String> actual = new TreeSet<>();
-        objectMapper.readTree(body).path("paths").fields().forEachRemaining(path -> {
+        objectMapper.readTree(body).path("paths").properties().forEach(path -> {
             JsonNode operations = path.getValue();
             operations.fieldNames().forEachRemaining(method -> {
                 if (HTTP_METHODS.contains(method)) {
