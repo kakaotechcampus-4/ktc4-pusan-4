@@ -35,6 +35,7 @@ src/
   entry-server.tsx 빌드 때만 쓰는 서버 렌더 입구
 scripts/
   prerender.mjs    공개 페이지 HTML·robots.txt·sitemap.xml·llms.txt 생성
+  build-demo-pool.ts  업로드 화면 「무작위 카드내역 만들기」의 거래 풀(src/parser/demoPool.json)을 실제 서버 판정으로 만든다. 실행법은 파일 머리에
 ```
 
 ## 검색 노출

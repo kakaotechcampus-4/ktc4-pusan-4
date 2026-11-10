@@ -164,9 +164,32 @@ function kbSheetRows(variant: KbSample): Row[] {
 
 /** KB 승인내역 모양의 BIFF8 .xls (OLE). xlrd 로도 읽힌다 */
 export async function buildKbXls(variant: KbSample = 'full'): Promise<ArrayBuffer> {
+  return writeKbXls(kbSheetRows(variant));
+}
+
+/** 무작위 시연 파일의 한 행 (randomSample.ts) */
+export interface KbDemoRow {
+  approvedAt: string;
+  merchant: string;
+  amount: number;
+  /** 해외이용금액(달러). 국내 결제는 0 */
+  foreign: number;
+  approvalNo: string;
+}
+
+/** 'demo' 와 같은 머리(2026-07-01 ~ 09-30)에 주어진 행을 넣은 KB 승인내역 파일 */
+export async function buildKbDemoXls(rows: KbDemoRow[]): Promise<ArrayBuffer> {
+  return writeKbXls([
+    ...KB_DEMO_SUMMARY,
+    KB_HEADERS,
+    ...rows.map((r) => kbRow(r.approvedAt, r.merchant, r.amount, r.approvalNo, { foreign: r.foreign }))
+  ]);
+}
+
+async function writeKbXls(sheetRows: Row[]): Promise<ArrayBuffer> {
   const xlsx = await loadXlsx();
   const book = xlsx.utils.book_new();
-  xlsx.utils.book_append_sheet(book, xlsx.utils.aoa_to_sheet(kbSheetRows(variant)), '국내이용내역');
+  xlsx.utils.book_append_sheet(book, xlsx.utils.aoa_to_sheet(sheetRows), '국내이용내역');
   return xlsx.write(book, { bookType: 'biff8', type: 'array' }) as ArrayBuffer;
 }
 
