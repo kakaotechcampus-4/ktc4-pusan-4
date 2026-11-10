@@ -71,7 +71,7 @@ const tick = (ms = 0) => act(async () => {
 const mount = async () => {
   await act(async () => {
     root.render(
-      <MemoryRouter initialEntries={['/run/run-1']}>
+      <MemoryRouter initialEntries={['/run/run-1']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
           <Route path="/run/:runId" element={<Run />} />
           <Route path="/results" element={<p>결과 화면</p>} />
