@@ -62,12 +62,15 @@
   article h3 { font-size:16px; margin-top:28px; color:var(--blue-d); }
   p, li { line-height:1.8; color:var(--ink2); }
   blockquote { margin:14px 0; padding:14px 18px; border-left:3px solid var(--blue); background:var(--surface); border-radius:0 12px 12px 0; }
-  code { background:var(--blue-l); color:var(--blue-d); padding:2px 6px; border-radius:6px; font-size:.88em; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; }
+  code { background:var(--blue-l); color:var(--blue-d); padding:2px 6px; border-radius:6px; font-size:.88em; font-family:ui-monospace,SFMono-Regular,Consolas,"Pretendard",monospace; }
   pre { background:#191F28; color:#E5E8EB; padding:18px 20px; border-radius:14px; overflow-x:auto; font-size:13px; line-height:1.65; }
   pre code { background:none; color:inherit; padding:0; }
   pre:has(> code.bash) { position:relative; }
   pre:has(> code.bash)::before { content:"bash"; position:absolute; top:8px; right:14px; font-size:11px; color:#8B95A1; }
   .sh-c { color:#7FB4FF; } .sh-f { color:#F5B97A; } .sh-s { color:#9FD98B; } .sh-v { color:#E7A6D8; } .sh-n { color:#8B95A1; }
+  pre.commit { font-size:15px; line-height:1.8; }
+  pre[data-label] { position:relative; }
+  pre[data-label]::before { content:attr(data-label); position:absolute; top:8px; right:14px; font-size:11px; color:#8B95A1; font-family:"Pretendard",sans-serif; }
   table { border-collapse:collapse; width:100%; margin:14px 0; font-size:14px; border-top:2px solid var(--text); }
   th, td { padding:10px 12px; text-align:left; vertical-align:top; border-bottom:1px solid var(--line); }
   th { font-size:13px; color:var(--muted); font-weight:700; }
@@ -115,7 +118,7 @@
   .board { margin:16px 0 8px; padding:24px; border-radius:24px; background:var(--surface); }
   .board-head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:16px; }
   .board-head b { font-size:16px; } .board-head small { color:var(--muted); font-size:12px; }
-  .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
   .stats > div { background:#fff; border-radius:16px; padding:14px 16px; }
   .stats small { display:block; color:var(--muted); font-size:12px; }
   .stats b { display:block; font-size:30px; font-weight:800; color:var(--blue); letter-spacing:-1px; line-height:1.3; }
@@ -381,11 +384,12 @@ const DOCS = [
 <tr><td>의사결정</td><td>큰 틀은 <b>다수결</b>로 정하고, 정해지지 않으면 <b>PM이 결정</b>합니다.</td></tr>
 <tr><td>작업 관리</td><td><a href="https://app.notion.com/p/elice-track/4-3b92bb98425780a28c51d7d7c2174d42" target="_blank"><b>노션 프로젝트 페이지</b> ↗</a>에서 관리합니다. 노션 안에 직접 만든 지라 보드에서 할 일을 관리합니다.</td></tr></table>
 <div class="board">
-  <div class="board-head"><b>작업 현황</b><small>GitHub PR 기준 · 2026-11-06</small></div>
+  <div class="board-head"><b>작업 현황</b><small>GitHub PR · worklog 기준 · 2026-11-06</small></div>
   <div class="stats">
     <div><small>완료한 작업 (머지된 PR)</small><b>196<em>개</em></b></div>
     <div><small>진행률</small><b>97.5<em>%</em></b><small>열린 PR 5개 남음</small></div>
     <div><small>파트</small><b>4<em>개</em></b><small>백엔드 · AI · 프론트엔드 · PM</small></div>
+    <div><small>작업 기록 (worklog)</small><b>177<em>개</em></b><small>push 마다 하나</small></div>
   </div>
   <p class="board-sub">파트별 머지된 PR</p>
   <div class="bars"><div class="bar"><span>백엔드</span><div class="track"><i style="--w:100.0%"></i><small>yuyeol3 69 · memoryhong 31</small></div><b>100</b></div><div class="bar"><span>AI</span><div class="track"><i style="--w:38.0%"></i><small>RainDrop3 38</small></div><b>38</b></div><div class="bar"><span>프론트엔드</span><div class="track"><i style="--w:32.0%"></i><small>Jaeseong22 24 · cho104 8</small></div><b>32</b></div><div class="bar"><span>PM</span><div class="track"><i style="--w:25.0%"></i><small>IwanttobeaHokage 25</small></div><b>25</b></div><div class="bar"><span>운영진</span><div class="track"><i style="--w:1.0%"></i><small>junseok-elice 1</small></div><b>1</b></div></div>
@@ -405,17 +409,44 @@ const DOCS = [
 <tr><td>수시 회의</td><td>협업이 필요한 일이 생기면 그때마다 카톡방에서 일정을 정해 회의합니다.</td></tr>
 <tr><td>회의록</td><td><a href="https://app.notion.com/p/elice-track/4-3b92bb98425780a28c51d7d7c2174d42" target="_blank">노션 프로젝트 페이지</a>에 남깁니다.</td></tr></table>
 
-<h2>PR 리뷰</h2>
+<h2>PR · 리뷰</h2>
+<p>할 일 하나가 노션에서 시작해 <code>develop</code>에 머지되기까지의 흐름입니다. <em class="auto-key">자동</em> 표시는 사람이 챙기지 않아도 도구가 처리하는 단계입니다.</p>
+<ol class="flow"><li><small>Notion</small><b>할 일 등록</b><span>파트 보드에 할 일 추가, 시작하면 "진행 중"</span></li><li><small>Git</small><b>브랜치에서 작업<em>자동</em></b><span><code>feature/…</code> 브랜치, push 때 worklog 자동 작성</span></li><li><small>GitHub</small><b>PR 올리기</b><span>PR 템플릿 4칸 채우기</span></li><li><small>Discord</small><b>바로 알림<em>자동</em></b><span>새 PR · 리뷰어 멘션, 24시간 지나면 다시 알림</span></li><li><small>GitHub</small><b>리뷰 · 승인<em>자동</em></b><span>1명 이상 승인해야 머지 버튼이 열림</span></li><li><small>GitHub</small><b>각자 머지</b><span><code>develop</code>에 합쳐지고 노션은 "완료"</span></li></ol>
+<p>열려 있는 PR은 <a href="https://github.com/kakaotechcampus-4/ktc4-pusan-4/pulls" target="_blank">GitHub PR 목록 ↗</a>에서 봅니다.</p>
+<h3>리뷰 기한</h3>
 <ul>
   <li>PR이 올라오면 <b>24시간 안에</b> 리뷰합니다.</li>
   <li>주중 <b>오후 5시 전</b>에 올라온 PR은 <b>그날 안에</b>, 오후 5시 이후에 올라온 PR은 <b>다음 날 오후 5시까지</b> 봅니다.</li>
   <li>주말에 올라온 PR은 언제 올렸든 <b>하루 안에</b> 보고 답합니다.</li>
-  <li>팀원 <b>1명 이상이 리뷰(승인)</b>하면 PR을 올린 사람이 <b>각자 머지</b>합니다.
-    <p class="why"><span class="why-label">참고</span> 승인 1명 이상은 GitHub 룰셋이 강제합니다. 승인이 없으면 머지 버튼이 열리지 않습니다 (<a href="#06b-Automation">협업 자동화</a>).</p></li>
-  <li>매주 <b>수요일 오후 4시까지</b> 파트별로 한 내용을 정리해 PM에게 보내고, PM이 확인한 뒤 오후 6시 전에 develop에 머지합니다. 주간 일정은 <a href="#06-PR">PR · 리뷰 규칙</a>에 있습니다.</li>
 </ul>
-<p class="why"><span class="why-label">자동 알림</span> 리뷰 요청 후 24시간 동안 리뷰가 없으면 디스코드에서 리뷰어를 멘션하고, 그 뒤 12시간마다 다시 알립니다 (<code>.github/workflows/pr-review-reminder.yml</code>).</p>
-
+<p class="why"><span class="why-label">자동 알림</span> 리뷰 요청 후 24시간 동안 리뷰가 없으면 디스코드에서 리뷰어를 멘션하고, 그 뒤 12시간마다 다시 알립니다 (<a href="#06b-Automation">자동화 · 알림</a>).</p>
+<h3>머지</h3>
+<ul>
+  <li>팀원 <b>1명 이상이 승인</b>하면 PR을 올린 사람이 <b>각자 머지</b>합니다. <code>develop → main</code> 주간 PR 은 PM 이 올리고 머지합니다.</li>
+  <li>멘토 리뷰용 PR은 base가 <code>main</code>인지 꼭 확인합니다 (기본값이 <code>develop</code>).</li>
+</ul>
+<p>승인 조건은 사람의 약속에만 맡기지 않고 GitHub 룰셋으로 강제합니다. 승인이 없으면 머지 버튼이 열리지 않습니다.</p>
+<table><tr><th style="width:18%">브랜치</th><th>머지 조건</th></tr>
+<tr><td><code>develop</code></td><td>PR로만 머지, <b>승인 1명 이상</b>, 강제 push 금지</td></tr>
+<tr><td><code>main</code></td><td>강제 push · 삭제 금지. 승인 조건은 없고, 멘토 리뷰는 아래 주간 사이클로 받습니다</td></tr>
+<tr><td><code>release</code></td><td><b>승인 1명 이상</b> + 백엔드 · AI · 웹 검사 통과, <code>develop</code>에서 온 PR만 허용, 강제 push · 삭제 금지</td></tr></table>
+<h3>PR 본문</h3>
+<p><code>.github/pull_request_template.md</code> 섹션 제목을 그대로 씁니다.</p>
+<table><tr><th>섹션</th><th>쓰는 법</th></tr>
+<tr><td>이번에 한 일</td><td>2~3줄. 화면이 있으면 스크린샷/GIF</td></tr>
+<tr><td>리뷰에서 봐주셨으면 하는 곳</td><td>"전체 봐주세요" 대신 콕 집어서</td></tr>
+<tr><td>고민했던 점 · 다른 선택지</td><td>없으면 지워도 됨</td></tr>
+<tr><td>지난 리뷰 반영</td><td>재리뷰 요청일 때만</td></tr></table>
+<h3>주간 사이클</h3>
+<p>카카오테크 캠퍼스 전체 공통 일정에, 우리 팀은 수요일 오후 4시 정리 단계를 더했습니다.</p>
+<table><tr><th style="width:22%">시점</th><th>할 일</th></tr>
+<tr><td>수 16:00 <span class="why-label">우리 팀</span></td><td>파트별로 이번 주에 한 내용을 정리해 PM에게 전달</td></tr>
+<tr><td>수 16:00 ~ 18:00</td><td>PM이 정리 내용을 확인한 뒤 develop에 머지</td></tr>
+<tr><td>수 18:00</td><td>PM이 develop → main PR</td></tr>
+<tr><td>목 22:00</td><td>멘토 1차 리뷰</td></tr>
+<tr><td>토 10:00</td><td>재리뷰 요청</td></tr>
+<tr><td>일 23:59</td><td>main 머지</td></tr></table>
+<blockquote>수요일 오후 6시 전까지 develop에 머지되지 않은 작업은 그 주 멘토 리뷰에서 빠집니다.</blockquote>
 <h2>코드 · 저장소</h2>
 <h3>판정 경로에 AI를 넣지 않는다</h3>
 <p><code>judge()</code>에는 LLM·외부 API·랜덤·현재 시각이 들어가지 않습니다. RAG는 규칙 카드 생성에만 쓰고, 범위를 넓히려면 팀 합의가 필요합니다.</p>
@@ -426,7 +457,7 @@ const DOCS = [
 <p class="why"><span class="why-label">왜</span> 저장소가 public입니다. 커밋을 지워도 히스토리에는 남습니다. 1단계에서 학생 API 토큰 8건이 실제로 유출됐습니다 (<code>.gitignore</code> 머리말).</p>
 
 <h3>push 할 때마다 worklog를 남긴다</h3>
-<p>코드가 바뀐 push에는 <code>worklog/</code> 문서가 함께 들어가야 합니다. Claude Code에서 <code>/worklog</code>를 실행하면 작성해 줍니다.</p>
+<p>코드가 바뀐 push에는 <code>worklog/</code> 문서가 함께 들어가야 합니다. Claude Code에서 <code>/worklog</code>를 실행하면 작성해 줍니다. 쓰는 법과 자동 작성 흐름은 <a href="#06d-Docs">문서화 규칙</a>에 있습니다.</p>
 <p class="why"><span class="why-label">왜</span> <code>.githooks/pre-push</code>가 worklog 없는 push를 막습니다.</p>
 
 <h3>브랜치 이름은 처음부터 규칙대로</h3>
@@ -440,6 +471,9 @@ const DOCS = [
 <h3>결정은 날짜와 이유를 함께 남긴다</h3>
 <p>설계 결정은 이유와 버린 대안까지 <code>CONTEXT.md</code>나 <code>docs/</code>에 적습니다. 같은 명세가 여러 문서에 흩어지면 하나를 단일 원본으로 정합니다.</p>
 <p class="why"><span class="why-label">왜</span> <code>CONTEXT.md</code> 머리말에 날짜별 변경 기록이 있고, 규칙 카드 필드는 <code>docs/rule-card-fields.md</code>가 단일 원본입니다.</p>
+<h3>코드는 AI 가 써도 리뷰와 머지는 사람이</h3>
+<p>코딩 에이전트가 따를 원칙은 <code>CLAUDE.md</code>에 두고, <code>AGENTS.md</code>가 모든 에이전트에게 이 파일을 먼저 읽게 합니다. 에이전트가 코드를 쓰더라도 리뷰와 머지는 사람이 합니다.</p>
+<p class="why"><span class="why-label">왜</span> 지침이 저장소에 있으면 누가 어떤 에이전트를 쓰든 같은 원칙을 따릅니다. 모니터링 작업도 "코드는 에이전트가 쓰고 사람은 리뷰와 merge 를 맡는다"로 나눠 진행했습니다 (<code>docs/monitoring_plan.md</code>).</p>
 `],
 ['04-Branch', '1. 브랜치 전략', `
 <table><tr><th>브랜치</th><th>용도</th></tr>
@@ -448,14 +482,12 @@ const DOCS = [
 <tr><td><code>release</code></td><td>AWS 자동 배포 대상. 검증된 <code>develop</code> 커밋을 PR로 승격합니다.</td></tr>
 <tr><td><code>feature/*</code></td><td>기능 작업. <code>develop</code>에서 따고 <code>develop</code>으로 머지.</td></tr>
 <tr><td><code>refactor/*</code></td><td>멘토님 리뷰사항 반영.</td></tr></table>
-<blockquote><code>feat/</code>가 아니라 <code>feature/</code>입니다. PR이 열린 브랜치는 이름을 바꾸지 마세요 (PR이 닫힙니다).</blockquote>
 `],
 ['05-Commit', '2. 커밋 컨벤션', `
-<pre><code>&lt;type&gt;: &lt;subject&gt;
-
-feat: G6 한도 버킷 판정 추가
-fix: 카드사 CSV 헤더 공백 처리
-docs: 커밋 컨벤션 추가</code></pre>
+<pre class="commit" data-label="형식"><code><span class="sh-c">&lt;type&gt;</span>: <span class="sh-s">&lt;subject&gt;</span></code></pre>
+<pre class="commit" data-label="예시"><code><span class="sh-c">feat</span>: G6 한도 버킷 판정 추가
+<span class="sh-c">fix</span>: 카드사 CSV 헤더 공백 처리
+<span class="sh-c">docs</span>: 커밋 컨벤션 추가</code></pre>
 <h2>type</h2>
 <table><tr><th>타입</th><th>설명</th></tr>
 <tr><td>feat</td><td>새로운 기능 추가</td></tr>
@@ -472,40 +504,8 @@ docs: 커밋 컨벤션 추가</code></pre>
 <h2>subject</h2>
 <ul><li>한국어로 씁니다.</li><li>명사로 마치고 마침표를 찍지 않습니다.</li><li>50자 이내 권장.</li></ul>
 `],
-['06-PR', '3. PR · 리뷰 규칙', `
-<p>열려 있는 PR은 <a href="https://github.com/kakaotechcampus-4/ktc4-pusan-4/pulls" target="_blank">GitHub PR 목록 ↗</a>에서 봅니다.</p>
-<h2>PR 본문</h2>
-<p><code>.github/pull_request_template.md</code> 섹션 제목을 그대로 씁니다.</p>
-<table><tr><th>섹션</th><th>쓰는 법</th></tr>
-<tr><td>이번에 한 일</td><td>2~3줄. 화면이 있으면 스크린샷/GIF</td></tr>
-<tr><td>리뷰에서 봐주셨으면 하는 곳</td><td>"전체 봐주세요" 대신 콕 집어서</td></tr>
-<tr><td>고민했던 점 · 다른 선택지</td><td>없으면 지워도 됨</td></tr>
-<tr><td>지난 리뷰 반영</td><td>재리뷰 요청일 때만</td></tr></table>
-<h2>머지</h2>
-<ul>
-  <li>팀원 <b>1명 이상 승인</b>해야 머지 버튼이 열립니다 (GitHub 룰셋). 승인을 받으면 PR을 올린 사람이 <b>각자 머지</b>합니다.</li>
-  <li>리뷰 기한은 24시간. 주중 오후 5시 전 PR은 그날 안에, 이후는 다음 날 오후 5시까지. 주말 PR은 하루 안에.</li>
-  <li>멘토 리뷰용 PR은 base가 <code>main</code>인지 꼭 확인 (기본값이 <code>develop</code>).</li>
-</ul>
-<h2>주간 사이클</h2>
-<p>카카오테크 캠퍼스 전체 공통 일정에, 우리 팀은 수요일 오후 4시 정리 단계를 더했습니다.</p>
-<table><tr><th style="width:22%">시점</th><th>할 일</th></tr>
-<tr><td>수 16:00 <span class="why-label">우리 팀</span></td><td>파트별로 이번 주에 한 내용을 정리해 PM에게 전달</td></tr>
-<tr><td>수 16:00 ~ 18:00</td><td>PM이 정리 내용을 확인한 뒤 develop에 머지</td></tr>
-<tr><td>수 18:00</td><td>PM이 develop → main PR</td></tr>
-<tr><td>목 22:00</td><td>멘토 1차 리뷰</td></tr>
-<tr><td>토 10:00</td><td>재리뷰 요청</td></tr>
-<tr><td>일 23:59</td><td>main 머지</td></tr></table>
-<blockquote>수요일 오후 6시 전까지 develop에 머지되지 않은 작업은 그 주 멘토 리뷰에서 빠집니다.</blockquote>
-`],
-['06b-Automation', '4. 협업 자동화', `
-<p>사람이 챙기다 빠뜨리기 쉬운 일은 자동으로 돌립니다. 아래는 모두 저장소에서 실제로 돌고 있는 것들입니다.</p>
-
-<h2>한눈에 보기</h2>
-<p>할 일 하나가 노션에서 시작해 <code>develop</code>에 머지되기까지의 흐름입니다. <em class="auto-key">자동</em> 표시는 사람이 챙기지 않아도 도구가 처리하는 단계입니다.</p>
-<ol class="flow"><li><small>Notion</small><b>할 일 등록</b><span>파트 보드에 할 일 추가, 시작하면 "진행 중"</span></li><li><small>Git</small><b>브랜치에서 작업<em>자동</em></b><span><code>feature/…</code> 브랜치, push 때 worklog 자동 작성</span></li><li><small>GitHub</small><b>PR 올리기</b><span>PR 템플릿 4칸 채우기</span></li><li><small>Discord</small><b>바로 알림<em>자동</em></b><span>새 PR · 리뷰어 멘션, 24시간 지나면 다시 알림</span></li><li><small>GitHub</small><b>리뷰 · 승인<em>자동</em></b><span>1명 이상 승인해야 머지 버튼이 열림</span></li><li><small>GitHub</small><b>각자 머지</b><span><code>develop</code>에 합쳐지고 노션은 "완료"</span></li></ol>
-<p class="board-sub">그리고 매주 멘토 리뷰로</p>
-<ol class="week"><li><b>수 16:00</b><span>파트별 정리 → PM</span></li><li><b>수 18:00</b><span>develop → main PR</span></li><li><b>목 22:00</b><span>멘토 리뷰</span></li><li><b>토 10:00</b><span>재리뷰 요청</span></li><li><b>일 23:59</b><span>main 머지</span></li></ol>
+['06b-Automation', '3. 자동화 · 알림', `
+<p>사람이 챙기다 빠뜨리기 쉬운 일은 디스코드로 알려 줍니다. 아래는 모두 지금 실제로 돌고 있는 알림입니다.</p>
 <h2>PR · 리뷰 알림 (AI 도구로 직접 만든 디스코드 봇)</h2>
 <p>팀이 AI 코딩 도구를 활용해 직접 만든 알림 봇입니다. PR이나 Issue에 변화가 생기면 팀 디스코드 채널로 바로 알림이 옵니다. GitHub에 들어가 확인하지 않아도 리뷰 요청을 놓치지 않습니다.</p>
 <table><tr><th style="width:34%">이럴 때</th><th>알림</th></tr>
@@ -516,58 +516,28 @@ docs: 커밋 컨벤션 추가</code></pre>
 <tr><td>Issue 생성 · 담당자 지정</td><td>새 Issue 알림, 담당자 멘션</td></tr></table>
 <p class="why"><span class="why-label">파일</span> <code>.github/workflows/pr-discord-notify.yml</code>, <code>.github/workflows/pr-review-reminder.yml</code>, 로직은 <code>tools/pr_discord_bot.py</code>. 운영진이 준 멘토 리뷰 알림(<code>notify-discord</code>)과 별개로, 팀 내부 PR(<code>feature/*</code> → <code>develop</code>)용으로 팀이 만들었습니다.</p>
 
-<h2>승인 없이는 머지되지 않는다 (GitHub 룰셋)</h2>
-<p>규칙을 사람의 약속에만 맡기지 않고 GitHub 설정으로 강제합니다.</p>
-<table><tr><th style="width:18%">브랜치</th><th>머지 조건</th></tr>
-<tr><td><code>develop</code></td><td>PR로만 머지, <b>승인 1명 이상</b>, 강제 push 금지</td></tr>
-<tr><td><code>main</code></td><td>PR로만 머지, <b>승인 1명 이상</b> + 코드 오너(멘토) 리뷰, 강제 push · 삭제 금지</td></tr>
-<tr><td><code>release</code></td><td><b>승인 1명 이상</b> + 백엔드 · AI · 웹 검사 통과, <code>develop</code>에서 온 PR만 허용, 강제 push · 삭제 금지</td></tr></table>
-<p class="why"><span class="why-label">참고</span> 승인을 받으면 PR을 올린 사람이 각자 머지합니다. <code>develop → main</code> 주간 PR 은 PM 이 올리고 머지합니다.</p>
-
-<h2>push 할 때마다 작업 기록 (Claude Code 활용)</h2>
-<p>코드를 바꾼 push에는 작업 기록(<code>worklog/</code>)이 반드시 함께 올라가야 합니다. 기록이 없으면 push가 막히고, Claude Code가 이번 push 분량의 변경을 읽어 기록을 대신 작성합니다.</p>
-<pre><code>git push
-  → pre-push 훅: "worklog 문서가 없습니다" 로 막음
-  → Claude Code 훅이 감지 → /worklog 스킬 실행
-  → 변경 내용을 읽고 worklog/{fe|be|ai|etc}/날짜-주제.md 작성 · 커밋
-  → 다시 push</code></pre>
-<p class="why"><span class="why-label">파일</span> <code>.githooks/pre-push</code>, <code>.claude/hooks/push-nudge.sh</code>, <code>.claude/skills/worklog/SKILL.md</code></p>
-
-<h2>CI · 배포</h2>
-<table><tr><th style="width:30%">워크플로</th><th>하는 일</th></tr>
-<tr><td>Backend CI</td><td>백엔드·규칙 카드·평가셋이 바뀐 PR에서 단위 테스트와 통합 테스트 실행</td></tr>
-<tr><td>AI CI</td><td><code>ai/</code>가 바뀐 PR에서 ruff 검사와 pytest 실행</td></tr>
-<tr><td>Backend Code Health</td><td>백엔드 PR마다 JaCoCo(커버리지)·PMD·CPD(중복 코드)·Codelens 리포트를 참고용으로 남김</td></tr>
-<tr><td>AWS release</td><td><code>release</code> PR에서 백엔드·AI·웹을 빌드·테스트하고, 머지되면 이미지를 ECR에 올려 SSM으로 EC2에 배포</td></tr>
-<tr><td>Release source</td><td><code>release</code>는 <code>develop</code>에서 온 PR만 받도록 검사</td></tr></table>
-<p class="why"><span class="why-label">참고</span> 규칙 카드 판정은 평가셋 60건(<code>eval/</code>)으로 회귀 검사합니다. 기대값은 규칙 카드가 아니라 조문에서 뽑습니다.</p>
-
-<h2>서버에서 정기적으로 도는 작업</h2>
-<table><tr><th style="width:30%">언제</th><th>하는 일</th></tr>
-<tr><td>매주 일요일 04:00</td><td>국가법령정보 API에서 법령 코퍼스 동기화</td></tr>
-<tr><td>매주 일요일 05:00</td><td>① 관리자가 승인한 규칙 후보를 카드로 만들어 <code>develop</code>에 PR 자동 생성 ② 새 규칙 후보 추출 (AI) ③ 결과를 디스코드로 알림</td></tr>
-<tr><td>매일 03:00</td><td>PostgreSQL 백업</td></tr></table>
-<p class="why"><span class="why-label">파일</span> <code>deploy/</code>의 systemd 타이머(<code>ktc4-corpus</code>, <code>ktc4-rule-candidates</code>, <code>ktc4-backup</code>). 시간은 한국 시간입니다.</p>
-
+<h2>멘토 리뷰 (운영진 제공)</h2>
+<p><code>main</code>으로 가는 멘토 리뷰 PR은 운영진이 준 워크플로가 처리합니다. 이 파일들은 수정 · 삭제하지 않습니다 (<a href="#00-Ground-Rules">그라운드 룰</a>).</p>
+<table><tr><th style="width:34%">워크플로</th><th>하는 일</th></tr>
+<tr><td><code>assign-mentor</code></td><td>PR을 열면 담당 멘토를 리뷰어로 자동 지정</td></tr>
+<tr><td><code>notify-discord</code></td><td>리뷰 요청과 리뷰 결과를 팀 디스코드로 알림</td></tr>
+<tr><td><code>convention-check</code></td><td>PR 규칙 안내 댓글</td></tr></table>
+<h2>서버 배치 알림</h2>
+<table><tr><th style="width:34%">언제</th><th>알림</th></tr>
+<tr><td>매주 일요일 04:00 법령 코퍼스 동기화</td><td>바뀐 조문 요약과 검토할 규칙 카드. 변경이 없거나 실패해도 보냄</td></tr>
+<tr><td>매주 일요일 05:00 규칙 후보 배치</td><td>승인된 후보로 만든 카드 PR과 새 규칙 후보. 결과와 상관없이 늘 보내므로, 알림이 없으면 타이머나 스크립트가 멈춘 것</td></tr></table>
+<p class="why"><span class="why-label">파일</span> <code>ai/pipeline/sync_report.py</code>, <code>ai/pipeline/notify.py</code>. 배치 일정은 <a href="#09b-Deploy">배포</a>에 있습니다.</p>
 <h2>장애 알림 (CloudWatch → 디스코드)</h2>
-<p>백엔드 로그와 서버 CPU·메모리·디스크 지표를 CloudWatch에 모으고, 알람이 울리면 Lambda가 디스코드로 알립니다.</p>
+<p>백엔드 로그와 서버 지표를 CloudWatch에 모으고, 알람이 울리면 Lambda가 디스코드 장애 알림 스레드로 보냅니다.</p>
+<table><tr><th style="width:34%">알람</th><th>조건</th></tr>
+<tr><td>백엔드 5xx</td><td>5분에 1건 이상</td></tr>
+<tr><td>백엔드 재시작</td><td>기동 로그 1건 이상. 배포 때도 울림</td></tr>
+<tr><td>CPU</td><td>80% 이상, 5분 단위 2번 연속</td></tr>
+<tr><td>메모리 · 디스크</td><td>메모리 90% 이상 5분, 루트 디스크 80% 이상</td></tr>
+<tr><td>상태 검사</td><td>EC2 상태 검사 실패</td></tr></table>
 <p class="why"><span class="why-label">파일</span> <code>deploy/monitoring/alarm_to_discord.py</code>, <code>docs/monitoring_plan.md</code></p>
-
-<h2>AI와 함께 개발하는 방식</h2>
-<ul>
-  <li><b>AI 작업 지침을 저장소에 둔다:</b> 코딩 에이전트가 따를 원칙을 <code>CLAUDE.md</code>에 적고, <code>AGENTS.md</code>가 모든 에이전트에게 이 파일을 먼저 읽게 합니다.</li>
-  <li><b>코드는 에이전트가, 리뷰와 머지는 사람이:</b> 모니터링 작업 계획에서 이렇게 역할을 나눴습니다 (<code>docs/monitoring_plan.md</code>).</li>
-  <li><b>AI 비서 보안 실험:</b> 비서 Really에 프롬프트 인젝션 공격 7종을 시험하고, 방어를 고친 뒤 다시 시험했습니다 (<code>docs/really-prompt-injection-report.md</code>).</li>
-</ul>
-
-<h2>숫자로 보기</h2>
-<table><tr><th style="width:30%">항목</th><th>값 (2026-11-06 기준)</th></tr>
-<tr><td>머지된 PR</td><td>196개</td></tr>
-<tr><td>작업 기록(worklog)</td><td>177개</td></tr>
-<tr><td>확정된 규칙 카드</td><td>53장 (<code>rules/cards/</code>)</td></tr>
-<tr><td>판정 평가셋</td><td>60건</td></tr></table>
 `],
-['06c-Review', '5. 코드 리뷰 기록', `
+['06c-Review', '4. 코드 리뷰 기록', `
 <p>매주 PM 이 <code>develop → main</code> PR 을 올리고 담당 멘토님(<a href="https://github.com/bbeomgeun" target="_blank">bbeomgeun</a>)이 리뷰합니다. 1~12주차 PR 7개 모두 멘토님의 수정 요청(Request changes)과 승인(Approve) 리뷰가 함께 남아 있습니다.</p>
 <h2>주차별 멘토 리뷰</h2>
 <table><tr><th style="width:15%">PR</th><th style="width:14%">올린 날</th><th>멘토님이 다룬 주제</th></tr>
@@ -587,13 +557,13 @@ docs: 커밋 컨벤션 추가</code></pre>
   <li>9주차 공휴일 데이터는 처음에 벌크로 넣고 임시 공휴일에 대비해 주기적으로 동기화하라는 의견을 받았습니다 (<code>HolidaySync</code>, <code>docs/deployment.md</code> 7절).</li>
 </ul>
 `],
-['06d-Docs', '6. 문서화 규칙', `
+['06d-Docs', '5. 문서화 규칙', `
 <h2>어디에 무엇을 쓰나</h2>
 <table><tr><th style="width:30%">문서</th><th>쓰는 것</th></tr>
 <tr><td><code>CONTEXT.md</code></td><td>설계 결정과 이유, 버린 대안. 머리말에 날짜별로 바뀐 결정을 남깁니다</td></tr>
 <tr><td><code>docs/</code></td><td>기능 명세(API · 비서 · 규칙 카드 필드 등), 실험 · 평가 보고서, 배포 절차</td></tr>
 <tr><td><code>worklog/</code></td><td>push 마다 남기는 작업 기록</td></tr>
-<tr><td>PR 본문</td><td>PR 템플릿 4칸 (<a href="#06-PR">PR · 리뷰 규칙</a>)</td></tr>
+<tr><td>PR 본문</td><td>PR 템플릿 4칸 (<a href="#00-Ground-Rules">그라운드 룰</a>)</td></tr>
 <tr><td>각 폴더 README</td><td>실행 방법 (<code>backend/README.md</code>, <code>frontend/README.md</code>, <code>db/README.md</code>, <code>eval/README.md</code>)</td></tr></table>
 <h2>단일 원본</h2>
 <p>같은 명세를 여러 문서에 나눠 쓰지 않고 한 곳을 원본으로 정합니다. 예: 규칙 카드 필드는 <code>docs/rule-card-fields.md</code>, 비서 명세는 <code>docs/agent-secretary.md</code>, 화면 규칙은 <code>frontend/DESIGN.md</code>.</p>
@@ -604,7 +574,13 @@ docs: 커밋 컨벤션 추가</code></pre>
   <li>틀: 제목 · 브랜치 · 커밋 · 주요파일 → 한 일 → 왜 이렇게 했나 → 남은 것 · 아는 문제.</li>
   <li>커밋 메시지와 diff 에서 읽히는 것만 씁니다. 추측으로 채우지 않습니다.</li>
 </ul>
-<p class="why"><span class="why-label">파일</span> <code>.claude/skills/worklog/SKILL.md</code>, <code>.githooks/pre-push</code></p>
+<p>기록이 없으면 push 가 막히고, Claude Code 가 이번 push 분량의 변경을 읽어 기록을 대신 작성합니다.</p>
+<pre><code>git push
+  → pre-push 훅: "worklog 문서가 없습니다" 로 막음
+  → Claude Code 훅이 감지 → /worklog 스킬 실행
+  → 변경 내용을 읽고 worklog/{fe|be|ai|etc}/날짜-주제.md 작성 · 커밋
+  → 다시 push</code></pre>
+<p class="why"><span class="why-label">파일</span> <code>.githooks/pre-push</code>, <code>.claude/hooks/push-nudge.sh</code>, <code>.claude/skills/worklog/SKILL.md</code></p>
 `],
 ]],
 ['개발 가이드', [
@@ -983,8 +959,9 @@ uv run uvicorn app.main:app --reload --port 8000   # 확인: curl localhost:8000
 <h2>운영</h2>
 <table><tr><th style="width:22%">항목</th><th>내용</th></tr>
 <tr><td>백업</td><td>매일 03:00 <code>pg_dump</code> 를 S3 로 보냄. 복원은 임시 DB 에서 확인</td></tr>
+<tr><td>정기 작업</td><td>매주 일요일 04:00 법령 코퍼스 동기화, 05:00 규칙 후보 배치(승인된 후보를 카드 PR 로 올리고 새 후보 추출). EC2 의 systemd 타이머(<code>ktc4-corpus</code> · <code>ktc4-rule-candidates</code>)로 돌고, 결과는 디스코드로 옴</td></tr>
 <tr><td>되돌리기</td><td><code>deploy.sh &lt;이전 SHA&gt; --rollback</code>. Flyway 스키마는 되돌리지 않으므로 스키마 변경은 이전 앱과 호환되게 나눠 배포</td></tr>
-<tr><td>로그 · 알림</td><td>백엔드 로그는 CloudWatch Logs, 알람은 디스코드로 (<a href="#06b-Automation">협업 자동화</a>)</td></tr>
+<tr><td>로그 · 알림</td><td>백엔드 로그는 CloudWatch Logs, 알람은 디스코드로 (<a href="#06b-Automation">자동화 · 알림</a>)</td></tr>
 <tr><td>주의</td><td>DB 볼륨이 지워지므로 운영에서 <code>docker compose down -v</code> 금지</td></tr></table>
 <h2>SEO</h2>
 <p>검색엔진, 카카오톡 미리보기, AI 크롤러는 자바스크립트를 실행하지 않고 HTML 만 읽는 경우가 많습니다. 아래는 서비스의 검색 엔진 노출도를 향상시키기 위한 SEO 설정입니다. 자세한 내용은 <code>docs/deployment.md</code> 13절에 있습니다.</p>
@@ -1021,11 +998,10 @@ const DESC = {   // 홈 카드 한 줄 설명
   '01b-Domain': '세무사 면담 · 방문 · 통화에서 얻은 것과 반영한 것',
   '02-Principles': '판정 경로에 LLM이 없는 이유와 6가지 원칙',
   '03-Team': '팀원 · 파트 리더(Maintainers)와 자주 쓰는 링크',
-  '00-Ground-Rules': '소통 · 회의 · 리뷰 시간과 저장소에서 지킬 것',
+  '00-Ground-Rules': '소통 · 회의 · PR 리뷰 규칙과 저장소에서 지킬 것',
   '04-Branch': 'main · develop · release · feature 브랜치의 쓰임',
   '05-Commit': 'type: subject 형식과 타입 목록',
-  '06-PR': 'PR 본문 쓰는 법, 머지 규칙, 주간 리뷰 사이클',
-  '06b-Automation': 'PR 알림 봇, 승인 필수 룰셋, worklog 자동 작성, CI·배포, 모니터링',
+  '06b-Automation': 'PR · 리뷰 봇, 멘토 리뷰, 배치 · 장애 디스코드 알림',
   '06c-Review': '주차별 멘토 리뷰 PR 과 다룬 주제',
   '06d-Docs': 'CONTEXT · docs · worklog · README 에 무엇을 쓰나',
   '07b-API': '리소스 구조, 공통 규칙, 엔드포인트 43개',
