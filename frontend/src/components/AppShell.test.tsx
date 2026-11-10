@@ -32,7 +32,7 @@ let root: Root;
 const mount = async (path: string) => {
   await act(async () => {
     root.render(
-      <MemoryRouter initialEntries={[path]}>
+      <MemoryRouter initialEntries={[path]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <AppShell>본문</AppShell>
       </MemoryRouter>
     );
