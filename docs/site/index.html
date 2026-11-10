@@ -772,8 +772,6 @@ docs: 커밋 컨벤션 추가</code></pre>
   <li>판정 결과는 색만으로 말하지 않고 기호(✓ ? ✕)를 붙입니다 → <code>VerdictBadge</code>.</li>
   <li>움직임은 첫 화면 큰 판에서만. 세금 판정 화면은 차분하게 둡니다.</li>
 </ul>
-<h2>검색 노출</h2>
-<p><code>npm run build</code> 끝에 공개 페이지를 미리 그려(prerender) 크롤러와 카카오톡 미리보기가 본문 · 제목을 읽게 합니다. 공개 페이지를 더하면 <code>src/seo.ts</code> 의 <code>PAGES</code> 에 넣습니다.</p>
 `],
 ['07e-Convention', '6. 코딩 컨벤션', `
 <p>커밋 메시지 규칙은 <a href="#05-Commit">커밋 컨벤션</a> 에 있습니다. 여기는 코드 규칙입니다.</p>
@@ -806,7 +804,6 @@ docs: 커밋 컨벤션 추가</code></pre>
   <li>분류 결과를 fixture 로 고정 안 하기: CI 가 비결정적이 됨</li>
   <li>속성 관문을 조기 종료로 구현: <code>putAll</code> 이지 <code>return</code> 이 아님</li>
 </ol>
-<p class="why"><span class="why-label">출처</span> <code>CONTEXT.md</code> 16절 (20개 중 코드 쪽 10개). AI 코딩 에이전트용 지침은 <code>CLAUDE.md</code>.</p>
 `],
 ['07f-Test', '7. 테스트', `
 <h2>백엔드</h2>
@@ -870,7 +867,7 @@ npm run dev   # http://localhost:5173</code></pre>
 <p>검색엔진, 카카오톡 미리보기, AI 크롤러는 자바스크립트를 실행하지 않고 HTML 만 읽는 경우가 많습니다. 아래는 서비스의 검색 엔진 노출도를 향상시키기 위한 SEO 설정입니다. 자세한 내용은 <code>docs/deployment.md</code> 13절에 있습니다.</p>
 <h3>크롤러가 읽는 페이지</h3>
 <table><tr><th style="width:22%">항목</th><th>내용</th></tr>
-<tr><td>프리렌더</td><td>공개 4페이지(<code>/</code>, <code>/faq</code>, <code>/terms</code>, <code>/privacy</code>)는 빌드 때 미리 그린 HTML 이 나감. 목록과 제목 · 설명의 원본은 <code>frontend/src/seo.ts</code>. 페이지마다 h1 이 1개, 본문이 200자 이상이어야 빌드가 통과</td></tr>
+<tr><td>프리렌더</td><td>공개 4페이지(<code>/</code>, <code>/faq</code>, <code>/terms</code>, <code>/privacy</code>)는 빌드 때 미리 그린 HTML 이 나감. 목록과 제목 · 설명의 원본은 <code>frontend/src/seo.ts</code>(공개 페이지를 더하면 <code>PAGES</code> 에 넣음). 페이지마다 h1 이 1개, 본문이 200자 이상이어야 빌드가 통과</td></tr>
 <tr><td>메타 · 공유 미리보기</td><td>title, description, canonical, og:*, twitter:card. 공유 이미지는 <code>frontend/public/og-image.png</code>(1200×630)</td></tr>
 <tr><td>크롤러 파일</td><td><code>/robots.txt</code>, <code>/sitemap.xml</code>(URL 4개), <code>/llms.txt</code> 를 빌드가 만듦. 검색엔진과 AI 크롤러를 모두 허용</td></tr>
 <tr><td>웹 서버(Caddy)</td><td>화면 파일 zstd · gzip 압축(11월 10일 JS 407KB → 127KB), <code>/assets/*</code> 1년 캐시, 모든 https 응답에 HSTS 1년</td></tr>
