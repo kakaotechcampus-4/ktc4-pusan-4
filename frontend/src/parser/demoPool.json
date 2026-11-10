@@ -1,0 +1,2921 @@
+[
+ {
+  "approvedAt": "2026-07-01",
+  "merchant": "스타벅스 센텀점",
+  "amount": 5900,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-01",
+  "merchant": "컴포즈커피 해운대점",
+  "amount": 13100,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-01",
+  "merchant": "알라딘",
+  "amount": 30700,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-01",
+  "merchant": "삼성전자판매 해운대",
+  "amount": 364400,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-01",
+  "merchant": "위워크 센텀",
+  "amount": 528000,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-02",
+  "merchant": "교보문고 부산점",
+  "amount": 19200,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-02",
+  "merchant": "리디북스",
+  "amount": 29800,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-02",
+  "merchant": "대한항공",
+  "amount": 47000,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-02",
+  "merchant": "교보문고 부산점",
+  "amount": 52000,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-02",
+  "merchant": "현대해상",
+  "amount": 60000,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-03",
+  "merchant": "NOTION LABS",
+  "amount": 9900,
+  "foreign": 7.07,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-03",
+  "merchant": "부산시 지방세(주민세)",
+  "amount": 52400,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-03",
+  "merchant": "부산도시가스",
+  "amount": 82900,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-03",
+  "merchant": "부산IT직업전문학원",
+  "amount": 262300,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-04",
+  "merchant": "ADOBE CREATIVE CLOUD",
+  "amount": 56200,
+  "foreign": 40.14,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-04",
+  "merchant": "GOOGLE ADS",
+  "amount": 187400,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-04",
+  "merchant": "애플스토어",
+  "amount": 512400,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-04",
+  "merchant": "GOOGLE CLOUD",
+  "amount": 820000,
+  "foreign": 585.71,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-05",
+  "merchant": "밀리의서재",
+  "amount": 31500,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-05",
+  "merchant": "센텀문구",
+  "amount": 80500,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-05",
+  "merchant": "한마음법무사사무소",
+  "amount": 646000,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-06",
+  "merchant": "CU 해운대점",
+  "amount": 13200,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-06",
+  "merchant": "이디야커피 센텀점",
+  "amount": 24400,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-06",
+  "merchant": "카카오페이",
+  "amount": 33300,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-06",
+  "merchant": "GS칼텍스 센텀주유소",
+  "amount": 49200,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-06",
+  "merchant": "센텀정형외과의원",
+  "amount": 57600,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-06",
+  "merchant": "헬로모바일",
+  "amount": 65200,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-06",
+  "merchant": "부산 택시",
+  "amount": 119300,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-07",
+  "merchant": "배달의민족",
+  "amount": 16900,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-07",
+  "merchant": "구글애즈",
+  "amount": 34300,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-07",
+  "merchant": "이스트소프트",
+  "amount": 60400,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-07",
+  "merchant": "부산진구 주정차위반과태료",
+  "amount": 70600,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-07",
+  "merchant": "부산시 지방세(재산세)",
+  "amount": 77000,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-07",
+  "merchant": "인프런",
+  "amount": 85000,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-07",
+  "merchant": "대한항공",
+  "amount": 152700,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-07",
+  "merchant": "META PLATFORMS",
+  "amount": 289400,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-08",
+  "merchant": "넷플릭스",
+  "amount": 10800,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-08",
+  "merchant": "쏘카",
+  "amount": 35100,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-08",
+  "merchant": "YES24",
+  "amount": 50200,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-08",
+  "merchant": "당구클럽 큐",
+  "amount": 80100,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-09",
+  "merchant": "SLACK TECHNOLOGIES",
+  "amount": 10500,
+  "foreign": 7.5,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-09",
+  "merchant": "밀리의서재",
+  "amount": 15300,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-09",
+  "merchant": "센텀온누리약국",
+  "amount": 22900,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-09",
+  "merchant": "럭키코인노래연습장",
+  "amount": 63200,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-09",
+  "merchant": "토스랩 잔디",
+  "amount": 82100,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-09",
+  "merchant": "국민건강보험공단",
+  "amount": 214700,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-10",
+  "merchant": "세븐일레븐 해운대점",
+  "amount": 13600,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-10",
+  "merchant": "당구클럽 큐",
+  "amount": 15800,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-10",
+  "merchant": "리디북스",
+  "amount": 27800,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-10",
+  "merchant": "특허법인 해솔",
+  "amount": 494100,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-12",
+  "merchant": "GS25 센텀점",
+  "amount": 3100,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-12",
+  "merchant": "이마트24 센텀점",
+  "amount": 3900,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-12",
+  "merchant": "센텀문구",
+  "amount": 35300,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-12",
+  "merchant": "GITHUB, INC.",
+  "amount": 37400,
+  "foreign": 26.71,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-12",
+  "merchant": "PLAYSTATION NETWORK",
+  "amount": 39800,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-12",
+  "merchant": "닌텐도 eShop",
+  "amount": 46200,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-12",
+  "merchant": "해운대컴퓨터수리",
+  "amount": 232900,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-12",
+  "merchant": "바른노무사사무소",
+  "amount": 362100,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-13",
+  "merchant": "해운대고운피부과의원",
+  "amount": 14600,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-13",
+  "merchant": "당구클럽 큐",
+  "amount": 41400,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-13",
+  "merchant": "NOTION LABS",
+  "amount": 44500,
+  "foreign": 31.79,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-13",
+  "merchant": "한글과컴퓨터",
+  "amount": 59500,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-13",
+  "merchant": "부산 택시",
+  "amount": 66700,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-13",
+  "merchant": "애플스토어",
+  "amount": 270200,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-14",
+  "merchant": "LINEAR ORBIT",
+  "amount": 5200,
+  "foreign": 3.71,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-14",
+  "merchant": "GITHUB, INC.",
+  "amount": 7600,
+  "foreign": 5.43,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-14",
+  "merchant": "알라딘",
+  "amount": 11300,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-14",
+  "merchant": "이마트24 센텀점",
+  "amount": 14800,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-14",
+  "merchant": "유튜브프리미엄",
+  "amount": 16400,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-14",
+  "merchant": "어벤져스PC 센텀점",
+  "amount": 21000,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-14",
+  "merchant": "경찰청 교통범칙금",
+  "amount": 155700,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-14",
+  "merchant": "OPENAI *CHATGPT SUBSCR",
+  "amount": 353100,
+  "foreign": 252.21,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-15",
+  "merchant": "SK에너지 해운대주유소",
+  "amount": 10000,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-15",
+  "merchant": "NHN클라우드",
+  "amount": 62500,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-15",
+  "merchant": "삼성전자판매 해운대",
+  "amount": 2130000,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-16",
+  "merchant": "투썸플레이스 해운대점",
+  "amount": 5400,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-16",
+  "merchant": "SPOTIFY",
+  "amount": 8400,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-16",
+  "merchant": "교보문고 센텀시티점",
+  "amount": 25600,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-16",
+  "merchant": "알파문고 센텀점",
+  "amount": 40200,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-16",
+  "merchant": "스포애니 피트니스",
+  "amount": 73800,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-18",
+  "merchant": "스포애니 피트니스",
+  "amount": 13800,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-18",
+  "merchant": "HEROKU",
+  "amount": 35700,
+  "foreign": 25.5,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-18",
+  "merchant": "네이버클라우드",
+  "amount": 39400,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-18",
+  "merchant": "옥션",
+  "amount": 48100,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-18",
+  "merchant": "센텀공영주차장",
+  "amount": 59500,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-18",
+  "merchant": "이스트소프트",
+  "amount": 82600,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-18",
+  "merchant": "11번가",
+  "amount": 137800,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-18",
+  "merchant": "전자랜드 서면점",
+  "amount": 518100,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-19",
+  "merchant": "PLAYSTATION NETWORK",
+  "amount": 54400,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-19",
+  "merchant": "패스트파이브 서면점",
+  "amount": 511100,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-20",
+  "merchant": "OPENAI *CHATGPT SUBSCR",
+  "amount": 15800,
+  "foreign": 11.29,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-20",
+  "merchant": "CLOUDFLARE",
+  "amount": 29300,
+  "foreign": 20.93,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-20",
+  "merchant": "센텀볼링장",
+  "amount": 78700,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-20",
+  "merchant": "쿠팡",
+  "amount": 95000,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-20",
+  "merchant": "부산종합버스터미널 고속버스",
+  "amount": 122000,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-20",
+  "merchant": "국민연금공단",
+  "amount": 204500,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-21",
+  "merchant": "MICROSOFT 365",
+  "amount": 18700,
+  "foreign": 13.36,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-21",
+  "merchant": "토스랩 잔디",
+  "amount": 57500,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-22",
+  "merchant": "CURSOR AI",
+  "amount": 8100,
+  "foreign": 5.79,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-22",
+  "merchant": "CLAUDE.AI SUBSCRIPTION",
+  "amount": 29100,
+  "foreign": 20.79,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-22",
+  "merchant": "맘스터치 해운대점",
+  "amount": 30400,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-22",
+  "merchant": "UDEMY",
+  "amount": 83200,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-22",
+  "merchant": "이스트소프트",
+  "amount": 100700,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-22",
+  "merchant": "에어부산",
+  "amount": 139600,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-23",
+  "merchant": "CURSOR AI",
+  "amount": 17500,
+  "foreign": 12.5,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-23",
+  "merchant": "SK텔레콤",
+  "amount": 54000,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-24",
+  "merchant": "CURSOR AI",
+  "amount": 29000,
+  "foreign": 20.71,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-24",
+  "merchant": "LG유플러스",
+  "amount": 61300,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-24",
+  "merchant": "준오헤어 센텀점",
+  "amount": 63400,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-24",
+  "merchant": "부산IT직업전문학원",
+  "amount": 155700,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-25",
+  "merchant": "예스24",
+  "amount": 16500,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-25",
+  "merchant": "YES24",
+  "amount": 25700,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-25",
+  "merchant": "삼성전자서비스센터 해운대",
+  "amount": 150500,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-26",
+  "merchant": "해운대365치과의원",
+  "amount": 8800,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-26",
+  "merchant": "GS25 센텀점",
+  "amount": 11100,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-26",
+  "merchant": "XBOX GAME PASS",
+  "amount": 48100,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-26",
+  "merchant": "GOOGLE CLOUD",
+  "amount": 53400,
+  "foreign": 38.14,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-27",
+  "merchant": "CLAUDE.AI SUBSCRIPTION",
+  "amount": 9200,
+  "foreign": 6.57,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-27",
+  "merchant": "부산종합버스터미널 고속버스",
+  "amount": 11300,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-27",
+  "merchant": "해운대연세내과의원",
+  "amount": 35200,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-27",
+  "merchant": "GOOGLE CLOUD",
+  "amount": 37700,
+  "foreign": 26.93,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-27",
+  "merchant": "헬로모바일",
+  "amount": 68400,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-27",
+  "merchant": "옥션",
+  "amount": 126800,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-28",
+  "merchant": "알라딘 중고서점 센텀점",
+  "amount": 27300,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-28",
+  "merchant": "현대해상",
+  "amount": 36400,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-28",
+  "merchant": "롯데리아 서면점",
+  "amount": 43300,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-28",
+  "merchant": "구글애즈",
+  "amount": 49900,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-28",
+  "merchant": "NHN클라우드",
+  "amount": 79200,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-28",
+  "merchant": "헬로모바일",
+  "amount": 93300,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-28",
+  "merchant": "GOOGLE ADS",
+  "amount": 218500,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-28",
+  "merchant": "UDEMY",
+  "amount": 224800,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-29",
+  "merchant": "한국도로공사 통행료",
+  "amount": 4400,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-29",
+  "merchant": "ADOBE CREATIVE CLOUD",
+  "amount": 38200,
+  "foreign": 27.29,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-29",
+  "merchant": "노트북 수리센터 서면",
+  "amount": 174800,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-29",
+  "merchant": "한빛세무사사무소",
+  "amount": 345500,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-30",
+  "merchant": "오피스디포 서면점",
+  "amount": 19400,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-30",
+  "merchant": "네이버페이",
+  "amount": 27900,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-30",
+  "merchant": "센텀 데이터분석학원",
+  "amount": 52400,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-30",
+  "merchant": "하이마트 센텀점",
+  "amount": 71100,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-30",
+  "merchant": "쿠팡",
+  "amount": 139200,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-30",
+  "merchant": "국민건강보험공단",
+  "amount": 239600,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-31",
+  "merchant": "AWS",
+  "amount": 9700,
+  "foreign": 6.93,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-31",
+  "merchant": "G마켓",
+  "amount": 15500,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-31",
+  "merchant": "메가커피 서면점",
+  "amount": 18500,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-07-31",
+  "merchant": "알라딘",
+  "amount": 18600,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-31",
+  "merchant": "카카오모먼트",
+  "amount": 35100,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-31",
+  "merchant": "센텀문구",
+  "amount": 73800,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-07-31",
+  "merchant": "패스트캠퍼스",
+  "amount": 350600,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-01",
+  "merchant": "SK에너지 해운대주유소",
+  "amount": 6800,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-01",
+  "merchant": "스포애니 피트니스",
+  "amount": 21700,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-01",
+  "merchant": "센텀공영주차장",
+  "amount": 33900,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-01",
+  "merchant": "교보문고 부산점",
+  "amount": 52300,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-02",
+  "merchant": "교보문고 센텀시티점",
+  "amount": 9600,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-02",
+  "merchant": "무신사",
+  "amount": 38600,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-02",
+  "merchant": "럭키코인노래연습장",
+  "amount": 90300,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-02",
+  "merchant": "애플스토어",
+  "amount": 1086100,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-03",
+  "merchant": "XBOX GAME PASS",
+  "amount": 32400,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-03",
+  "merchant": "센텀정형외과의원",
+  "amount": 37600,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-03",
+  "merchant": "11번가",
+  "amount": 84800,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-03",
+  "merchant": "어벤져스PC 센텀점",
+  "amount": 91700,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-03",
+  "merchant": "META PLATFORMS",
+  "amount": 169500,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-04",
+  "merchant": "롯데리아 서면점",
+  "amount": 52700,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-04",
+  "merchant": "당구클럽 큐",
+  "amount": 68300,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-05",
+  "merchant": "OPENAI *CHATGPT SUBSCR",
+  "amount": 42100,
+  "foreign": 30.07,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-05",
+  "merchant": "GS칼텍스 센텀주유소",
+  "amount": 82600,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-06",
+  "merchant": "오피스디포 해운대점",
+  "amount": 4400,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-06",
+  "merchant": "김밥천국 센텀점",
+  "amount": 12300,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-06",
+  "merchant": "서면밝은안과의원",
+  "amount": 19400,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-06",
+  "merchant": "모나미스토어",
+  "amount": 22400,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-06",
+  "merchant": "알라딘 중고서점 센텀점",
+  "amount": 30400,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-06",
+  "merchant": "LG유플러스",
+  "amount": 42600,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-06",
+  "merchant": "패스트캠퍼스",
+  "amount": 132600,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-06",
+  "merchant": "국민건강보험공단",
+  "amount": 249700,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-06",
+  "merchant": "하이마트 센텀점",
+  "amount": 2303600,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-07",
+  "merchant": "오피스디포 서면점",
+  "amount": 11200,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-07",
+  "merchant": "컴포즈커피 해운대점",
+  "amount": 20700,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-07",
+  "merchant": "부산시 지방세(재산세)",
+  "amount": 36800,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-07",
+  "merchant": "전자랜드 서면점",
+  "amount": 44100,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-07",
+  "merchant": "NHN클라우드",
+  "amount": 56700,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-07",
+  "merchant": "삼성화재",
+  "amount": 59000,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-07",
+  "merchant": "서면 동전노래방",
+  "amount": 79600,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-07",
+  "merchant": "코레일",
+  "amount": 128100,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-08",
+  "merchant": "해운대연세내과의원",
+  "amount": 33600,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-08",
+  "merchant": "인프런",
+  "amount": 70700,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-08",
+  "merchant": "무신사",
+  "amount": 76400,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-08",
+  "merchant": "AWS",
+  "amount": 1357800,
+  "foreign": 969.86,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-09",
+  "merchant": "한글과컴퓨터",
+  "amount": 21200,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-09",
+  "merchant": "CANVA",
+  "amount": 24700,
+  "foreign": 17.64,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-09",
+  "merchant": "바버샵 해운대",
+  "amount": 78000,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-09",
+  "merchant": "카카오모먼트",
+  "amount": 225500,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-10",
+  "merchant": "FIGMA",
+  "amount": 13700,
+  "foreign": 9.79,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-10",
+  "merchant": "준오헤어 센텀점",
+  "amount": 19000,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-10",
+  "merchant": "헤어살롱 센텀",
+  "amount": 36400,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-10",
+  "merchant": "어벤져스PC 센텀점",
+  "amount": 66700,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-10",
+  "merchant": "삼성전자판매 해운대",
+  "amount": 2383800,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-11",
+  "merchant": "NOTION LABS",
+  "amount": 19700,
+  "foreign": 14.07,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-11",
+  "merchant": "AWS",
+  "amount": 29000,
+  "foreign": 20.71,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-11",
+  "merchant": "알파문고 서면점",
+  "amount": 36800,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-11",
+  "merchant": "한국전력공사",
+  "amount": 38000,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-11",
+  "merchant": "GOOGLE CLOUD",
+  "amount": 57200,
+  "foreign": 40.86,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-11",
+  "merchant": "무신사",
+  "amount": 116000,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-12",
+  "merchant": "ADOBE CREATIVE CLOUD",
+  "amount": 21600,
+  "foreign": 15.43,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-12",
+  "merchant": "요기요",
+  "amount": 26900,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-12",
+  "merchant": "해운대고운피부과의원",
+  "amount": 41000,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-12",
+  "merchant": "예스24",
+  "amount": 42500,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-12",
+  "merchant": "바버샵 해운대",
+  "amount": 49700,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-12",
+  "merchant": "부산도시가스",
+  "amount": 69100,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-12",
+  "merchant": "알파문고 서면점",
+  "amount": 86300,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-12",
+  "merchant": "특허법인 해솔",
+  "amount": 534000,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-13",
+  "merchant": "투썸플레이스 해운대점",
+  "amount": 2200,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-13",
+  "merchant": "SPOTIFY",
+  "amount": 12500,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-13",
+  "merchant": "해운대고운피부과의원",
+  "amount": 15100,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-13",
+  "merchant": "SRT",
+  "amount": 16800,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-13",
+  "merchant": "11번가",
+  "amount": 24500,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-13",
+  "merchant": "FIGMA",
+  "amount": 36000,
+  "foreign": 25.71,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-13",
+  "merchant": "부산IT직업전문학원",
+  "amount": 86500,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-13",
+  "merchant": "노트북 수리센터 서면",
+  "amount": 178200,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-14",
+  "merchant": "이디야커피 센텀점",
+  "amount": 2400,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-14",
+  "merchant": "HEROKU",
+  "amount": 7700,
+  "foreign": 5.5,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-14",
+  "merchant": "구글플레이",
+  "amount": 7800,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-14",
+  "merchant": "XBOX GAME PASS",
+  "amount": 9100,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-14",
+  "merchant": "블링네일 해운대점",
+  "amount": 60300,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-14",
+  "merchant": "한국전력공사",
+  "amount": 64200,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-14",
+  "merchant": "서면 동전노래방",
+  "amount": 90000,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-16",
+  "merchant": "MICROSOFT 365",
+  "amount": 45800,
+  "foreign": 32.71,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-16",
+  "merchant": "스포애니 피트니스",
+  "amount": 52700,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-16",
+  "merchant": "GOOGLE CLOUD",
+  "amount": 1091000,
+  "foreign": 779.29,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-18",
+  "merchant": "넷플릭스",
+  "amount": 16500,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-18",
+  "merchant": "한마음법무사사무소",
+  "amount": 312900,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-19",
+  "merchant": "네이버클라우드",
+  "amount": 20300,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-19",
+  "merchant": "LINEAR ORBIT",
+  "amount": 41200,
+  "foreign": 29.43,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-19",
+  "merchant": "센텀온누리약국",
+  "amount": 44000,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-19",
+  "merchant": "김밥천국 센텀점",
+  "amount": 55100,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-19",
+  "merchant": "PLAYSTATION NETWORK",
+  "amount": 67500,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-19",
+  "merchant": "오피스디포 해운대점",
+  "amount": 86100,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-20",
+  "merchant": "알라딘 중고서점 센텀점",
+  "amount": 9900,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-21",
+  "merchant": "서면밝은안과의원",
+  "amount": 6700,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-21",
+  "merchant": "넷플릭스",
+  "amount": 12300,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-21",
+  "merchant": "KT",
+  "amount": 35800,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-21",
+  "merchant": "쏘카",
+  "amount": 37800,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-21",
+  "merchant": "SLACK TECHNOLOGIES",
+  "amount": 55200,
+  "foreign": 39.43,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-21",
+  "merchant": "PLAYSTATION NETWORK",
+  "amount": 60300,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-21",
+  "merchant": "한국도로공사 통행료",
+  "amount": 78100,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-22",
+  "merchant": "닌텐도 eShop",
+  "amount": 14600,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-22",
+  "merchant": "네이버페이",
+  "amount": 15400,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-22",
+  "merchant": "교보문고 센텀시티점",
+  "amount": 30800,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-22",
+  "merchant": "헤어살롱 센텀",
+  "amount": 47400,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-22",
+  "merchant": "VERCEL INC",
+  "amount": 54500,
+  "foreign": 38.93,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-23",
+  "merchant": "삼성전자서비스센터 해운대",
+  "amount": 32600,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-23",
+  "merchant": "VERCEL INC",
+  "amount": 45500,
+  "foreign": 32.5,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-23",
+  "merchant": "삼성전자서비스센터 해운대",
+  "amount": 56300,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-24",
+  "merchant": "스타벅스 센텀점",
+  "amount": 19400,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-24",
+  "merchant": "해운대구 주정차위반과태료",
+  "amount": 55000,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-24",
+  "merchant": "해운대컴퓨터수리",
+  "amount": 154400,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-24",
+  "merchant": "한빛세무사사무소",
+  "amount": 304200,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-25",
+  "merchant": "컴포즈커피 해운대점",
+  "amount": 16700,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-25",
+  "merchant": "XBOX GAME PASS",
+  "amount": 20500,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-25",
+  "merchant": "카카오페이",
+  "amount": 34000,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-25",
+  "merchant": "한국전력공사",
+  "amount": 79900,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-25",
+  "merchant": "부산시 지방세(주민세)",
+  "amount": 130500,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-25",
+  "merchant": "UDEMY",
+  "amount": 219400,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-26",
+  "merchant": "CLAUDE.AI SUBSCRIPTION",
+  "amount": 17000,
+  "foreign": 12.14,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-26",
+  "merchant": "준오헤어 센텀점",
+  "amount": 19600,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-26",
+  "merchant": "센텀정형외과의원",
+  "amount": 26800,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-27",
+  "merchant": "모나미스토어",
+  "amount": 11000,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-27",
+  "merchant": "GS칼텍스 센텀주유소",
+  "amount": 22700,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-27",
+  "merchant": "쿠팡이츠",
+  "amount": 22800,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-27",
+  "merchant": "서면밝은안과의원",
+  "amount": 32000,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-27",
+  "merchant": "옥션",
+  "amount": 102600,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-27",
+  "merchant": "에어부산",
+  "amount": 150600,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-27",
+  "merchant": "하이마트 센텀점",
+  "amount": 213100,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-28",
+  "merchant": "CLOUDFLARE",
+  "amount": 19800,
+  "foreign": 14.14,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-28",
+  "merchant": "버거킹 해운대점",
+  "amount": 26300,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-28",
+  "merchant": "DIGITALOCEAN",
+  "amount": 27500,
+  "foreign": 19.64,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-28",
+  "merchant": "CANVA",
+  "amount": 27600,
+  "foreign": 19.71,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-28",
+  "merchant": "부산진구 주정차위반과태료",
+  "amount": 86300,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-28",
+  "merchant": "국민연금공단",
+  "amount": 200600,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-28",
+  "merchant": "바른노무사사무소",
+  "amount": 209700,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-28",
+  "merchant": "스파크플러스 부산",
+  "amount": 534500,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-29",
+  "merchant": "CU 해운대점",
+  "amount": 4100,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-29",
+  "merchant": "SUPABASE",
+  "amount": 6500,
+  "foreign": 4.64,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-29",
+  "merchant": "센텀볼링장",
+  "amount": 28600,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-29",
+  "merchant": "헤어살롱 센텀",
+  "amount": 60600,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-29",
+  "merchant": "노트북 수리센터 서면",
+  "amount": 83900,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-29",
+  "merchant": "전자랜드 서면점",
+  "amount": 223300,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-30",
+  "merchant": "GOOGLE ADS",
+  "amount": 41600,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-31",
+  "merchant": "코레일",
+  "amount": 11400,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-31",
+  "merchant": "STEAM PURCHASE",
+  "amount": 12300,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-31",
+  "merchant": "유튜브프리미엄",
+  "amount": 13300,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-31",
+  "merchant": "LINEAR ORBIT",
+  "amount": 28800,
+  "foreign": 20.57,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-31",
+  "merchant": "SK에너지 해운대주유소",
+  "amount": 49700,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-08-31",
+  "merchant": "럭키코인노래연습장",
+  "amount": 77600,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-08-31",
+  "merchant": "AWS",
+  "amount": 1289400,
+  "foreign": 921,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-01",
+  "merchant": "네이버페이",
+  "amount": 13700,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-01",
+  "merchant": "해운대365치과의원",
+  "amount": 16200,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-01",
+  "merchant": "서면 동전노래방",
+  "amount": 29300,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-01",
+  "merchant": "닌텐도 eShop",
+  "amount": 31200,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-01",
+  "merchant": "한글과컴퓨터",
+  "amount": 78200,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-02",
+  "merchant": "롯데리아 서면점",
+  "amount": 14200,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-02",
+  "merchant": "해운대구 주정차위반과태료",
+  "amount": 43600,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-02",
+  "merchant": "SLACK TECHNOLOGIES",
+  "amount": 46700,
+  "foreign": 33.36,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-02",
+  "merchant": "닌텐도 eShop",
+  "amount": 47400,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-02",
+  "merchant": "G마켓",
+  "amount": 52200,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-02",
+  "merchant": "센텀 데이터분석학원",
+  "amount": 296900,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-03",
+  "merchant": "META PLATFORMS",
+  "amount": 52900,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-03",
+  "merchant": "삼성화재",
+  "amount": 111200,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-04",
+  "merchant": "서면밝은안과의원",
+  "amount": 28100,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-04",
+  "merchant": "바버샵 해운대",
+  "amount": 35600,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-04",
+  "merchant": "G마켓",
+  "amount": 39600,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-04",
+  "merchant": "헤어살롱 센텀",
+  "amount": 44400,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-04",
+  "merchant": "해운대고운피부과의원",
+  "amount": 50500,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-04",
+  "merchant": "스파크플러스 부산",
+  "amount": 398300,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-05",
+  "merchant": "센텀볼링장",
+  "amount": 44900,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-05",
+  "merchant": "해운대365치과의원",
+  "amount": 51400,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-05",
+  "merchant": "HEROKU",
+  "amount": 56000,
+  "foreign": 40,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-05",
+  "merchant": "센텀온누리약국",
+  "amount": 56100,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-05",
+  "merchant": "네이버클라우드",
+  "amount": 61100,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-05",
+  "merchant": "부산시 지방세(재산세)",
+  "amount": 131400,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-06",
+  "merchant": "FIGMA",
+  "amount": 6600,
+  "foreign": 4.71,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-06",
+  "merchant": "SK텔레콤",
+  "amount": 36900,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-06",
+  "merchant": "구글애즈",
+  "amount": 136800,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-07",
+  "merchant": "유튜브프리미엄",
+  "amount": 12400,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-07",
+  "merchant": "AWS",
+  "amount": 21200,
+  "foreign": 15.14,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-07",
+  "merchant": "오피스디포 해운대점",
+  "amount": 27600,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-07",
+  "merchant": "OPENAI *CHATGPT SUBSCR",
+  "amount": 28800,
+  "foreign": 20.57,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-07",
+  "merchant": "카카오모먼트",
+  "amount": 216500,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-07",
+  "merchant": "한마음법무사사무소",
+  "amount": 296100,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-07",
+  "merchant": "전자랜드 서면점",
+  "amount": 919900,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-08",
+  "merchant": "해운대365치과의원",
+  "amount": 26300,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-08",
+  "merchant": "예스24",
+  "amount": 53900,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-08",
+  "merchant": "밀리의서재",
+  "amount": 57100,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-08",
+  "merchant": "알파문고 서면점",
+  "amount": 65700,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-09",
+  "merchant": "센텀온누리약국",
+  "amount": 23900,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-09",
+  "merchant": "쿠팡",
+  "amount": 35100,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-09",
+  "merchant": "STEAM PURCHASE",
+  "amount": 46700,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-09",
+  "merchant": "SK텔레콤",
+  "amount": 81300,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-09",
+  "merchant": "특허법인 해솔",
+  "amount": 566200,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-09",
+  "merchant": "삼성전자판매 해운대",
+  "amount": 1786200,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-10",
+  "merchant": "DIGITALOCEAN",
+  "amount": 30400,
+  "foreign": 21.71,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-10",
+  "merchant": "어벤져스PC 센텀점",
+  "amount": 53600,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-10",
+  "merchant": "버거킹 해운대점",
+  "amount": 55900,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-10",
+  "merchant": "바버샵 해운대",
+  "amount": 56000,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-10",
+  "merchant": "LG유플러스",
+  "amount": 58800,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-10",
+  "merchant": "바른노무사사무소",
+  "amount": 274900,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-11",
+  "merchant": "부산시 지방세(주민세)",
+  "amount": 26600,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-11",
+  "merchant": "해운대 돼지국밥식당",
+  "amount": 37200,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-11",
+  "merchant": "YES24",
+  "amount": 51400,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-11",
+  "merchant": "에어부산",
+  "amount": 77600,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-12",
+  "merchant": "국민연금공단",
+  "amount": 175300,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-12",
+  "merchant": "국민연금공단",
+  "amount": 181700,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-13",
+  "merchant": "SPOTIFY",
+  "amount": 9300,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-13",
+  "merchant": "리디북스",
+  "amount": 23100,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-13",
+  "merchant": "국민건강보험공단",
+  "amount": 247400,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-13",
+  "merchant": "위워크 센텀",
+  "amount": 312100,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-14",
+  "merchant": "해운대연세내과의원",
+  "amount": 31700,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-14",
+  "merchant": "SUPABASE",
+  "amount": 41300,
+  "foreign": 29.5,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-14",
+  "merchant": "패스트파이브 서면점",
+  "amount": 276800,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-15",
+  "merchant": "세븐일레븐 해운대점",
+  "amount": 11100,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-15",
+  "merchant": "버거킹 해운대점",
+  "amount": 13600,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-15",
+  "merchant": "스타벅스 센텀점",
+  "amount": 20300,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-15",
+  "merchant": "KT",
+  "amount": 63200,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-15",
+  "merchant": "SRT",
+  "amount": 112200,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-16",
+  "merchant": "GS25 센텀점",
+  "amount": 3400,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-16",
+  "merchant": "세븐일레븐 해운대점",
+  "amount": 11600,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-16",
+  "merchant": "모나미스토어",
+  "amount": 35200,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-16",
+  "merchant": "맘스터치 해운대점",
+  "amount": 41200,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-16",
+  "merchant": "부산도시가스",
+  "amount": 52100,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-16",
+  "merchant": "블링네일 해운대점",
+  "amount": 70000,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-16",
+  "merchant": "KT",
+  "amount": 95700,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-17",
+  "merchant": "한국도로공사 통행료",
+  "amount": 54200,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-17",
+  "merchant": "해운대구 주정차위반과태료",
+  "amount": 88500,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-18",
+  "merchant": "해운대연세내과의원",
+  "amount": 21400,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-18",
+  "merchant": "교촌치킨 센텀점",
+  "amount": 23800,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-18",
+  "merchant": "VERCEL INC",
+  "amount": 38100,
+  "foreign": 27.21,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-18",
+  "merchant": "경찰청 교통범칙금",
+  "amount": 50400,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-18",
+  "merchant": "토스랩 잔디",
+  "amount": 68500,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-18",
+  "merchant": "서면 동전노래방",
+  "amount": 88400,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-19",
+  "merchant": "구글플레이",
+  "amount": 3900,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-19",
+  "merchant": "구글플레이",
+  "amount": 6600,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-19",
+  "merchant": "MICROSOFT 365",
+  "amount": 32000,
+  "foreign": 22.86,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-19",
+  "merchant": "STEAM PURCHASE",
+  "amount": 65700,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-19",
+  "merchant": "센텀공영주차장",
+  "amount": 73700,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-19",
+  "merchant": "애플스토어",
+  "amount": 1407700,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-20",
+  "merchant": "GITHUB, INC.",
+  "amount": 28300,
+  "foreign": 20.21,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-20",
+  "merchant": "센텀 데이터분석학원",
+  "amount": 139200,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-21",
+  "merchant": "이마트24 센텀점",
+  "amount": 13200,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-21",
+  "merchant": "해운대 돼지국밥식당",
+  "amount": 17700,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-21",
+  "merchant": "패스트캠퍼스",
+  "amount": 42400,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-21",
+  "merchant": "럭키코인노래연습장",
+  "amount": 60700,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-21",
+  "merchant": "블링네일 해운대점",
+  "amount": 75000,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-22",
+  "merchant": "투썸플레이스 해운대점",
+  "amount": 13200,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-22",
+  "merchant": "쿠팡이츠",
+  "amount": 29200,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-22",
+  "merchant": "CLOUDFLARE",
+  "amount": 31700,
+  "foreign": 22.64,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-22",
+  "merchant": "블링네일 해운대점",
+  "amount": 32700,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-22",
+  "merchant": "DIGITALOCEAN",
+  "amount": 40100,
+  "foreign": 28.64,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-22",
+  "merchant": "하이마트 센텀점",
+  "amount": 105700,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-22",
+  "merchant": "한빛세무사사무소",
+  "amount": 220300,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-22",
+  "merchant": "인프런",
+  "amount": 381800,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-23",
+  "merchant": "CU 해운대점",
+  "amount": 5100,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-23",
+  "merchant": "교촌치킨 센텀점",
+  "amount": 11200,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-23",
+  "merchant": "오피스디포 서면점",
+  "amount": 19900,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-23",
+  "merchant": "센텀정형외과의원",
+  "amount": 21800,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-23",
+  "merchant": "해운대컴퓨터수리",
+  "amount": 30900,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-23",
+  "merchant": "센텀볼링장",
+  "amount": 46200,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-23",
+  "merchant": "준오헤어 센텀점",
+  "amount": 59100,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-27",
+  "merchant": "SUPABASE",
+  "amount": 53700,
+  "foreign": 38.36,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-27",
+  "merchant": "알파문고 센텀점",
+  "amount": 85900,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-27",
+  "merchant": "경찰청 교통범칙금",
+  "amount": 136100,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-29",
+  "merchant": "쿠팡이츠",
+  "amount": 26700,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-29",
+  "merchant": "CANVA",
+  "amount": 29100,
+  "foreign": 20.79,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-29",
+  "merchant": "쏘카",
+  "amount": 33100,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-29",
+  "merchant": "STEAM PURCHASE",
+  "amount": 35100,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-29",
+  "merchant": "알파문고 센텀점",
+  "amount": 55600,
+  "foreign": 0,
+  "verdict": "AVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-29",
+  "merchant": "부산진구 주정차위반과태료",
+  "amount": 60300,
+  "foreign": 0,
+  "verdict": "UNAVAILABLE"
+ },
+ {
+  "approvedAt": "2026-09-30",
+  "merchant": "카카오페이",
+  "amount": 8900,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-30",
+  "merchant": "메가커피 서면점",
+  "amount": 10800,
+  "foreign": 0,
+  "verdict": "NEEDS_REVIEW"
+ },
+ {
+  "approvedAt": "2026-09-30",
+  "merchant": "OPENAI *CHATGPT SUBSCR",
+  "amount": 1370600,
+  "foreign": 979,
+  "verdict": "NEEDS_REVIEW"
+ }
+]
