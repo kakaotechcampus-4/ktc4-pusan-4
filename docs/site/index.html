@@ -419,7 +419,7 @@ const DOCS = [
   <li>주중 <b>오후 5시 전</b>에 올라온 PR은 <b>그날 안에</b>, 오후 5시 이후에 올라온 PR은 <b>다음 날 오후 5시까지</b> 봅니다.</li>
   <li>주말에 올라온 PR은 언제 올렸든 <b>하루 안에</b> 보고 답합니다.</li>
 </ul>
-<p class="why"><span class="why-label">자동 알림</span> 리뷰 요청 후 24시간 동안 리뷰가 없으면 디스코드에서 리뷰어를 멘션하고, 그 뒤 12시간마다 다시 알립니다 (<a href="#06b-Automation">자동화 · 알림</a>).</p>
+<p class="why"><span class="why-label">자동 알림</span> 리뷰 요청 후 24시간 동안 리뷰가 없으면 디스코드에서 리뷰어를 멘션하고, 그 뒤 12시간마다 다시 알립니다 (<a href="#06b-Automation">디스코드 알림</a>).</p>
 <h3>머지</h3>
 <ul>
   <li>팀원 <b>1명 이상이 승인</b>하면 PR을 올린 사람이 <b>각자 머지</b>합니다. <code>develop → main</code> 주간 PR 은 PM 이 올리고 머지합니다.</li>
@@ -504,38 +504,40 @@ const DOCS = [
 <h2>subject</h2>
 <ul><li>한국어로 씁니다.</li><li>명사로 마치고 마침표를 찍지 않습니다.</li><li>50자 이내 권장.</li></ul>
 `],
-['06b-Automation', '3. 자동화 · 알림', `
+['06b-Automation', '3. 디스코드 알림', `
 <p>사람이 챙기다 빠뜨리기 쉬운 일은 디스코드로 알려 줍니다. 아래는 모두 지금 실제로 돌고 있는 알림입니다.</p>
-<h2>PR · 리뷰 알림 (AI 도구로 직접 만든 디스코드 봇)</h2>
-<p>팀이 AI 코딩 도구를 활용해 직접 만든 알림 봇입니다. PR이나 Issue에 변화가 생기면 팀 디스코드 채널로 바로 알림이 옵니다. GitHub에 들어가 확인하지 않아도 리뷰 요청을 놓치지 않습니다.</p>
-<table><tr><th style="width:34%">이럴 때</th><th>알림</th></tr>
-<tr><td>PR이 열리거나 리뷰 가능 상태가 됨</td><td>새 PR 알림 + 지정된 리뷰어 멘션 (2분 기다렸다가 한 번에 묶어서 보냄)</td></tr>
-<tr><td>나중에 리뷰어가 추가됨</td><td>추가된 리뷰어만 따로 멘션</td></tr>
-<tr><td>리뷰 · 댓글이 달림</td><td>PR 작성자 멘션</td></tr>
-<tr><td>리뷰 요청 후 24시간 동안 리뷰 없음</td><td>리뷰어 멘션, 그 뒤로 12시간마다 다시 알림</td></tr>
-<tr><td>Issue 생성 · 담당자 지정</td><td>새 Issue 알림, 담당자 멘션</td></tr></table>
-<p class="why"><span class="why-label">파일</span> <code>.github/workflows/pr-discord-notify.yml</code>, <code>.github/workflows/pr-review-reminder.yml</code>, 로직은 <code>tools/pr_discord_bot.py</code>. 운영진이 준 멘토 리뷰 알림(<code>notify-discord</code>)과 별개로, 팀 내부 PR(<code>feature/*</code> → <code>develop</code>)용으로 팀이 만들었습니다.</p>
+<h2>레포지토리 관련 알림 </h2>
+<p>PR이나 Issue에 변화가 생기면 팀 디스코드 채널로 바로 알림이 옵니다. GitHub에 들어가 확인하지 않아도 리뷰 요청을 놓치지 않습니다.</p>
+<table><tr><th style="width:18%">알림</th><th>언제</th><th style="width:28%">멘션</th></tr>
+<tr><td><code>[새 PR]</code></td><td>PR 이 열리거나, 다시 열리거나, draft 에서 리뷰 가능으로 바뀜. 2분 기다렸다가 그 사이 지정된 리뷰어까지 한 메시지에 담음</td><td>지정된 리뷰어(없으면 미지정), 본문에서 @멘션한 팀원</td></tr>
+<tr><td><code>[리뷰 요청]</code></td><td>PR 이 열리고 2분이 지난 뒤 리뷰어가 추가됨</td><td>추가된 리뷰어</td></tr>
+<tr><td><code>[리마인드]</code></td><td>리뷰 요청 후 24시간 동안 리뷰가 없음. 그 뒤 12시간마다 다시 보내고 그때마다 느낌표가 늘어남. 리뷰를 남기거나 PR 이 닫히면 멈춤</td><td>아직 리뷰하지 않은 리뷰어</td></tr>
+<tr><td><code>[리뷰 알림]</code></td><td>다른 팀원이 리뷰를 남김 (approve · comment · request changes)</td><td>PR 작성자, 리뷰에서 @멘션한 팀원</td></tr>
+<tr><td><code>[댓글 알림]</code></td><td>다른 팀원이 PR 이나 Issue 에 댓글을 담</td><td>작성자, 댓글에서 @멘션한 팀원</td></tr>
+<tr><td><code>[멘션 알림]</code></td><td>작성자가 자기 PR · Issue 의 리뷰나 댓글에서 팀원을 @멘션함</td><td>멘션된 팀원</td></tr>
+<tr><td><code>[새 Issue]</code></td><td>팀원이 Issue 를 엶</td><td>담당자, 본문에서 @멘션한 팀원</td></tr>
+<tr><td><code>[담당자 지정]</code></td><td>Issue 를 만든 뒤 담당자가 추가됨. 스스로 맡은 건 알리지 않음</td><td>지정된 담당자</td></tr></table>
+<ul>
+  <li><code>main</code> 으로 가는 PR 과 draft PR 은 이 봇이 알리지 않습니다. 멘토 리뷰 PR 은 아래 운영진 알림이 맡습니다.</li>
+  <li>저장소가 public 이라 팀원(<code>DISCORD_USER_IDS</code> 에 등록된 GitHub 아이디)이 아닌 사람의 Issue · 리뷰 · 댓글은 거릅니다.</li>
+</ul>
 
-<h2>멘토 리뷰 (운영진 제공)</h2>
-<p><code>main</code>으로 가는 멘토 리뷰 PR은 운영진이 준 워크플로가 처리합니다. 이 파일들은 수정 · 삭제하지 않습니다 (<a href="#00-Ground-Rules">그라운드 룰</a>).</p>
-<table><tr><th style="width:34%">워크플로</th><th>하는 일</th></tr>
-<tr><td><code>assign-mentor</code></td><td>PR을 열면 담당 멘토를 리뷰어로 자동 지정</td></tr>
-<tr><td><code>notify-discord</code></td><td>리뷰 요청과 리뷰 결과를 팀 디스코드로 알림</td></tr>
-<tr><td><code>convention-check</code></td><td>PR 규칙 안내 댓글</td></tr></table>
 <h2>서버 배치 알림</h2>
 <table><tr><th style="width:34%">언제</th><th>알림</th></tr>
 <tr><td>매주 일요일 04:00 법령 코퍼스 동기화</td><td>바뀐 조문 요약과 검토할 규칙 카드. 변경이 없거나 실패해도 보냄</td></tr>
 <tr><td>매주 일요일 05:00 규칙 후보 배치</td><td>승인된 후보로 만든 카드 PR과 새 규칙 후보. 결과와 상관없이 늘 보내므로, 알림이 없으면 타이머나 스크립트가 멈춘 것</td></tr></table>
-<p class="why"><span class="why-label">파일</span> <code>ai/pipeline/sync_report.py</code>, <code>ai/pipeline/notify.py</code>. 배치 일정은 <a href="#09b-Deploy">배포</a>에 있습니다.</p>
+
 <h2>장애 알림 (CloudWatch → 디스코드)</h2>
 <p>백엔드 로그와 서버 지표를 CloudWatch에 모으고, 알람이 울리면 Lambda가 디스코드 장애 알림 스레드로 보냅니다.</p>
-<table><tr><th style="width:34%">알람</th><th>조건</th></tr>
-<tr><td>백엔드 5xx</td><td>5분에 1건 이상</td></tr>
-<tr><td>백엔드 재시작</td><td>기동 로그 1건 이상. 배포 때도 울림</td></tr>
-<tr><td>CPU</td><td>80% 이상, 5분 단위 2번 연속</td></tr>
-<tr><td>메모리 · 디스크</td><td>메모리 90% 이상 5분, 루트 디스크 80% 이상</td></tr>
-<tr><td>상태 검사</td><td>EC2 상태 검사 실패</td></tr></table>
-<p class="why"><span class="why-label">파일</span> <code>deploy/monitoring/alarm_to_discord.py</code>, <code>docs/monitoring_plan.md</code></p>
+<table><tr><th style="width:34%">알람</th><th>조건</th><th style="width:14%">복구 알림</th></tr>
+<tr><td><code>ktc4-backend-http-5xx</code></td><td>백엔드 5xx 응답이 5분에 1건 이상</td><td>없음</td></tr>
+<tr><td><code>ktc4-backend-restarted</code></td><td>백엔드 기동 로그 1건 이상. 배포 때도 울림</td><td>없음</td></tr>
+<tr><td><code>ktc4-ec2-cpu-high</code></td><td>CPU 80% 이상이 5분 단위 2번 연속</td><td>있음</td></tr>
+<tr><td><code>ktc4-ec2-memory-high</code></td><td>메모리 사용률 90% 이상 5분</td><td>있음</td></tr>
+<tr><td><code>ktc4-ec2-disk-high</code></td><td>루트 디스크 사용률 80% 이상</td><td>있음</td></tr>
+<tr><td><code>ktc4-ec2-status-check-failed</code></td><td>EC2 상태 검사 실패가 1분 단위 2번 연속</td><td>있음</td></tr></table>
+<p>알림은 <code>🚨 장애</code> 또는 <code>✅ 복구</code> 뒤에 알람 이름, 설명, 상태 변화, 이유, CloudWatch 콘솔 링크로 옵니다. 아무도 멘션하지 않습니다. 5xx · 재시작은 건이 없으면 저절로 정상으로 돌아가 복구 알림을 보내지 않습니다.</p>
+
 `],
 ['06c-Review', '4. 코드 리뷰 기록', `
 <p>매주 PM 이 <code>develop → main</code> PR 을 올리고 담당 멘토님(<a href="https://github.com/bbeomgeun" target="_blank">bbeomgeun</a>)이 리뷰합니다. 1~12주차 PR 7개 모두 멘토님의 수정 요청(Request changes)과 승인(Approve) 리뷰가 함께 남아 있습니다.</p>
@@ -961,7 +963,7 @@ uv run uvicorn app.main:app --reload --port 8000   # 확인: curl localhost:8000
 <tr><td>백업</td><td>매일 03:00 <code>pg_dump</code> 를 S3 로 보냄. 복원은 임시 DB 에서 확인</td></tr>
 <tr><td>정기 작업</td><td>매주 일요일 04:00 법령 코퍼스 동기화, 05:00 규칙 후보 배치(승인된 후보를 카드 PR 로 올리고 새 후보 추출). EC2 의 systemd 타이머(<code>ktc4-corpus</code> · <code>ktc4-rule-candidates</code>)로 돌고, 결과는 디스코드로 옴</td></tr>
 <tr><td>되돌리기</td><td><code>deploy.sh &lt;이전 SHA&gt; --rollback</code>. Flyway 스키마는 되돌리지 않으므로 스키마 변경은 이전 앱과 호환되게 나눠 배포</td></tr>
-<tr><td>로그 · 알림</td><td>백엔드 로그는 CloudWatch Logs, 알람은 디스코드로 (<a href="#06b-Automation">자동화 · 알림</a>)</td></tr>
+<tr><td>로그 · 알림</td><td>백엔드 로그는 CloudWatch Logs, 알람은 디스코드로 (<a href="#06b-Automation">디스코드 알림</a>)</td></tr>
 <tr><td>주의</td><td>DB 볼륨이 지워지므로 운영에서 <code>docker compose down -v</code> 금지</td></tr></table>
 <h2>SEO</h2>
 <p>검색엔진, 카카오톡 미리보기, AI 크롤러는 자바스크립트를 실행하지 않고 HTML 만 읽는 경우가 많습니다. 아래는 서비스의 검색 엔진 노출도를 향상시키기 위한 SEO 설정입니다. 자세한 내용은 <code>docs/deployment.md</code> 13절에 있습니다.</p>
@@ -1001,7 +1003,7 @@ const DESC = {   // 홈 카드 한 줄 설명
   '00-Ground-Rules': '소통 · 회의 · PR 리뷰 규칙과 저장소에서 지킬 것',
   '04-Branch': 'main · develop · release · feature 브랜치의 쓰임',
   '05-Commit': 'type: subject 형식과 타입 목록',
-  '06b-Automation': 'PR · 리뷰 봇, 멘토 리뷰, 배치 · 장애 디스코드 알림',
+  '06b-Automation': 'PR · 리뷰 봇, 멘토 리뷰, 배치 · 장애 알림',
   '06c-Review': '주차별 멘토 리뷰 PR 과 다룬 주제',
   '06d-Docs': 'CONTEXT · docs · worklog · README 에 무엇을 쓰나',
   '07b-API': '리소스 구조, 공통 규칙, 엔드포인트 43개',
