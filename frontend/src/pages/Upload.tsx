@@ -5,6 +5,7 @@ import {
   ArrowRightIcon,
   FileSpreadsheetIcon,
   Loader2Icon,
+  ShuffleIcon,
   UploadCloudIcon } from
 'lucide-react';
 import { AppShell } from '../components/AppShell';
@@ -14,6 +15,7 @@ import { Badge, Button, Table, cn, type Column } from '../components/ui';
 import { useSession } from '../contexts/SessionContext';
 import { api, ApiRequestError } from '../api';
 import { parseCardFile, sampleFiles } from '../parser';
+import { buildRandomUpload } from '../parser/randomSample';
 import type {
   BlockedOutcome,
   ParsedOutcome,
@@ -399,12 +401,13 @@ function SampleList({ onPick }: {onPick: (file: File) => void;}) {
     };
   }, []);
 
-  if (samples.length === 0) return null;
-
   return (
     <section className="mt-8">
       <h2 className="text-body font-bold text-ink">샘플 파일로 해 보기</h2>
       <ul className="mt-3 space-y-2">
+        <li>
+          <RandomSample onPick={onPick} />
+        </li>
         {samples.map((sample) =>
         <li key={sample.id}>
             <button
@@ -420,6 +423,38 @@ function SampleList({ onPick }: {onPick: (file: File) => void;}) {
         )}
       </ul>
     </section>);
+
+}
+
+/**
+ * 시연용 무작위 카드내역. 누르면 100~300건짜리 KB 승인내역을 바로 만들어 올리기 전 미리보기로 넘긴다.
+ * 건수와 판정별 몫(확인필요 10% 이하)은 고를 수 없고 무작위다 (parser/randomSample.ts)
+ */
+function RandomSample({ onPick }: {onPick: (file: File) => void;}) {
+  const [making, setMaking] = useState(false);
+
+  const make = async () => {
+    setMaking(true);
+    try {
+      onPick(await buildRandomUpload());
+    } finally {
+      setMaking(false);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      disabled={making}
+      onClick={() => void make()}
+      className="flex w-full items-center gap-3 rounded-xl border border-edge bg-canvas px-4 py-3 text-left transition-colors duration-150 ease-snap hover:bg-surface disabled:cursor-wait">
+
+      {making ?
+      <Loader2Icon className="h-4 w-4 shrink-0 animate-spin text-ink2" aria-hidden="true" /> :
+      <ShuffleIcon className="h-4 w-4 shrink-0 text-ink2" aria-hidden="true" />}
+      <span className="min-w-0 flex-1 truncate text-body text-ink">무작위 카드내역 만들기</span>
+      <ArrowRightIcon className="h-4 w-4 shrink-0 text-ink2" aria-hidden="true" />
+    </button>);
 
 }
 
