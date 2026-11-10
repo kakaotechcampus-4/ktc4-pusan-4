@@ -667,7 +667,107 @@ docs: 커밋 컨벤션 추가</code></pre>
   <li class="f"><b>CLAUDE.md</b><span>AI 코딩 도구 작업 지침</span></li>
 </ul></div>
 `],
-['07b-API', '3. API', `
+['08b-Experiments', '3. AI 실험', `
+<p>판정은 룰엔진만 하고, AI 는 판정 밖 세 곳(규칙 카드 생성 RAG, 가맹점 분류 추천, 비서 Really)에 있습니다. 세 곳 모두 모델과 방식을 실측으로 골랐습니다. 이 페이지는 실험마다 질문 · 비교 · 결과 · 결정만 요약합니다. 전체 기록은 <code>docs/rag-eval.md</code>, <code>docs/agent-secretary.md</code>, <code>docs/category_decision_eval.md</code> 에 있습니다.</p>
+<h2>실험 목록</h2>
+<p>실험 8개의 이름과 주제입니다. 비교 내용 · 결과 · 결정은 아래 각 실험에서 설명합니다.</p>
+<table><tr><th style="width:22%">영역</th><th style="width:30%">실험</th><th>주제</th></tr>
+<tr><td rowspan="3">규칙 카드 생성 (RAG)</td><td>모델 비교 실험</td><td>gpt-4o-mini → GPT-6 Luna</td></tr>
+<tr><td>검색 기법 비교 실험</td><td>RRF(하이브리드) vs 벡터 단독</td></tr>
+<tr><td>벡터 인덱스 비교 실험</td><td>HNSW vs 정확 스캔</td></tr>
+<tr><td rowspan="2">가맹점 분류</td><td>분류 방식 비교 실험</td><td>문자 n-gram 분류기 vs 임베딩</td></tr>
+<tr><td>분류 모델 비교 실험</td><td>Jev 1.14 vs GPT-6 Luna</td></tr>
+<tr><td rowspan="3">비서 Really</td><td>모델 비교 실험</td><td>GPT-6 Luna vs Claude Haiku 5.5</td></tr>
+<tr><td>프레임워크 적용 여부 실험</td><td>openai SDK 직접 vs LangChain</td></tr>
+<tr><td>프롬프트 인젝션 방어</td><td>지시 무시 · 내부 정보 빼내기 · 서비스 밖 요청을 막는지</td></tr></table>
+<h2>실험 원칙</h2>
+<ul>
+  <li><b>한 번 돌린 결과는 믿지 않습니다.</b> 같은 코드 · 설정으로 규칙 카드 초안을 두 번 돌려도 게이트 일치가 3/8 과 5/8 로 갈렸습니다. LLM 이 질의 작성 · 근거 선택 · 초안 세 곳에서 흔들리기 때문입니다. 질의 계획을 파일로 고정하고, 같은 조건을 3회 이상 돌려 범위로 봅니다.</li>
+  <li><b>같은 날 대조군과 잽니다.</b> 프롬프트를 그대로 둬도 하루 사이 확정 적중이 13~14 에서 10~14 로 흔들렸습니다. 새 안은 같은 날 돌린 기존 안과 비교합니다.</li>
+  <li><b>판정 기준을 먼저 정합니다.</b> RRF 비교는 측정 전에 "벡터 단독이 재현율에서 같거나 낫고 초안이 나빠지지 않으면 바꾼다"를 정해 뒀습니다.</li>
+  <li><b>중간 지표보다 최종 결과로 판단합니다.</b> 검색 순위가 좋아져도 초안 인용이 줄면 채택하지 않습니다(아래 키워드 별칭).</li>
+</ul>
+<h2>규칙 카드 생성 (RAG)</h2>
+<p>매주 규칙에 안 걸린 거래를 모아 법령 코퍼스에서 '검색'하고, 모델이 근거를 골라 규칙 카드 초안을 제작합니다. 평가는 기존 규칙 카드를 (카테고리, 업종) 32키로 묶어 정답지로 씁니다.</p>
+<h3>병목은 검색이 아니라 전제였음을 발견 (9/23)</h3>
+<p>놓친 근거 12건 중 11건이 검색 누락이었습니다. 그런데 카드 인용 51건 중 44건이 소득세법 27 · 33조였고, 주제로 검색하면 27조 1항은 32~233위, 33조 1항 5호는 81~913위였습니다. 검색으로 찾을 대상이 아니라 늘 깔려 있는 전제였습니다.</p>
+<blockquote><b>결정:</b> 27 · 33조(10/9 부터 시행령 61 · 78조 포함)를 검색 없이 늘 후보에 붙입니다. 정답이 후보에 들어온 비율이 2/51 에서 46/51 로 올랐고, 이후 병목은 선택으로 옮겨 갔습니다(놓친 30건 중 26건은 후보에 있었는데 못 고름).</blockquote>
+<h3>모델 비교 실험: gpt-4o-mini → GPT-6 Luna (10/9)</h3>
+<p>32키 초안을 모두 12회 돌렸습니다(4o-mini 3회, Luna 조합 6회, 채택 뒤 3회). 가격은 100만 토큰당 4o-mini 입력 ₩228 · 출력 ₩913, Luna ₩152 · ₩761 입니다.</p>
+<table><tr><th style="width:26%">지표</th><th>4o-mini</th><th>Luna</th><th>Luna + 결론 기준 보정</th><th>Luna 추론 low + 보정</th></tr>
+<tr><td>오류 (재시도 소진)</td><td>2~3</td><td>0</td><td>0</td><td>0</td></tr>
+<tr><td>가사 경비(33조 1항 5호) 인용</td><td>9~10/20</td><td>20/20</td><td>20/20</td><td>19/20</td></tr>
+<tr><td>확정 적중</td><td>9~10/14</td><td>3/15</td><td>14/15</td><td>10~11/15</td></tr>
+<tr><td>확인필요로 낸 키</td><td>16~18/32</td><td>28~29/32</td><td>16~17/32</td><td>18~19/32</td></tr></table>
+<blockquote><b>결정:</b> GPT-6 Luna(추론 끔) + 결론 기준 보정. 모델만 바꾸면 오류가 사라지고 가사 경비를 다 고르지만, 거의 모든 키를 확인필요로 냈습니다. 그래서 "대개 업무면 가능, 대개 개인 소비면 불가, 물어야만 가를 수 있으면 확인필요" 기준을 함께 넣었습니다. 추론 low 는 결론을 비우고, temperature 가 1 로 고정돼 회차마다 흔들려 버렸습니다.</blockquote>
+<h3>검색 기법 비교 실험: RRF(하이브리드) vs 벡터 단독 (10/16~10/26)</h3>
+<p>검색은 벡터 검색과 키워드 검색(pg_bigm)의 순위를 RRF 로 합칩니다. 키워드는 "벡터는 3만원 초과와 5만원 초과를 못 가른다"는 이유로 넣었는데, 실제 질의 52개 중 숫자가 든 것은 0개였습니다. 그래서 키워드를 빼도 되는지 쟀습니다. 코퍼스는 운영 10/15 백업(청크 56,020개)입니다.</p>
+<table><tr><th style="width:46%">지표</th><th>RRF</th><th>벡터 단독</th></tr>
+<tr><td>골든셋 고정 질의 재현율 (기본 조문 제외)</td><td>6/6</td><td>4/6</td></tr>
+<tr><td>규칙 카드 32키 후보 재현율</td><td>7/9</td><td>9/9</td></tr>
+<tr><td>검색 SQL 1회</td><td>504ms</td><td>91ms</td></tr>
+<tr><td>카페 · 음식점 초안이 기업업무추진비 조항(35조 1항)을 인용</td><td>21/26</td><td>5/26</td></tr>
+<tr><td>같은 인용, 질의 계획을 10개씩 새로 받아서</td><td>40/60</td><td>15/60</td></tr></table>
+<p>법령은 용어 변경이 자주 있습니다. 예시로 '접대비'는 2024년부터 '기업업무추진비'로 변경됐고 옛 심판례는 '접대비'로 남아있습니다. 키워드 검색이 심판례 쪽에 접대비 사건을 올려 줘서(카페: 심판례 후보 8건 중 RRF 8건, 벡터 1건) 모델이 35조 1항을 근거로 더 자주 골랐습니다. 35조 1항 자체는 두 방식 모두 후보에 있었습니다.</p>
+<blockquote><b>결정:</b> RRF 유지. 벡터 단독이 후보에 더 넣은 2건은 한 번도 인용되지 않았고, 검색 속도 차이는 주 1회 배치라 이득이 아닙니다.</blockquote>
+<p>함께 재고 버린 것: 접대비 ↔ 기업업무추진비 키워드 별칭(검색 순위는 좋아졌지만 인용이 21/26 에서 15/26 으로 줄어듦), 근거 선택 프롬프트에 특칙 · 접대 한 줄(35조 1항은 고치지만 단정적인 결론이 늘어남).</p>
+<h3>벡터 인덱스 비교 실험: HNSW vs 정확 스캔</h3>
+<p>HNSW 는 위계(doc_type) 필터를 걸기 전에 후보를 뽑습니다. 행정규칙은 전체의 9.7% 라 max_scan_tuples 를 20만까지 올려도 정답이 상위 8 에 들지 않았고, 정확 스캔은 같은 질의에서 정답을 1 · 2위로 가져왔습니다. 속도는 110ms 대 115ms 로 같았습니다.</p>
+<blockquote><b>결정:</b> 벡터 인덱스를 일부러 만들지 않고 정확 스캔합니다(<code>db/rag.sql</code>).</blockquote>
+<h2>가맹점 분류</h2>
+<p>판정 전에 거래마다 가맹점 카테고리(32종)를 정합니다. 지금 흐름은 PG 차단 → 개인 사전 → 전역 사전 → 키워드룰이고, 여기서 못 정한 가맹점은 분류 모델의 추천을 받아 사용자가 고릅니다.</p>
+<h3>분류 방식 비교 실험: 문자 n-gram 분류기 vs 임베딩 (9/23)</h3>
+<p>소상공인 상권정보 40만 행 표본을 썼고, 같은 브랜드는 학습과 평가에 나눠 넣지 않았습니다. 숫자는 정밀도 95% 를 지키며 자동 확정할 수 있는 비율입니다.</p>
+<table><tr><th style="width:34%">방식</th><th>처음 보는 브랜드 (지점명 붙음)</th><th>잔여분 (키워드룰 미적중 개별 사업장)</th></tr>
+<tr><td>문자 n-gram + 로지스틱 회귀</td><td>0.609</td><td>0.345</td></tr>
+<tr><td>TF-IDF 최근접 이웃</td><td>0.388</td><td>0.245</td></tr>
+<tr><td>OpenAI 임베딩 최근접 이웃</td><td>0.371</td><td>0.144</td></tr></table>
+<p>상호명은 의미가 아니라 고유명사라 의미 임베딩으로 얻는 게 없었습니다. 가장 나은 분류기도 잔여분의 34.5% 만 확정했습니다.</p>
+<blockquote><b>결정:</b> 모델은 되묻기를 없애 주지 못하고 3분의 1 을 덜어 줄 뿐입니다. 모델은 사전 · 규칙 뒤의 보조로 둡니다.</blockquote>
+<h3>가맹점 데이터셋 매칭 · 해외 결제 사전 적합성 확인(9/28 · 10/5)</h3>
+<ul>
+  <li><b>상권정보 매칭:</b> 277만 행에서 같은 이름 가게들의 최다 카테고리 비율이 0.9 이상이면 확정합니다. 데이터에 있는 가게는 85.6% 를 정확도 99.8% 로, 없는 가게(동명 다른 가게에 붙음)는 32.2% 를 91.1% 로 확정했습니다.</li>
+  <li><b>해외 결제 사전:</b> 상권정보는 오프라인 점포만 담아 해외 SaaS 를 못 잡습니다. 키워드룰 뒤에 SaaS 도구 사전을 붙이니 도구 재현율이 52% 에서 85% 로 올랐고, 확정한 52건에 오답이 없었습니다(평가 94건).</li>
+  <li><b>모르는 해외 결제:</b> 구독서비스로 넘겨짚지 않고 미분류로 보냅니다. 넘겨짚으면 게임 결제 8건이 "업무 관련 구독인가" 질문을 받습니다.</li>
+</ul>
+<p>상권정보 매칭과 도구 사전은 측정까지 했고, 지금 서비스 분류 흐름에는 둘 다 들어가 있지 않습니다(도구 사전은 <code>tools/exp_overseas_saas/</code> 에만 있음).</p>
+<h3>분류 모델 비교 실험: Jev 1.14 vs GPT-6 Luna (10/30)</h3>
+<p>사전 · 규칙으로 미분류된 가맹점에 사용할 모델입니다. 두 모델 모두 캠퍼스 게이트웨이의 <code>/v1/decisions</code>(선택지마다 확률을 돌려주는 API)로 불렀고, 평가셋 742건(잔여분 505 · 쉬운 몫 237)을 썼습니다.</p>
+<table><tr><th style="width:46%">지표</th><th>Jev 1.14</th><th>GPT-6 Luna</th></tr>
+<tr><td>잔여분 1위 정답률</td><td>0.372</td><td>0.396</td></tr>
+<tr><td>잔여분 3위 안 정답률</td><td>0.602</td><td>0.620</td></tr>
+<tr><td>잔여분 정밀도 95% 자동 확정</td><td>7.3%</td><td>0%</td></tr>
+<tr><td>키워드룰 미적중 온라인 결제 1위 정답률</td><td>0.765</td><td>0.902</td></tr>
+<tr><td>같은 요청을 반복했을 때 1위가 바뀐 비율</td><td>8%</td><td>0%</td></tr>
+<tr><td>응답 지연 (중앙값)</td><td>544ms</td><td>430ms</td></tr></table>
+<p>Luna 는 신뢰도 1.0 으로 답해도 잔여분 정밀도가 75% 였습니다. 쉬운 몫에서 잡은 기준값을 잔여분에 쓰면 대량으로 틀린 채 통과합니다.</p>
+<blockquote><b>결정:</b> GPT-6 Luna. 자동 확정 없이 3순위까지 추천만 하고, 사용자가 분류 확인 화면에서 고릅니다.</blockquote>
+<h2>비서 Really</h2>
+<h3>모델 비교 실험: GPT-6 Luna vs Claude Haiku 5.5 (10/15)</h3>
+<p>가짜 도구 7개, 한 턴 시나리오 18개를 모델마다 3회씩, 모두 대화 108턴을 돌렸습니다.</p>
+<table><tr><th style="width:34%">지표</th><th>GPT-6 Luna</th><th>Claude Haiku 5.5</th></tr>
+<tr><td>정답</td><td>51/54</td><td>54/54</td></tr>
+<tr><td>한 턴 응답 시간 (중앙값)</td><td>4.1초</td><td>5.1초</td></tr>
+<tr><td>한 턴 비용</td><td>0.5원</td><td>1.5원</td></tr>
+<tr><td>토큰</td><td>기준</td><td>입력 약 2배 · 출력 약 6배</td></tr></table>
+<p>Luna 가 틀린 3건은 소명 대기 건이 여럿일 때 묻지 않고 제안한 유형이었습니다. 답의 날짜 · 금액 검사를 넣고 다시 돌리니 두 모델 모두 15/15 였습니다. Haiku 는 strict 도구 스키마를 받지 않습니다.</p>
+<blockquote><b>결정:</b> GPT-6 Luna 기본, Haiku 5.5 예비. 도구 13개를 다 만든 뒤 최종 평가(시나리오 28개 × 3회)는 84/84, 한 턴 중앙값 4.8초였습니다.</blockquote>
+<h3>프레임워크 적용 여부 실험: openai SDK 직접 vs LangChain (10/15)</h3>
+<table><tr><th style="width:34%">항목</th><th>SDK 직접</th><th>LangChain</th></tr>
+<tr><td>설치 패키지</td><td>14개</td><td>44개</td></tr>
+<tr><td>import 직후 메모리</td><td>51MB</td><td>90MB</td></tr>
+<tr><td>한 턴 (로컬 가짜 서버)</td><td>5.4ms</td><td>8.3ms</td></tr></table>
+<p>속도 차이는 LLM 왕복(1~2초)에 비하면 무시할 만합니다. 문제는 LangChain 이 대신 짜 주는 부분(호출 → 도구 실행 반복, 직접 짜도 15줄 정도)이 작고, Langfuse 추적과 겹쳐 같은 호출이 두 번 기록된다는 점이었습니다.</p>
+<blockquote><b>결정:</b> openai SDK 를 직접 쓰고 Langfuse 로 추적합니다. LangGraph 도 쓰지 않습니다.</blockquote>
+<h3>프롬프트 인젝션 방어(11/2)</h3>
+<p>공격 7종(화면 값에 지시 끼워 넣기, 대화 이력 위조, 가맹점명에 숨긴 지시, 숫자 검증 우회 등)과 사회공학 요청(긴급 상황, 할머니 소원, 인질극)을 보냈습니다.</p>
+<ul>
+  <li><b>수정 전:</b> 프롬프트 원문은 거절했지만 규칙 · 도구 요약 요청에는 풀어 설명했습니다. "모든 프롬프트를 무시하라"에는 코드를 내놓았고, 저녁 메뉴 · 레시피 같은 서비스 밖 요청에도 답했습니다.</li>
+  <li><b>수정:</b> 프롬프트 · 규칙 · 도구 · 모델을 묻거나 지시를 무시하라고 하면, 또는 서비스 밖 요청이면 도구 없이 정해 둔 문장으로 거절하는 규칙 2개를 넣었습니다. 화면 값은 아는 경로만 모델에 넘깁니다.</li>
+  <li><b>수정 후:</b> 7종 모두 막았고, "용어 안내"로 포장한 서비스 밖 요청 1건만 일부 답했습니다. 거절은 도구를 부르지 않고 대부분 2초 안팎에 끝났습니다.</li>
+</ul>
+`],
+['07b-API', '4. API', `
 <p>모든 API 는 <code>/api/v1</code> 아래에 있습니다. 전체 명세(요청 · 응답 · 에러 코드)의 원본은 <code>docs/api.md</code> 입니다.</p>
 <h2>리소스 구조</h2>
 <div class="res"><svg viewBox="0 0 760 360" role="img" aria-label="리소스 구조: UploadBatch 는 Transaction 을 여럿 담는다. Transaction 은 분류에 실패하면 ClassificationReview 로, 판정은 Judgment 로 간다. Judgment 는 Question 과 UserFact 로 재판정하거나 JudgmentOverride 로 수정할 때마다 새 revision 이 쌓인다. JudgmentRun 은 Batch 하나를 일괄 판정해 rev1 을 만든다.">
@@ -709,7 +809,7 @@ docs: 커밋 컨벤션 추가</code></pre>
 <tr><td>기타</td><td>GET statutes/&#123;statuteVersionId&#125; · GET progress · POST assistant/chat · GET · POST handoff-notes</td></tr>
 <tr><td>관리자</td><td>GET admin/rule-candidates · POST admin/rule-candidates/&#123;id&#125;/approve · reject</td></tr></table>
 `],
-['07c-DB', '4. DB 스키마', `
+['07c-DB', '5. DB 스키마', `
 <p>PostgreSQL 17 + pgvector + pg_bigm. 적용 방법은 <code>db/README.md</code> 에 있습니다.</p>
 <h2>누가 만드나</h2>
 <table><tr><th style="width:30%">소유</th><th>무엇</th><th>어디</th></tr>
@@ -755,7 +855,7 @@ docs: 커밋 컨벤션 추가</code></pre>
   <li><code>unmatched_log</code> 에 <code>user_id</code> 를 넣지 않습니다. 개인 지출 패턴이 드러납니다.</li>
 </ul>
 `],
-['07d-FE', '5. 프론트엔드', `
+['07d-FE', '6. 프론트엔드', `
 <p>Vite + React 18 + TypeScript + Tailwind. 원본은 <code>frontend/README.md</code> 와 <code>frontend/DESIGN.md</code> 입니다.</p>
 <h2>폴더</h2>
 <table><tr><th style="width:28%">경로</th><th>내용</th></tr>
@@ -776,7 +876,7 @@ docs: 커밋 컨벤션 추가</code></pre>
   <li>움직임은 첫 화면 큰 판에서만. 세금 판정 화면은 차분하게 둡니다.</li>
 </ul>
 `],
-['07e-Convention', '6. 코딩 컨벤션', `
+['07e-Convention', '7. 코딩 컨벤션', `
 <p>커밋 메시지 규칙은 <a href="#05-Commit">커밋 컨벤션</a> 에 있습니다. 여기는 코드 규칙입니다.</p>
 <h2>백엔드 (Java · Spring)</h2>
 <ul>
@@ -808,7 +908,7 @@ docs: 커밋 컨벤션 추가</code></pre>
   <li>속성 관문을 조기 종료로 구현: <code>putAll</code> 이지 <code>return</code> 이 아님</li>
 </ol>
 `],
-['07f-Test', '7. 테스트', `
+['07f-Test', '8. 테스트', `
 <h2>CI</h2>
 <table><tr><th style="width:22%">워크플로</th><th>언제</th><th>검사</th></tr>
 <tr><td>Backend CI</td><td><code>backend</code> · <code>rules</code> · <code>profiles</code> · <code>eval</code> 이 바뀐 PR, develop · main push</td><td>단위 테스트 → 통합 테스트 (평가셋 포함)</td></tr>
@@ -845,7 +945,7 @@ docs: 커밋 컨벤션 추가</code></pre>
 <tr><td>법령 검색</td><td><code>uv run python -m eval.run_search</code></td><td>검색 골든셋으로 청킹 · 검색 전략 비교</td></tr>
 <tr><td>규칙 카드 초안</td><td><code>uv run python -m eval.run_draft</code></td><td>규칙 카드를 정답지로 근거 선택과 초안 채점</td></tr></table>
 `],
-['09-Local', '8. 로컬 실행', `
+['09-Local', '9. 로컬 실행', `
 <h2>프론트엔드</h2>
 <pre><code class="bash">cd frontend
 npm install
@@ -868,7 +968,7 @@ uv run uvicorn app.main:app --reload --port 8000   # 확인: curl localhost:8000
 <tr><td><code>AGENT_*</code> · <code>EMBEDDING_*</code> · <code>LAW_API_OC</code></td><td>규칙 후보 파이프라인 · 조문 검색</td><td>배치 실패</td></tr>
 <tr><td><code>LANGFUSE_*</code></td><td>LLM 호출 추적</td><td>꺼짐</td></tr></table>
 `],
-['09b-Deploy', '9. 배포', `
+['09b-Deploy', '10. 배포', `
 <p>원본은 <code>docs/deployment.md</code> 입니다. 여기는 흐름만 요약합니다.</p>
 <h2>구성</h2>
 <ul>
@@ -935,6 +1035,7 @@ const DESC = {   // 홈 카드 한 줄 설명
   '07f-Test': '단위 · 통합 테스트, 판정 평가셋, 린트',
   '09b-Deploy': 'EC2 · compose 구성, release 배포 흐름, 백업 · 롤백',
   '07-Architecture': '입력 검증부터 집계까지, 6관문 판정 흐름',
+  '08b-Experiments': 'RAG 검색 · 모델 · 분류 방식을 고른 실험과 결정',
   '08-Stack': '프론트 · 백엔드 · AI 서버 · DB 구성과 디렉터리',
   '09-Local': '백엔드·프론트 로컬 실행',
 };
