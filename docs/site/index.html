@@ -569,19 +569,27 @@ const DOCS = [
 <tr><td>각 폴더 README</td><td>실행 방법 (<code>backend/README.md</code>, <code>frontend/README.md</code>, <code>db/README.md</code>, <code>eval/README.md</code>)</td></tr></table>
 <h2>단일 원본</h2>
 <p>같은 명세를 여러 문서에 나눠 쓰지 않고 한 곳을 원본으로 정합니다. 예: 규칙 카드 필드는 <code>docs/rule-card-fields.md</code>, 비서 명세는 <code>docs/agent-secretary.md</code>, 화면 규칙은 <code>frontend/DESIGN.md</code>.</p>
-<h2>worklog 쓰는 법</h2>
-<ul>
-  <li>경로: <code>worklog/&lt;fe|be|ai|etc&gt;/&lt;YYYY-MM-DD&gt;-&lt;영문-슬러그&gt;.md</code>. 여러 도메인에 걸치면 바뀐 파일이 가장 많은 쪽 하나.</li>
-  <li>같은 날 같은 도메인 문서가 있으면 새로 만들지 않고 끝에 <code>## HH:MM 한 줄 요약</code> 으로 이어 씁니다. 이미 쓴 줄은 고치지 않습니다.</li>
-  <li>틀: 제목 · 브랜치 · 커밋 · 주요파일 → 한 일 → 왜 이렇게 했나 → 남은 것 · 아는 문제.</li>
-  <li>커밋 메시지와 diff 에서 읽히는 것만 씁니다. 추측으로 채우지 않습니다.</li>
-</ul>
-<p>기록이 없으면 push 가 막히고, Claude Code 가 이번 push 분량의 변경을 읽어 기록을 대신 작성합니다.</p>
+<h2>worklog 스킬 명세</h2>
+<p><code>/worklog</code> 스킬이 이번 push 에 담길 작업을 문서로 남깁니다. push 한 번에 기록 한 번입니다.</p>
+<p>기록이 없으면 push 가 막히고, Claude Code 가 이 스킬로 이번 push 분량의 변경을 읽어 기록을 대신 작성합니다.</p>
 <pre><code>git push
   → pre-push 훅: "worklog 문서가 없습니다" 로 막음
   → Claude Code 훅이 감지 → /worklog 스킬 실행
   → 변경 내용을 읽고 worklog/{fe|be|ai|etc}/날짜-주제.md 작성 · 커밋
   → 다시 push</code></pre>
+<table><tr><th style="width:18%">단계</th><th>명세</th></tr>
+<tr><td>언제</td><td>pre-push 훅이 push 를 막았을 때, 또는 push 직전. <code>/worklog</code>, "worklog", "작업 로그 남겨줘" 로 부릅니다</td></tr>
+<tr><td>① 범위</td><td>아직 push 하지 않은 커밋(<code>@{push}..HEAD</code>). 브랜치를 처음 push 하면 <code>origin/develop</code> 에서 갈라진 지점부터</td></tr>
+<tr><td>② 도메인</td><td>바뀐 경로로 하나 고릅니다(아래 표). 여러 도메인에 걸치면 바뀐 파일이 가장 많은 쪽 하나이고, 작업 성격에 따라 유연하게 고릅니다</td></tr>
+<tr><td>③ 문서</td><td>오늘 같은 도메인 문서가 있으면 새로 만들지 않고 끝에 <code>## HH:MM 한 줄 요약</code> 으로 이어 씁니다. 없으면 <code>worklog/&lt;도메인&gt;/&lt;YYYY-MM-DD&gt;-&lt;영문-슬러그&gt;.md</code> 를 새로 만듭니다. 이미 쓴 줄은 고치지 않습니다</td></tr>
+<tr><td>쓰는 기준</td><td>커밋 메시지와 diff 에서 실제로 읽히는 것만 씁니다. 추측으로 채우지 않고, "왜"에 쓸 게 없으면 그 절은 지웁니다</td></tr>
+<tr><td>④ 커밋</td><td><code>docs: worklog &lt;슬러그&gt;</code></td></tr>
+<tr><td>⑤ push</td><td>훅에 막혀 실행했을 때만 막혔던 push 를 다시 실행합니다. 직접 불렀으면 커밋까지만 합니다. 올릴 생각이 없던 커밋까지 함께 올라가기 때문입니다</td></tr></table>
+<table><tr><th style="width:60%">바뀐 경로</th><th>도메인</th></tr>
+<tr><td><code class="path">frontend/</code></td><td><code>fe</code></td></tr>
+<tr><td><code class="path">backend/</code> · <code class="path">db/</code> · <code class="path">docker/</code> · <code class="path">tools/</code></td><td><code>be</code></td></tr>
+<tr><td><code class="path">ai/</code> · <code class="path">eval/</code> · <code class="path">rules/</code> · <code class="path">profiles/</code></td><td><code>ai</code></td></tr>
+<tr><td>그 밖 (<code class="path">docs/</code> · <code class="path">.github/</code> · 빌드 · 설정)</td><td><code>etc</code></td></tr></table>
 <p class="why"><span class="why-label">파일</span> <code>.githooks/pre-push</code>, <code>.claude/hooks/push-nudge.sh</code>, <code>.claude/skills/worklog/SKILL.md</code></p>
 `],
 ]],
