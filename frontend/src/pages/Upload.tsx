@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   AlertTriangleIcon,
   ArrowRightIcon,
+  CircleHelpIcon,
   FileSpreadsheetIcon,
   Loader2Icon,
   ShuffleIcon,
@@ -430,6 +431,9 @@ function SampleList({ onPick }: {onPick: (file: File) => void;}) {
  * 시연용 무작위 카드내역. 누르면 100~300건짜리 KB 승인내역을 바로 만들어 올리기 전 미리보기로 넘긴다.
  * 건수와 판정별 몫(확인필요 10% 이하)은 고를 수 없고 무작위다 (parser/randomSample.ts)
  */
+const RANDOM_SAMPLE_HELP =
+'카드내역 파일이 없어도 판정을 해 볼 수 있게 만든 시연용 편의 기능입니다. 100~300건짜리 승인내역 파일이 브라우저에서 새로 생성되고, 서버에 업로드하여 실제 파일과 동일한 로직으로 판정합니다. 서버에 미리 넣어 둔 거래나 결과는 없습니다.';
+
 function RandomSample({ onPick }: {onPick: (file: File) => void;}) {
   const [making, setMaking] = useState(false);
 
@@ -442,19 +446,40 @@ function RandomSample({ onPick }: {onPick: (file: File) => void;}) {
     }
   };
 
+  // 줄 전체가 만들기 버튼이다(after 로 줄을 덮는다). ? 는 그 위에 따로 올려 버튼 안에 버튼이 들어가지 않게 한다
   return (
-    <button
-      type="button"
-      disabled={making}
-      onClick={() => void make()}
-      className="flex w-full items-center gap-3 rounded-xl border border-edge bg-canvas px-4 py-3 text-left transition-colors duration-150 ease-snap hover:bg-surface disabled:cursor-wait">
-
+    <div className="relative flex items-center gap-3 rounded-xl border border-edge bg-canvas px-4 py-3 transition-colors duration-150 ease-snap hover:bg-surface">
       {making ?
       <Loader2Icon className="h-4 w-4 shrink-0 animate-spin text-ink2" aria-hidden="true" /> :
       <ShuffleIcon className="h-4 w-4 shrink-0 text-ink2" aria-hidden="true" />}
-      <span className="min-w-0 flex-1 truncate text-body text-ink">무작위 카드내역 만들기</span>
-      <ArrowRightIcon className="h-4 w-4 shrink-0 text-ink2" aria-hidden="true" />
-    </button>);
+      <button
+        type="button"
+        disabled={making}
+        onClick={() => void make()}
+        className="min-w-0 truncate text-left text-body text-ink after:absolute after:inset-0 after:rounded-xl disabled:cursor-wait">
+
+        무작위 카드내역 만들기
+      </button>
+      {/* 시연에서 서버에 미리 넣어 둔 결과를 보여 주는 것으로 오해하지 않게 한다. 터치에서는 눌러서 초점이 가면 보인다 */}
+      <span className="group relative z-10 inline-flex">
+        <button
+          type="button"
+          aria-label="무작위 카드내역 만들기 안내"
+          aria-describedby="random-sample-help"
+          className="inline-flex h-6 w-6 items-center justify-center rounded-full text-ink2 hover:text-ink">
+
+          <CircleHelpIcon className="h-4 w-4" aria-hidden="true" />
+        </button>
+        <span
+          id="random-sample-help"
+          role="tooltip"
+          className="pointer-events-none invisible absolute bottom-full left-1/2 mb-2 w-72 -translate-x-1/2 rounded-2xl bg-ink px-4 py-3 text-small leading-6 text-white shadow-panel group-focus-within:visible group-hover:visible">
+
+          {RANDOM_SAMPLE_HELP}
+        </span>
+      </span>
+      <ArrowRightIcon className="ml-auto h-4 w-4 shrink-0 text-ink2" aria-hidden="true" />
+    </div>);
 
 }
 
