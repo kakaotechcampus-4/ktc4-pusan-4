@@ -188,6 +188,7 @@
   .res .ln { fill:none; stroke:#9AA4AF; stroke-width:1.5; }
   .res .ln.dash { stroke-dasharray:5 4; }
   .res .lb { font-size:11.5px; fill:var(--muted); }
+  .prs ul { margin:0; padding-left:18px; } .prs li { line-height:1.6; margin:2px 0; }
   /* 디렉터리 트리 그림 */
   .tree { margin:14px 0; padding:20px 24px; background:var(--surface); border-radius:16px; font-size:14px; }
   .tree b { display:flex; align-items:center; gap:8px; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:13px; color:var(--text); }
@@ -540,7 +541,7 @@ const DOCS = [
 
 `],
 ['06c-Review', '4. 코드 리뷰 기록', `
-<p>매주 PM 이 <code>develop → main</code> PR 을 올리고 담당 멘토님(<a href="https://github.com/bbeomgeun" target="_blank">bbeomgeun</a>)이 리뷰합니다. 1~12주차 PR 7개 모두 멘토님의 수정 요청(Request changes)과 승인(Approve) 리뷰가 함께 남아 있습니다.</p>
+<p>주차별 멘토 PR과 주요 PR 입니다. </p>
 <h2>주차별 멘토 리뷰</h2>
 <table><tr><th style="width:15%">PR</th><th style="width:14%">올린 날</th><th>멘토님이 다룬 주제</th></tr>
 <tr><td><a href="https://github.com/kakaotechcampus-4/ktc4-pusan-4/pull/14" target="_blank">#14</a> 1주차</td><td style="white-space:nowrap">2026-09-09</td><td>natural_key(중복 방지 키) 재료 선정 · 판정 기준을 코드가 아니라 데이터로 두는 구조 · 불확정 상황의 안전 강등 · 요청부터 응답까지 플로우차트 요청</td></tr>
@@ -550,14 +551,14 @@ const DOCS = [
 <tr><td><a href="https://github.com/kakaotechcampus-4/ktc4-pusan-4/pull/107" target="_blank">#107</a> 9주차</td><td style="white-space:nowrap">2026-10-07</td><td>[PM] 규칙 기반 분류 로직을 어디에 둘지 · [BE] 인증·인가 방식 · 공휴일 데이터 배치 적재와 동기화 · 소프트/하드 삭제 · [AI] 민감정보 관리 · 모델 선택 기준</td></tr>
 <tr><td><a href="https://github.com/kakaotechcampus-4/ktc4-pusan-4/pull/165" target="_blank">#165</a> 11주차</td><td style="white-space:nowrap">2026-10-21</td><td>[BE] 서버 재시작으로 중단된 백그라운드 작업 처리 · 재판정 중 일부 실패 시 롤백 여부 · 거래 목록 필터 · [AI] AI 비서</td></tr>
 <tr><td><a href="https://github.com/kakaotechcampus-4/ktc4-pusan-4/pull/189" target="_blank">#189</a> 12주차</td><td style="white-space:nowrap">2026-10-28</td><td>[BE] 판정 실행 시 DB CPU 측정 결과 판단 · 리프레시 토큰 재사용 감지와 여러 탭 동시 재발급 · 대기열 실패 시 FE 재처리 여부</td></tr>
-<tr><td><a href="https://github.com/kakaotechcampus-4/ktc4-pusan-4/pull/243" target="_blank">#243</a> 13주차</td><td style="white-space:nowrap">2026-11-04</td><td>리뷰 대기 중</td></tr></table>
-<p class="why"><span class="why-label">기준</span> 멘토님 리뷰 본문의 번호 붙은 질문 제목을 옮겼습니다. 자세한 답변은 각 PR 에서 봅니다.</p>
-<h2>리뷰가 문서와 코드로 이어진 예</h2>
-<ul>
-  <li>1주차 리뷰에서 요청부터 응답까지의 플로우차트를 요청받았고, 9월 11일 <code>docs/architecture.md</code> 에 흐름도가 추가됐습니다. 멘토님은 승인하며 배포 파이프라인 · ERD · API 명세 · 인프라 구조도 · 주요 비즈니스 플로우를 그림으로 남기라고 권했습니다.</li>
-  <li>3주차에 목 서버를 따로 두지 말고 스프링에서 목 응답을 내리라는 의견을 받고, 4주차 PR 에서 목 응답으로 교체한 것을 멘토님이 확인했습니다.</li>
-  <li>9주차 공휴일 데이터는 처음에 벌크로 넣고 임시 공휴일에 대비해 주기적으로 동기화하라는 의견을 받았습니다 (<code>HolidaySync</code>, <code>docs/deployment.md</code> 7절).</li>
-</ul>
+<tr><td><a href="https://github.com/kakaotechcampus-4/ktc4-pusan-4/pull/243" target="_blank">#243</a> 13주차</td><td style="white-space:nowrap">2026-11-04</td><td>[AI] QA 때 중점적으로 볼 것(해피 케이스, 엣지 케이스와 동시성, 화면 깨짐, AI 가드레일, 성능) · [AI] 서비스 완성도를 판단하는 기준(기능 동작, 운영 모니터링, UX 엣지 케이스) · QA 체크리스트와 증적 남기는 방식</td></tr></table>
+<h2>주요 PR</h2>
+<table class="prs"><tr><th style="width:28%">PR</th><th>리뷰에서 나온 것</th><th style="width:36%">반영</th></tr>
+<tr><td><a href="https://github.com/kakaotechcampus-4/ktc4-pusan-4/pull/4" target="_blank">#4</a> 결제대행사 차단 목록과 키워드 분류 규칙</td><td><ul><li>'쿠팡 이츠'가 띄어쓰기에 따라 다른 카테고리로 분류됨</li><li>.COM, .APP 결제를 해외 SaaS 로 확정하면 위험함</li><li>지점명도 저장하자는 제안</li></ul></td><td><ul><li>원문과 정규화 키 양쪽에 매칭해 priority 가 높은 쪽 채택</li><li>도메인 결제는 확정하지 않고 힌트만 남김</li><li>지점명은 생활권 정보라 저장하지 않기로 함</li></ul></td></tr>
+<tr><td><a href="https://github.com/kakaotechcampus-4/ktc4-pusan-4/pull/25" target="_blank">#25</a> 판정 평가셋 50건과 회귀 하네스</td><td><ul><li><code>rules/categories.yaml</code> 만 바뀐 PR 에서 Backend CI 가 돌지 않음</li><li>아직 검수하지 않은 기대값이 CI 를 막음</li><li>README 와 코드의 치명 기준이 다름</li><li>반대 방향 오답(기대 가능, 실제 불가)이 치명이 아님</li></ul></td><td><ul><li>CI 경로를 <code>rules/**</code> 로 넓힘</li><li>검수 상태 대신 보류 표시를 둠</li><li>README 를 코드 기준으로 고침</li><li>반대 방향 오답도 치명으로 바꿈</li></ul></td></tr>
+<tr><td><a href="https://github.com/kakaotechcampus-4/ktc4-pusan-4/pull/42" target="_blank">#42</a> API 계약 기반 스웨거와 컨트롤러 골격</td><td><ul><li>규칙 카드에 없는 응답 필드가 있음</li><li>멘토 리뷰에서 합의한 out_of_scope 필드가 빠짐</li><li>Idempotency-Key 가 없을 때 오류 코드를 따로 둘지</li><li>명세의 enum 값을 한글로 쓰는 방식</li></ul></td><td><ul><li>응답 필드를 명세에 맞추고 <code>outOfScope</code> 추가</li><li>키 누락은 <code>IDEMPOTENCY_KEY_REQUIRED</code> 로 구분해 프론트 요청 버그가 바로 드러나게 함</li><li>한글 enum 은 회의 안건으로 넘김</li></ul></td></tr>
+<tr><td><a href="https://github.com/kakaotechcampus-4/ktc4-pusan-4/pull/56" target="_blank">#56</a> 주말과 공휴일 식대, 여비교통 기본 불가</td><td><ul><li>'소명으로 풀리는 불가'와 확인필요의 차이</li><li>주말 식비를 기본 불가로 둘지 확인필요로 둘지</li></ul></td><td><ul><li>세무사가 주말 식비를 통상 경비로 넣지 않는 점에 맞춰 기본 불가, 소명하면 가능으로 팀 합의</li><li>요일 조건이 있는 카드는 불가만 내도록 로더가 검사</li><li>공휴일과 심야 결제는 후속 이슈로 넘김</li></ul></td></tr>
+<tr><td><a href="https://github.com/kakaotechcampus-4/ktc4-pusan-4/pull/148" target="_blank">#148</a> 거래 조회와 판정 대상 포함, 제외</td><td><ul><li>판정 필터에 사용자가 제외한 거래가 섞여 요약 건수와 달라짐</li><li>동적 SQL 이 서비스 계층에 있음</li><li>연도 필터가 인덱스를 타지 못함</li></ul></td><td><ul><li>판정 대상 조건을 더해 필터 건수와 요약 건수를 맞춤</li><li>쿼리를 <code>TransactionQueryRepository</code> 로 분리</li><li>연도는 <code>approved_at</code> 범위 조건으로 바꿔 인덱스를 탐</li></ul></td></tr></table>
 `],
 ['06d-Docs', '5. 문서화 규칙', `
 <h2>어디에 무엇을 쓰나</h2>
@@ -1012,7 +1013,7 @@ const DESC = {   // 홈 카드 한 줄 설명
   '04-Branch': 'main · develop · release · feature 브랜치의 쓰임',
   '05-Commit': 'type: subject 형식과 타입 목록',
   '06b-Automation': 'PR · 리뷰 봇, 멘토 리뷰, 배치 · 장애 알림',
-  '06c-Review': '주차별 멘토 리뷰 PR 과 다룬 주제',
+  '06c-Review': '주차별 멘토 리뷰와 팀 내부 주요 PR',
   '06d-Docs': 'CONTEXT · docs · worklog · README 에 무엇을 쓰나',
   '07b-API': '리소스 구조, 공통 규칙, 엔드포인트 43개',
   '07c-DB': '테이블 소유 · 적용 순서 · 테이블 24개',
