@@ -52,3 +52,29 @@
 - ERD 그림은 주요 관계만 담아 FK 일부(user_fact → upload_batch, question_queue → user_fact, 판정 원인 FK 4개)가 빠져 있다.
 - 판정로직 · 아키텍처 페이지와 DB 스키마 페이지의 홈 카드 설명은 바꾸지 않았다.
 - 검색 결과 캡처의 사이트 이름은 아직 「Duck DNS」다.
+
+## 16:36 개발 가이드에 AI 실험 페이지 추가 (2651eb12)
+
+- 커밋: 2651eb12 (1개)
+- 주요파일: docs/site/index.html
+
+### 한 일
+
+- 기술 스택 다음에 「AI 실험」 페이지(`08b-Experiments`)를 새로 만들었다. 뒤 페이지들의 원본 번호(API 3 → 4 … 배포 9 → 10)를 하나씩 밀었고, 홈 카드 설명을 더했다.
+- 맨 위에 실험 목록 표(영역 · 실험 · 주제, 8개)와 실험 원칙 4가지(1회 결과 불신, 같은 날 대조군, 기준 먼저, 최종 결과로 판단)를 두었다.
+- 본문은 영역별로 실험마다 질문 · 비교 표 · 결정을 적었다.
+  - 규칙 카드 생성: 기본 조문 전제화(9/23), 모델 gpt-4o-mini → GPT-6 Luna(10/9), RRF vs 벡터 단독(10/16~10/26), HNSW vs 정확 스캔
+  - 가맹점 분류: 문자 n-gram 분류기 vs 임베딩(9/23), 상권정보 매칭 · 해외 결제 사전(9/28 · 10/5), Jev 1.14 vs GPT-6 Luna(10/30)
+  - 비서 Really: Luna vs Haiku 5.5(10/15), openai SDK vs LangChain(10/15), 프롬프트 인젝션(11/2)
+- 수치는 `docs/rag-eval.md`, `docs/agent-secretary.md` 7~8장, `docs/category_*.md`, `docs/merchant_matching_eval.md`, `docs/overseas_saas_eval.md`, `docs/really-prompt-injection-report.md`, `db/rag.sql` 주석과 대조했다.
+- 실험 제목은 사용자가 「○○ 비교 실험: 주제」 형식으로 고쳤고, 목록 표는 그 앞뒤를 실험 · 주제 칸으로 나눴다. 기본 조문 전제화와 상권정보 매칭 · 해외 결제 사전은 실험이 아니라 보고 목록 표에서만 뺐다.
+
+### 왜 이렇게 했나
+
+- 규모는 「대화 108턴」, 「초안 12회」처럼 무엇을 센 숫자인지 드러나게 썼다. 발표 준비 때 「108회」가 실험 횟수로 읽혀 문제가 된 적이 있다.
+
+### 남은 것 · 아는 문제
+
+- 상권정보 매칭과 해외 결제 도구 사전은 측정까지만 했고 서비스 분류 흐름에는 없다(백엔드 `ClassificationStage`, 도구 사전은 `tools/exp_overseas_saas/` 에만 있음). 페이지에도 그렇게 적었다.
+- 목록 표는 8개인데 본문 실험은 10개다(표에서 뺀 2개가 본문에 남아 있음).
+- 기술 스택 페이지 「AI 도구 선정 근거」의 LangChain 이유는 `CONTEXT.md` 12절의 옛 문구라, 실험 페이지의 측정 근거(`docs/agent-secretary.md` 7장)와 다르다.
