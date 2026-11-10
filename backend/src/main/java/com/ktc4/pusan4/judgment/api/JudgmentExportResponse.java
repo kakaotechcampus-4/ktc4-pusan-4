@@ -18,7 +18,7 @@ public record JudgmentExportResponse(
         List<JudgmentExportRow> rows, List<LimitYearTotal> limits, RuleSet rules
     ) {
         return new JudgmentExportResponse(rows.stream()
-            .map(row -> new Item(JudgmentResponse.from(row.judgment(), rules), row.allowedAmount(), row.answers()))
+            .map(row -> new Item(JudgmentResponse.from(row.judgment(), rules, row.pendingQuestion()), row.allowedAmount(), row.answers()))
             .toList(), LimitYearResponse.from(limits, rules));
     }
 

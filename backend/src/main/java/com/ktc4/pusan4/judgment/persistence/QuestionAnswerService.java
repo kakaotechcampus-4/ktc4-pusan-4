@@ -25,7 +25,8 @@ import java.util.TreeMap;
 import java.util.UUID;
 
 /**
- * 확인 질문 응답과 부분 재판정 (api.md 3.10), 일괄 응답 (api.md 3.11). 새 JudgmentRun 은 만들지 않는다.
+ * 확인 질문 응답과 부분 재판정 (api.md 3.10), 답 취소 (3.10 답 취소), 일괄 응답 (api.md 3.11).
+ * 새 JudgmentRun 은 만들지 않는다.
  */
 @Service
 public class QuestionAnswerService {
@@ -70,6 +71,8 @@ public class QuestionAnswerService {
         if (source == AnswerSource.BULK) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "요청 값이 올바르지 않습니다.");
         }
+        // 검증 전에 사용자 락을 잡는다. 락 없이 검증하면 그사이 답 취소가 이 질문을 취소해도 옛 id 로 답이 들어간다
+        limitSettlement.lockUser(userId);
         List<AnswerTarget> requested = findRequested(userId, questionIds);
         validateAnswerable(requested, value);
         AnswerTarget first = requested.getFirst();
@@ -77,6 +80,37 @@ public class QuestionAnswerService {
             first.question().factType(), value, source);
         int rejudged = rejudge(userId, List.of(answered));
         return new QuestionAnswerResult(answered.questionCount(), answered.factId(), rejudged);
+    }
+
+    /**
+     * 답 취소 (api.md 3.10 답 취소). 응답의 거울이다. 같은 Batch·groupKey·factType 의 답한 질문을 모두 PENDING 으로
+     * 돌리고, 취소를 UserFact 새 version 으로 남긴 뒤 응답이 재판정하는 거래를 같은 식으로 다시 판정한다.
+     * 재판정한 revision 은 답이 없어 같은 질문을 새로 만들고, 돌려 둔 이전 revision 의 질문은 재판정이 취소한다.
+     * 답한 질문이 없으면 아무것도 바꾸지 않는다(멱등).
+     */
+    @Transactional
+    public QuestionWithdrawResult withdraw(UUID userId, List<UUID> questionIds) {
+        // 대상을 읽기 전에 사용자 락을 잡는다. 락 없이 읽으면 그사이 들어온 응답이 답한 질문을 바꿔 놓는다(bulkAnswer 와 같다).
+        limitSettlement.lockUser(userId);
+        List<AnswerTarget> requested = findRequested(userId, questionIds);
+        validateOneGroup(requested);
+        if (requested.stream().allMatch(target -> target.question().isCanceled())) {
+            throw new ApiException(HttpStatus.CONFLICT, "QUESTION_NOT_ANSWERABLE", "취소된 질문은 답을 취소할 수 없습니다.");
+        }
+        AnswerTarget first = requested.getFirst();
+        UUID batchId = first.batchId();
+        String groupKey = first.question().groupKey();
+        String factType = first.question().factType();
+
+        List<AnswerTarget> siblings = questionRepository.findSiblings(batchId, groupKey, factType);
+        if (siblings.stream().noneMatch(sibling -> sibling.question().isAnswered())) {
+            return new QuestionWithdrawResult(0, 0);
+        }
+        UUID factId = userFactService.withdraw(userId, batchId, groupKey, factType);
+        int withdrawn = (int) siblings.stream().filter(sibling -> sibling.question().withdrawAnswer()).count();
+        int rejudged = rejudge(userId, List.of(new Answered(factId, withdrawn,
+            rejudgeTargets(batchId, groupKey, siblings), contextVersion(siblings))));
+        return new QuestionWithdrawResult(withdrawn, rejudged);
     }
 
     /**
@@ -143,15 +177,24 @@ public class QuestionAnswerService {
         OffsetDateTime now = OffsetDateTime.now(clock);
         siblings.forEach(sibling -> sibling.question().recordAnswer(factId, now));
 
+        return new Answered(factId, siblings.size(), rejudgeTargets(batchId, groupKey, siblings),
+            contextVersion(siblings));
+    }
+
+    /** 4. 재판정할 거래. 그룹 질문이 걸린 거래와, 가맹점 단위면 그 가맹점의 판정한 적 있는 판정 대상 거래. */
+    private Set<UUID> rejudgeTargets(UUID batchId, String groupKey, List<AnswerTarget> siblings) {
         Set<UUID> targets = new HashSet<>();
         siblings.forEach(sibling -> targets.add(sibling.transactionId()));
         if (groupKey.startsWith(MERCHANT_SCOPE)) {
             targets.addAll(transactionRepository.findJudgedTargetIdsByMerchant(
                 batchId, groupKey.substring(MERCHANT_SCOPE.length())));
         }
-        // 질문이 생긴 판정의 Context 로 재판정한다. 그룹 안에서 버전이 갈리면 가장 최근 것을 쓴다.
-        int contextVersion = siblings.stream().mapToInt(AnswerTarget::contextVersion).max().orElseThrow();
-        return new Answered(factId, siblings.size(), targets, contextVersion);
+        return targets;
+    }
+
+    /** 질문이 생긴 판정의 Context 로 재판정한다. 그룹 안에서 버전이 갈리면 가장 최근 것을 쓴다. */
+    private static int contextVersion(List<AnswerTarget> siblings) {
+        return siblings.stream().mapToInt(AnswerTarget::contextVersion).max().orElseThrow();
     }
 
     /**
@@ -185,6 +228,17 @@ public class QuestionAnswerService {
 
     /** 요청한 질문이 한 그룹(같은 Batch·groupKey·factType)이고, 답할 수 있고, 값을 받는지 본다. */
     private static void validateAnswerable(List<AnswerTarget> requested, String value) {
+        validateOneGroup(requested);
+        if (requested.stream().anyMatch(target -> target.question().isCanceled())) {
+            throw new ApiException(HttpStatus.CONFLICT, "QUESTION_NOT_ANSWERABLE", "취소된 질문에는 답할 수 없습니다.");
+        }
+        if (requested.stream().anyMatch(target -> !target.question().accepts(value))) {
+            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "INVALID_ANSWER_VALUE", "선택지에 없는 값입니다.");
+        }
+    }
+
+    /** 요청한 질문이 한 그룹(같은 Batch·groupKey·factType)인지 본다. 응답과 답 취소가 같이 쓴다. */
+    private static void validateOneGroup(List<AnswerTarget> requested) {
         AnswerTarget first = requested.getFirst();
         if (requested.stream().anyMatch(target -> !target.batchId().equals(first.batchId()))) {
             throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "QUESTIONS_FROM_DIFFERENT_BATCHES",
@@ -194,12 +248,6 @@ public class QuestionAnswerService {
             !target.question().groupKey().equals(first.question().groupKey())
                 || !target.question().factType().equals(first.question().factType()))) {
             throw new ApiException(HttpStatus.CONFLICT, "QUESTION_GROUP_MISMATCH", "서로 다른 질문을 함께 답할 수 없습니다.");
-        }
-        if (requested.stream().anyMatch(target -> target.question().isCanceled())) {
-            throw new ApiException(HttpStatus.CONFLICT, "QUESTION_NOT_ANSWERABLE", "취소된 질문에는 답할 수 없습니다.");
-        }
-        if (requested.stream().anyMatch(target -> !target.question().accepts(value))) {
-            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "INVALID_ANSWER_VALUE", "선택지에 없는 값입니다.");
         }
     }
 

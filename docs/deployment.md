@@ -377,6 +377,7 @@ curl -sI https://<도메인>/ | grep -i strict-transport           # max-age=315
 
 - 구글 서치콘솔: 도메인 속성. DuckDNS의 TXT 레코드에 `google-site-verification=…` 값을 넣었다. DuckDNS는 도메인마다 TXT를 하나만 두므로, 다른 용도로 TXT를 갱신하면 이 값이 사라진다.
 - Bing 웹마스터 도구: 서치콘솔에서 가져와 등록했다. 서치콘솔 확인이 풀리면 같이 풀린다.
+- Bing IndexNow: 키 파일 `frontend/public/51bba25716dd4d159a71f6d2d98eb948.txt`. 빌드하면 `https://<도메인>/51bba25716dd4d159a71f6d2d98eb948.txt`로 나가고, 내용은 파일 이름과 같은 키 한 줄이다. 지우거나 내용을 바꾸면 IndexNow 제출이 거부된다.
 - 네이버 서치어드바이저: `frontend/index.html`의 `naver-site-verification` 메타 태그. 프리렌더가 이 파일을 틀로 쓰므로 공개 페이지마다 들어간다.
 - 사이트맵은 세 곳 모두 `https://<도메인>/sitemap.xml`로 제출한다.
 

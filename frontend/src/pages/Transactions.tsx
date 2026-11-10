@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
-import { ChevronDownIcon, SearchXIcon } from 'lucide-react';
+import { ChevronDownIcon, MinusIcon, PlusIcon, SearchXIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { api, ApiRequestError, useApi } from '../api';
 import { useSession } from '../contexts/SessionContext';
 import { categoryLabel, merchantTitle } from '../components/results/display';
+import { ExcludeConfirm } from '../components/results/ExcludeConfirm';
 import {
   Badge,
   Button,
   Empty,
   FilterBar,
+  IconButton,
   Pagination,
   Table,
   type Column } from
@@ -81,6 +83,9 @@ export function Transactions() {
   const [page, setPage] = useState(0);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** 빼기 전에 묻는 거래(11/8 회의). 빼지 못한 까닭은 그 창 안에 보인다 */
+  const [excluding, setExcluding] = useState<Transaction | null>(null);
+  const [excludeError, setExcludeError] = useState<string | null>(null);
   // 포함 API 는 다시 판정하지 않는다(#135). 제외는 현재 결과에서 바로 빠지지만, 다시 넣은 거래는
   // 새 판정을 돌리기 전까지 판정이 없거나 옛 답으로 낸 판정이 남는다.
   // 미분류 거래는 판정에 넘기지 않으므로 분류 확인이 먼저다. 다시 넣으면 서버가 분류 확인 항목을 만든다(#148)
@@ -149,8 +154,10 @@ export function Transactions() {
 
   const change = async (row: Transaction, next: 'INCLUDED' | 'EXCLUDED') => {
     if (busyId) return;
+    const report = next === 'EXCLUDED' ? setExcludeError : setError;
     setBusyId(row.id);
     setError(null);
+    setExcludeError(null);
     try {
       if (next === 'INCLUDED') await api.transactions.include(row.id);else
       await api.transactions.exclude(row.id);
@@ -158,10 +165,11 @@ export function Transactions() {
       setRerunNeeded((prev) =>
       prev === 'classify' || row.classificationStatus.code !== 'CLASSIFIED' ? 'classify' : 'run'
       );
+      if (next === 'EXCLUDED') setExcluding(null);
       listQ.reload();
       countsQ.reload();
     } catch (caught) {
-      setError(
+      report(
         caught instanceof ApiRequestError ?
         caught.message :
         '상태를 바꾸지 못했습니다. 잠시 후 다시 시도해 주세요.'
@@ -185,17 +193,21 @@ export function Transactions() {
       <span className="inline-flex flex-row-reverse items-center gap-3 sm:flex-row">
         {row.effectiveStatus.code !== 'JUDGEABLE' && <Badge>{row.effectiveStatus.label}</Badge>}
         {canceled ?
-        <span aria-hidden="true" className="hidden w-[6.5rem] sm:block" /> :
+        <span aria-hidden="true" className="hidden w-9 sm:block" /> :
 
-        <Button
+        <IconButton
           variant="secondary"
-          size="sm"
-          className="w-[6.5rem] px-0"
-          disabled={busyId === row.id}
-          onClick={() => void change(row, excluded ? 'INCLUDED' : 'EXCLUDED')}>
-
-            {excluded ? '다시 넣기' : '빼기'}
-          </Button>
+          icon={excluded ? PlusIcon : MinusIcon}
+          label={`${merchantTitle(row)} ${excluded ? '판정 대상에 다시 넣기' : '판정 대상에서 빼기'}`}
+          busy={busyId === row.id}
+          onClick={() => {
+            if (excluded) {
+              void change(row, 'INCLUDED');
+              return;
+            }
+            setExcludeError(null);
+            setExcluding(row);
+          }} />
         }
       </span>);
 
@@ -419,6 +431,16 @@ export function Transactions() {
 
         }
       </div>
+
+      <ExcludeConfirm
+        transaction={excluding}
+        busy={excluding !== null && busyId === excluding.id}
+        error={excludeError}
+        onConfirm={() => {
+          if (excluding) void change(excluding, 'EXCLUDED');
+        }}
+        onClose={() => setExcluding(null)} />
+
     </AppShell>);
 
 }

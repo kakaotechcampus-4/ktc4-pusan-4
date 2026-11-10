@@ -21,7 +21,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
 /**
- * 같은 batch 에는 진행 중인 run 이 하나만 있을 수 있다(#191·#187, api.md 3.6).
+ * 한 사용자에게는 진행 중인 run 이 하나만 있을 수 있다(#191·#187, api.md 3.6).
+ * 같은 파일을 다시 올리면 batch 가 달라지므로 batch 가 아니라 사용자로 센다.
  * 판정 실행기를 목으로 두어 만든 run 이 QUEUED 로 남게 한다.
  */
 @SpringBootTest
@@ -66,6 +67,63 @@ class JudgmentRunActiveConflictIntegrationTest {
         assertThat(conflict.getStatus()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(conflict.getCode()).isEqualTo("RUN_ALREADY_ACTIVE");
         assertThat(conflict.getRunId()).isEqualTo(active.id().toString());
+    }
+
+    @Test
+    void active_run_on_another_batch_of_the_same_user_is_a_conflict() {
+        // given: 같은 파일을 다시 올려 batch 가 새로 생긴 경우
+        JudgmentRun active = runService.create(userId, batchId, contextId);
+        UUID reupload = insertBatch(userId);
+        insertTransaction(userId, reupload);
+
+        // when
+        ApiException conflict = catchThrowableOfType(ApiException.class,
+            () -> runService.create(userId, reupload, contextId));
+
+        // then
+        assertThat(conflict.getCode()).isEqualTo("RUN_ALREADY_ACTIVE");
+        assertThat(conflict.getRunId()).isEqualTo(active.id().toString());
+    }
+
+    @Test
+    void active_run_of_another_user_does_not_block() {
+        // given
+        runService.create(userId, batchId, contextId);
+        UUID other = insertUser();
+        UUID otherBatch = insertBatch(other);
+        UUID otherContext = insertContext(other);
+        insertTransaction(other, otherBatch);
+
+        // when
+        JudgmentRun otherRun = runService.create(other, otherBatch, otherContext);
+
+        // then
+        assertThat(otherRun.batchId()).isEqualTo(otherBatch);
+    }
+
+    @Test
+    void active_returns_the_running_run_of_the_user_only() {
+        // given
+        JudgmentRun active = runService.create(userId, batchId, contextId);
+
+        // when, then: 화면이 이 id 로 진행 화면(/run/{runId})에 돌아간다
+        assertThat(runService.active(userId)).map(JudgmentRun::id).contains(active.id());
+        assertThat(runService.active(insertUser())).isEmpty();
+    }
+
+    @Test
+    void active_is_empty_once_the_run_finishes_or_goes_stale() {
+        // given
+        JudgmentRun finished = runService.create(userId, batchId, contextId);
+        jdbcTemplate.update("update judgment_run set status = 'COMPLETED' where id = ?", finished.id());
+        assertThat(runService.active(userId)).isEmpty();
+
+        JudgmentRun stale = runService.create(userId, batchId, contextId);
+        jdbcTemplate.update("update judgment_run set last_progress_at = now() - interval '6 minutes' where id = ?",
+            stale.id());
+
+        // when, then: 409 와 같은 기준으로 멈춘 run 은 진행 중이 아니다
+        assertThat(runService.active(userId)).isEmpty();
     }
 
     @Test

@@ -353,10 +353,20 @@ const labelOf = (account: string) => ACCOUNT_LABELS[account] ?? account;
 /** 목업 한도. 서버는 최신 문진의 직전연도 수입금액으로 계산한다(api.md 3.7 limitAmount 예시 값) */
 const MOCK_LIMIT_AMOUNT = 12_090_000;
 
-/** 판정에 거래 요약과 계정과목 화면 이름을 붙인다. 판정 당시가 아니라 응답 시점의 거래 값이다 (3.4 거래 요약) */
+/**
+ * 판정에 거래 요약과 계정과목 화면 이름, 답변 대기 표지를 붙인다. 판정 당시가 아니라 응답 시점의 거래 값이다 (3.4 거래 요약).
+ * 답변 대기는 불가인데 그 거래에 답하지 않은 질문이 남은 것이다 (3.7 awaitingAnswer)
+ */
 const withTransaction = (j: JudgmentSeed): Judgment | null => {
   const t = transactionOf(j.transactionId);
-  return t ? { ...j, accountLabel: j.account && labelOf(j.account), transaction: summaryOf(t) } : null;
+  return t ?
+  {
+    ...j,
+    accountLabel: j.account && labelOf(j.account),
+    awaitingAnswer: j.verdict.code === 'UNAVAILABLE' && hasPendingQuestion(j.transactionId),
+    transaction: summaryOf(t)
+  } :
+  null;
 };
 
 /** §5 판정 대상: 판정대상이면서 분류가 끝난 거래 */
@@ -514,6 +524,10 @@ filter((g) => g.pairs.length > 0);
 
 const isAnswered = (g: LiveGroup) => store.answers.has(g.seed.groupKey);
 
+/** 답하지 않은 질문이 남은 거래인지. 질문 목록처럼 판정 대상인 거래만 본다 */
+const hasPendingQuestion = (transactionId: string) =>
+visibleGroups().some((g) => !isAnswered(g) && g.pairs.some((p) => p.transaction.id === transactionId));
+
 /**
  * 소명 대기 (3.11). Override 를 뺀 최신 자동 판정이 불가인데 PENDING 질문이 남은 거래.
  * 현재 결과가 아니라 자동 판정을 본다 — Override 를 해제하면 자동 판정이 다시 현재 결과가 된다
@@ -627,6 +641,10 @@ transactionId?: string)
 
 const notFound = (code: string, message: string) =>
 Promise.reject(new ApiRequestError(404, code, message, nextId('mock-trace')));
+
+/** 진행 중인 실행. 체험 화면은 한 사용자라 전부에서 찾는다. 가장 새것을 준다 */
+const activeRun = () =>
+[...store.runs.values()].filter((r) => r.status.code === 'QUEUED' || r.status.code === 'RUNNING').at(-1) ?? null;
 
 /** 승인·기각. 검토한 사람과 시각을 남긴다. 이미 처리한 후보는 다시 바꾸지 않는다 */
 const reviewCandidate = (id: number, status: RuleCandidate['status']) => {
@@ -1056,6 +1074,12 @@ const mockGroups: Api = {
       return notFound('BATCH_NOT_FOUND', '업로드를 찾을 수 없습니다.');
       const context = store.contexts.find((c) => c.id === contextId);
       if (!context) return notFound('CONTEXT_NOT_FOUND', '사업자 문진을 찾을 수 없습니다.');
+      // 진행 중인 실행이 있으면 업로드와 상관없이 막는다 (api.md 3.6)
+      const active = activeRun();
+      if (active)
+      return Promise.reject(
+        new ApiRequestError(409, 'RUN_ALREADY_ACTIVE', '이미 판정 중인 업로드가 있습니다. 끝난 뒤 다시 실행해 주세요.', '', undefined, active.id)
+      );
       // 판정 대상은 JUDGEABLE 이면서 분류가 끝난 거래다. 미분류는 엔진에 넘기지 않는다(api.md 3.3)
       const judgeable = (t: Transaction) =>
       t.batchId === batchId &&
@@ -1132,6 +1156,10 @@ const mockGroups: Api = {
       }
       return delay({ ...run });
     },
+    active: () => {
+      const run = activeRun();
+      return delay(run ? { ...run } : null);
+    },
     failures: (runId, q) => {
       const run = store.runs.get(runId);
       if (!run) return notFound('JUDGMENT_RUN_NOT_FOUND', '판정 실행을 찾을 수 없습니다.');
@@ -1170,16 +1198,37 @@ const mockGroups: Api = {
         return true;
       });
 
-      const by: Record<Verdict, { count: number; finalAmount: number }> = {
-        AVAILABLE: { count: 0, finalAmount: 0 },
-        UNAVAILABLE: { count: 0, finalAmount: 0 },
-        NEEDS_REVIEW: { count: 0, finalAmount: 0 }
+      const by: Record<Verdict, { count: number; finalAmount: number; spendAmount: number }> = {
+        AVAILABLE: { count: 0, finalAmount: 0, spendAmount: 0 },
+        UNAVAILABLE: { count: 0, finalAmount: 0, spendAmount: 0 },
+        NEEDS_REVIEW: { count: 0, finalAmount: 0, spendAmount: 0 }
       };
+      const awaiting = { count: 0, spendAmount: 0 };
+      const overridden: Record<Verdict, { count: number; finalAmount: number; spendAmount: number }> = {
+        AVAILABLE: { count: 0, finalAmount: 0, spendAmount: 0 },
+        UNAVAILABLE: { count: 0, finalAmount: 0, spendAmount: 0 },
+        NEEDS_REVIEW: { count: 0, finalAmount: 0, spendAmount: 0 }
+      };
+      const years = new Map<number, number>();
       const accounts = new Map<string, { count: number; finalAmount: number }>();
       for (const j of rows) {
         const slot = by[j.verdict.code];
+        const spend = transactionOf(j.transactionId)?.amount ?? 0;
         slot.count += 1;
         slot.finalAmount += j.finalAmount ?? 0;
+        slot.spendAmount += spend;
+        if (j.verdict.code === 'UNAVAILABLE' && hasPendingQuestion(j.transactionId)) {
+          awaiting.count += 1;
+          awaiting.spendAmount += spend;
+        }
+        if (j.origin.type === 'OVERRIDE') {
+          const changed = overridden[j.verdict.code];
+          changed.count += 1;
+          changed.finalAmount += j.finalAmount ?? 0;
+          changed.spendAmount += spend;
+        }
+        const year = Number(transactionOf(j.transactionId)?.approvedAt.slice(0, 4));
+        years.set(year, (years.get(year) ?? 0) + (j.verdict.code === 'AVAILABLE' ? j.finalAmount ?? 0 : 0));
         if (j.verdict.code !== 'AVAILABLE' || !j.account) continue;
         const acc = accounts.get(j.account) ?? { count: 0, finalAmount: 0 };
         acc.count += 1;
@@ -1195,7 +1244,10 @@ const mockGroups: Api = {
         map(([account, v]) => ({ account, accountLabel: labelOf(account), ...v })).
         sort((a, b) => b.finalAmount - a.finalAmount || a.account.localeCompare(b.account)),
         // 과거 Run 범위는 그 시점 한도가 남아 있지 않아 빈 배열이다 (api.md 3.7)
-        limits: scope.runId ? [] : limitsFor(rows)
+        limits: scope.runId ? [] : limitsFor(rows),
+        awaiting,
+        overridden,
+        byYear: [...years].sort(([a], [b]) => a - b).map(([year, finalAmount]) => ({ year, finalAmount }))
       });
     },
     list: (q) => {
@@ -1225,7 +1277,12 @@ const mockGroups: Api = {
       const out = items.
       map(withTransaction).
       filter((j): j is Judgment => j !== null).
-      sort((a, b) => b.computedAt.localeCompare(a.computedAt) || b.id.localeCompare(a.id));
+      filter((j) => q?.awaiting === undefined || j.awaitingAnswer === q.awaiting).
+      sort((a, b) =>
+      (q?.sort === 'APPROVED_AT' ?
+      b.transaction.approvedAt.localeCompare(a.transaction.approvedAt) :
+      b.computedAt.localeCompare(a.computedAt)) || b.id.localeCompare(a.id)
+      );
       return delay(paginate(out, q?.page, q?.size ?? 20));
     },
     get: (id) => {
@@ -1294,7 +1351,12 @@ const mockGroups: Api = {
         judgmentId: next.id,
         active: true
       });
-      return delay({ ...next, accountLabel: next.account && labelOf(next.account), transaction: summaryOf(t) });
+      return delay({
+        ...next,
+        accountLabel: next.account && labelOf(next.account),
+        awaitingAnswer: next.verdict.code === 'UNAVAILABLE' && hasPendingQuestion(next.transactionId),
+        transaction: summaryOf(t)
+      });
     },
     removeOverride: (overrideId) => {
       const found = store.overrides.get(overrideId);
@@ -1384,6 +1446,39 @@ const mockGroups: Api = {
         factId: factIdOf(groupKey),
         rejudgedTransactionCount: rejudged.length
       });
+    },
+    withdraw: ({ questionIds }) => {
+      if (questionIds.length === 0)
+      return Promise.reject(new ApiRequestError(400, 'VALIDATION_ERROR', '거둘 질문을 보내야 합니다.'));
+      const groups = liveGroups();
+      const owners = questionIds.map((id) => groups.find((g) => g.pairs.some((p) => p.questionId === id)));
+      const group = owners[0];
+      if (!group || owners.some((g) => g === undefined))
+      return notFound('QUESTION_NOT_FOUND', '질문을 찾을 수 없습니다.');
+      const { groupKey } = group.seed;
+      // 이미 대기면 바꿀 것이 없다
+      if (!store.answers.has(groupKey)) return delay({ withdrawnCount: 0, rejudgedTransactionCount: 0 });
+      store.answers.delete(groupKey);
+      // 답하기 전처럼 확인 필요로 다시 판정한다. 답할 때와 같은 거래만 다시 판정한다
+      const rejudged = group.pairs.
+      map((p) => p.transaction).
+      filter((t) => isJudgeable(t) && automaticOf(t.id) !== undefined);
+      rejudged.forEach((t) => {
+        const prev = automaticOf(t.id);
+        if (!prev) return;
+        store.judgments.push({
+          ...prev,
+          id: nextId('0199f1c3'),
+          revision: latestOf(t.id).revision + 1,
+          origin: { type: 'USER_FACT', id: factIdOf(groupKey) },
+          verdict: { code: 'NEEDS_REVIEW', label: LABEL.NEEDS_REVIEW },
+          account: null,
+          finalAmount: null,
+          explanation: null,
+          computedAt: now()
+        });
+      });
+      return delay({ withdrawnCount: group.pairs.length, rejudgedTransactionCount: rejudged.length });
     },
     suggestions: (batchId) => delay({ items: suggestionsIn(batchId) }),
     bulkAnswer: ({ batchId, factType, answer }) => {

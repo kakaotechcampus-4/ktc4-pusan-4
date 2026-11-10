@@ -55,12 +55,25 @@ public class UserFactPersistenceService {
         return factId;
     }
 
+    /**
+     * 답을 취소한다. 지난 답은 그대로 두고 취소를 새 version 으로 쌓는다. 이후 판정은 이 답이 없는 것으로 본다
+     * (findAllLatest). 돌려주는 id 는 재판정 revision 의 origin 이 된다.
+     */
+    @Transactional
+    public UUID withdraw(UUID userId, UUID batchId, String scopeKey, String factType) {
+        UUID factId = uuidGenerator.generate();
+        userFactRepository.save(UserFactEntity.withdrawal(
+            factId, userId, batchId, scopeKey, factType, nextVersion(userId, batchId, scopeKey, factType)));
+        return factId;
+    }
+
     @Transactional(readOnly = true)
     public Optional<UserFact> findLatest(UUID userId, UUID batchId, String scopeKey, String factType) {
         return userFactRepository
             .findFirstByUserIdAndBatchIdAndScopeKeyAndFactTypeOrderByVersionDesc(
                 userId, batchId, scopeKey, factType
             )
+            .filter(fact -> !fact.withdrawn())
             .map(UserFactEntity::toDomain);
     }
 

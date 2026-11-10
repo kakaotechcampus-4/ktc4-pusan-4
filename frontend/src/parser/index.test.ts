@@ -218,6 +218,27 @@ describe('parseCardBytes — IBK 샘플', () => {
   });
 });
 
+describe('parseCardBytes — 시연 샘플 (demo)', () => {
+  // 실서버 판정 분포(가능 · 확인필요 · 불가)는 samples.ts 주석에 적었다. 여기서는 파서가 지키는 몫만 본다
+  const statusCounts = async (bytes: ArrayBuffer) => {
+    const outcome = await parseCardBytes(bytes);
+    if (outcome.kind !== 'parsed' || !outcome.request) throw new Error('시연 샘플을 읽지 못했다');
+    const counts: Record<string, number> = {};
+    for (const t of outcome.request.transactions) counts[t.status] = (counts[t.status] ?? 0) + 1;
+    return { counts, unsendable: outcome.unsendable.length };
+  };
+
+  it('KB 54행: 판정대상 52 · 취소상계 2, 보내지 못하는 행 없음', async () => {
+    expect(await statusCounts(await buildKbXls('demo'))).toEqual({
+      counts: { JUDGEABLE: 52, CANCELED_OFFSET: 2 }, unsendable: 0 });
+  });
+
+  it('IBK 70행: 판정대상 67 · 취소상계 2 · 대상제외 1, 보내지 못하는 행 없음', async () => {
+    expect(await statusCounts(utf8(buildIbkHtml('demo')))).toEqual({
+      counts: { JUDGEABLE: 67, CANCELED_OFFSET: 2, EXCLUDED: 1 }, unsendable: 0 });
+  });
+});
+
 describe('parseCardBytes — 읽을 수 없는 입력', () => {
   it('PK(xlsx) 바이트는 UNKNOWN_FORMAT 으로 막는다', async () => {
     const pk = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x14, 0x00]).buffer;

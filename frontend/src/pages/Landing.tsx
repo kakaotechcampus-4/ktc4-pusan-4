@@ -13,10 +13,7 @@ import { ExampleCarousel } from '../components/ExampleCarousel';
 import {
   FLOW_STEPS,
   NOT_DOING,
-  RULE_CARD_COUNT,
-  STATS,
-  SYSTEM_FEATURES,
-  VERDICTS } from
+  SYSTEM_FEATURES } from
 '../mock/marketing';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { PAGES } from '../seo';
@@ -136,76 +133,25 @@ export function Landing() {
       <MarketingHeader />
 
       <main id={MAIN_ID} tabIndex={-1} className="outline-none">
-        {/* 큰 패널 + 오른쪽 세로 띠 (레퍼런스 section_visual: 1094 / 206, 사이 16) */}
+        {/* 히어로가 본문 폭을 다 쓴다. 오른쪽 띠(규칙 카드 수 · 판정 세 갈래)는 뺐다 */}
         <section className={`${SHELL} pt-10`}>
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_206px]">
-            <div className="relative">
-              <HeroBanner autoplay={!intro} />
-
-              {/*
-                왼쪽 아래 모서리를 베어 낸 자리가 그대로 버튼이다.
-                전에는 그 자리를 바탕색(흰색)으로 채우고 글자만 뒀는데, 페이지 바탕과 같은 색이라
-                판이 패인 것으로 읽히고 누를 것으로 안 보였다. 흰 자리에 알약을 또 넣으면
-                판·흰 상자·알약 세 겹이 된다 — 베어 낸 자리를 통째로 칠한다 (#254 리뷰).
-                왼쪽 아래는 판과 같은 20px 으로 깎는다. 각지면 판의 둥근 모서리를 덮어 혼자 튄다
-              */}
-              <Link
-                to={startTo}
-                className="absolute bottom-0 left-0 flex h-[76px] items-center gap-3 rounded-bl-[20px] rounded-tr-[20px] bg-ink pl-7 pr-6 text-ir-lead font-normal tracking-ir-xs text-white transition-colors duration-150 ease-snap hover:bg-ink2">
-
-                {signedIn ? '카드내역 올리기' : '무료로 판정해보기'}
-                <ArrowDot invert />
-              </Link>
-            </div>
+          <div className="relative">
+            <HeroBanner autoplay={!intro} />
 
             {/*
-              첫 장은 남색에 큰 숫자, 아래로 회색 (레퍼런스 wrap_banner).
-              로그인 전에는 보여 줄 실제 판정 결과가 없다. 지어낸 금액·건수 대신
-              세어서 확인되는 것(규칙 카드 수)과 제품이 하는 일만 둔다
+              왼쪽 아래 모서리를 베어 낸 자리가 그대로 버튼이다.
+              전에는 그 자리를 바탕색(흰색)으로 채우고 글자만 뒀는데, 페이지 바탕과 같은 색이라
+              판이 패인 것으로 읽히고 누를 것으로 안 보였다. 흰 자리에 알약을 또 넣으면
+              판·흰 상자·알약 세 겹이 된다 — 베어 낸 자리를 통째로 칠한다 (#254 리뷰).
+              왼쪽 아래는 판과 같은 20px 으로 깎는다. 각지면 판의 둥근 모서리를 덮어 혼자 튄다
             */}
-            <div className="flex flex-col gap-2">
-              <div className="rounded-2xl bg-surface2 p-5 text-white">
-                <p className="text-caption text-white">조문을 읽고 만든 규칙 카드</p>
-                <p className="mt-2 whitespace-nowrap text-ir-num font-bold tracking-ir-sm tabular-nums">
-                  {RULE_CARD_COUNT}
-                  <span className="ml-0.5 text-body font-normal">장</span>
-                </p>
-                <p className="mt-2 text-caption leading-5 text-white [word-break:keep-all]">
-                  판정마다 어느 카드가 걸렸는지 함께 보여줍니다
-                </p>
-              </div>
+            <Link
+              to={startTo}
+              className="absolute bottom-0 left-0 flex h-[76px] items-center gap-3 rounded-bl-[20px] rounded-tr-[20px] bg-ink pl-7 pr-6 text-ir-lead font-normal tracking-ir-xs text-white transition-colors duration-150 ease-snap hover:bg-ink2">
 
-              <div className="rounded-2xl bg-surface p-5">
-                <p className="text-caption text-muted">판정 세 갈래</p>
-                <ul className="mt-4 space-y-3.5">
-                  {VERDICTS.map((item) =>
-                  <li key={item.label}>
-                      <div className="flex items-center gap-1.5 text-small">
-                        <span
-                        className={`h-1.5 w-1.5 shrink-0 rounded-full ${item.bar}`}
-                        aria-hidden="true" />
-
-                        <span className="font-bold text-ink">{item.label}</span>
-                      </div>
-                      <p className="mt-1 text-caption leading-5 text-ink2 [word-break:keep-all]">
-                        {item.body}
-                      </p>
-                    </li>
-                  )}
-                </ul>
-              </div>
-
-              <div className="flex-1 rounded-2xl bg-surface p-5">
-                <p className="text-caption text-muted">되돌릴 수 없는 동작</p>
-                <p className="mt-2 text-h4 font-bold tracking-ir-sm text-ink">
-                  만들지 않습니다
-                </p>
-                <p className="mt-2 text-small leading-6 text-ink2 [word-break:keep-all]">
-                  신고, 제출, 발송은 하지 않습니다. 답을 고치면 그 자리에서 다시
-                  판정합니다.
-                </p>
-              </div>
-            </div>
+              {signedIn ? '카드내역 올리기' : '무료로 판정해보기'}
+              <ArrowDot invert />
+            </Link>
           </div>
         </section>
 
@@ -261,44 +207,17 @@ export function Landing() {
             )}
           </ul>
 
-          <div className="mt-10 flex justify-center">
-            <Link
-              to={startTo}
-              className="inline-flex h-[79px] items-center gap-4 rounded-full bg-surface px-10 text-ir-lead font-normal tracking-ir-xs text-ink transition-colors hover:bg-accent-line">
-
-              판정 흐름 전체보기
-              <ArrowDot />
-            </Link>
-          </div>
         </section>
 
         {/* 지출 예시 — 가로로 넘겨 본다 */}
         <section className={`${SHELL} pt-28`}>
           <IrHeading>이런 지출을 이렇게 봅니다</IrHeading>
           <p className="mt-5 max-w-xl text-body-lg text-ink2 [word-break:keep-all]">
-            1인 개발 사업자가 자주 쓰는 항목입니다. 같은 지출도 상황에 따라
-            결과가 달라집니다.
+            1인 개발 사업자가 자주 쓰는 항목입니다.
           </p>
           <div className="mt-10">
             <ExampleCarousel />
           </div>
-        </section>
-
-        {/* 숫자 줄 — 위아래 괘선만 */}
-        <section id="evidence" className="mt-28 border-y border-line">
-          <dl className={`${SHELL} grid grid-cols-2 gap-10 py-16 md:grid-cols-3`}>
-            {STATS.map((stat) =>
-            <div key={stat.label}>
-                <dt className="sr-only">{stat.label}</dt>
-                <dd>
-                  <p className="text-h3 font-bold tracking-ir tabular-nums text-ink lg:text-ir-panel">
-                    {stat.value}
-                  </p>
-                  <p className="mt-2.5 text-small text-muted">{stat.label}</p>
-                </dd>
-              </div>
-            )}
-          </dl>
         </section>
 
         {/* 지키는 것 — 회색 패널 3장 */}

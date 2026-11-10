@@ -36,6 +36,8 @@ import type {
   QuestionPage,
   UnresolvedPage,
   QuestionResponseRequest,
+  QuestionWithdrawRequest,
+  QuestionWithdrawResult,
   QuestionResponseResult,
   QuestionStatus,
   QuestionSuggestion,
@@ -83,6 +85,10 @@ export interface JudgmentQuery extends PageQuery {
   verdict?: Verdict;
   /** 기본 true(현재 판정만). transactionId 와 false 로 쓰면 revision 이력 전체. runId 와 함께 쓰지 않는다 */
   latestOnly?: boolean;
+  /** true 면 답변 대기만, false 면 답변 대기를 뺀다. 없으면 거르지 않는다 */
+  awaiting?: boolean;
+  /** 기본 COMPUTED_AT(판정한 시각 최근 순). APPROVED_AT 은 승인일 최근 순 */
+  sort?: 'COMPUTED_AT' | 'APPROVED_AT';
 }
 
 /** batchId · year 중 정확히 하나. 0개거나 2개면 400 INVALID_EXPORT_SCOPE */
@@ -190,6 +196,11 @@ export interface Api {
   runs: {
     create(body: {batchId: string;contextId: string;}): Promise<JudgmentRunCreated>;
     get(runId: string): Promise<JudgmentRun>;
+    /**
+     * 이 사용자의 진행 중인(QUEUED, RUNNING) 실행. 없으면 null(204).
+     * 진행 화면을 떠났다가 돌아오거나, 판정 시작을 막을 때 쓴다
+     */
+    active(): Promise<JudgmentRun | null>;
     /** 기술적 실패만. NEEDS_REVIEW 는 여기 오지 않는다 */
     failures(runId: string, query?: PageQuery): Promise<Page<JudgmentRunFailure>>;
   };
@@ -219,6 +230,8 @@ export interface Api {
     list(query?: QuestionQuery): Promise<QuestionPage<Question>>;
     grouped(query?: QuestionQuery): Promise<QuestionPage<QuestionGroup>>;
     respond(body: QuestionResponseRequest): Promise<QuestionResponseResult>;
+    /** 한 답을 거둔다. 같은 그룹의 질문이 다시 대기가 되고 그 거래를 다시 판정한다 */
+    withdraw(body: QuestionWithdrawRequest): Promise<QuestionWithdrawResult>;
     /** 남은 꼬리 질문을 factType 단위로 한 번에 닫는다 */
     bulkAnswer(body: BulkAnswerRequest): Promise<BulkAnswerResult>;
     /** 다른 업로드에서 같은 질문에 한 답 (명세 3.1, api.md GET /questions/suggestions) */

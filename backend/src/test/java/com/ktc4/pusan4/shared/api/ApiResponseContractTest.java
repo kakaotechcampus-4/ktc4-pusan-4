@@ -20,6 +20,7 @@ import com.ktc4.pusan4.judgment.domain.JudgmentSummary;
 import com.ktc4.pusan4.judgment.domain.LimitYearTotal;
 import com.ktc4.pusan4.judgment.domain.PendingTotal;
 import com.ktc4.pusan4.judgment.domain.Question;
+import com.ktc4.pusan4.judgment.domain.QuestionGroup;
 import com.ktc4.pusan4.judgment.domain.QuestionStatus;
 import com.ktc4.pusan4.judgment.domain.RuleCandidate;
 import com.ktc4.pusan4.judgment.domain.RuleCandidateStatus;
@@ -32,6 +33,7 @@ import com.ktc4.pusan4.judgment.persistence.JudgmentOverrideService;
 import com.ktc4.pusan4.judgment.persistence.JudgmentQueryService;
 import com.ktc4.pusan4.judgment.persistence.JudgmentRunService;
 import com.ktc4.pusan4.judgment.persistence.QuestionAnswerResult;
+import com.ktc4.pusan4.judgment.persistence.QuestionWithdrawResult;
 import com.ktc4.pusan4.judgment.persistence.QuestionAnswerService;
 import com.ktc4.pusan4.judgment.persistence.QuestionQueryService;
 import com.ktc4.pusan4.judgment.persistence.QuestionSuggestionService;
@@ -229,19 +231,25 @@ class ApiResponseContractTest {
         given(overrideService.override(any(), any(), any(), any())).willReturn(UUID.fromString(ID));
         given(judgmentQueryService.list(any(), any(), anyInt(), anyInt())).willReturn(new PageImpl<>(List.of(judgment)));
         given(judgmentQueryService.summary(any(), any(), any(), any())).willReturn(JudgmentSummary.of(List.of(
-            new JudgmentSummary.Row(Verdict.AVAILABLE, "소모품비", 12_800L))));
+            new JudgmentSummary.Row(Verdict.AVAILABLE, "소모품비", 12_800L, 0L, false, 2026, false))));
         given(judgmentQueryService.export(any(), any(), any())).willReturn(List.of(new JudgmentExportRow(judgment,
-            0L, List.of(new JudgmentExportRow.Answer("용도가 무엇인가요?", "혼용")))));
+            0L, List.of(new JudgmentExportRow.Answer("용도가 무엇인가요?", "혼용")), false)));
         HandoffNote note = new HandoffNote(UUID.fromString(ID), "휴대폰 요금의 업무 비중은?", List.of(UUID.fromString(ID)),
             OffsetDateTime.parse("2026-11-01T14:05:00+09:00"));
         given(handoffNoteService.list(any())).willReturn(List.of(note));
         given(handoffNoteService.create(any(), any(), any())).willReturn(note);
 
-        given(questionQueryService.find(any(), any(), any())).willReturn(List.of(new Question(UUID.fromString(ID),
+        Question question = new Question(UUID.fromString(ID),
             UUID.fromString(ID), UUID.fromString(ID), "merchant:스타벅스", "용도", "용도가 무엇인가요?",
             List.of("사업", "개인", "혼용"), QuestionStatus.PENDING, null, null,
             OffsetDateTime.parse("2026-09-12T14:05:30+09:00"), null, judgment.transaction(), false, false,
-            "CAFE_PURPOSE")));
+            "CAFE_PURPOSE");
+        given(questionQueryService.find(any(), any(), any())).willReturn(List.of(question));
+        given(questionQueryService.page(any(), any(), any(), any(), anyInt(), anyInt()))
+            .willReturn(new PageImpl<>(List.of(question)));
+        given(questionQueryService.unresolved(any(), any(), any())).willReturn(new PendingTotal(1, 11_000L));
+        given(questionQueryService.groupPage(any(), any(), any(), any(), anyInt(), anyInt()))
+            .willReturn(new PageImpl<>(QuestionGroup.group(List.of(question))));
         given(assistantRelayService.chat(any(), any(), any()))
             .willReturn(new ChatResponse("판정 근거를 확인했습니다.", List.of(), "trace-1"));
         given(progressService.progress(any(), any())).willReturn(new ProgressService.Progress(
@@ -251,6 +259,7 @@ class ApiResponseContractTest {
             new PendingTotal(9, 1_038_100), 2, NextStep.QUESTIONS));
         given(questionAnswerService.answer(any(), any(), any(), any()))
             .willReturn(new QuestionAnswerResult(1, UUID.fromString(ID), 1));
+        given(questionAnswerService.withdraw(any(), any())).willReturn(new QuestionWithdrawResult(1, 1));
         given(questionAnswerService.bulkAnswer(any(), any(), any(), any()))
             .willReturn(new BulkAnswerResult(1, 0, 0, List.of(UUID.fromString(ID)), 1, new PendingTotal(0, 0L)));
 
@@ -348,6 +357,9 @@ class ApiResponseContractTest {
             Arguments.of("POST", "/api/v1/question-responses", """
                 {"questionIds": ["%s"], "answer": {"value": "사업"}}
                 """.formatted(ID), 200),
+            Arguments.of("POST", "/api/v1/question-responses/withdraw", """
+                {"questionIds": ["%s"]}
+                """.formatted(ID), 200),
             Arguments.of("GET", "/api/v1/statutes/1523", null, 200),
             Arguments.of("GET", "/api/v1/admin/rule-candidates", null, 200),
             Arguments.of("POST", "/api/v1/admin/rule-candidates/1/approve", null, 200),
@@ -384,7 +396,7 @@ class ApiResponseContractTest {
     private static final Set<String> TRANSACTION_SUMMARY_KEYS = Set.of("approvedAt", "merchantRaw", "merchantNorm",
         "merchantCategory", "amount", "installmentMonths");
     private static final Set<String> JUDGMENT_KEYS = Set.of("id", "transactionId", "transaction", "revision", "origin",
-        "verdict", "outOfScope", "blockedAtGate", "account", "accountLabel", "finalAmount", "isInference", "unmatchedReason", "attributes",
+        "verdict", "awaitingAnswer", "outOfScope", "blockedAtGate", "account", "accountLabel", "finalAmount", "isInference", "unmatchedReason", "attributes",
         "ruleCardId", "ruleCardVersion", "appliedRuleIds", "rulesCommitSha", "userContextVersion", "explanation",
         "computedAt", "citations");
     private static final Set<String> QUESTION_KEYS = Set.of("id", "batchId", "transactionId", "groupKey", "factType",
@@ -526,7 +538,7 @@ class ApiResponseContractTest {
     void active_run_conflict_names_the_active_run() throws Exception {
         // given
         given(runService.create(any(), any(), any())).willThrow(new ApiException(
-            org.springframework.http.HttpStatus.CONFLICT, "RUN_ALREADY_ACTIVE", "이 업로드는 이미 판정 중입니다.", ID));
+            org.springframework.http.HttpStatus.CONFLICT, "RUN_ALREADY_ACTIVE", "이미 판정 중인 업로드가 있습니다.", ID));
 
         // when / then: api.md 1.3·3.6 — 409 RUN_ALREADY_ACTIVE 는 진행 중인 run 의 id 를 함께 준다
         mockMvc.perform(request(HttpMethod.POST, "/api/v1/judgment-runs")
@@ -546,10 +558,10 @@ class ApiResponseContractTest {
         given(judgmentQueryService.list(any(), any(), anyInt(), anyInt()))
             .willReturn(new PageImpl<>(List.of(judgment("접대비"))));
         given(judgmentQueryService.export(any(), any(), any()))
-            .willReturn(List.of(new JudgmentExportRow(judgment("접대비"), 0L, List.of())));
+            .willReturn(List.of(new JudgmentExportRow(judgment("접대비"), 0L, List.of(), false)));
         given(judgmentQueryService.summary(any(), any(), any(), any())).willReturn(JudgmentSummary.of(List.of(
-            new JudgmentSummary.Row(Verdict.AVAILABLE, "접대비", 50_000L),
-            new JudgmentSummary.Row(Verdict.AVAILABLE, "소모품비", 12_800L))));
+            new JudgmentSummary.Row(Verdict.AVAILABLE, "접대비", 50_000L, 0L, false, 2026, false),
+            new JudgmentSummary.Row(Verdict.AVAILABLE, "소모품비", 12_800L, 0L, false, 2026, false))));
         given(judgmentQueryService.limits(any(), any(), any()))
             .willReturn(List.of(new LimitYearTotal("접대비", 2026, 12_246_000L, 50_000L, 0L)));
 

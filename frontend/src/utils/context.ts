@@ -20,7 +20,8 @@ export const contextRows = (context: BusinessContext | StoredBusinessContext) =>
   term: '업종',
   value: industryName(context.industryCode)
 },
-{ term: '직전연도 수입금액', value: `${formatNumber(context.prevYearRevenue)}원` },
+// 0 은 모른다고 답한 문진이다. 기장의무만 보인다
+...(context.prevYearRevenue > 0 ? [{ term: '직전연도 수입금액', value: `${formatNumber(context.prevYearRevenue)}원` }] : []),
 { term: '개업일', value: formatFullDate(context.businessOpenDate) },
 { term: '기장의무', value: context.bookkeepingDuty },
 { term: '직원', value: context.hasEmployee ? '있음' : '없음 (1인)' },

@@ -222,14 +222,14 @@ export function IntroOverlay({ onDone }: {onDone: () => void;}) {
           }}
           style={{ transform: moves?.texts.eyebrow }}
           className={`text-body text-white ${textMotion}`}>
-          1인 IT 개발 사업자를 위한 경비 판정
+          1인 사업자를 위한 종합소득세 경비 판정 서비스
         </p>
         <strong
           ref={(el) => {
             texts.current.title = el;
           }}
           style={{ transform: moves?.texts.title }}
-          className={`mt-5 block text-h2 font-normal leading-tight tracking-ir text-white [word-break:keep-all] lg:text-h2-lg xl:text-ir-display ${textMotion}`}>
+          className={`mt-5 block text-h2 font-bold leading-tight tracking-ir-sm text-white [word-break:keep-all] lg:text-h2-lg xl:text-ir-display ${textMotion}`}>
           이 카드값이 경비인지,
           <br />
           조문까지 붙여 답합니다

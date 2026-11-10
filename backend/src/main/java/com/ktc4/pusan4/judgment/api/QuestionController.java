@@ -2,8 +2,6 @@ package com.ktc4.pusan4.judgment.api;
 
 import com.ktc4.pusan4.judgment.domain.AnswerSource;
 import com.ktc4.pusan4.judgment.domain.PendingTotal;
-import com.ktc4.pusan4.judgment.domain.Question;
-import com.ktc4.pusan4.judgment.domain.QuestionGroup;
 import com.ktc4.pusan4.judgment.domain.QuestionStatus;
 import com.ktc4.pusan4.judgment.persistence.QuestionAnswerService;
 import com.ktc4.pusan4.judgment.persistence.QuestionQueryService;
@@ -19,19 +17,16 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 import java.util.UUID;
 
-@Tag(name = "questions", description = "룰엔진 확인 질문 (api.md 3.9~3.12). 사용자가 질문을 직접 취소하는 API 는 없다")
+@Tag(name = "questions", description = "룰엔진 확인 질문 (api.md 3.9~3.12). 사용자가 질문을 직접 취소하는 API 는 없다. "
+    + "답을 거두는 것은 POST /question-responses/withdraw 다")
 @RestController
 public class QuestionController {
 
@@ -77,27 +72,18 @@ public class QuestionController {
         @RequestParam(defaultValue = "0") @Min(0) int page,
         @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size
     ) {
-        List<Question> questions = queryService.find(currentUser.id(), batchId, transactionId);
         // 미해소 집계는 status·grouped·page 를 적용하기 전 목록으로 센다 (api.md 3.9)
-        PendingTotal pending = PendingTotal.of(questions);
+        PendingTotal pending = queryService.unresolved(currentUser.id(), batchId, transactionId);
         Unresolved unresolved = new Unresolved(pending.count(), pending.amount());
-        List<Question> matched = questions.stream()
-            .filter(question -> status == null || question.status() == status)
-            .toList();
         if (grouped) {
-            PageResponse<QuestionGroupResponse> groups =
-                PageResponse.of(slice(QuestionGroup.group(matched), page, size).map(QuestionGroupResponse::from));
+            PageResponse<QuestionGroupResponse> groups = PageResponse.of(
+                queryService.groupPage(currentUser.id(), batchId, transactionId, status, page, size)
+                    .map(QuestionGroupResponse::from));
             return new QuestionGroupPage(groups.items(), unresolved, groups.page());
         }
-        PageResponse<QuestionResponse> items =
-            PageResponse.of(slice(matched, page, size).map(QuestionResponse::from));
+        PageResponse<QuestionResponse> items = PageResponse.of(
+            queryService.page(currentUser.id(), batchId, transactionId, status, page, size).map(QuestionResponse::from));
         return new QuestionPage(items.items(), unresolved, items.page());
-    }
-
-    private static <T> Page<T> slice(List<T> items, int page, int size) {
-        int from = (int) Math.min((long) page * size, items.size());
-        int to = Math.min(from + size, items.size());
-        return new PageImpl<>(items.subList(from, to), PageRequest.of(page, size), items.size());
     }
 
     @Operation(summary = "확인 질문 응답 및 부분 재판정",
@@ -117,6 +103,23 @@ public class QuestionController {
             answerService.answer(currentUser.id(), request.questionIds(), request.answer().value(),
                 request.source() == null ? AnswerSource.USER : request.source())
         );
+    }
+
+    @Operation(summary = "답 취소 및 부분 재판정",
+        description = "같은 Batch·groupKey·factType 의 ANSWERED 질문을 모두 PENDING 으로 돌리고, 취소를 UserFact 새 version 으로 "
+            + "남긴 뒤 응답과 같은 거래를 재판정한다. 재판정한 revision 은 같은 질문을 새 id 로 다시 묻고, 돌려 둔 질문은 "
+            + "재판정이 CANCELED 로 바꾼다. 답한 질문이 없으면 withdrawnCount = 0 (에러 아님). api.md 3.10 답 취소")
+    @ApiResponse(responseCode = "404", description = "QUESTION_NOT_FOUND",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode = "409", description = "QUESTION_NOT_ANSWERABLE, QUESTION_GROUP_MISMATCH",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode = "422", description = "QUESTIONS_FROM_DIFFERENT_BATCHES",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @PostMapping("/question-responses/withdraw")
+    public QuestionWithdrawResponse withdraw(
+        CurrentUser currentUser, @Valid @RequestBody QuestionWithdrawRequest request
+    ) {
+        return QuestionWithdrawResponse.from(answerService.withdraw(currentUser.id(), request.questionIds()));
     }
 
     @Operation(summary = "미해소 질문 일괄 응답",

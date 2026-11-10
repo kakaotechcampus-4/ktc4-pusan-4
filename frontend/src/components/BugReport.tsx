@@ -1,10 +1,10 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { BugIcon, CopyIcon, MailIcon } from 'lucide-react';
+import { BugIcon, CheckIcon, CopyIcon, MailIcon } from 'lucide-react';
 import { useSession } from '../contexts/SessionContext';
 import { api, ApiRequestError, lastErrorTraceId } from '../api';
 import { rememberTraceId } from '../api/contract';
-import { Button, Modal } from './ui';
+import { Button, IconButton, Modal } from './ui';
 import { bugReportMailto, cutText } from '../utils/bugReport';
 import { SUPPORT_EMAIL } from '../utils/contact';
 
@@ -111,15 +111,17 @@ function BugReportFields({ form }: {form: ReturnType<typeof useBugReportForm>;})
       <label htmlFor={fieldId} className="block text-small text-ink2">
         무엇을 하려다 무엇을 봤는지
       </label>
-      <textarea
-        id={fieldId}
-        value={form.message}
-        onChange={(event) => form.setMessage(cutText(event.target.value, MESSAGE_LIMIT))}
-        rows={6}
-        placeholder="예: 결과 화면에서 금액이 0원으로 나와요"
-        aria-invalid={form.error !== null}
-        aria-describedby={form.error ? `${fieldId}-error` : undefined}
-        className="mt-1.5 w-full resize-y rounded-xl border border-edge bg-canvas px-3.5 py-2.5 text-[14px] leading-6 text-ink placeholder:text-muted focus-visible:outline-none aria-[invalid=true]:border-deny" />
+      <div className="field-box mt-1.5 rounded-xl border border-edge bg-canvas pb-1 pr-1">
+        <textarea
+          id={fieldId}
+          value={form.message}
+          onChange={(event) => form.setMessage(cutText(event.target.value, MESSAGE_LIMIT))}
+          rows={6}
+          placeholder="예: 결과 화면에서 금액이 0원으로 나와요"
+          aria-invalid={form.error !== null}
+          aria-describedby={form.error ? `${fieldId}-error` : undefined}
+          className="block w-full resize-y rounded-xl border-0 bg-transparent px-3.5 py-2.5 text-[14px] leading-6 text-ink placeholder:text-muted" />
+      </div>
 
       {form.error &&
       <p id={`${fieldId}-error`} role="alert" className="mt-1.5 text-[13px] text-deny">
@@ -153,22 +155,28 @@ function useMailto(message?: string) {
  */
 export function BugReportAddress() {
   const [copied, setCopied] = useState(false);
+  // 확인 표시는 잠깐만 둔다. 계속 두면 다시 복사해도 바뀌는 게 없다
+  useEffect(() => {
+    if (!copied) return;
+    const timer = window.setTimeout(() => setCopied(false), 2000);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
   const copy = () => {
+    // 2초 안에 다시 복사해도 알리도록 한 번 걷었다가 다시 띄운다
+    setCopied(false);
     void navigator.clipboard?.writeText(SUPPORT_EMAIL).then(() => setCopied(true), () => setCopied(false));
   };
   return (
     <div className="text-small">
       <p className="text-ink2">받는 주소</p>
-      <div className="mt-1 flex items-center justify-between gap-3">
+      {/* 복사 그림은 주소 바로 옆에 둔다. 그림만 바뀌면 화면 읽기가 알 수 없어 status 로 알린다 */}
+      <div className="mt-1 flex items-center gap-2">
         <span className="break-all font-bold text-ink">{SUPPORT_EMAIL}</span>
-        <button
-          type="button"
-          onClick={copy}
-          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-line px-3 py-1 text-caption font-bold text-ink hover:border-ink">
-
-          <CopyIcon className="h-3 w-3" aria-hidden="true" />
-          {copied ? '복사했습니다' : '주소 복사'}
-        </button>
+        <IconButton
+          icon={copied ? CheckIcon : CopyIcon}
+          label={copied ? '복사했습니다' : '주소 복사'}
+          onClick={copy} />
+        <span role="status" className="sr-only">{copied ? '주소를 복사했습니다' : ''}</span>
       </div>
       <p className="mt-3 leading-6 text-ink2">
         메일 쓰기를 눌러도 아무 일이 없으면 주소를 복사해 쓰는 메일에서 보내 주세요.
@@ -244,7 +252,7 @@ export function BugReportButton({ className, label = '버그 신고', icon = tru
           {form.mode === 'form' && <BugReportFields form={form} />}
           {form.mode === 'sent' &&
           <p role="status" className="text-body text-ink">
-              보냈습니다. 알려 주셔서 고맙습니다.
+              감사합니다.
             </p>
           }
         </div>
@@ -256,7 +264,7 @@ export function BugReportButton({ className, label = '버그 신고', icon = tru
 /** /bug-report 화면의 신고 칸. 로그인 전이거나 메일 계정이 없는 서버면 메일 안내를 보인다 */
 export function BugReportPanel() {
   const form = useBugReportForm();
-  // 보냈거나 메일로 넘어가면 보내기 버튼이, 하나 더 보내면 그 버튼이 사라져 초점이 body 로 떨어진다. 바뀐 첫 줄이나 적는 칸으로 옮긴다
+  // 보냈거나 메일로 넘어가면 보내기 버튼이, 새로 보내면 그 버튼이 사라져 초점이 body 로 떨어진다. 바뀐 첫 줄이나 적는 칸으로 옮긴다
   const status = useRef<HTMLParagraphElement>(null);
   const shown = useRef(form.mode);
   useEffect(() => {
@@ -281,10 +289,10 @@ export function BugReportPanel() {
   return (
     <>
         <p ref={status} tabIndex={-1} role="status" className="text-h4 font-bold text-ink outline-none">
-          보냈습니다. 알려 주셔서 고맙습니다.
+          감사합니다.
         </p>
         <Button variant="secondary" size="md" className="mt-6" onClick={form.reset}>
-          하나 더 보내기
+          새로 보내기
         </Button>
       </>);
 
