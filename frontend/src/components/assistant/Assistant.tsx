@@ -232,6 +232,8 @@ function Panel({
   // 열리면 입력칸으로 초점을 옮긴다
   useEffect(() => {
     input.current?.focus();
+    // 닫히면 카드에 초점이 있어도 blur 가 오지 않는다. 행 강조를 지운다
+    return () => highlightBus.emit(null);
   }, []);
 
   // 거래를 붙이거나 물을 말을 미리 적어 주면 이어서 적게 입력칸으로 간다

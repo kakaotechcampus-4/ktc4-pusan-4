@@ -207,6 +207,8 @@ function RunProgress() {
           const result = await api.judgments.list({ runId: id, page, size: ARRIVAL_PAGE });
           if (stopped) return;
           const unseen = result.items.filter((judgment) => !seen.has(judgment.transactionId));
+          // 읽는 사이 새 판정이 들어오면 앞 쪽 행이 다음 쪽으로 밀려 다시 온다
+          unseen.forEach((judgment) => seen.add(judgment.transactionId));
           fresh.push(...unseen);
           if (unseen.length < result.items.length || !result.page.hasNext) break;
         }
@@ -216,7 +218,6 @@ function RunProgress() {
         inFlight = false;
       }
       if (stopped || fresh.length === 0) return;
-      fresh.forEach((judgment) => seen.add(judgment.transactionId));
       // 최근 판정부터 왔다. 먼저 난 것부터 칠한다
       setArrived((prev) => [...prev, ...fresh.reverse()]);
     };
