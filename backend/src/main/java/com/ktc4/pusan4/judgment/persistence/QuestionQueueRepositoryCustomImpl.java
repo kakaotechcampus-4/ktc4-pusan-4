@@ -36,6 +36,11 @@ class QuestionQueueRepositoryCustomImpl implements QuestionQueueRepositoryCustom
     }
 
     @Override
+    public List<QuestionRow> findPendingRows(UUID userId, UUID batchId) {
+        return rows(conditions(userId, batchId, null, QuestionStatus.PENDING.name())).fetch();
+    }
+
+    @Override
     public Page<QuestionRow> findRowsPage(
         UUID userId, UUID batchId, UUID transactionId, String status, Pageable pageable
     ) {
