@@ -1,13 +1,16 @@
 import React from 'react';
 import { Button } from './ui';
 
+/** 제목 줄 오른쪽 그림 버튼(IconButton)의 여백. 36px 버튼이 제목 줄을 키우지 않고 오른쪽 끝이 본문 여백에 맞는다 */
+export const PANEL_ICON = '-my-1.5 -mr-2.5';
+
 /** 문장 속 링크와 같은 모양. 파랑은 주된 동작(판정 시작)에만 쓴다 */
 export const PANEL_LINK =
 'text-small font-bold text-ink underline decoration-accent-line underline-offset-4 transition-colors duration-150 hover:decoration-ink';
 
 /**
  * 판정 전 확인과 내 정보가 입력 하나씩을 보여 주는 흰 상자. 회색 판 대신 괘선으로만 가른다 (11/5 치오 방향).
- * action 은 제목 줄 오른쪽의 링크 하나다 (문진 고치기, 다시 올리기)
+ * action 은 제목 줄 오른쪽의 그림 버튼 하나다 (문진 고치기, 다시 올리기)
  */
 export function InfoPanel({ title, action, children }: {title: string;action?: React.ReactNode;children: React.ReactNode;}) {
   return (

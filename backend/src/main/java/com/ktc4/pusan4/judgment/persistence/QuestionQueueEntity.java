@@ -107,6 +107,24 @@ class QuestionQueueEntity extends AssignedIdEntity<UUID> {
         this.status = "ANSWERED";
     }
 
+    boolean isAnswered() {
+        return "ANSWERED".equals(status);
+    }
+
+    /**
+     * 답을 거둔다 (api.md 3.10 답 취소). ANSWERED 만 PENDING 으로 돌리고 가리키던 UserFact 를 놓는다.
+     * 지난 답은 UserFact 이전 version 에 남는다. 거둔 질문이면 true.
+     */
+    boolean withdrawAnswer() {
+        if (!isAnswered()) {
+            return false;
+        }
+        this.answeredFactId = null;
+        this.answeredAt = null;
+        this.status = "PENDING";
+        return true;
+    }
+
     boolean isPending() {
         return "PENDING".equals(status);
     }

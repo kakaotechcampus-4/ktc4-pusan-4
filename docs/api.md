@@ -103,6 +103,12 @@ Question
 │   │       └── POST                    가입 인증 코드 확인
 │   ├── signup/
 │   │   └── POST                        이메일 회원가입
+│   ├── password-reset/
+│   │   ├── POST                        비밀번호 재설정 코드 메일 보내기
+│   │   ├── confirm/
+│   │   │   └── POST                    재설정 코드 확인
+│   │   └── complete/
+│   │       └── POST                    비밀번호 재설정
 │   ├── login/
 │   │   └── POST                        로그인
 │   ├── kakao/
@@ -116,6 +122,8 @@ Question
 │   └── me/
 │       ├── GET                         내 정보 조회
 │       ├── DELETE                      회원 탈퇴
+│       ├── password/
+│       │   └── PUT                     비밀번호 변경
 │       │
 │       └── contexts/
 │           ├── POST                    사업자 Context 생성
@@ -151,6 +159,9 @@ Question
 ├── judgment-runs/
 │   ├── POST                            Batch 전체 판정 실행
 │   │
+│   ├── active/
+│   │   └── GET                         진행 중인 판정 실행 조회
+│   │
 │   └── {runId}/
 │       ├── GET                         판정 실행 상태 조회
 │       └── failures/
@@ -181,7 +192,9 @@ Question
 │       └── POST                        미해소 질문 일괄 응답
 │
 ├── question-responses/
-│   └── POST                            확인 질문 응답 및 부분 재판정
+│   ├── POST                            확인 질문 응답 및 부분 재판정
+│   └── withdraw/
+│       └── POST                        답 취소 및 부분 재판정
 │
 ├── handoff-notes/
 │   ├── GET                             세무대리인 질문 목록
@@ -190,6 +203,9 @@ Question
 ├── statutes/
 │   └── {statuteVersionId}/
 │       └── GET                         법령 원문 조회
+│
+├── bug-reports/
+│   └── POST                            버그 신고 (팀 메일로 보냄)
 │
 └── admin/
     └── rule-candidates/
@@ -298,15 +314,60 @@ refresh_token={token}; Path=/api/v1/auth; Max-Age=1209600; HttpOnly; Secure; Sam
 | 필드 | 제약 |
 | --- | --- |
 | email | 이메일 형식, 최대 320자. 인증한 이메일과 같아야 한다(대소문자·앞뒤 공백 무시) |
-| password | 8자 이상, UTF-8 72바이트 이하 |
+| password | 영문자, 숫자, 기호만 쓰고 셋을 각각 하나 이상 넣은 8~72자. 기호는 영문자와 숫자가 아닌 출력 가능한 ASCII 문자(`!`부터 `~`까지)다. 공백, 한글 등 그 밖의 문자는 쓸 수 없다. 대문자는 필수가 아니다 |
 | verificationToken | `email-verification/confirm` 응답의 값 |
 
 가입하고 바로 로그인한다. 응답은 로그인과 같고 상태만 `201` 이다. 가입하면 인증 토큰은 더 쓸 수 없다.
 
+비밀번호 규칙은 새 비밀번호를 정할 때만 본다. 로그인은 보지 않아, 규칙이 생기기 전에 가입한 사용자(공백이나 한글이 든 비밀번호 포함)도 그대로 로그인한다.
+
 ```
-400 VALIDATION_ERROR       형식·길이가 맞지 않음
+400 VALIDATION_ERROR       형식·길이가 맞지 않음. 비밀번호 규칙을 어기면 message 에 이유가 있다
 400 EMAIL_NOT_VERIFIED     인증 토큰이 없거나, 다른 이메일 것이거나, 만료됨 → 인증부터 다시
 409 EMAIL_ALREADY_EXISTS   이미 가입한 이메일
+```
+
+### `POST /api/v1/auth/password-reset`
+
+```
+{
+  "email": "user@example.com"
+}
+```
+
+비밀번호 재설정 코드를 메일로 보낸다. 응답 `202`. 가입하지 않은 이메일도 `202`이고 메일은 보내지 않는다. 가입 여부를 드러내지 않으려는 것이다.
+코드의 유효시간, 다시 받기 간격, 하루 횟수는 가입 인증과 같고, 가입 인증과 따로 센다. 가입 인증 코드와 섞어 쓸 수 없다.
+
+```
+400 VALIDATION_ERROR                 이메일 형식이 아님
+429 VERIFICATION_RESEND_TOO_SOON     60초 안에 다시 요청함 (가입한 이메일만)
+429 VERIFICATION_DAILY_LIMIT         오늘 이 이메일로 5번 보냄 (가입한 이메일만)
+502 EMAIL_SEND_FAILED                메일을 보내지 못함 (가입한 이메일만)
+503 EMAIL_VERIFICATION_UNAVAILABLE   서버에 메일 계정이 설정되지 않음
+```
+
+`429`와 `502`는 가입한 이메일에서만 나오므로, 같은 이메일로 60초 안에 두 번 요청하면 가입 여부를 알 수 있다. 그 정도는 가입 인증(`409 EMAIL_ALREADY_EXISTS`)에서도 이미 알 수 있어 막지 않는다.
+
+### `POST /api/v1/auth/password-reset/confirm`
+
+요청과 응답, 오류는 `email-verification/confirm`과 같다. 받은 토큰은 30분 동안 그 이메일의 비밀번호 재설정에만 쓸 수 있다.
+
+### `POST /api/v1/auth/password-reset/complete`
+
+```
+{
+  "email": "user@example.com",
+  "verificationToken": "...",
+  "newPassword": "..."
+}
+```
+
+비밀번호를 바꾸고 그 사용자의 모든 로그인(리프레시 토큰)을 끊는다. 응답 `204`. 새 비밀번호로 다시 로그인한다.
+`newPassword` 규칙은 가입과 같다(`signup`의 `password`). 규칙에 맞지 않으면 토큰은 그대로라 고쳐서 다시 보내면 된다. 바꾸고 나면 토큰은 더 쓸 수 없다.
+
+```
+400 VALIDATION_ERROR      새 비밀번호가 규칙에 맞지 않음. message 에 이유가 있다
+400 EMAIL_NOT_VERIFIED    토큰이 없거나, 다른 이메일 것이거나, 만료됐거나, 이미 씀 → 코드부터 다시
 ```
 
 ### `POST /api/v1/auth/login`
@@ -611,6 +672,8 @@ sourceStatus = CANCELED_OFFSET
 
 재판정 결과 해당 Question이 더 이상 필요하지 않을 때 시스템이 변경한다.
 
+답을 취소하면(3.10 답 취소) 답한 Question은 잠깐 `PENDING`으로 돌아갔다가 같은 요청의 재판정에서 `CANCELED`가 되고, 새 revision이 같은 질문을 새 Question으로 다시 묻는다.
+
 ---
 
 ## 2.6 ClassificationReview 상태
@@ -748,6 +811,28 @@ G6
 `email` 은 카카오 계정이면 `null` 이다.
 `role` 은 `USER` 또는 `ADMIN` 이다. `ADMIN` 이면 관리자 API(3.15)를 쓸 수 있다.
 
+### `PUT /api/v1/users/me/password`
+
+```
+{
+  "currentPassword": "...",
+  "newPassword": "..."
+}
+```
+
+현재 비밀번호를 확인하고 바꾼 뒤, 지금 기기를 포함한 모든 로그인(리프레시 토큰)을 끊는다. 화면은 `POST /auth/logout`으로 쿠키를 지우고 로그인으로 보낸다. 이미 받은 액세스 토큰은 만료(15분)까지 남는다.
+
+`newPassword` 규칙은 가입과 같다(1.1 `password`).
+
+응답:
+
+```
+204
+400 INVALID_CURRENT_PASSWORD   현재 비밀번호가 맞지 않음
+400 VALIDATION_ERROR           새 비밀번호가 규칙에 맞지 않음. message 에 이유가 있다
+409 PASSWORD_NOT_SET           비밀번호가 없는 계정(카카오 가입)
+```
+
 ### `DELETE /api/v1/users/me`
 
 그 사용자의 모든 로그인(리프레시 토큰)을 끊고 지운다. 이미 받은 액세스 토큰은 만료(15분)까지 남는다.
@@ -869,7 +954,7 @@ Idempotency-Key: {uuid}
 | branchRaw | string | N |  |
 | memo | string | N |  |
 | isAggregated | boolean | N |  |
-| needsReview | boolean | N | 파서 단계 확인 필요 여부 |
+| needsReview | boolean | N | 파서 단계 확인 필요 여부. 저장만 하고 아직 판정과 응답에는 쓰지 않는다 |
 | reviewReason | string | N |  |
 | sourceCard | string | N |  |
 
@@ -1585,10 +1670,10 @@ classificationStatus = CLASSIFIED
 409 RUN_ALREADY_ACTIVE
 ```
 
-같은 Batch에 진행 중(`QUEUED`, `RUNNING`)인 Run이 있으면 `409 RUN_ALREADY_ACTIVE`다. 본문 `runId`가 그 Run이라 화면은 그 Run의 진행 화면으로 가면 된다. 두 Run이 같은 거래를 동시에 판정하면 늦게 쓴 쪽이 최신이 되어 다른 문진의 결과가 섞이기 때문이다(#187).
+이 사용자에게 진행 중(`QUEUED`, `RUNNING`)인 Run이 있으면 Batch와 상관없이 `409 RUN_ALREADY_ACTIVE`다. 본문 `runId`가 그 Run이라 화면은 그 Run의 진행 화면으로 가면 된다. 두 Run이 같은 거래를 동시에 판정하면 늦게 쓴 쪽이 최신이 되어 다른 문진의 결과가 섞이기 때문이다(#187). 같은 파일을 다시 올리면 Batch가 새로 생기므로 Batch 기준으로는 막히지 않는다.
 
 - 마지막 진행 뒤 5분이 지난 Run은 진행 중으로 보지 않는다. 서버가 내려가 남은 Run이고, 정리 작업이 곧 `RUN_INTERRUPTED`로 끝낸다.
-- 다른 Batch의 Run과는 상관없다.
+- 화면은 판정을 시작하기 전에 `GET /judgment-runs/active`로 진행 중인 Run을 확인한다.
 
 ### 재실행
 
@@ -1602,6 +1687,16 @@ T1 rev2 ← Run R2
 ```
 
 각 revision은 자신을 실제 생성한 Run만 참조한다.
+
+---
+
+## `GET /api/v1/judgment-runs/active`
+
+이 사용자의 진행 중(`QUEUED`, `RUNNING`)인 Run을 준다. 진행 화면을 떠났다가 돌아올 길과, 판정 시작을 막을 근거로 쓴다.
+
+- 있으면 `200`, 본문은 아래 `GET /judgment-runs/{runId}`와 같다.
+- 없으면 `204`, 본문 없음.
+- 진행 중의 기준은 `POST`의 `409 RUN_ALREADY_ACTIVE`와 같다(마지막 진행 뒤 5분이 지난 Run은 뺀다).
 
 ---
 
@@ -1724,6 +1819,8 @@ transactionId
 batchId
 year
 verdict
+awaiting
+sort
 latestOnly
 runId
 page
@@ -1741,6 +1838,10 @@ true
 조건은 모두 AND로 건다. `transactionId`·`batchId`·`year`·`runId`가 하나도 없으면 오류 없이 본인 전체의 현재 Judgment를 반환한다.
 
 다른 사용자의 `transactionId`·`batchId`·`runId`를 넘기면 404가 아니라 빈 목록이다.
+
+`awaiting`은 답변 대기(아래 `awaitingAnswer`)로 거른다. `true`면 답변 대기만, `false`면 답변 대기를 뺀 것만 남긴다. 보내지 않으면 거르지 않는다. 불가 가운데 답변 대기가 아닌 것은 `verdict=UNAVAILABLE&awaiting=false`다.
+
+`sort`는 `COMPUTED_AT`(기본)이나 `APPROVED_AT`이다. 화면 표처럼 승인일 최근 순으로 받을 때 `APPROVED_AT`을 쓴다.
 
 ### batchId / year
 
@@ -1787,7 +1888,8 @@ R1 이후 QuestionResponse나 Override로 생성된 revision은 포함하지 않
 정렬:
 
 ```
-computedAt DESC, id DESC
+sort=COMPUTED_AT (기본)   computedAt DESC, id DESC
+sort=APPROVED_AT         transaction.approvedAt DESC, id DESC
 ```
 
 응답:
@@ -1845,21 +1947,55 @@ GET /api/v1/judgments/summary?runId=R1
   "byVerdict": {
     "AVAILABLE": {
       "count": 180,
-      "finalAmount": 4820000
+      "finalAmount": 4820000,
+      "spendAmount": 5310000
     },
     "UNAVAILABLE": {
       "count": 62,
-      "finalAmount": 0
+      "finalAmount": 0,
+      "spendAmount": 1840000
     },
     "NEEDS_REVIEW": {
       "count": 30,
-      "finalAmount": 0
+      "finalAmount": 0,
+      "spendAmount": 760000
     }
   },
+
+  "awaiting": {
+    "count": 12,
+    "spendAmount": 410000
+  },
+
+  "overridden": {
+    "AVAILABLE": {
+      "count": 3,
+      "finalAmount": 85000,
+      "spendAmount": 85000
+    },
+    "UNAVAILABLE": {
+      "count": 1,
+      "finalAmount": 0,
+      "spendAmount": 12000
+    },
+    "NEEDS_REVIEW": {
+      "count": 0,
+      "finalAmount": 0,
+      "spendAmount": 0
+    }
+  },
+
+  "byYear": [
+    {
+      "year": 2026,
+      "finalAmount": 4820000
+    }
+  ],
 
   "byAccount": [
     {
       "account": "소모품비",
+      "accountLabel": "소모품비",
       "count": 42,
       "finalAmount": 1820000
     }
@@ -1868,7 +2004,9 @@ GET /api/v1/judgments/summary?runId=R1
   "limits": [
     {
       "bucket": "접대비",
+      "bucketLabel": "기업업무추진비",
       "taxYear": 2026,
+      "limitAmount": 12090000,
       "totalAmount": 13006500,
       "excessAmount": 916500
     }
@@ -1876,7 +2014,13 @@ GET /api/v1/judgments/summary?runId=R1
 }
 ```
 
-`byVerdict`는 세 verdict를 늘 담는다. 판정이 없는 verdict는 `count`·`finalAmount`가 0이다. `finalAmount`가 아직 없는 Judgment(금액 계산 전)는 0으로 더한다.
+`byVerdict`는 세 verdict를 늘 담는다. 판정이 없는 verdict는 `count`·`finalAmount`·`spendAmount`가 0이다. `finalAmount`가 아직 없는 Judgment(금액 계산 전)는 0으로 더한다. `spendAmount`는 그 판정이 난 거래의 결제 금액(`transaction.amount`) 합이다. 경비 가능 금액을 결제 금액과 견주어 보이는 바탕이다.
+
+`awaiting`은 답변 대기(`GET /judgments/{judgmentId}`의 `awaitingAnswer`가 `true`인 판정)의 건수와 결제 금액 합이다. 답변 대기는 불가에 붙는 표지라 `byVerdict.UNAVAILABLE`에도 들어 있다. 답변 대기를 따로 보이려면 불가에서 뺀다. 범위(`batchId`, `year`, `runId`)는 위와 같다.
+
+`overridden`은 사용자가 직접 바꾼(3.8 Override) 판정을 바뀐 판정별로 센다. `byVerdict`와 같은 모양이고 `byVerdict`에도 들어 있다. 현재 판정이 수정 revision(`origin.type = OVERRIDE`)인 것만 세고, 해제한 수정은 세지 않는다. 수정은 확인 필요로 가지 않아 `NEEDS_REVIEW`는 늘 0이다.
+
+`byYear`는 범위의 판정이 있는 해(거래 `approvedAt`)마다 가능 판정의 경비 가능 금액 합이다. 해 순이고, 가능이 없는 해는 0이다. 금액은 `byVerdict.AVAILABLE.finalAmount`와 같은 기준이다(`year` 집계만 접대비 한도 인정액). 신고는 해마다 따로 해서 두 해에 걸친 업로드를 나눠 보인다.
 
 접대비 한도(소득세법 §35 3항)는 사용자의 한 해 전체 지출로 정해지고, 어느 거래가 초과분인지는 법이 정하지 않는다. 그래서 거래별·batch별로 한도를 나누지 않고 연 단위로만 다룬다(#15, `CONTEXT.md` G6 "건별로 계산하지 않는다").
 
@@ -1889,11 +2033,13 @@ GET /api/v1/judgments/summary?runId=R1
 | 필드 | 설명 |
 | --- | --- |
 | bucket | 한도 묶음. 판정 `attributes.limit_bucket`과 같은 값(`접대비`) |
+| bucketLabel | 한도 묶음 화면 이름. `rules/accounts.yaml`의 label이다(`기업업무추진비`) |
 | taxYear | 과세연도 |
+| limitAmount | 그해 한도. 최신 문진의 직전연도 수입금액으로 계산한 잠정치라 해마다 같은 값이다. `totalAmount - excessAmount`가 한도 안에서 인정된 금액이다 |
 | totalAmount | 그해 이 묶음 Judgment 금액의 합(한도 전) |
 | excessAmount | 한도를 넘어 필요경비에 넣지 않는 금액. 넘지 않았으면 0 |
 
-`byAccount`는 `AVAILABLE`이면서 `account`가 있는 Judgment만 모은다. 정렬은 `finalAmount DESC`이고, 같으면 `account` 이름순이다.
+`byAccount`는 `AVAILABLE`이면서 `account`가 있는 Judgment만 모은다. 정렬은 `finalAmount DESC`이고, 같으면 `account` 이름순이다. `accountLabel`은 계정과목 화면 이름이다(`GET /judgments/{judgmentId}`의 `accountLabel`).
 
 다른 사용자의 `batchId`·`runId`를 넘기면 404가 아니라 빈 집계(`totalCount` 0)다.
 
@@ -1911,7 +2057,7 @@ Query: `batchId` 또는 `year` 중 정확히 하나. 0개거나 2개면 `400 INV
 {
   "items": [
     {
-      "judgment": { "id": "0199f1c3-...", "transaction": { "approvedAt": "2026-01-12", "merchantRaw": "스타벅스코리아 서면점", "amount": 12800 }, "verdict": { "code": "AVAILABLE", "label": "가능" }, "account": "기업업무추진비", "finalAmount": 12800, "citations": [{ "statuteVersionId": 1418, "statuteId": "소득세법-35-1" }] },
+      "judgment": { "id": "0199f1c3-...", "transaction": { "approvedAt": "2026-01-12", "merchantRaw": "스타벅스코리아 서면점", "amount": 12800 }, "verdict": { "code": "AVAILABLE", "label": "가능" }, "account": "접대비", "accountLabel": "기업업무추진비", "finalAmount": 12800, "citations": [{ "statuteVersionId": 1418, "statuteId": "소득세법-35-1" }] },
       "allowedAmount": 12800,
       "answers": [
         { "question": "이 가맹점에서 사용한 비용은 주로 어떤 목적으로 지출하셨나요?", "answer": "업무미팅" }
@@ -1919,7 +2065,7 @@ Query: `batchId` 또는 `year` 중 정확히 하나. 0개거나 2개면 `400 INV
     }
   ],
   "limits": [
-    { "bucket": "접대비", "taxYear": 2026, "totalAmount": 12800, "excessAmount": 0 }
+    { "bucket": "접대비", "bucketLabel": "기업업무추진비", "taxYear": 2026, "limitAmount": 12090000, "totalAmount": 12800, "excessAmount": 0 }
   ]
 }
 ```
@@ -1962,10 +2108,12 @@ Query: `batchId` 또는 `year` 중 정확히 하나. 0개거나 2개면 `400 INV
     "code": "AVAILABLE",
     "label": "가능"
   },
+  "awaitingAnswer": false,
 
   "outOfScope": false,
   "blockedAtGate": null,
   "account": "소모품비",
+  "accountLabel": "소모품비",
   "finalAmount": 1200000,
 
   "isInference": false,
@@ -2006,8 +2154,10 @@ Query: `batchId` 또는 `year` 중 정확히 하나. 0개거나 2개면 `400 INV
 | transaction | 판정한 거래의 거래 요약(3.4). 판정 당시가 아니라 응답 시점의 거래 값이다 |
 | revision | Transaction 재판정마다 증가 |
 | origin | 이 revision이 생성된 직접 원인 |
+| awaitingAnswer | 답변 대기. `verdict = UNAVAILABLE`이면서 이 거래에 답하지 않은(`PENDING`) 질문이 남았으면 `true`다. 판정의 네 번째 값이 아니라 불가에 붙는 표지라 `verdict`는 그대로 불가다. 질문은 revision마다 생기므로 거래의 모든 revision의 질문을 본다. 3.9처럼 지금 판정 대상인 거래만 `true`가 된다 |
 | outOfScope | 룰엔진 판정 범위 밖(핸드오프)인지. `verdict = NEEDS_REVIEW`일 때만 `true`일 수 있고 그 외 verdict에서는 항상 `false` |
-| account | 계정과목 |
+| account | 계정과목 ID. 비교와 집계는 이 값으로 한다. 허용 값은 `rules/accounts.yaml`이다 |
+| accountLabel | 계정과목 화면 이름. 사람에게 보일 때는 이 값을 쓴다. 이름이 따로 없으면 `account`와 같다(`접대비` → `기업업무추진비`, 소득세법 §35) |
 | finalAmount | 안분, 상각 적용 후 인정 금액. `AVAILABLE`이 아니면 0. G6 한도는 연간 집계라 반영하지 않는다(`year` 요약과 `limits`가 반영한다, 3.7 summary) |
 | isInference | 룰로 확정하지 못해 fallback 결과인지 |
 | unmatchedReason | 매칭 실패 원인 |
@@ -2239,6 +2389,8 @@ Question 개별 항목을 반환한다. `unresolved` 집계는 grouped 여부와
 `answer`는 답한 값이다. 3.10 요청의 `answer`와 같은 모양(`{ "value": "개인" }`)이고, `ANSWERED`가 아니면 `null`이다. 정정했으면 마지막 답이다.
 
 `code`는 질문을 만든 규칙 카드의 질문 코드(`question.code`)다. 다른 업로드의 같은 질문을 찾는 데 쓴다(3.14 지난번 답). 같은 `factType`이라도 카드마다 선택지가 달라서 `factType`이 아니라 `code`로 맞춘다. 저장 값은 `question_queue.reason_code`다. `grouped=true` 그룹에도 같은 값이 붙는다.
+
+`grouped=false`는 요청한 쪽만 DB에서 읽는다. `grouped=true`는 그룹 순서(건수, 금액)가 질문 전부로 정해져서, 묶기와 순서에 쓰는 값(그룹 키, 상태, 거래 승인일, 금액)만 전부 읽고 그 쪽의 그룹에 든 질문에만 거래, 답, 수정 여부를 붙인다. 미해소 집계나 건수만 필요하면 `grouped=false&size=1`이 더 가볍다.
 
 ### grouped=true
 
@@ -2525,6 +2677,67 @@ T3 rev2 → F10
 422 INVALID_ANSWER_VALUE                options에 없는 값이다
 ```
 
+## `POST /api/v1/question-responses/withdraw`
+
+한 답을 취소한다. 화면에서 이미 고른 선택지를 다시 누르면 부른다.
+
+```
+{
+  "questionIds": [
+    "0199a1..."
+  ]
+}
+```
+
+같은 요청의 Question은 응답과 같이 동일 Batch, `groupKey`, `factType`에 속해야 한다.
+
+처리 순서:
+
+```
+1. Question 검증
+2. 같은 Batch·groupKey·factType 의 CANCELED가 아닌 Question 중 ANSWERED가 없으면 여기서 끝낸다
+3. 답 취소를 UserFact 새 version으로 남긴다 (withdrawn = true, value = {})
+4. ANSWERED Question → PENDING, answeredFactId·answeredAt 비움
+5. 응답과 같은 Transaction을 재판정한다 (3.10 4단계)
+6. 각 Transaction에 새 Judgment revision 저장
+7. 4단계에서 돌린 Question은 이전 revision의 대기 질문이라 CANCELED가 된다
+8. 새 revision이 같은 질문을 새 Question으로 다시 만든다
+```
+
+응답의 거울이다. 답한 Question만이 아니라 같은 그룹의 답한 Question을 모두 돌리고, 가맹점 단위 Question이면 그 가맹점에서 판정한 적 있는 판정 대상 Transaction도 다시 판정한다. 새 JudgmentRun은 만들지 않고, 접대비 한도는 응답과 같이 다시 집계한다. 활성 JudgmentOverride는 그대로다.
+
+취소한 Question은 7단계에서 `CANCELED`가 되므로, 다시 답할 때는 목록을 다시 읽어 새 Question의 id로 3.10을 부른다.
+
+UserFact는 고치지 않는다. 최신 version이 취소이면 그 (Batch, `scopeKey`, `factType`)에는 답이 없는 것으로 판정하고, 취소보다 앞선 답은 다시 살아나지 않는다. 다시 답하면 취소 다음 version이 된다. 재판정한 revision의 `origin`은 `USER_FACT`이고 `id`는 취소를 남긴 UserFact다.
+
+응답 `200`:
+
+```
+{
+  "withdrawnCount": 2,
+  "rejudgedTransactionCount": 3
+}
+```
+
+| 필드 | 설명 |
+| --- | --- |
+| withdrawnCount | `ANSWERED`에서 `PENDING`으로 돌린 Question 수. 함께 돌린 같은 그룹 Question까지 센다 |
+| rejudgedTransactionCount | 다시 판정한 Transaction 수 |
+
+이미 답이 없는 그룹(모두 `PENDING`)이면 아무것도 바꾸지 않고 `withdrawnCount = 0`, `rejudgedTransactionCount = 0`이다. 에러가 아니다.
+
+에러는 아래 순서로 검사해 처음 걸린 것을 반환한다.
+
+```
+400 VALIDATION_ERROR                    questionIds가 비었다
+404 QUESTION_NOT_FOUND                  없거나 다른 사용자의 Question이 있다
+422 QUESTIONS_FROM_DIFFERENT_BATCHES
+409 QUESTION_GROUP_MISMATCH             groupKey·factType이 다른 Question이 있다
+409 QUESTION_NOT_ANSWERABLE             요청한 Question이 모두 CANCELED다
+```
+
+요청에 `CANCELED` Question이 섞여 있어도 하나라도 살아 있으면 그 그룹을 취소한다. 응답(3.10)은 하나라도 `CANCELED`면 막는 것과 다르다. 화면이 들고 있던 목록이 오래되어도 취소는 같은 결과가 되기 때문이다.
+
 ---
 
 # 3.11 Question 일괄 응답
@@ -2665,6 +2878,11 @@ Question을 삭제하지 않고 상태를 남겨 판정 이력을 보존한다.
 
 법률, 시행령, 기본통칙, 판례 등의 표시를 구분할 수 있도록 `hierarchy`를 반환한다.
 
+법령(`hierarchy`가 법률, 시행령, 시행규칙)은 응답할 때 두 값을 고친다. 법령 동기화가 저장한 값을 바꾸지 않아 이미 저장된 행에도 적용된다.
+
+- `title`: 동기화는 법령 이름만 저장한다. `statuteId`의 조, 항, 호를 붙인다(`소득세법-33-1-5` → `소득세법 제33조 제1항 제5호`, `소득세법시행령-208의2-1-1` → `소득세법 시행령 제208조의2 제1항 제1호`). 제목에 이미 조가 있으면 그대로 둔다.
+- `sourceUrl`: 가지 조문 주소 `제81의6조`를 국가법령정보 주소 모양 `제81조의6`으로 바꾼다.
+
 없는 법령이면 `404 STATUTE_NOT_FOUND`.
 
 ---
@@ -2677,7 +2895,7 @@ Question을 삭제하지 않고 상태를 남겨 판정 이력을 보존한다.
 
 ```json
 {
-  "batch": { "id": "0199aa11-...", "label": "국민 · 2026-09", "transactionCount": 18 },
+  "batch": { "id": "0199aa11-...", "label": "국민 2026-09", "transactionCount": 18 },
   "context": { "version": 4, "bookkeeping": "복식부기", "hasEmployee": false },
   "classification": { "pendingCount": 2, "pendingAmount": 97000 },
   "run": { "id": "0199b2...", "status": { "code": "COMPLETED", "label": "완료" } },
@@ -2688,7 +2906,7 @@ Question을 삭제하지 않고 상태를 남겨 판정 이력을 보존한다.
 
 | 필드 | 뜻 |
 | --- | --- |
-| batch.label | `카드사 · 시작월`. 기간이 여러 달이면 `카드사 · 시작월~끝월` |
+| batch.label | `카드사 시작월`. 기간이 여러 달이면 `카드사 시작월~끝월` |
 | context | 최신 문진의 버전·기장의무·직원 유무. 문진 전이면 `null` |
 | classification | 이 Batch 에서 분류를 기다리는 거래 수와 금액 |
 | run | 이 Batch 의 최근 판정 실행. 실행한 적 없으면 `null` |
@@ -2864,6 +3082,40 @@ Query: `status`(없으면 전체), `page`, `size`(1.4). 정렬은 `createdAt` DE
 ```
 404 RULE_CANDIDATE_NOT_FOUND
 409 CONFLICT                   이미 승인·기각한 후보
+```
+
+---
+
+# 3.16 버그 신고
+
+## `POST /api/v1/bug-reports`
+
+```
+{
+  "message": "결과 화면에서 금액이 0원으로 나와요",
+  "pageUrl": "/results?batchId=...",
+  "userAgent": "Mozilla/5.0 ...",
+  "traceId": "..."
+}
+```
+
+| 필드 | 필수 | 제약 |
+| --- | --- | --- |
+| message | Y | 공백만은 안 됨, 최대 2000자 |
+| pageUrl | N | 최대 2000자. 프론트는 도메인 없이 경로와 쿼리를 보낸다 |
+| userAgent | N | 최대 500자 |
+| traceId | N | 최대 100자. 화면이 마지막으로 받은 에러 응답의 `traceId`. 로그와 바로 이을 수 있다. 프론트는 `/auth/*`와 신고 자체의 실패는 적지 않고, 로그인, 로그아웃, 신고를 보낸 뒤에는 지운다 |
+
+로그인한 사용자만 보낸다. 팀 메일(`app.bug-report.to`, 비면 보내는 계정)로 보내고 저장하지 않는다. 메일에는 사용자 id와 위 내용만 넣고 이메일 주소는 넣지 않는다. 제목은 `message` 첫 줄 앞 50자다.
+사용자마다 한 시간(정시 기준)에 5건까지 받는다. 메일을 보내지 못한 신고도 센다.
+
+응답 `202`.
+
+```
+400 VALIDATION_ERROR          message 가 비었거나 길이를 넘음
+429 BUG_REPORT_RATE_LIMITED   한 시간에 5건을 넘음 (message 에 남은 분)
+502 BUG_REPORT_SEND_FAILED    메일을 보내지 못함 → 잠시 뒤 다시
+503 BUG_REPORT_UNAVAILABLE    서버에 메일 계정이 없음(로컬) → 화면은 메일 주소를 보이고, 적은 글과 traceId 를 메일 본문에 옮긴다
 ```
 
 ---
@@ -3178,6 +3430,14 @@ batch_id
 ```
 source  USER | ASSISTANT | PREVIOUS_ANSWER | BULK
 ```
+
+답 취소(3.10 답 취소, V23):
+
+```
+withdrawn  boolean, 기본 false. true면 value = {} 이고 출처는 USER
+```
+
+최신 version만 판정에 쓰고, 최신 version이 취소이면 답이 없다.
 
 ---
 

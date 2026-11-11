@@ -3,6 +3,7 @@ package com.ktc4.pusan4.judgment.api;
 import com.ktc4.pusan4.judgment.domain.Gate;
 import com.ktc4.pusan4.judgment.domain.JudgmentOrigin;
 import com.ktc4.pusan4.judgment.domain.JudgmentRevision;
+import com.ktc4.pusan4.judgment.domain.RuleSet;
 import com.ktc4.pusan4.judgment.domain.JudgmentRevision.JudgedTransaction;
 import com.ktc4.pusan4.judgment.domain.UnmatchedReason;
 import com.ktc4.pusan4.judgment.domain.Verdict;
@@ -22,11 +23,14 @@ public record JudgmentResponse(
     @Schema(description = "Transaction 재판정마다 증가") int revision,
     JudgmentOrigin origin,
     Coded<Verdict> verdict,
+    @Schema(description = "답변 대기. 불가인데 이 거래에 답하지 않은 질문이 남았다. 판정이 아니라 불가에 붙는 표지다 (api.md 2.1)")
+    boolean awaitingAnswer,
     @Schema(description = "차단된 경우에만 값이 있다") Gate blockedAtGate,
     @Schema(description = "범위 밖 핸드오프. true 면 판정하지 않고 세무사에게 넘긴 건이다. "
         + "verdict 는 항상 NEEDS_REVIEW 이고, 되묻기 대기와 달리 답할 질문이 없다 (docs/rule-card-fields.md)")
     boolean outOfScope,
-    @Schema(description = "계정과목", example = "소모품비") String account,
+    @Schema(description = "계정과목 ID. 분기·비교는 이 값으로 한다(rules/accounts.yaml)", example = "접대비") String account,
+    @Schema(description = "계정과목 화면 이름. 화면·내보내기는 이 값을 보인다", example = "기업업무추진비") String accountLabel,
     @Schema(description = "안분·상각 적용 후 인정 금액. G6 한도는 연간 집계라 넣지 않는다(year 요약과 limits 가 반영)")
     Long finalAmount,
     @Schema(description = "룰로 확정하지 못한 fallback 결과인지") Boolean isInference,
@@ -43,13 +47,14 @@ public record JudgmentResponse(
 ) {
 
     /** explanation 은 출처(RuleCard reason)가 아직 없어 비워 둔다. */
-    static JudgmentResponse from(JudgmentRevision judgment) {
+    static JudgmentResponse from(JudgmentRevision judgment, RuleSet rules, boolean pendingQuestion) {
         JudgedTransaction transaction = judgment.transaction();
         return new JudgmentResponse(judgment.id(), judgment.transactionId(),
             new TransactionSummary(transaction.approvedAt(), transaction.merchantRaw(), transaction.merchantNorm(),
                 transaction.merchantCategory(), transaction.amount(), transaction.installmentMonths()),
-            judgment.revision(), judgment.origin(), verdict(judgment.verdict()), judgment.blockedAtGate(),
-            judgment.outOfScope(), judgment.account(), judgment.finalAmount(), judgment.inference(),
+            judgment.revision(), judgment.origin(), verdict(judgment.verdict()),
+            judgment.verdict() == Verdict.UNAVAILABLE && pendingQuestion, judgment.blockedAtGate(),
+            judgment.outOfScope(), judgment.account(), rules.accountLabel(judgment.account()), judgment.finalAmount(), judgment.inference(),
             judgment.unmatchedReason(), judgment.attributes(), judgment.ruleCardId(), judgment.ruleCardVersion(),
             judgment.appliedRuleIds(), judgment.rulesCommitSha(), judgment.userContextVersion(),
             /* explanation */ null, judgment.computedAt(),

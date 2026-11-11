@@ -150,12 +150,61 @@ describe('거래', () => {
     expect(transactions.list).toHaveBeenLastCalledWith(expect.objectContaining({ year: 2026, month: 2 }));
   });
 
-  it('판정 대상 칸은 상태 배지와 같은 모양의 버튼으로 맞춘다', async () => {
+  it('상태 배지는 판정대상이 아닌 행에만 달고, 바꾸는 버튼은 모든 행에 둔다', async () => {
     await render();
-    expect(rowOf('스타벅스')?.textContent).toContain('판정대상');
-    expect(rowOf('스타벅스')?.textContent).toContain('빼기');
+    expect(rowOf('스타벅스')?.textContent).not.toContain('판정대상');
+    const action = (merchant: string) => rowOf(merchant)?.querySelector('button[aria-label]')?.getAttribute('aria-label');
+    expect(action('스타벅스')).toContain('판정 대상에서 빼기');
     expect(rowOf('포인트사용')?.textContent).toContain('대상제외');
-    expect(rowOf('포인트사용')?.textContent).toContain('다시 넣기');
+    expect(action('포인트사용')).toContain('판정 대상에 다시 넣기');
+  });
+
+  it('빼기는 확인 창에서 한 번 더 묻고, 다시 넣기는 묻지 않는다 (11/8 회의)', async () => {
+    transactions.exclude.mockReset().mockResolvedValue({});
+    transactions.include.mockReset().mockResolvedValue({});
+    await render();
+    const press = async (button: Element | null | undefined) => {
+      if (!(button instanceof HTMLElement)) throw new Error('버튼이 없다');
+      await act(async () => {
+        button.click();
+      });
+    };
+    const dialog = () => document.body.querySelector('[role="dialog"]');
+    const dialogButton = (label: string) =>
+    [...(dialog()?.querySelectorAll('button') ?? [])].find((button) => button.textContent === label);
+
+    await press(rowOf('스타벅스')?.querySelector('button[aria-label]'));
+    expect(dialog()?.textContent).toContain('판정 대상에서 뺄까요?');
+    expect(dialog()?.textContent).toContain('스타벅스');
+    expect(transactions.exclude).not.toHaveBeenCalled();
+
+    await press(dialogButton('취소'));
+    expect(dialog()).toBeNull();
+    expect(transactions.exclude).not.toHaveBeenCalled();
+
+    await press(rowOf('스타벅스')?.querySelector('button[aria-label]'));
+    await press(dialogButton('빼기'));
+    expect(transactions.exclude).toHaveBeenCalledWith('1');
+    expect(dialog()).toBeNull();
+
+    await press(rowOf('포인트사용')?.querySelector('button[aria-label]'));
+    expect(dialog()).toBeNull();
+    expect(transactions.include).toHaveBeenCalledWith('3');
+  });
+
+  it('빼지 못하면 확인 창 안에 까닭을 보인다', async () => {
+    const { ApiRequestError } = await import('../api/contract');
+    transactions.exclude.mockReset().mockRejectedValue(
+      new ApiRequestError(500, 'INTERNAL', '서버가 잠시 멈췄습니다.')
+    );
+    await render();
+    await act(async () => {
+      (rowOf('스타벅스')?.querySelector('button[aria-label]') as HTMLElement).click();
+    });
+    await act(async () => {
+      [...document.body.querySelectorAll('[role="dialog"] button')].find((button) => button.textContent === '빼기')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(document.body.querySelector('[role="dialog"] [role="alert"]')?.textContent).toBe('서버가 잠시 멈췄습니다.');
   });
 
   it('올린 파일이 없으면 올리기를 권하고 거래를 묻지 않는다', async () => {

@@ -55,18 +55,51 @@ aws ecr get-login-password --region ap-northeast-2 \
     | docker login --username AWS --password-stdin "$registry"
 
 compose=(docker compose --env-file "$config" -f "$repo/deploy/compose.yaml")
-"${compose[@]}" pull
-"${compose[@]}" up -d --wait --remove-orphans
 
-# Caddy keeps running across deploys; `up` has already published this commit's web files
-# (web-files). Apply any Caddyfile change in place.
-"${compose[@]}" exec -T web caddy reload --config /etc/caddy/Caddyfile
+# Blue-green: start the idle colour's backend and ai, send /api/v1 to it, then stop the old pair.
+# The file Caddy imports records the colour that serves. The single-pair layout (services
+# "backend" and "ai", before blue-green or after a --rollback to it) has no colour, and its
+# backend holds host port 8080 like blue, so green goes first then.
+upstream=$repo/deploy/caddy/upstream.caddy
+active=$(sed -n 's/^reverse_proxy backend-\(blue\|green\):8080$/\1/p' "$upstream" 2>/dev/null || true)
+single=$(for service in backend ai; do
+    docker ps -aq --filter "label=com.docker.compose.project=ktc4" \
+        --filter "label=com.docker.compose.service=$service"
+done)
+if [[ -z $single && $active == green ]]; then next=blue old=green; else next=green old=blue; fi
+
+"${compose[@]}" pull postgres redis web web-files "backend-$next" "ai-$next"
+# Postgres and Redis are recreated here if their definitions changed. Flyway runs while the old
+# pair keeps serving, so every migration must also work with the previous release (db/README.md).
+"${compose[@]}" up -d --wait "backend-$next" "ai-$next"
 
 # Flyway must initialize the empty application schema before these SQL files run.
 "${compose[@]}" exec -T postgres \
     psql -1 -v ON_ERROR_STOP=1 -U "$DB_USERNAME" -d "$DB_NAME" < "$repo/db/schema.sql"
 "${compose[@]}" exec -T postgres \
     psql -1 -v ON_ERROR_STOP=1 -U "$DB_USERNAME" -d "$DB_NAME" < "$repo/db/rag.sql"
+
+previous=$(cat "$upstream" 2>/dev/null || true)
+printf 'reverse_proxy backend-%s:8080\n' "$next" > "$upstream"
+# `up` recreates Caddy only when its own definition changed (a version bump); otherwise a no-op.
+# If Caddy rejects the change it keeps sending to the old colour, so put the file back to match.
+# Otherwise the next deploy would take the new colour as active and recreate the serving one.
+if ! { "${compose[@]}" up -d --no-deps web &&
+    "${compose[@]}" exec -T web caddy reload --config /etc/caddy/Caddyfile; }; then
+    if [[ -n $previous ]]; then printf '%s\n' "$previous" > "$upstream"; else rm -f "$upstream"; fi
+    exit 1
+fi
+"${compose[@]}" run --rm --no-deps web-files
+
+# Traffic has moved, so the old pair finishes its requests and judgment runs (stop_grace_period)
+# unseen. It stays stopped rather than removed. Stopping the other colour even when it did not
+# serve also cleans up after a deploy that failed before switching.
+"${compose[@]}" stop "backend-$old" "ai-$old"
+# Retire the single-pair containers the same way.
+if [[ -n $single ]]; then
+    # shellcheck disable=SC2086 # one container ID per line
+    docker stop $single && docker rm $single
+fi
 
 printf '%s\n' "$sha" > /opt/ktc4/current-sha
 docker image prune -af --filter until=168h

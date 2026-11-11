@@ -246,6 +246,133 @@ class QuestionAnswerIntegrationTest {
     }
 
     @Test
+    void withdraw_reopens_the_question_on_every_rejudged_transaction() throws Exception {
+        // given: 「전용」으로 답한 가맹점 질문 둘과, 그 답으로 재판정된 같은 가맹점 카페 거래
+        UUID first = insertTransaction("통신", "KT");
+        UUID second = insertTransaction("통신", "KT");
+        UUID cafe = insertTransaction("카페", "KT");
+        judge(first);
+        judge(second);
+        judge(cafe);
+        UUID firstQuestion = pendingQuestion(first, "전용여부");
+        UUID secondQuestion = pendingQuestion(second, "전용여부");
+        answer(List.of(firstQuestion), "전용").andExpect(status().isOk());
+        assertThat(latestVerdict(first)).isEqualTo("AVAILABLE");
+
+        // when: 한 질문으로 답을 취소한다
+        withdraw(List.of(firstQuestion))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.withdrawnCount").value(2))
+            .andExpect(jsonPath("$.rejudgedTransactionCount").value(3));
+
+        // then: 취소가 UserFact 새 version 으로 남고, 그것을 origin 으로 세 거래가 재판정된다
+        UUID withdrawal = jdbcTemplate.queryForObject("""
+            select id from user_fact
+            where batch_id = ? and scope_key = 'merchant:KT' and version = 2 and withdrawn and value = '{}'::jsonb
+            """, UUID.class, batchId);
+        assertThat(jdbcTemplate.queryForList("""
+            select transaction_id from judgment where trigger_user_fact_id = ?
+            """, UUID.class, withdrawal)).containsExactlyInAnyOrder(first, second, cafe);
+        // 답이 없어 확인 필요로 돌아가 같은 질문을 새로 묻고, 답했던 질문은 이력에서 빠진다(답을 가리키지 않는다)
+        assertThat(latestVerdict(first)).isEqualTo("NEEDS_REVIEW");
+        assertThat(latestVerdict(second)).isEqualTo("NEEDS_REVIEW");
+        assertThat(pendingQuestion(first, "전용여부")).isNotEqualTo(firstQuestion);
+        assertThat(pendingQuestion(second, "전용여부")).isNotEqualTo(secondQuestion);
+        assertThat(jdbcTemplate.queryForList(
+            "select status from question_queue where id in (?, ?) and answered_fact_id is null and answered_at is null",
+            String.class, firstQuestion, secondQuestion)).containsExactly("CANCELED", "CANCELED");
+        // 재판정한 판정은 취소한 답을 판정 입력으로 쓰지 않는다
+        assertThat(jdbcTemplate.queryForObject(
+            "select count(*) from judgment_input_fact where user_fact_id = ?", Integer.class, withdrawal)).isZero();
+        assertThat(CurrentJudgments.mismatches(jdbcTemplate)).isZero();
+    }
+
+    @Test
+    void answer_after_withdraw_is_a_new_version_and_withdrawing_twice_changes_nothing() throws Exception {
+        // given: 답했다가 취소한 거래 단위 질문
+        UUID cafe = insertTransaction("카페", "스타벅스");
+        judge(cafe);
+        answer(List.of(pendingQuestion(cafe, "용도")), "업무미팅").andExpect(status().isOk());
+        withdraw(List.of(answeredQuestion(cafe, "용도"))).andExpect(status().isOk());
+        UUID reopened = pendingQuestion(cafe, "용도");
+        int revisions = revisionCount(cafe);
+
+        // when: 다시 열린 질문으로 한 번 더 취소한다
+        withdraw(List.of(reopened))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.withdrawnCount").value(0))
+            .andExpect(jsonPath("$.rejudgedTransactionCount").value(0));
+
+        // then: 아무것도 바뀌지 않는다
+        assertThat(revisionCount(cafe)).isEqualTo(revisions);
+        assertThat(jdbcTemplate.queryForObject(
+            "select count(*) from user_fact where batch_id = ?", Integer.class, batchId)).isEqualTo(2);
+
+        // when: 다시 답한다
+        answer(List.of(reopened), "업무미팅").andExpect(status().isOk());
+
+        // then: 취소 다음 version 이고, 그 답으로 다시 판정된다
+        assertThat(jdbcTemplate.queryForObject("""
+            select version from user_fact where batch_id = ? and not withdrawn order by version desc limit 1
+            """, Integer.class, batchId)).isEqualTo(3);
+        assertThat(latestVerdict(cafe)).isEqualTo("AVAILABLE");
+    }
+
+    @Test
+    void withdrawing_an_entertainment_answer_takes_it_out_of_the_limit() throws Exception {
+        // given: 업무미팅으로 답해 접대비 한도 항목에 들어간 카페 거래
+        UUID cafe = insertTransaction("카페", "스타벅스");
+        judge(cafe);
+        answer(List.of(pendingQuestion(cafe, "용도")), "업무미팅").andExpect(status().isOk());
+
+        // when
+        withdraw(List.of(answeredQuestion(cafe, "용도"))).andExpect(status().isOk());
+
+        // then: 현재 판정이 확인 필요라 한도를 다시 집계해 이 거래의 항목이 빠진다
+        assertThat(latestVerdict(cafe)).isEqualTo("NEEDS_REVIEW");
+        assertThat(jdbcTemplate.queryForObject("""
+            select count(*)
+            from limit_bucket_entry entry
+            join judgment on judgment.id = entry.judgment_id
+            where judgment.transaction_id = ?
+            """, Integer.class, cafe)).isZero();
+    }
+
+    @Test
+    void invalid_withdrawals_change_nothing() throws Exception {
+        // given: 답한 가맹점 질문, 같은 batch 의 거래 단위 질문, 다른 batch 의 질문, 재판정으로 취소된 질문
+        UUID telecom = insertTransaction("통신", "KT");
+        judge(telecom);
+        UUID canceled = pendingQuestion(telecom, "전용여부");
+        judge(telecom);
+        UUID merchantQuestion = pendingQuestion(telecom, "전용여부");
+        answer(List.of(merchantQuestion), "전용").andExpect(status().isOk());
+        UUID cafe = insertTransaction("카페", "스타벅스");
+        judge(cafe);
+        UUID cafeQuestion = pendingQuestion(cafe, "용도");
+        UUID otherBatchQuestion = otherBatchQuestion();
+
+        // when / then
+        withdraw(List.of(UUID.randomUUID()))
+            .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("QUESTION_NOT_FOUND"));
+        withdraw(List.of(merchantQuestion, otherBatchQuestion))
+            .andExpect(status().isUnprocessableEntity())
+            .andExpect(jsonPath("$.code").value("QUESTIONS_FROM_DIFFERENT_BATCHES"));
+        withdraw(List.of(merchantQuestion, cafeQuestion))
+            .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("QUESTION_GROUP_MISMATCH"));
+        withdraw(List.of(canceled))
+            .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("QUESTION_NOT_ANSWERABLE"));
+        withdraw(List.of())
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+
+        // then: 답은 그대로다
+        assertThat(jdbcTemplate.queryForObject(
+            "select status from question_queue where id = ?", String.class, merchantQuestion)).isEqualTo("ANSWERED");
+        assertThat(jdbcTemplate.queryForObject(
+            "select count(*) from user_fact where batch_id = ? and withdrawn", Integer.class, batchId)).isZero();
+    }
+
+    @Test
     void rejudges_only_current_targets_with_the_latest_context_of_the_group() throws Exception {
         // given: Context 1·2 로 각각 판정한 가맹점 질문 거래 둘, 그 뒤 제외되거나 분류가 풀린 같은 가맹점 카페 거래
         UUID first = insertTransaction("통신", "KT");
@@ -689,6 +816,30 @@ class QuestionAnswerIntegrationTest {
             .content("""
                 {"questionIds": ["%s"], "answer": {"value": "%s"}}
                 """.formatted(ids, value)));
+    }
+
+    private ResultActions withdraw(List<UUID> questionIds) throws Exception {
+        String ids = questionIds.isEmpty() ? ""
+            : "\"" + String.join("\", \"", questionIds.stream().map(UUID::toString).toList()) + "\"";
+        return mockMvc.perform(post("/api/v1/question-responses/withdraw")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"questionIds": [%s]}
+                """.formatted(ids)));
+    }
+
+    private UUID answeredQuestion(UUID transactionId, String factType) {
+        return jdbcTemplate.queryForObject("""
+            select question.id
+            from question_queue question
+            join judgment on judgment.id = question.judgment_id
+            where judgment.transaction_id = ? and question.fact_type = ? and question.status = 'ANSWERED'
+            """, UUID.class, transactionId, factType);
+    }
+
+    private int revisionCount(UUID transactionId) {
+        return jdbcTemplate.queryForObject(
+            "select count(*) from judgment where transaction_id = ?", Integer.class, transactionId);
     }
 
     private ResultActions bulkAnswer(UUID targetBatchId, String factType, String value) throws Exception {

@@ -12,7 +12,7 @@ export function RequireAuth({ children }: {children: React.ReactElement;}) {
   return (
     <p role="status" className="flex min-h-full items-center justify-center gap-2 bg-canvas text-body text-ink2">
         <Loader2Icon className="h-4 w-4 animate-spin text-accent" aria-hidden="true" />
-        로그인 정보를 확인하고 있습니다…
+        로그인 정보를 확인하고 있습니다
       </p>);
 
   // 로그인이 저절로 끝났으면 왜 끝났는지 로그인 화면이 알린다 (C51)

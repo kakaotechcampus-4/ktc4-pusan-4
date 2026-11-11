@@ -37,11 +37,11 @@ export const SHOWCASE_TRACES: ShowcaseTrace[] = [
     gateTrace: [
       {
         gate: 'G0',
-        result: '승인내역 확인 · 형식 검증 통과'
+        result: '승인내역 확인, 형식 검증 통과'
       },
       {
         gate: 'G1',
-        result: '§33 불산입 항목 해당 없음'
+        result: '제33조 불산입 항목 해당 없음'
       },
       {
         gate: 'G2',
@@ -49,7 +49,7 @@ export const SHOWCASE_TRACES: ShowcaseTrace[] = [
       },
       {
         gate: 'G3',
-        result: '자산 아님 · 안분 대상 아님'
+        result: '자산 아님, 안분 대상 아님'
       },
       {
         gate: 'G4',
@@ -92,7 +92,7 @@ export const SHOWCASE_TRACES: ShowcaseTrace[] = [
       },
       {
         gate: 'G2',
-        result: '목적 불명 → 확인 필요로 강등'
+        result: '목적 불명이라 확인 필요로 강등'
       }
     ],
     citation: {
@@ -123,7 +123,7 @@ export const SHOWCASE_TRACES: ShowcaseTrace[] = [
       },
       {
         gate: 'G2',
-        result: '통상성 부정 → 불가'
+        result: '통상성 부정으로 불가'
       }
     ],
     citation: {

@@ -8,8 +8,8 @@ scrape_configs:
   - job_name: ktc4-backend
     metrics_path: /actuator/prometheus
     static_configs:
-      # A2 가 compose 에서 127.0.0.1:8080 으로만 연다. A2 release 전에는 연결 실패가 Agent 로그에 찍힌다.
-      - targets: ["127.0.0.1:8080"]
+      # compose 가 blue 를 127.0.0.1:8080, green 을 127.0.0.1:8081 로 연다(블루그린). 멈춘 색은 연결 실패가 Agent 로그에 찍힌다.
+      - targets: ["127.0.0.1:8080", "127.0.0.1:8081"]
     metric_relabel_configs:
       # 긁은 시계열은 전부 EMF 로그로 나가 로그 요금이 붙는다. 대시보드에 쓰는 3개만 남긴다.
       # 값은 "__name__;area;name" 으로 이어 붙여 비교한다. 없는 라벨은 빈 문자열이다.

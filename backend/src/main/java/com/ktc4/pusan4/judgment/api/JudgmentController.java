@@ -1,6 +1,8 @@
 package com.ktc4.pusan4.judgment.api;
 
 import com.ktc4.pusan4.judgment.api.JudgmentSummaryResponse.Scope;
+import com.ktc4.pusan4.judgment.domain.JudgmentRevision;
+import com.ktc4.pusan4.judgment.domain.RuleSet;
 import com.ktc4.pusan4.judgment.domain.Verdict;
 import com.ktc4.pusan4.judgment.persistence.JudgmentListQuery;
 import com.ktc4.pusan4.judgment.persistence.JudgmentOverrideService;
@@ -18,6 +20,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,7 +30,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -38,16 +43,22 @@ public class JudgmentController {
 
     private final JudgmentQueryService queryService;
     private final JudgmentOverrideService overrideService;
+    /** 계정과목 화면 이름(rules/accounts.yaml)을 응답에 붙인다. */
+    private final RuleSet rules;
 
-    public JudgmentController(JudgmentQueryService queryService, JudgmentOverrideService overrideService) {
+    public JudgmentController(
+        JudgmentQueryService queryService, JudgmentOverrideService overrideService, RuleSet rules
+    ) {
         this.queryService = queryService;
         this.overrideService = overrideService;
+        this.rules = rules;
     }
 
     @Operation(summary = "판정 목록 및 revision 조회",
         description = "batchId·year 는 거래별 현재 Judgment, runId 는 그 Run 이 실제 생성한 Judgment, "
             + "transactionId + latestOnly=false 는 전체 revision 이력. 조건은 모두 AND. "
-            + "정렬: computedAt DESC, id DESC")
+            + "정렬: sort=COMPUTED_AT(기본) 이면 computedAt DESC, id DESC, APPROVED_AT 이면 거래 approvedAt DESC, id DESC. "
+            + "awaiting=true 는 답변 대기(불가인데 답하지 않은 질문이 걸린 거래)만, false 는 그것을 뺀다")
     @GetMapping
     public PageResponse<JudgmentResponse> list(
         CurrentUser currentUser,
@@ -57,11 +68,18 @@ public class JudgmentController {
         @RequestParam(required = false) Verdict verdict,
         @Parameter(description = "runId 와 함께 쓰지 않는다") @RequestParam(defaultValue = "true") boolean latestOnly,
         @RequestParam(required = false) UUID runId,
+        @RequestParam(required = false) Boolean awaiting,
+        @RequestParam(defaultValue = "COMPUTED_AT") JudgmentListQuery.Sort sort,
         @RequestParam(defaultValue = "0") @Min(0) int page,
         @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size
     ) {
-        JudgmentListQuery query = new JudgmentListQuery(transactionId, batchId, year, verdict, latestOnly, runId);
-        return PageResponse.of(queryService.list(currentUser.id(), query, page, size).map(JudgmentResponse::from));
+        JudgmentListQuery query =
+            new JudgmentListQuery(transactionId, batchId, year, verdict, latestOnly, runId, awaiting, sort);
+        Page<JudgmentRevision> judgments = queryService.list(currentUser.id(), query, page, size);
+        Set<UUID> pending = queryService.pendingQuestionTransactionIds(
+            judgments.map(JudgmentRevision::transactionId).getContent());
+        return PageResponse.of(judgments.map(judgment ->
+            JudgmentResponse.from(judgment, rules, pending.contains(judgment.transactionId()))));
     }
 
     @Operation(summary = "판정 결과 요약",
@@ -82,7 +100,7 @@ public class JudgmentController {
         }
         return JudgmentSummaryResponse.from(scope(batchId, year, runId),
             queryService.summary(currentUser.id(), batchId, year, runId),
-            queryService.limits(currentUser.id(), batchId, year));
+            queryService.limits(currentUser.id(), batchId, year), rules);
     }
 
     @Operation(summary = "세무사에게 넘길 내보내기",
@@ -101,7 +119,7 @@ public class JudgmentController {
                 "batchId, year 중 정확히 하나를 지정해야 합니다.");
         }
         return JudgmentExportResponse.from(queryService.export(currentUser.id(), batchId, year),
-            queryService.limits(currentUser.id(), batchId, year));
+            queryService.limits(currentUser.id(), batchId, year), rules);
     }
 
     private static Scope scope(UUID batchId, Integer year, UUID runId) {
@@ -119,7 +137,7 @@ public class JudgmentController {
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @GetMapping("/{judgmentId}")
     public JudgmentResponse detail(CurrentUser currentUser, @PathVariable UUID judgmentId) {
-        return JudgmentResponse.from(queryService.get(currentUser.id(), judgmentId));
+        return withPending(queryService.get(currentUser.id(), judgmentId));
     }
 
     @Operation(summary = "사용자 판정 수정 (Override)",
@@ -139,6 +157,11 @@ public class JudgmentController {
     ) {
         UUID revisionId = overrideService.override(currentUser.id(), judgmentId, request.toVerdict(), request.reason());
         // 저장 트랜잭션이 끝난 뒤 다시 읽어야 DB 가 정한 computedAt 이 실린다.
-        return JudgmentResponse.from(queryService.get(currentUser.id(), revisionId));
+        return withPending(queryService.get(currentUser.id(), revisionId));
+    }
+
+    private JudgmentResponse withPending(JudgmentRevision judgment) {
+        boolean pending = !queryService.pendingQuestionTransactionIds(List.of(judgment.transactionId())).isEmpty();
+        return JudgmentResponse.from(judgment, rules, pending);
     }
 }

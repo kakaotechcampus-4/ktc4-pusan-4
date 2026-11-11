@@ -14,11 +14,12 @@ import java.util.Objects;
 
 /**
  * Redis 에 둔 메일 인증 상태. 이메일은 {@link com.ktc4.pusan4.user.domain.Emails#normalize} 를 거친 값이다.
+ * 키 앞부분 {@code {p}} 는 용도마다 다르다({@link VerificationPurpose#keyPrefix}, 가입은 {@code email-verify}).
  * <ul>
- *   <li>{@code email-verify:code:{email}} → {@code { code, attempts }}. TTL {@link #CODE_TTL}.</li>
- *   <li>{@code email-verify:cooldown:{email}} → 재발송 대기. TTL {@link #RESEND_COOLDOWN}.</li>
- *   <li>{@code email-verify:daily:{email}} → 하루 발송 횟수. 첫 발송부터 24시간.</li>
- *   <li>{@code email-verify:verified:{email}} → 인증 토큰의 SHA-256. TTL {@link #VERIFIED_TTL}.</li>
+ *   <li>{@code {p}:code:{email}} → {@code { code, attempts }}. TTL {@link #CODE_TTL}.</li>
+ *   <li>{@code {p}:cooldown:{email}} → 재발송 대기. TTL {@link #RESEND_COOLDOWN}.</li>
+ *   <li>{@code {p}:daily:{email}} → 하루 발송 횟수. 첫 발송부터 24시간.</li>
+ *   <li>{@code {p}:verified:{email}} → 인증 토큰의 SHA-256. TTL {@link #VERIFIED_TTL}.</li>
  * </ul>
  * 코드는 6자리라 해시해도 금방 풀려서 원문으로 둔다. 대신 틀린 횟수와 하루 발송 횟수로 맞혀 보기를 막는다
  * (코드 하나에 {@link #MAX_ATTEMPTS}번, 하루 {@link #DAILY_LIMIT}개).
@@ -85,8 +86,9 @@ class EmailVerificationStore {
     }
 
     /** 새 코드를 둔다. 이전 코드는 버린다. */
-    IssueResult issue(String email, String code) {
-        Long result = redis.execute(ISSUE, List.of(codeKey(email), cooldownKey(email), dailyKey(email)),
+    IssueResult issue(VerificationPurpose purpose, String email, String code) {
+        Long result = redis.execute(ISSUE,
+            List.of(key(purpose, "code", email), key(purpose, "cooldown", email), key(purpose, "daily", email)),
             code, ms(CODE_TTL), ms(RESEND_COOLDOWN), ms(DAY), Integer.toString(DAILY_LIMIT));
         long value = Objects.requireNonNull(result);
         if (value == 0) {
@@ -100,12 +102,12 @@ class EmailVerificationStore {
      * 재발송 대기는 그대로 둔다. Gmail 이 장애여도 이메일 하나에 SMTP 호출이 대기 한 번에 한 번으로 묶인다.
      * 코드도 지우지 않는다. 타임아웃처럼 실패로 보였지만 메일은 나간 경우 사용자가 받은 코드를 그대로 쓸 수 있다.
      */
-    void refund(String email) {
-        redis.execute(REFUND, List.of(dailyKey(email)));
+    void refund(VerificationPurpose purpose, String email) {
+        redis.execute(REFUND, List.of(key(purpose, "daily", email)));
     }
 
-    ConfirmResult confirm(String email, String code, String verificationToken) {
-        Long result = redis.execute(CONFIRM, List.of(codeKey(email), verifiedKey(email)),
+    ConfirmResult confirm(VerificationPurpose purpose, String email, String code, String verificationToken) {
+        Long result = redis.execute(CONFIRM, List.of(key(purpose, "code", email), key(purpose, "verified", email)),
             code, Integer.toString(MAX_ATTEMPTS), hash(verificationToken), ms(VERIFIED_TTL));
         long value = Objects.requireNonNull(result);
         if (value == 1) {
@@ -114,29 +116,21 @@ class EmailVerificationStore {
         return value == 0 ? ConfirmResult.NO_CODE : ConfirmResult.WRONG_CODE;
     }
 
-    boolean isVerified(String email, String verificationToken) {
-        return hash(verificationToken).equals(redis.opsForValue().get(verifiedKey(email)));
+    boolean isVerified(VerificationPurpose purpose, String email, String verificationToken) {
+        return hash(verificationToken).equals(redis.opsForValue().get(key(purpose, "verified", email)));
     }
 
-    /** 가입이 끝나면 지운다. 같은 토큰으로 다시 가입할 일은 없지만 남겨 둘 이유도 없다. */
-    void consumeVerified(String email) {
-        redis.delete(verifiedKey(email));
+    /**
+     * 토큰을 쓰면 지운다. 같은 토큰으로 다시 가입하거나 비밀번호를 바꾸지 못한다.
+     *
+     * @return 지웠으면 true. 그사이 다른 요청이 먼저 썼으면 false
+     */
+    boolean consumeVerified(VerificationPurpose purpose, String email) {
+        return Boolean.TRUE.equals(redis.delete(key(purpose, "verified", email)));
     }
 
-    private static String codeKey(String email) {
-        return "email-verify:code:" + email;
-    }
-
-    private static String cooldownKey(String email) {
-        return "email-verify:cooldown:" + email;
-    }
-
-    private static String dailyKey(String email) {
-        return "email-verify:daily:" + email;
-    }
-
-    private static String verifiedKey(String email) {
-        return "email-verify:verified:" + email;
+    private static String key(VerificationPurpose purpose, String kind, String email) {
+        return purpose.keyPrefix() + ":" + kind + ":" + email;
     }
 
     private static String ms(Duration duration) {

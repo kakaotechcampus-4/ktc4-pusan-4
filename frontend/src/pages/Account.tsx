@@ -1,18 +1,19 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRightIcon } from 'lucide-react';
+import { ArrowRightIcon, PencilIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
-import { InfoPanel, InfoRows, PANEL_LINK, PanelFailed, PanelNote } from '../components/InfoPanel';
+import { InfoPanel, InfoRows, PANEL_ICON, PanelFailed, PanelNote } from '../components/InfoPanel';
 import { api, ApiRequestError, useApi } from '../api';
 import { useSession } from '../contexts/SessionContext';
-import { Button, Modal } from '../components/ui';
+import { Button, IconButton, Modal } from '../components/ui';
 import { formatFullDate } from '../utils/format';
 import { accountLabel } from '../utils/account';
 import { contextRows } from '../utils/context';
+import { PasswordChange } from '../components/PasswordChange';
 
 /**
- * 내 정보 (FR-02·03). 계정과 사업자 문진, 내 자료로 가는 길, 탈퇴.
- * 비밀번호 바꾸기와 계정 연결은 BE API 가 생기면 붙인다
+ * 내 정보 (FR-02·03). 계정과 사업자 문진, 내 자료로 가는 길, 비밀번호, 탈퇴.
+ * 계정 연결은 BE API 가 생기면 붙인다
  */
 export function Account() {
   const navigate = useNavigate();
@@ -60,7 +61,7 @@ export function Account() {
         </header>
 
         <InfoPanel title="계정">
-          {meQ.loading && !me && <PanelNote>불러오는 중…</PanelNote>}
+          {meQ.loading && !me && <PanelNote>불러오는 중</PanelNote>}
           {!meQ.loading && !me &&
           <PanelFailed onRetry={meQ.reload}>가입 정보를 불러오지 못했습니다.</PanelFailed>
           }
@@ -70,14 +71,17 @@ export function Account() {
         <InfoPanel
           title="사업자 문진"
           action={
-          contextStatus === 'ready' ?
-          <Link to="/interview" state={{ from: '/account' }} className={PANEL_LINK}>문진 고치기</Link> :
-          contextStatus === 'none' ?
-          <Link to="/interview" state={{ from: '/account' }} className={PANEL_LINK}>문진 하기</Link> :
+          contextStatus === 'ready' || contextStatus === 'none' ?
+          <IconButton
+            to="/interview"
+            state={{ from: '/account' }}
+            icon={PencilIcon}
+            className={PANEL_ICON}
+            label={contextStatus === 'ready' ? '문진 고치기' : '문진 하기'} /> :
           null
           }>
 
-          {contextStatus === 'loading' && <PanelNote>불러오는 중…</PanelNote>}
+          {contextStatus === 'loading' && <PanelNote>불러오는 중</PanelNote>}
           {/* 못 읽은 것을 문진 전으로 그리지 않는다 (C57) */}
           {contextStatus === 'error' && <PanelFailed onRetry={reloadContext}>문진을 불러오지 못했습니다.</PanelFailed>}
           {contextStatus === 'none' && <PanelNote>아직 문진을 하지 않았습니다.</PanelNote>}
@@ -86,6 +90,13 @@ export function Account() {
 
         <InfoPanel title="내 자료">
           <ul className="divide-y divide-line text-small">
+            {/* 올린 파일을 합쳐 한 해 단위로 본다. 파일 하나를 따라가는 판정 흐름(단계 띠)과 섞지 않는다 */}
+            <li>
+              <Link to="/yearly" className="flex items-center justify-between gap-3 px-5 py-3 text-ink hover:bg-surface">
+                연간 결과
+                <ArrowRightIcon className="h-4 w-4 text-ink2" aria-hidden="true" />
+              </Link>
+            </li>
             <li>
               <Link to="/uploads" className="flex items-center justify-between gap-3 px-5 py-3 text-ink hover:bg-surface">
                 업로드 이력
@@ -101,15 +112,22 @@ export function Account() {
           </ul>
         </InfoPanel>
 
+        {me &&
+        <section className="mt-10">
+            <h2 className="text-h4 font-bold text-ink">비밀번호</h2>
+            <PasswordChange email={me.email} />
+          </section>
+        }
+
         <section className="mt-10">
           <h2 className="text-h4 font-bold text-ink">탈퇴</h2>
           <p className="mt-1.5 text-body leading-6 text-ink">
             탈퇴하면 계정과 함께 올린 카드내역과 거래, 판정 결과, 질문과 답변, 사업자 문진이 모두
             사라집니다. 되돌릴 수 없습니다.
           </p>
-          {/* 빨강은 판정과 오류에만 쓴다. 다른 지우기(업로드 삭제)처럼 칠하지 않는다 */}
+          {/* 계정을 지우는 것은 되돌릴 수 없어 빨강이다(11/8 회의). 확인 창에서 한 번 더 묻는다 */}
           <Button
-            variant="secondary"
+            variant="danger"
             size="md"
             className="mt-4"
             disabled={!me}
@@ -141,12 +159,12 @@ export function Account() {
                 취소
               </Button>
               <Button
-              variant="primary"
+              variant="danger"
               size="md"
               disabled={removing}
               onClick={() => void remove()}>
 
-                {removing ? '탈퇴하는 중…' : '탈퇴하기'}
+                {removing ? '탈퇴하는 중' : '탈퇴하기'}
               </Button>
             </>
           }>

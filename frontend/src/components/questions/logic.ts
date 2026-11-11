@@ -28,7 +28,16 @@ export const ANSWER_LABEL: Record<string, string> = {
   '100만 원 넘는 물건은 없어요': '100만 원 넘는 물건 없음'
 };
 
-export const answerLabel = (value: string) => ANSWER_LABEL[value] ?? value;
+/**
+ * 예전 카드 버전의 선택지(70d13a9d 에서 업무·개인 혼용으로 합쳤다). 그 전에 만든 질문에 남아 있다.
+ * 지금 카드에는 없어 위 표와 나눈다(위 표는 지금 카드에 있는 값만 둔다)
+ */
+export const LEGACY_ANSWER_LABEL: Record<string, string> = {
+  '업무·개인 혼재': '업무와 개인 둘 다',
+  '업무·개인 섞임': '업무와 개인 둘 다'
+};
+
+export const answerLabel = (value: string) => ANSWER_LABEL[value] ?? LEGACY_ANSWER_LABEL[value] ?? value;
 
 /** 응답을 잃은 뒤 저장됐는지도 확인하지 못했다 */
 export const UNCONFIRMED_CODE = 'ANSWER_UNCONFIRMED';

@@ -71,7 +71,7 @@ export function AmountHero({
               <dd className="whitespace-nowrap text-small tabular-nums text-ink2">{formatNumber(share.count)}건</dd>
               }
                     <dd className="w-32 whitespace-nowrap text-right text-body font-bold tabular-nums text-ink">
-                      {share.amount === null ? '—' : formatWon(share.amount)}
+                      {share.amount === null ? '-' : formatWon(share.amount)}
                     </dd>
                   </div>
             )}

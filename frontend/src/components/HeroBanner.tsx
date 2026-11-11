@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon, PauseIcon, PlayIcon } from 'lucide-react';
 import { OrbitStage } from './OrbitStage';
 import { InterviewCard, UploadRows, VerdictCard } from './flowFigure';
-import { FLOW_STEPS, NOT_DOING } from '../mock/marketing';
+import { FLOW_STEPS, NOT_DOING, VERDICTS } from '../mock/marketing';
 
 /**
  * 메인 맨 위 큰 판. 세 장을 좌우로 넘겨 본다.
@@ -237,14 +237,15 @@ function TextSlide({
       <RingBackdrop variant={backdrop} />
       {/* 밝은 파랑 판 위에서 핑크는 대비 1.60 이라 안 읽힌다. eyebrow 는 흰색으로 둔다 */}
       <p className="relative text-body text-white">{eyebrow}</p>
-      <strong className="mt-5 block whitespace-pre-line relative text-h2 font-normal leading-tight tracking-ir text-white [word-break:keep-all] lg:text-ir-display">
+      <strong className="mt-5 block whitespace-pre-line relative text-h2 font-bold leading-tight tracking-ir-sm text-white [word-break:keep-all] lg:text-ir-display">
         {title}
       </strong>
       {/* 도식은 제목과 항목 사이 빈 자리를 채운다. 좁은 화면에서는 자리가 없어 숨는다 */}
       <div className="relative flex min-h-0 flex-1 items-center sm:py-8">{figure}</div>
-      <ul className="relative grid gap-6 pb-24 sm:grid-cols-3">
+      {/* 좁은 화면은 1 / 3 알약이 항목 줄 바로 아래(bottom-24)에 떠 있다. 항목 사이를 좁히고 알약 높이만큼 더 띄운다 */}
+      <ul className="relative grid gap-3 pb-36 sm:grid-cols-3 sm:gap-6 sm:pb-24">
         {items.map((item) =>
-        <li key={item} className="border-t border-white/20 pt-5">
+        <li key={item} className="border-t border-white/20 pt-3 sm:pt-5">
             <strong className="block text-h4 font-bold leading-tight tracking-ir-sm text-white [word-break:keep-all]">
               {item}
             </strong>
@@ -351,7 +352,8 @@ export function HeroBanner({ autoplay = true }: {autoplay?: boolean;}) {
 
   return (
     <div
-      className="relative"
+      // 멈춤은 장면 넘김만이 아니라 궤도 회전도 멈춘다. 움직이는 것이 남아 있으면 멈춘 것이 아니다(WCAG 2.2.2)
+      className={`relative ${stopped ? '[&_*]:[animation-play-state:paused]' : ''}`}
       onPointerEnter={(e) => {
         // 터치는 손을 떼도 hover 가 남는다. 마우스만 본다
         if (e.pointerType === 'mouse') setHolding(true);
@@ -368,6 +370,7 @@ export function HeroBanner({ autoplay = true }: {autoplay?: boolean;}) {
       }}>
       <ul
         ref={track}
+        data-hero-panel
         onScroll={() => {
           const el = track.current;
           if (!el) return;
@@ -382,18 +385,38 @@ export function HeroBanner({ autoplay = true }: {autoplay?: boolean;}) {
         className="flex snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain rounded-[20px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 
         <Slide>
-          <OrbitStage />
+          <OrbitStage paused={stopped} />
           {/* 글은 궤도 위에 올린다 */}
           <div className="relative z-10 px-8 pt-12 sm:px-16 sm:pt-16">
-            <p className="text-body text-white">
-              1인 IT 개발 사업자를 위한 경비 판정
+            {/* data-hero-eyebrow, data-hero-title: 인트로가 걷힐 때 같은 글이 이 자리로 옮겨 온다(IntroOverlay) */}
+            <p data-hero-eyebrow className="text-body text-white">
+              1인 사업자를 위한 종합소득세 경비 판정 서비스
             </p>
             {/* 페이지의 h1. 프리렌더가 공개 페이지마다 h1 이 하나인지 본다(scripts/prerender.mjs) */}
-            <h1 className="mt-5 block text-h2 font-normal leading-tight tracking-ir text-white [word-break:keep-all] lg:text-ir-display">
+            <h1 data-hero-title className="mt-5 block text-h2 font-bold leading-tight tracking-ir-sm text-white [word-break:keep-all] lg:text-h2-lg xl:text-ir-display">
               이 카드값이 경비인지,
               <br />
               조문까지 붙여 답합니다
             </h1>
+            {/*
+              제목 아래가 비어 보였다 (11/9). 무엇을 올리면 무엇이 나오는지 둔다.
+              좁은 화면은 이 자리에 작은 궤도 판이 들어가서 lg 부터 보인다.
+              폭은 궤도 판이 제목 몫으로 비워 둔 자리(OrbitStage: lg 424px, xl 520px)에서 좌우 여백을 뺀 만큼이다
+            */}
+            <div className="hidden lg:block lg:max-w-[360px] xl:max-w-[456px]">
+              <p className="mt-6 text-lead text-white [word-break:keep-all]">
+                카드사에서 받은 승인내역 파일 하나면 됩니다.
+              </p>
+              <ul className="mt-6">
+                {VERDICTS.map((item) =>
+                <li key={item.label} className="flex items-center gap-3 border-t border-white/20 py-2.5">
+                    <span className={`h-2 w-2 shrink-0 rounded-full ${item.bar}`} aria-hidden="true" />
+                    <strong className="w-16 shrink-0 text-body font-bold text-white">{item.label}</strong>
+                    <span className="text-body text-white [word-break:keep-all]">{item.body}</span>
+                  </li>
+                )}
+              </ul>
+            </div>
           </div>
         </Slide>
 

@@ -61,9 +61,9 @@ describe('classifyStatement', () => {
   });
 
   it('아무것도 못 찾으면 헤더를 코드 포인트 60개까지 보여 준다', () => {
-    expect(classifyStatement([]).why).toBe('가맹점명·승인정보 컬럼을 찾지 못했다 (헤더: 없음)');
+    expect(classifyStatement([]).why).toBe('가맹점명, 승인정보 컬럼을 찾지 못했다 (헤더: 없음)');
     const verdict = classifyStatement(['가'.repeat(59) + '\u{20000}'.repeat(11)]);
     expect(verdict.code).toBe('NO_COLUMNS');
-    expect(verdict.why).toBe(`가맹점명·승인정보 컬럼을 찾지 못했다 (헤더: ${'가'.repeat(59)}\u{20000})`);
+    expect(verdict.why).toBe(`가맹점명, 승인정보 컬럼을 찾지 못했다 (헤더: ${'가'.repeat(59)}\u{20000})`);
   });
 });

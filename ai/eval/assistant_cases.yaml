@@ -159,7 +159,7 @@
 - id: S40
   message: 올해 접대비 한도 넘었어?
   screen: /summary
-  expect: {called: [get_summary], contains: ["916,500"], not_matches: ['11,?751,?100']}
+  expect: {called: [get_summary], contains: ["916,500"], not_matches: ['11,?751,?100', '한도(는|은|가|:)?\s*13,?006,?500']}
 - id: S41
   message: 올해 경비로 인정되는 금액이 모두 얼마야?
   screen: /summary

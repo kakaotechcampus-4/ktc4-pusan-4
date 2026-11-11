@@ -38,12 +38,17 @@ class ApiContractIntegrationTest {
         "POST /api/v1/auth/email-verification",
         "POST /api/v1/auth/email-verification/confirm",
         "POST /api/v1/auth/signup",
+        "POST /api/v1/auth/password-reset",
+        "POST /api/v1/auth/password-reset/confirm",
+        "POST /api/v1/auth/password-reset/complete",
         "POST /api/v1/auth/login",
         "POST /api/v1/auth/kakao",
         "POST /api/v1/auth/refresh",
         "POST /api/v1/auth/logout",
         "GET /api/v1/users/me",
         "DELETE /api/v1/users/me",
+        "PUT /api/v1/users/me/password",
+        "POST /api/v1/bug-reports",
         "POST /api/v1/users/me/contexts",
         "GET /api/v1/users/me/contexts",
         "GET /api/v1/users/me/contexts/current",
@@ -58,6 +63,7 @@ class ApiContractIntegrationTest {
         "GET /api/v1/classification-reviews",
         "POST /api/v1/classification-responses",
         "POST /api/v1/judgment-runs",
+        "GET /api/v1/judgment-runs/active",
         "GET /api/v1/judgment-runs/{runId}",
         "GET /api/v1/judgment-runs/{runId}/failures",
         "GET /api/v1/judgments",
@@ -72,6 +78,7 @@ class ApiContractIntegrationTest {
         "POST /api/v1/assistant/chat",
         "POST /api/v1/questions/bulk-answer",
         "POST /api/v1/question-responses",
+        "POST /api/v1/question-responses/withdraw",
         "GET /api/v1/handoff-notes",
         "POST /api/v1/handoff-notes",
         "GET /api/v1/statutes/{statuteVersionId}",
@@ -93,7 +100,7 @@ class ApiContractIntegrationTest {
             .andReturn().getResponse().getContentAsString();
 
         Set<String> actual = new TreeSet<>();
-        objectMapper.readTree(body).path("paths").fields().forEachRemaining(path -> {
+        objectMapper.readTree(body).path("paths").properties().forEach(path -> {
             JsonNode operations = path.getValue();
             operations.fieldNames().forEachRemaining(method -> {
                 if (HTTP_METHODS.contains(method)) {

@@ -98,7 +98,7 @@ public class ClassificationReviewService {
     public ClassificationAnswer answer(UUID userId, List<UUID> reviewIds, String category) {
         if (ClassificationResult.UNCLASSIFIED.equals(category)) {
             throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "UNCLASSIFIED_CATEGORY_NOT_ALLOWED",
-                "「미분류」는 답변으로 제출할 수 없습니다.");
+                "미분류는 답변으로 제출할 수 없습니다.");
         }
         if (!vocabulary.contains(category)) {
             throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "INVALID_MERCHANT_CATEGORY",

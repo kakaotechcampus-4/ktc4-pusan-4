@@ -54,6 +54,11 @@ export function Modal({
     );
 
     const onKey = (event: KeyboardEvent) => {
+      /*
+        바텀시트 안에서 열리면(결과 화면의 빼기 확인) 시트도 document 에서 Esc 와 Tab 을 듣는다.
+        캡처 단계에서 먼저 받고 넘기지 않아야, Esc 가 시트까지 닫거나 Tab 이 시트로 초점을 끌어가지 않는다
+      */
+      if (event.key === 'Escape' || event.key === 'Tab') event.stopImmediatePropagation();
       if (event.key === 'Escape') {
         onCloseRef.current();
         return;
@@ -78,7 +83,7 @@ export function Modal({
       }
     };
 
-    document.addEventListener('keydown', onKey);
+    document.addEventListener('keydown', onKey, true);
     /*
       읽을 거리(lg)는 창 자체에 초점을 둔다. 첫 요소로 보내면 그게 본문 가운데 링크일 때
       브라우저가 거기까지 밀어서 문서가 중간부터 열린다. 창은 tabIndex=-1 이라 받을 수 있고,
@@ -89,7 +94,7 @@ export function Modal({
     const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
-      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('keydown', onKey, true);
       document.body.style.overflow = previous;
       opener?.focus?.();
     };

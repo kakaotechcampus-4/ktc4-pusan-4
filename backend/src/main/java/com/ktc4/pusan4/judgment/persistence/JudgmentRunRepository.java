@@ -35,18 +35,23 @@ interface JudgmentRunRepository extends Repository<JudgmentRunEntity, UUID> {
         """)
     List<JudgmentRunEntity> findStaleForUpdate(@Param("cutoff") OffsetDateTime cutoff);
 
-    /** 이 batch 에서 진행 중인 run. cutoff 전부터 진행이 없는 run 은 멈춘 것으로 보고 뺀다(interruptStale 과 같은 기준). */
+    /**
+     * 이 사용자의 진행 중인 run. 새로 만든 것부터. cutoff 전부터 진행이 없는 run 은 멈춘 것으로 보고 뺀다
+     * (interruptStale 과 같은 기준).
+     */
     @Query("""
-        select run.id
-        from JudgmentRunEntity run
-        where run.batchId = :batchId
+        select run
+        from JudgmentRunEntity run, UploadBatchEntity batch
+        where run.batchId = batch.id
+          and batch.userId = :userId
           and run.status in (
             com.ktc4.pusan4.judgment.domain.JudgmentRunStatus.QUEUED,
             com.ktc4.pusan4.judgment.domain.JudgmentRunStatus.RUNNING
           )
           and run.lastProgressAt >= :cutoff
+        order by run.createdAt desc
         """)
-    List<UUID> findActiveIds(@Param("batchId") UUID batchId, @Param("cutoff") OffsetDateTime cutoff);
+    List<JudgmentRunEntity> findActiveForUser(@Param("userId") UUID userId, @Param("cutoff") OffsetDateTime cutoff);
 
     @Query("""
         select run

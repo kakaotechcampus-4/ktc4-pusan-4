@@ -3,6 +3,7 @@ import { useSession } from '../contexts/SessionContext';
 import { Button, Container, cn } from './ui';
 import { Logo } from './Logo';
 import { BugReportButton } from './BugReport';
+import { AccountMenu } from './AccountMenu';
 
 /**
  * 랜딩·FAQ 같은 공개 화면의 머리. 랜딩 안 앵커 대신 별도 페이지로 간다.
@@ -12,18 +13,18 @@ import { BugReportButton } from './BugReport';
  */
 const NAV = [{ to: '/faq', label: 'FAQ' }];
 /*
- * 로그인 뒤 머리띠(AppShell)의 「자료」 알약과 같은 모양·같은 색으로 맞춘다 (#242 리뷰).
+ * 로그인 뒤 머리띠(AppShell)의 진행 단계 알약과 같은 모양, 같은 색으로 맞춘다 (#242 리뷰).
  * 공개 화면은 글자 링크, 로그인 뒤는 알약이라 같은 서비스로 보이지 않았다.
  * 폭·여백(max-w-page px-6)과 높이(72px)는 원래 같았다 — 알약만 달랐다
  */
 const NAV_LINK =
-'shrink-0 whitespace-nowrap rounded-full px-2.5 py-1.5 text-small font-bold transition-colors duration-150 ease-snap sm:px-3';
+'inline-block shrink-0 whitespace-nowrap rounded-full px-2.5 py-1.5 text-small font-bold transition-colors duration-150 ease-snap sm:px-3';
 const NAV_ON = 'bg-accent text-white';
 const NAV_OFF = 'text-ink2 hover:bg-surface';
 
 
 export function MarketingHeader() {
-  const { status, signOut, batchId, batchStatus } = useSession();
+  const { status, batchId, batchStatus } = useSession();
   const { pathname } = useLocation();
   // 올린 카드내역이 있으면 결과로 간다 (C83). 업로드 목록을 읽는 중이거나 못 읽었으면 결과 화면이 그 상태를 보여 준다
   const mine = batchStatus === 'ready' && batchId === null ? '/upload' : '/results';
@@ -66,12 +67,7 @@ export function MarketingHeader() {
               <Button to={mine} size="sm" className="hidden sm:inline-flex">
                 내 판정으로
               </Button>
-              <Button to="/account" variant="secondary" size="sm">
-                내 정보
-              </Button>
-              <Button variant="secondary" size="sm" onClick={signOut}>
-                로그아웃
-              </Button>
+              <AccountMenu home={false} />
             </> :
 
           <>

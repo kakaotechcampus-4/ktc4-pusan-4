@@ -84,7 +84,7 @@ export function KakaoCallback() {
 
       <p role="status" className="flex items-center gap-2 text-[15px] text-ink2">
           <Loader2Icon className="h-4 w-4 animate-spin text-accent" aria-hidden="true" />
-          카카오 계정으로 로그인하고 있습니다…
+          카카오 계정으로 로그인하고 있습니다
         </p>
       }
     </AuthLayout>);

@@ -18,6 +18,11 @@ beforeEach(async () => {
 /** 시드: 1016 은 소명 대기(자동 판정 불가인데 「용도」 질문이 남음), 1005 는 카페 「용도」 질문 */
 const tx = (suffix: string) => `0199c8f2-0000-7000-8000-0000000000${suffix}`;
 const currentOf = async (transactionId: string) => (await api.judgments.list({ transactionId })).items[0];
+/** 목업 실행은 조회할 때마다 나아간다. 끝날 때까지 조회한다 */
+const finish = async (runId: string) => {
+  let run = await api.runs.get(runId);
+  while (run.status.code === 'QUEUED' || run.status.code === 'RUNNING') run = await api.runs.get(runId);
+};
 const pendingGroups = () => api.questions.grouped({ batchId, status: 'PENDING', size: 50 });
 const groupOf = async (transactionId: string) => {
   const group = (await pendingGroups()).items.find((g) => g.transactions.some((t) => t.transactionId === transactionId));
@@ -37,6 +42,44 @@ describe('판정 (3.7)', () => {
       amount: transaction.amount,
       installmentMonths: transaction.installmentMonths
     });
+  });
+
+  it('답변 대기는 목록 표지와 거르기, 요약 건수가 서로 맞고, 결제 금액은 판정마다 더한다', async () => {
+    const all = (await api.judgments.list({ batchId, size: 100 })).items;
+    const summary = await api.judgments.summary({ batchId });
+
+    // 1016 은 소명 대기 시드다. 표지는 불가에만 붙는다
+    expect(all.find((j) => j.transactionId === tx('1016'))?.awaitingAnswer).toBe(true);
+    expect(all.filter((j) => j.awaitingAnswer).every((j) => j.verdict.code === 'UNAVAILABLE')).toBe(true);
+
+    const awaiting = (await api.judgments.list({ batchId, awaiting: true, size: 100 })).items;
+    const otherUnavailable = (await api.judgments.list({ batchId, verdict: 'UNAVAILABLE', awaiting: false, size: 100 })).items;
+    expect(awaiting.map((j) => j.id).sort()).toEqual(all.filter((j) => j.awaitingAnswer).map((j) => j.id).sort());
+    expect(summary.awaiting.count).toBe(awaiting.length);
+    expect(otherUnavailable.length).toBe(summary.byVerdict.UNAVAILABLE.count - summary.awaiting.count);
+
+    const spend = (verdict: string) =>
+    all.filter((j) => j.verdict.code === verdict).reduce((sum, j) => sum + j.transaction.amount, 0);
+    expect(summary.byVerdict.AVAILABLE.spendAmount).toBe(spend('AVAILABLE'));
+    expect(summary.byVerdict.UNAVAILABLE.spendAmount).toBe(spend('UNAVAILABLE'));
+    expect(summary.awaiting.spendAmount).toBe(awaiting.reduce((sum, j) => sum + j.transaction.amount, 0));
+  });
+
+  it('sort=APPROVED_AT 이면 승인일 최근 순으로 준다', async () => {
+    const items = (await api.judgments.list({ batchId, sort: 'APPROVED_AT', size: 100 })).items;
+    const dates = items.map((j) => j.transaction.approvedAt);
+    expect(dates).toEqual([...dates].sort().reverse());
+  });
+
+  it('요약은 직접 바꾼 판정을 바뀐 판정별로 세고, 해마다 나눈 금액의 합은 경비 가능 금액이다', async () => {
+    const before = await api.judgments.summary({ batchId });
+    expect(before.overridden.AVAILABLE.count).toBe(0);
+    expect(before.byYear.reduce((sum, row) => sum + row.finalAmount, 0)).toBe(before.byVerdict.AVAILABLE.finalAmount);
+
+    await api.judgments.override((await currentOf(tx('1005'))).id, { toVerdict: 'AVAILABLE', reason: '업무' }, 'k1');
+    const after = await api.judgments.summary({ batchId });
+    expect(after.overridden.AVAILABLE.count).toBe(1);
+    expect(after.overridden.AVAILABLE.finalAmount).toBe((await currentOf(tx('1005'))).finalAmount ?? 0);
   });
 
   it('제외한 거래는 현재 결과·요약에서 빠지지만 transactionId 로는 읽힌다', async () => {
@@ -66,6 +109,10 @@ describe('판정 (3.7)', () => {
     expect(summary.limits).toHaveLength(1);
     expect(summary.limits[0].totalAmount).toBe(entertainment?.finalAmount);
     expect(summary.limits[0].excessAmount).toBe(0);
+    // 비교는 ID(접대비)로, 화면은 이름(기업업무추진비)으로 한다 (api.md 3.7)
+    expect(entertainment?.accountLabel).toBe('기업업무추진비');
+    expect(summary.limits[0].bucketLabel).toBe('기업업무추진비');
+    expect(summary.limits[0].limitAmount).toBeGreaterThan(0);
   });
 });
 
@@ -334,9 +381,27 @@ describe('문진·판정 실행', () => {
     controls.failNextRun(1, 'RUN_START_FAILED');
     const run = await api.runs.create({ batchId, contextId: seed.id });
     expect((await api.runs.failures(run.id)).items.map((f) => f.errorCode)).toEqual(['RUN_START_FAILED']);
+    await finish(run.id);
 
     const next = await api.runs.create({ batchId, contextId: seed.id });
     expect((await api.runs.failures(next.id)).items).toHaveLength(0);
+  });
+
+  it('진행 중인 실행이 있으면 active 가 그것을 주고, 새 실행은 409 로 그 실행을 알려 준다 (3.6)', async () => {
+    const seed = await api.contexts.current();
+    if (!seed) throw new Error('시드 문진이 없다');
+    expect(await api.runs.active()).toBeNull();
+
+    const run = await api.runs.create({ batchId, contextId: seed.id });
+    expect((await api.runs.active())?.id).toBe(run.id);
+    await expect(api.runs.create({ batchId, contextId: seed.id })).rejects.toMatchObject({
+      status: 409,
+      code: 'RUN_ALREADY_ACTIVE',
+      runId: run.id
+    });
+
+    await finish(run.id);
+    expect(await api.runs.active()).toBeNull();
   });
 });
 
@@ -415,11 +480,11 @@ describe('가입·카카오 로그인 (목업, #193·#176)', () => {
   it('코드 받기 → 확인 → 가입하면 바로 로그인되고, 그 비밀번호로 다시 들어온다', async () => {
     await api.auth.requestEmailVerification({ email: ' New@Example.com ' });
     const { verificationToken } = await api.auth.confirmEmailVerification({ email: 'new@example.com', code: '123456' });
-    await api.auth.signup({ email: 'new@example.com', password: 'longenough', verificationToken });
+    await api.auth.signup({ email: 'new@example.com', password: 'longenough1!', verificationToken });
     expect(await api.users.me()).toMatchObject({ email: 'new@example.com' });
 
     await api.auth.logout();
-    await api.auth.login({ email: 'NEW@example.com', password: 'longenough' });
+    await api.auth.login({ email: 'NEW@example.com', password: 'longenough1!' });
     expect((await api.users.me()).email).toBe('new@example.com');
     // 가입한 이메일은 코드를 다시 받을 수 없다
     await expect(api.auth.requestEmailVerification({ email: 'new@example.com' })).rejects.toMatchObject({
@@ -450,7 +515,7 @@ describe('가입·카카오 로그인 (목업, #193·#176)', () => {
     await api.auth.requestEmailVerification({ email: 'c@example.com' });
     const { verificationToken } = await api.auth.confirmEmailVerification({ email: 'c@example.com', code: '123456' });
     await expect(
-      api.auth.signup({ email: 'd@example.com', password: 'longenough', verificationToken })
+      api.auth.signup({ email: 'd@example.com', password: 'longenough1!', verificationToken })
     ).rejects.toMatchObject({ code: 'EMAIL_NOT_VERIFIED' });
     await expect(
       api.auth.signup({ email: 'c@example.com', password: 'short', verificationToken })
@@ -461,6 +526,65 @@ describe('가입·카카오 로그인 (목업, #193·#176)', () => {
   it('카카오 계정은 email 이 null 이다', async () => {
     await api.auth.kakao({ code: 'any-code' });
     expect(await api.users.me()).toMatchObject({ email: null, role: 'USER' });
+  });
+
+  it('규칙에 맞지 않는 비밀번호는 이유를 message 에 담아 400 이다', async () => {
+    await api.auth.requestEmailVerification({ email: 'e@example.com' });
+    const { verificationToken } = await api.auth.confirmEmailVerification({ email: 'e@example.com', code: '123456' });
+    await expect(
+      api.auth.signup({ email: 'e@example.com', password: 'longenough', verificationToken })
+    ).rejects.toMatchObject({ code: 'VALIDATION_ERROR', message: '숫자, 기호를 하나 이상 넣어 주세요.' });
+  });
+});
+
+describe('비밀번호 재설정과 변경 (목업, #270)', () => {
+  it('코드 받기 → 확인 → 새 비밀번호로 바꾸면 그 비밀번호로 들어온다', async () => {
+    await api.auth.requestPasswordReset({ email: 'r@example.com' });
+    const { verificationToken } = await api.auth.confirmPasswordReset({ email: 'r@example.com', code: '123456' });
+    // 규칙에 맞지 않으면 토큰은 그대로라 고쳐서 다시 보낸다
+    await expect(
+      api.auth.completePasswordReset({ email: 'r@example.com', verificationToken, newPassword: 'short' })
+    ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    await api.auth.completePasswordReset({ email: 'r@example.com', verificationToken, newPassword: 'newpass1!' });
+    // 바꾸고 나면 토큰은 더 쓸 수 없다
+    await expect(
+      api.auth.completePasswordReset({ email: 'r@example.com', verificationToken, newPassword: 'other12!' })
+    ).rejects.toMatchObject({ code: 'EMAIL_NOT_VERIFIED' });
+    await api.auth.login({ email: 'r@example.com', password: 'newpass1!' });
+    expect((await api.users.me()).email).toBe('r@example.com');
+  });
+
+  it('가입 인증 코드와 재설정 코드는 따로 센다', async () => {
+    await api.auth.requestEmailVerification({ email: 's@example.com' });
+    await expect(api.auth.requestPasswordReset({ email: 's@example.com' })).resolves.toBeUndefined();
+    await expect(api.auth.requestPasswordReset({ email: 's@example.com' })).rejects.toMatchObject({
+      code: 'VERIFICATION_RESEND_TOO_SOON'
+    });
+  });
+
+  it('현재 비밀번호가 맞아야 바꾸고, 카카오 계정은 409 PASSWORD_NOT_SET 이다', async () => {
+    await api.auth.login({ email: 'p@example.com', password: 'demo1234' });
+    await expect(
+      api.users.changePassword({ currentPassword: 'wrong', newPassword: 'newpass1!' })
+    ).rejects.toMatchObject({ code: 'INVALID_CURRENT_PASSWORD' });
+    await api.users.changePassword({ currentPassword: 'demo1234', newPassword: 'newpass1!' });
+    await api.auth.logout();
+    await api.auth.login({ email: 'p@example.com', password: 'newpass1!' });
+
+    await api.auth.kakao({ code: 'any-code' });
+    await expect(
+      api.users.changePassword({ currentPassword: 'x', newPassword: 'newpass1!' })
+    ).rejects.toMatchObject({ status: 409, code: 'PASSWORD_NOT_SET' });
+  });
+
+  it('버그 신고는 로그인해야 받고 한 시간에 5건까지다', async () => {
+    await expect(api.bugReports.create({ message: '금액이 0원' })).rejects.toMatchObject({ status: 401 });
+    await api.auth.login({ email: 'q@example.com', password: 'demo1234' });
+    for (let i = 0; i < 5; i += 1) await api.bugReports.create({ message: `신고 ${i}` });
+    await expect(api.bugReports.create({ message: '여섯 번째' })).rejects.toMatchObject({
+      status: 429,
+      code: 'BUG_REPORT_RATE_LIMITED'
+    });
   });
 });
 

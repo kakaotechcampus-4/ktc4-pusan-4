@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { CheckIcon } from 'lucide-react';
+import { CheckIcon, ChevronRightIcon } from 'lucide-react';
 import { SignedUpError, useSession } from '../contexts/SessionContext';
 import { api, ApiRequestError, mockVerificationCode } from '../api';
 import {
@@ -9,17 +9,18 @@ import {
   AUTH_LABEL,
   AuthLayout } from
 '../components/AuthLayout';
-import { Button, Modal } from '../components/ui';
+import { Button, IconButton, Modal } from '../components/ui';
 import { TERMS_EFFECTIVE, TermsBody } from './public/Terms';
 import { PRIVACY_EFFECTIVE, PrivacyBody } from './public/Privacy';
+import { PASSWORD_RULE, passwordProblem } from '../utils/password';
+import { PasswordCheck } from '../components/PasswordCheck';
+import { KakaoStart } from '../components/KakaoStart';
 
 /** 다시 받기 간격. 서버도 60초에 한 번만 보낸다 (#193) */
 const RESEND_SECONDS = 60;
 /** 서버는 코드 하나에 5번까지 받고, 5번째로 틀리면 코드를 지운다. 그래도 응답은 「틀림」이라 여기서 센다 (C69) */
 const MAX_CODE_ATTEMPTS = 5;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-/** 약관·처리방침을 여는 「보기」 */
-const DOC_LINK = 'shrink-0 text-[12px] text-ink2 underline underline-offset-4 hover:text-ink';
 
 interface LocationState {
   from?: string;
@@ -47,7 +48,7 @@ const CONFIRM_ERRORS: Record<string, string> = {
 };
 
 const SIGNUP_ERRORS: Record<string, string> = {
-  VALIDATION_ERROR: '비밀번호는 8자 이상, 72바이트 이하로 입력해 주세요.',
+  VALIDATION_ERROR: `비밀번호는 ${PASSWORD_RULE}로 입력해 주세요.`,
   EMAIL_ALREADY_EXISTS: '이미 가입한 이메일입니다. 로그인해 주세요.'
 };
 
@@ -56,9 +57,6 @@ const secondsLeft = (message: string) => {
   const found = /(\d+)\s*초/.exec(message);
   return found ? Number(found[1]) : RESEND_SECONDS;
 };
-
-/** bcrypt 한도 때문에 서버는 UTF-8 72바이트까지만 받는다 */
-const byteLength = (text: string) => new TextEncoder().encode(text).length;
 
 /**
  * 코드를 보낸 이메일과 인증 토큰. 새로고침이나 뒤로 가기로 화면이 다시 떠도 이어 가게 탭 안에 둔다 (C69).
@@ -156,6 +154,15 @@ export function Signup() {
   const invalid = (field: ErrorField, message: string) => {
     setError(message);
     setErrorField(field);
+  };
+
+  /** 틀렸다고 한 비밀번호 칸을 고치기 시작하면 그 오류는 걷는다. 그래야 규칙 확인(PasswordCheck)이 다시 보인다 */
+  const editPassword = (field: 'password' | 'passwordAgain', set: (value: string) => void) => (event: React.ChangeEvent<HTMLInputElement>) => {
+    set(event.target.value);
+    if (errorField === field) {
+      setError(null);
+      setErrorField(null);
+    }
   };
 
   /** 새 코드를 보냈다(보냈을 수 있다). 코드 칸과 틀린 횟수를 새로 시작한다 */
@@ -257,12 +264,9 @@ export function Signup() {
   const submitSignup = (event: React.FormEvent) => {
     event.preventDefault();
     if (!sentTo || !verificationToken) return;
-    if (password.length < 8) {
-      invalid('password', '비밀번호는 8자 이상으로 입력해 주세요.');
-      return;
-    }
-    if (byteLength(password) > 72) {
-      invalid('password', '비밀번호가 너무 깁니다. 한글은 24자, 영문은 72자까지 쓸 수 있습니다.');
+    const problem = passwordProblem(password);
+    if (problem) {
+      invalid('password', problem);
       return;
     }
     if (password !== passwordAgain) {
@@ -292,16 +296,19 @@ export function Signup() {
           setError('이메일 인증이 만료됐습니다. 인증 코드를 다시 받아 주세요.');
           return;
         }
-        const message = describe(caught, SIGNUP_ERRORS, '가입하지 못했습니다. 잠시 후 다시 시도해 주세요.');
-        if (caught instanceof ApiRequestError && caught.code === 'VALIDATION_ERROR') invalid('password', message);
-        else setError(message);
+        // 비밀번호 규칙을 어기면 서버가 이유를 message 에 담는다. 그 문장을 그대로 보인다
+        if (caught instanceof ApiRequestError && caught.code === 'VALIDATION_ERROR') {
+          invalid('password', caught.message);
+          return;
+        }
+        setError(describe(caught, SIGNUP_ERRORS, '가입하지 못했습니다. 잠시 후 다시 시도해 주세요.'));
       }
     });
   };
 
   // 이미 로그인했으면 로그인 뒤에 갈 곳으로 보낸다 (C52). 이어 가는 중에는 폼을 그리지 않는다
   if (status === 'signedIn' && !signingUp.current) return <Navigate to={from ?? '/'} replace />;
-  if (status === 'restoring') return <AuthLayout title="이메일로 가입">{null}</AuthLayout>;
+  if (status === 'restoring') return <AuthLayout title="회원가입">{null}</AuthLayout>;
 
   const step = verificationToken ? 3 : sentTo ? 2 : 1;
   /** 그 칸 바로 아래 둘 오류. 칸이 정해지지 않은 오류는 field 를 null 로 불러 그 자리에 둔다 */
@@ -315,10 +322,12 @@ export function Signup() {
   error && errorField === field ? `signup-${field}-error` : undefined;
 
   return (
-    <AuthLayout title="이메일로 가입">
+    <AuthLayout title="회원가입">
       <h1 className="text-[26px] font-bold tracking-tight text-ink">
-        이메일로 가입
+        회원가입
       </h1>
+
+      <KakaoStart from={from ?? '/'} label="카카오로 시작하기" divider="또는 이메일로" disabled={busy} />
 
       <ol className="mt-6 flex gap-2 text-[12px]" aria-label="가입 단계">
         {['이메일 인증', '코드 확인', '비밀번호'].map((label, index) =>
@@ -367,7 +376,7 @@ export function Signup() {
             {errorAt('email')}
             {errorAt(null)}
             <Button type="submit" disabled={busy} className="mt-4 w-full">
-              {busy ? '보내는 중…' : '인증 코드 받기'}
+              {busy ? '보내는 중' : '인증 코드 받기'}
             </Button>
           </> :
 
@@ -416,7 +425,7 @@ export function Signup() {
             </p>
         }
           <Button type="submit" disabled={busy} className="mt-4 w-full">
-            {busy ? '확인 중…' : '코드 확인'}
+            {busy ? '확인 중' : '코드 확인'}
           </Button>
           <Button
           variant="secondary"
@@ -436,19 +445,20 @@ export function Signup() {
             <div>
               {/* 조건은 placeholder 가 아니라 라벨에 둔다. placeholder 는 적기 시작하면 사라진다 (C70) */}
               <label htmlFor="signup-password" className={AUTH_LABEL}>
-                비밀번호 (8자 이상)
+                비밀번호 ({PASSWORD_RULE})
               </label>
               <input
               id="signup-password"
               type="password"
               autoComplete="new-password"
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              onChange={editPassword('password', setPassword)}
               aria-invalid={errorField === 'password'}
-              aria-describedby={describedBy('password')}
+              aria-describedby={describedBy('password') ?? (password ? 'signup-password-check' : undefined)}
               className={AUTH_INPUT} />
 
               {errorAt('password')}
+              <PasswordCheck id="signup-password-check" password={password} hidden={errorField === 'password'} />
             </div>
             <div>
               <label htmlFor="signup-password-again" className={AUTH_LABEL}>
@@ -459,7 +469,7 @@ export function Signup() {
               type="password"
               autoComplete="new-password"
               value={passwordAgain}
-              onChange={(event) => setPasswordAgain(event.target.value)}
+              onChange={editPassword('passwordAgain', setPasswordAgain)}
               aria-invalid={errorField === 'passwordAgain'}
               aria-describedby={describedBy('passwordAgain')}
               className={AUTH_INPUT} />
@@ -475,8 +485,9 @@ export function Signup() {
           }>
 
             <legend className="sr-only">약관 동의</legend>
-            <label className="flex items-center gap-2 font-bold text-ink">
+            <label htmlFor="agree-all" className="flex items-center gap-2 font-bold text-ink">
               <input
+              id="agree-all"
               type="checkbox"
               checked={agreeTerms && agreePrivacy}
               onChange={(event) => {
@@ -492,26 +503,23 @@ export function Signup() {
               읽어 보려다 동의한 것이 되면 안 된다 (#247 리뷰)
             */}
             <div className="flex items-center gap-2 text-ink2">
-              <label className="flex flex-1 items-center gap-2">
-                <input type="checkbox" checked={agreeTerms} onChange={(event) => setAgreeTerms(event.target.checked)} />
+              <label htmlFor="agree-terms" className="flex flex-1 items-center gap-2">
+                <input id="agree-terms" type="checkbox" checked={agreeTerms} onChange={(event) => setAgreeTerms(event.target.checked)} />
                 [필수] 이용약관 동의
               </label>
-              <button type="button" onClick={() => setDoc('terms')} className={DOC_LINK}>
-                보기
-              </button>
+              <IconButton icon={ChevronRightIcon} label="이용약관 보기" onClick={() => setDoc('terms')} />
             </div>
             <div className="flex items-center gap-2 text-ink2">
-              <label className="flex flex-1 items-center gap-2">
+              <label htmlFor="agree-privacy" className="flex flex-1 items-center gap-2">
                 <input
+                  id="agree-privacy"
                   type="checkbox"
                   checked={agreePrivacy}
                   onChange={(event) => setAgreePrivacy(event.target.checked)} />
 
                 [필수] 개인정보 수집 및 이용 동의
               </label>
-              <button type="button" onClick={() => setDoc('privacy')} className={DOC_LINK}>
-                보기
-              </button>
+              <IconButton icon={ChevronRightIcon} label="개인정보 수집 및 이용 동의 보기" onClick={() => setDoc('privacy')} />
             </div>
           </fieldset>
           {errorAt('terms')}
@@ -534,7 +542,7 @@ export function Signup() {
 
           {errorAt(null)}
           <Button type="submit" disabled={busy} className="mt-5 w-full">
-            {busy ? '가입하는 중…' : '가입하기'}
+            {busy ? '가입하는 중' : '가입하기'}
           </Button>
         </form>
       }

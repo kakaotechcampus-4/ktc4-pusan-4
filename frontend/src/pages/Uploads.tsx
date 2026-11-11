@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CheckIcon, InboxIcon } from 'lucide-react';
+import { CheckIcon, EyeIcon, InboxIcon, Trash2Icon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { api, ApiRequestError, useApi } from '../api';
 import { useSession } from '../contexts/SessionContext';
@@ -7,6 +7,7 @@ import {
   Badge,
   Button,
   Empty,
+  IconButton,
   Modal,
   Pagination,
   Table,
@@ -78,23 +79,17 @@ export function Uploads() {
           보는 중
         </span> :
 
-    <Button
+    <IconButton
       variant="secondary"
-      size="sm"
-      aria-label={`${uploadName(row)} ${formatPeriod(row.periodStart, row.periodEnd)} 보기`}
-      onClick={() => setBatchId(row.id)}>
+      icon={EyeIcon}
+      label={`${uploadName(row)} ${formatPeriod(row.periodStart, row.periodEnd)} 보기`}
+      onClick={() => setBatchId(row.id)} />
 
-          이 파일 보기
-        </Button>
     }
-      <Button
-      variant="ghost"
-      size="sm"
-      aria-label={`${uploadName(row)} ${formatPeriod(row.periodStart, row.periodEnd)} 업로드 삭제`}
-      onClick={() => setTarget(row)}>
-
-        삭제
-      </Button>
+      <IconButton
+      icon={Trash2Icon}
+      label={`${uploadName(row)} ${formatPeriod(row.periodStart, row.periodEnd)} 업로드 삭제`}
+      onClick={() => setTarget(row)} />
     </span>;
 
 
@@ -216,7 +211,7 @@ export function Uploads() {
             disabled={deleting}
             onClick={() => void remove()}>
 
-              {deleting ? '지우는 중…' : '지우기'}
+              {deleting ? '지우는 중' : '지우기'}
             </Button>
           </>
         }>

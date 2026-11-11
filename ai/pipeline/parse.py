@@ -263,7 +263,7 @@ def parse_law(payload: dict) -> list[Unit]:
             "doc_no": doc_no,
             "effective_from": _date(jo.get("조문시행일자")) or fallback_ef,
             "issued_at": issued_at,
-            "source_url": f"https://www.law.go.kr/법령/{name}/제{jo_key}조",
+            "source_url": f"https://www.law.go.kr/법령/{name}/제{jo['조문번호']}조" + (f"의{branch}" if branch else ""),
             "meta": {"조문제목": jo.get("조문제목"), "조문번호": jo_key},
         }
 

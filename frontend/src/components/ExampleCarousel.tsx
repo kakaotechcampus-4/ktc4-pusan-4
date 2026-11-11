@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import { DEV_EXPENSES } from '../mock/marketing';
-import { Badge, type BadgeTone } from './ui';
+import { Badge, type BadgeSymbol, type BadgeTone } from './ui';
 
 /** 랜딩의 지출 예시 카드. 판정 3분류를 색·기호와 함께 보여준다 */
 const VERDICT: Record<
   (typeof DEV_EXPENSES)[number]['verdict'],
-  {label: string; symbol: string; tone: BadgeTone; skin: string;}> =
+  {label: string; symbol: BadgeSymbol; tone: BadgeTone; skin: string;}> =
 {
-  ok: { label: '가능', symbol: '✓', tone: 'ok', skin: 'border-ok-line bg-ok-bg' },
-  ask: { label: '확인 필요', symbol: '?', tone: 'warn', skin: 'border-warn-line bg-warn-bg' },
-  deny: { label: '불가', symbol: '✕', tone: 'deny', skin: 'border-deny-line bg-deny-bg' }
+  ok: { label: '가능', symbol: 'check', tone: 'ok', skin: 'border-ok-line bg-ok-bg' },
+  ask: { label: '확인 필요', symbol: 'question', tone: 'warn', skin: 'border-warn-line bg-warn-bg' },
+  deny: { label: '불가', symbol: 'cross', tone: 'deny', skin: 'border-deny-line bg-deny-bg' }
 };
 
 /**
@@ -79,13 +79,13 @@ export function ExampleCarousel() {
         })}
       </ul>
 
-      {/* 좌우 끝에 걸치는 동그란 버튼 */}
+      {/* 좌우 끝에 걸치는 동그란 버튼. 흰 바탕에 테만 두면 카드 위에서 묻혀 회색으로 칠한다 */}
       <button
         type="button"
         aria-label="이전 예시"
         disabled={atStart}
         onClick={() => move(-1)}
-        className="absolute -left-4 top-1/2 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-accent-line bg-canvas text-ink transition-opacity hover:border-ink disabled:pointer-events-none disabled:opacity-0 lg:flex">
+        className="absolute -left-4 top-1/2 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-surface text-ink transition-[opacity,background-color] duration-150 ease-snap hover:bg-accent-line disabled:pointer-events-none disabled:opacity-0 lg:flex">
 
         <ChevronLeftIcon className="h-5 w-5" aria-hidden="true" />
       </button>
@@ -94,7 +94,7 @@ export function ExampleCarousel() {
         aria-label="다음 예시"
         disabled={atEnd}
         onClick={() => move(1)}
-        className="absolute -right-4 top-1/2 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-accent-line bg-canvas text-ink transition-opacity hover:border-ink disabled:pointer-events-none disabled:opacity-0 lg:flex">
+        className="absolute -right-4 top-1/2 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-surface text-ink transition-[opacity,background-color] duration-150 ease-snap hover:bg-accent-line disabled:pointer-events-none disabled:opacity-0 lg:flex">
 
         <ChevronRightIcon className="h-5 w-5" aria-hidden="true" />
       </button>

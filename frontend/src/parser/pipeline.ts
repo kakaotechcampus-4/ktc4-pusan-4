@@ -82,7 +82,7 @@ export function resolveCancellations(records: RawRecord[], stats: ParseStats): R
 
     if (AGGREGATED_RE.test(c.merchant)) {
       stats.cancelsUnpaired += 1;
-      c.reviewReason = '취소 행 (합산 행 — 개별 취소 대상이 없다)';
+      c.reviewReason = '취소 행 (합산 행이라 개별 취소 대상이 없다)';
       continue;
     }
 
@@ -130,22 +130,22 @@ export function resolveCancellations(records: RawRecord[], stats: ParseStats): R
       c.reviewReason = `취소 행 (${how} 매칭으로 상계됨)`;
     } else if (cands.length >= 2) {
       stats.cancelsAmbiguous += 1;
-      c.reviewReason = `취소 행 (상계 대상 불확정 — 후보 ${cands.length}건)`;
+      c.reviewReason = `취소 행 (상계 대상 불확정, 후보 ${cands.length}건)`;
       for (const o of cands) {
         flagged.set(o,
-        `취소 대상 불확정 — 같은 상호·금액 결제가 ${cands.length}건이라 어느 건이 취소됐는지 자동 판정 불가`
+        `취소 대상 불확정: 같은 상호와 금액 결제가 ${cands.length}건이라 어느 건이 취소됐는지 자동 판정 불가`
         );
       }
     } else if (outside.length > 0) {
       stats.cancelsUnpaired += 1;
       stats.cancelsOutOfWindow += 1;
-      c.reviewReason = `취소 행 (같은 상호·금액 결제가 ${PAIR_WINDOW_DAYS}일 밖에만 있음 — 상계하지 않음)`;
+      c.reviewReason = `취소 행 (같은 상호와 금액 결제가 ${PAIR_WINDOW_DAYS}일 밖에만 있어 상계하지 않음)`;
       for (const [o, days] of outside) {
-        flagged.set(o, `같은 상호·금액 취소가 ${days}일 떨어져 있음 — ${PAIR_WINDOW_DAYS}일 밖이라 상계하지 않음`);
+        flagged.set(o, `같은 상호와 금액 취소가 ${days}일 떨어져 있음. ${PAIR_WINDOW_DAYS}일 밖이라 상계하지 않음`);
       }
     } else {
       stats.cancelsUnpaired += 1;
-      c.reviewReason = '취소 행 (짝 후보 없음 — 원 결제가 조회 기간 밖일 수 있다)';
+      c.reviewReason = '취소 행 (짝 후보 없음. 원 결제가 조회 기간 밖일 수 있다)';
     }
   }
 
@@ -182,6 +182,11 @@ export class MedicalMasker {
     return this.labels.size;
   }
 }
+
+/**
+ * 취소 행 금액은 음수로 맞춘다 (C35). KB 는 취소를 음수로 주지만 IBK 는 승인구분만 취소이고 금액은 양수다
+ */
+const signedAmount = (r: RawRecord) => r.isCancel && r.amount !== null && r.amount > 0 ? -r.amount : r.amount;
 
 /** 출력 행으로 바꾼다. 레코드 순서를 지킨다 */
 export async function toRows(records: RawRecord[], stats: ParseStats): Promise<ParsedRow[]> {
@@ -222,7 +227,8 @@ export async function toRows(records: RawRecord[], stats: ParseStats): Promise<P
     const approvedAt = r.when ?? '';
     if (!approvedAt) stats.noDate += 1;
 
-    // 마스킹한 행은 원래 상호 대신 고정 문자열 의료_마스킹 으로 키를 만든다 (hash.ts naturalKey 참고)
+    // 마스킹한 행은 원래 상호 대신 고정 문자열 의료_마스킹 으로 키를 만든다 (hash.ts naturalKey 참고).
+    // 금액은 아래에서 부호를 맞추기 전, 파일에 적힌 값이다. 이미 올린 파일을 다시 올려도 같은 키가 나와야 한다
     keys.push(naturalKey(approvedAt, masked ? MEDICAL_PREFIX : r.merchant, r.amount, r.approvalNo));
 
     stats.kept += 1;
@@ -231,7 +237,7 @@ export async function toRows(records: RawRecord[], stats: ParseStats): Promise<P
     rows.push({
       approvedAt,
       rawMerchant,
-      amount: r.amount,
+      amount: signedAmount(r),
       installmentMonths: r.installment,
       approvalNo: r.approvalNo,
       naturalKey: '',

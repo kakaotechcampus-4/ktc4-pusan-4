@@ -17,6 +17,7 @@ import type {
 import { api, seedSession } from '../api';
 import { chooseBatch, saveBatchId, savedBatchId } from '../auth/session';
 import type { SessionEndReason } from '../auth/session';
+import { setSignedInHint } from './signedInHint';
 
 /** restoring: 새로고침 뒤 리프레시 쿠키로 로그인을 이어 가는 중. 이때는 로그인 화면으로 보내지 않는다 */
 export type AuthStatus = 'restoring' | 'anonymous' | 'signedIn';
@@ -89,6 +90,11 @@ const SessionContext = createContext<SessionValue | null>(null);
 
 export function SessionProvider({ children }: {children: React.ReactNode;}) {
   const [status, setStatus] = useState<AuthStatus>('restoring');
+
+  // 로그인 여부가 정해지면 표시를 맞춘다. 이어 가는 중(restoring)에는 건드리지 않는다
+  useEffect(() => {
+    if (status !== 'restoring') setSignedInHint(status === 'signedIn');
+  }, [status]);
   const [user, setUser] = useState<User | null>(null);
   const userId = user?.id ?? null;
   const email = user?.email ?? null;
@@ -330,6 +336,7 @@ export function SessionProvider({ children }: {children: React.ReactNode;}) {
 
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- Provider 와 짝인 훅이라 같이 둔다. 이 파일을 고치면 HMR 이 새로고침으로 바뀔 뿐이다
 export function useSession(): SessionValue {
   const value = useContext(SessionContext);
   if (!value) {

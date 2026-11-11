@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom';
 import {
   AlertTriangleIcon,
   ArrowRightIcon,
+  CircleHelpIcon,
   FileSpreadsheetIcon,
   Loader2Icon,
+  ShuffleIcon,
   UploadCloudIcon } from
 'lucide-react';
 import { AppShell } from '../components/AppShell';
@@ -14,6 +16,7 @@ import { Badge, Button, Table, cn, type Column } from '../components/ui';
 import { useSession } from '../contexts/SessionContext';
 import { api, ApiRequestError } from '../api';
 import { parseCardFile, sampleFiles } from '../parser';
+import { buildRandomUpload } from '../parser/randomSample';
 import type {
   BlockedOutcome,
   ParsedOutcome,
@@ -57,6 +60,9 @@ const UNSENT_REASON: Record<UnsendableCode, string> = {
 const formatDollar = (amount: number) =>
 `${amount.toLocaleString('ko-KR', { maximumFractionDigits: 2 })}달러`;
 
+/** 미리보기 표마다 보이는 행 수. 보낼 거래와 보내지 않는 행이 같다 */
+const PREVIEW_ROWS = 10;
+
 /** 카드 모양 상자. 흰 바탕에 괘선만 두른다 */
 const BOX = 'animate-rise rounded-2xl border border-line bg-canvas p-6';
 
@@ -86,6 +92,8 @@ const draft = {
   seq: 0,
   /** 연타로 두 번 보내지 않게 막는다 */
   sending: false,
+  /** 보내기 시작한 때. 다른 화면에 갔다 와도 지난 시간을 이어 센다 */
+  sendingSince: 0,
   listeners: new Set<() => void>()
 };
 
@@ -236,6 +244,7 @@ export function Upload() {
     if (!request) return;
     const mine = draft.seq;
     draft.sending = true;
+    draft.sendingSince = Date.now();
     put({ ...phase, send: 'sending' });
     try {
       const created = await api.uploads.create(request, key);
@@ -293,7 +302,12 @@ export function Upload() {
             <BlockedCard file={phase.file} outcome={phase.outcome} onReset={reset} />
             }
 
-            {phase.kind === 'preview' &&
+            {/* 1만 건이면 서버가 저장하고 분류하는 데 10초 넘게 걸린다(#274). 미리보기 대신 올리는 중임을 크게 보인다 (11/8 회의) */}
+            {phase.kind === 'preview' && phase.send === 'sending' && phase.outcome.request &&
+            <SendingCard request={phase.outcome.request} since={draft.sendingSince} onReset={reset} />
+            }
+
+            {phase.kind === 'preview' && phase.send !== 'sending' &&
             <PreviewCard
               file={phase.file}
               outcome={phase.outcome}
@@ -388,12 +402,13 @@ function SampleList({ onPick }: {onPick: (file: File) => void;}) {
     };
   }, []);
 
-  if (samples.length === 0) return null;
-
   return (
     <section className="mt-8">
       <h2 className="text-body font-bold text-ink">샘플 파일로 해 보기</h2>
       <ul className="mt-3 space-y-2">
+        <li>
+          <RandomSample onPick={onPick} />
+        </li>
         {samples.map((sample) =>
         <li key={sample.id}>
             <button
@@ -412,6 +427,62 @@ function SampleList({ onPick }: {onPick: (file: File) => void;}) {
 
 }
 
+/**
+ * 시연용 무작위 카드내역. 누르면 100~300건짜리 KB 승인내역을 바로 만들어 올리기 전 미리보기로 넘긴다.
+ * 건수와 판정별 몫(확인필요 10% 이하)은 고를 수 없고 무작위다 (parser/randomSample.ts)
+ */
+const RANDOM_SAMPLE_HELP =
+'카드내역 파일이 없어도 판정을 해 볼 수 있게 만든 시연용 편의 기능입니다. 100~300건짜리 승인내역 파일이 브라우저에서 새로 생성되고, 서버에 업로드하여 실제 파일과 동일한 로직으로 판정합니다. 서버에 미리 넣어 둔 거래나 결과는 없습니다.';
+
+function RandomSample({ onPick }: {onPick: (file: File) => void;}) {
+  const [making, setMaking] = useState(false);
+
+  const make = async () => {
+    setMaking(true);
+    try {
+      onPick(await buildRandomUpload());
+    } finally {
+      setMaking(false);
+    }
+  };
+
+  // 줄 전체가 만들기 버튼이다(after 로 줄을 덮는다). ? 는 그 위에 따로 올려 버튼 안에 버튼이 들어가지 않게 한다
+  return (
+    <div className="relative flex items-center gap-3 rounded-xl border border-edge bg-canvas px-4 py-3 transition-colors duration-150 ease-snap hover:bg-surface">
+      {making ?
+      <Loader2Icon className="h-4 w-4 shrink-0 animate-spin text-ink2" aria-hidden="true" /> :
+      <ShuffleIcon className="h-4 w-4 shrink-0 text-ink2" aria-hidden="true" />}
+      <button
+        type="button"
+        disabled={making}
+        onClick={() => void make()}
+        className="min-w-0 truncate text-left text-body text-ink after:absolute after:inset-0 after:rounded-xl disabled:cursor-wait">
+
+        무작위 카드내역 만들기
+      </button>
+      {/* 시연에서 서버에 미리 넣어 둔 결과를 보여 주는 것으로 오해하지 않게 한다. 터치에서는 눌러서 초점이 가면 보인다 */}
+      <span className="group relative z-10 inline-flex">
+        <button
+          type="button"
+          aria-label="무작위 카드내역 만들기 안내"
+          aria-describedby="random-sample-help"
+          className="inline-flex h-6 w-6 items-center justify-center rounded-full text-ink2 hover:text-ink">
+
+          <CircleHelpIcon className="h-4 w-4" aria-hidden="true" />
+        </button>
+        <span
+          id="random-sample-help"
+          role="tooltip"
+          className="pointer-events-none invisible absolute bottom-full left-1/2 mb-2 w-72 -translate-x-1/2 rounded-2xl bg-ink px-4 py-3 text-small leading-6 text-white shadow-panel group-focus-within:visible group-hover:visible">
+
+          {RANDOM_SAMPLE_HELP}
+        </span>
+      </span>
+      <ArrowRightIcon className="ml-auto h-4 w-4 shrink-0 text-ink2" aria-hidden="true" />
+    </div>);
+
+}
+
 function ParsingCard({ file }: {file: File;}) {
   return (
     <section className={BOX} aria-busy="true">
@@ -420,6 +491,56 @@ function ParsingCard({ file }: {file: File;}) {
         <h2 className="text-body-lg font-bold text-ink">파일을 읽고 있습니다</h2>
       </div>
       <p className="mt-1.5 break-all text-body text-ink2">{file.name}</p>
+    </section>);
+
+}
+
+/**
+ * 올리는 중. 서버는 한 요청 안에서 거래를 저장하고 가맹점을 분류한 뒤 답한다. 얼마나 남았는지 알 길이 없어
+ * 진행 막대 대신 지난 시간을 센다. 멈춘 것이 아니라는 것만 보인다
+ */
+function SendingCard({
+  request,
+  since,
+  onReset
+
+
+
+}: {request: UploadBatchRequest;since: number;onReset: () => void;}) {
+  const [now, setNow] = useState(() => Date.now());
+  // 누른 버튼이 사라지므로 초점을 제목으로 옮긴다. body 로 떨어지면 키보드로 이어 갈 자리를 잃는다
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => heading.current?.focus(), []);
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const seconds = Math.max(0, Math.floor((now - since) / 1000));
+
+  return (
+    <section className={BOX} aria-busy="true">
+      <div className="flex items-center gap-2.5">
+        <Loader2Icon className="h-4 w-4 animate-spin text-ink2" aria-hidden="true" />
+        <h2 ref={heading} tabIndex={-1} className="text-body-lg font-bold text-ink outline-none">
+          카드내역을 올리고 있습니다
+        </h2>
+      </div>
+      <Identity request={request} />
+      <p className="mt-4 text-body text-ink">
+        {formatNumber(request.transactions.length)}건을 저장하고 가맹점을 분류합니다.{' '}
+        {/* 매초 읽으면 시끄럽다. 화면 읽기 프로그램에는 aria-busy 로 기다리는 중임을 알린다 */}
+        <span className="tabular-nums text-ink2">{formatNumber(seconds)}초</span>
+      </p>
+      <p className="mt-1.5 text-body text-ink2">다른 화면으로 가도 올리기는 이어집니다.</p>
+      {/*
+        서버가 오래 답하지 않을 때 빠져나갈 길이다. 보낸 요청을 거두지는 못한다 — 서버가 끝내면 업로드 이력에 남는다.
+        reset 은 이 업로드의 결과를 버리고 다음 파일을 받는다
+      */}
+      <Actions>
+        <Button variant="secondary" className="whitespace-nowrap" onClick={onReset}>
+          다른 파일 올리기
+        </Button>
+      </Actions>
     </section>);
 
 }
@@ -491,7 +612,13 @@ function PreviewCard({
   const error = send instanceof ApiRequestError ? send : null;
   const view = error ? sendErrorView(error) : null;
   // 같은 요청은 같은 오류로 끝나므로, 다시 보낼 수 있는 오류에서만 버튼을 살린다
-  const canSend = request !== null && send !== 'sending' && (view === null || view.retry !== undefined);
+  // 보내는 동안은 SendingCard 가 대신 그려져 여기서 sending 을 볼 일이 없다
+  const canSend = request !== null && (view === null || view.retry !== undefined);
+  // 보내다 실패하면 이 카드가 새로 그려져 누른 버튼의 초점이 사라진다. 오류 문구로 옮겨 읽히고 바로 다시 시도로 갈 수 있게 한다
+  const errorBox = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (error) errorBox.current?.focus();
+  }, [error]);
 
   const counts = [
   { term: '읽은 행', value: rows.length },
@@ -538,12 +665,12 @@ function PreviewCard({
 
   const merchantCell = (merchant: string) =>
   <span className="block max-w-xs truncate whitespace-nowrap" title={merchant || undefined}>
-      {merchant || '—'}
+      {merchant || '-'}
     </span>;
 
 
   const unsentColumns: Column<UnsendableRow>[] = [
-  { header: '승인일', cell: (u) => <span className="whitespace-nowrap tabular-nums">{u.row.approvedAt ? formatFullDate(u.row.approvedAt) : '—'}</span> },
+  { header: '승인일', cell: (u) => <span className="whitespace-nowrap tabular-nums">{u.row.approvedAt ? formatFullDate(u.row.approvedAt) : '-'}</span> },
   { header: '가맹점명', cell: (u) => merchantCell(merchantName(u.row.rawMerchant)) },
   {
     header: '금액',
@@ -553,7 +680,7 @@ function PreviewCard({
         {u.row.foreignAmount !== null ?
       formatDollar(u.row.foreignAmount) :
       u.row.amount === null ?
-      '—' :
+      '-' :
       formatWon(u.row.amount)}
       </span>
 
@@ -563,14 +690,16 @@ function PreviewCard({
 
   // 보내지 않는 행은 위 표에 따로 있다. 여기에는 서버로 갈 행만 보인다
   const unsentIndex = new Set(unsendable.map((u) => u.index));
-  const head = rows.filter((_, index) => !unsentIndex.has(index)).slice(0, 10);
+  const head = rows.filter((_, index) => !unsentIndex.has(index)).slice(0, PREVIEW_ROWS);
+  // 보내지 않는 행도 처음 몇 건만 보인다. 수백 건이 다 그려지면 올리기 버튼이 한참 아래로 밀린다(#276 리뷰). 전체 수는 위 숫자에 있다
+  const unsentHead = unsendable.slice(0, PREVIEW_ROWS);
   const rowColumns: Column<ParsedRow>[] = [
-  { header: '승인일', cell: (r) => <span className="whitespace-nowrap tabular-nums">{r.approvedAt ? formatFullDate(r.approvedAt) : '—'}</span> },
+  { header: '승인일', cell: (r) => <span className="whitespace-nowrap tabular-nums">{r.approvedAt ? formatFullDate(r.approvedAt) : '-'}</span> },
   { header: '가맹점명', cell: (r) => merchantCell(merchantName(r.rawMerchant)) },
   {
     header: '금액',
     align: 'right',
-    cell: (r) => <span className="whitespace-nowrap">{r.amount === null ? '—' : formatWon(r.amount)}</span>
+    cell: (r) => <span className="whitespace-nowrap">{r.amount === null ? '-' : formatWon(r.amount)}</span>
   },
   { header: '상태', cell: (r) => <Badge>{r.status}</Badge> }];
 
@@ -614,13 +743,15 @@ function PreviewCard({
       {unsendable.length > 0 &&
       <div className="mt-8">
           <h3 className="text-body font-bold text-ink">
-            보내지 않는 행 {formatNumber(unsendable.length)}건
+            {unsendable.length > unsentHead.length ?
+          `보내지 않는 행 ${formatNumber(unsendable.length)}건 중 처음 ${formatNumber(unsentHead.length)}건` :
+          `보내지 않는 행 ${formatNumber(unsendable.length)}건`}
           </h3>
           <Table
           className="mt-3"
           caption="보내지 않는 행"
           columns={unsentColumns}
-          rows={unsendable}
+          rows={unsentHead}
           rowKey={(u) => String(u.index)} />
 
         </div>
@@ -645,7 +776,7 @@ function PreviewCard({
       {request === null && <p className="mt-6 text-body text-deny">보낼 수 있는 거래가 없습니다.</p>}
 
       {error && view &&
-      <div role="alert" className="mt-6 text-body text-deny">
+      <div ref={errorBox} tabIndex={-1} role="alert" className="mt-6 text-body text-deny outline-none">
           <p>{view.message}</p>
           {view.trace && error.traceId &&
         <p className="mt-1 text-caption tabular-nums text-muted">추적 번호 {error.traceId}</p>
@@ -663,7 +794,7 @@ function PreviewCard({
           다른 파일 올리기
         </Button>
         <Button className="whitespace-nowrap" disabled={!canSend} onClick={onSend}>
-          {send === 'sending' ? '올리는 중…' : view?.retry ?? `${formatNumber(sent.length)}건 올리기`}
+          {view?.retry ?? `${formatNumber(sent.length)}건 올리기`}
         </Button>
       </Actions>
     </section>);

@@ -115,11 +115,33 @@ export interface EmailVerificationConfirmed {
   verificationToken: string;
 }
 
-/** 이메일 가입 (#193). password 는 8자 이상, UTF-8 72바이트 이하 */
+/** 이메일 가입 (#193). password 는 영문, 숫자, 기호를 섞은 8~72자(utils/password.ts) */
 export interface SignupRequest {
   email: string;
   password: string;
   verificationToken: string;
+}
+
+/** 비밀번호 재설정 마무리 (api.md 1.1). 토큰은 password-reset/confirm 이 준 것이다 */
+export interface PasswordResetCompleteRequest {
+  email: string;
+  verificationToken: string;
+  newPassword: string;
+}
+
+/** 내 비밀번호 바꾸기 (api.md 3.1) */
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
+/** 버그 신고 (api.md 3.16). message 만 필수다 */
+export interface BugReportRequest {
+  message: string;
+  pageUrl?: string;
+  userAgent?: string;
+  /** 마지막으로 받은 오류 응답의 traceId */
+  traceId?: string;
 }
 
 /** 카카오가 콜백 주소로 넘긴 인가 코드 (#176). 한 번만 쓸 수 있다 */
@@ -329,10 +351,15 @@ export interface Judgment {
   /** 이 revision 이 생성된 직접 원인 */
   origin: JudgmentOrigin;
   verdict: Coded<Verdict>;
+  /** 답변 대기. 불가인데 이 거래에 답하지 않은 질문이 남았다. 판정이 아니라 불가에 붙는 표지다 (C12) */
+  awaitingAnswer: boolean;
   /** 룰엔진 판정 범위 밖(핸드오프). NEEDS_REVIEW 일 때만 true 일 수 있다 */
   outOfScope: boolean;
   blockedAtGate: GateId | null;
+  /** 계정과목 ID. 비교와 집계는 이 값으로 한다(rules/accounts.yaml) */
   account: string | null;
+  /** 계정과목 화면 이름. 사람에게 보일 때는 이 값이다. 따로 없으면 account 와 같다(접대비 → 기업업무추진비) */
+  accountLabel: string | null;
   /** 안분·상각·한도 적용 후 인정 금액 */
   finalAmount: number | null;
   /** 룰로 확정하지 못해 fallback 인지 */
@@ -368,6 +395,8 @@ export interface JudgmentExportRow {
 export interface VerdictSummary {
   count: number;
   finalAmount: number;
+  /** 그 판정이 난 거래의 결제 금액 합 */
+  spendAmount: number;
 }
 
 export type SummaryScopeType = 'BATCH' | 'YEAR' | 'RUN';
@@ -377,9 +406,13 @@ export type SummaryScopeType = 'BATCH' | 'YEAR' | 'RUN';
  * 직전연도 수입금액으로 계산한 잠정치다
  */
 export interface LimitYear {
-  /** 판정 attributes.limit_bucket 과 같은 값(접대비) */
+  /** 판정 attributes.limit_bucket 과 같은 값(접대비). 비교는 이 값으로 한다 */
   bucket: string;
+  /** 한도 묶음 화면 이름(기업업무추진비) */
+  bucketLabel: string;
   taxYear: number;
+  /** 그해 한도. 최신 문진의 직전연도 수입금액으로 계산한 잠정치 */
+  limitAmount: number;
   /** 그해 이 묶음 판정 금액의 합(한도 전) */
   totalAmount: number;
   /** 한도를 넘어 필요경비에 넣지 않는 금액. 넘지 않았으면 0 */
@@ -390,9 +423,15 @@ export interface JudgmentSummary {
   scope: { type: SummaryScopeType; id: string };
   totalCount: number;
   byVerdict: Record<Verdict, VerdictSummary>;
-  byAccount: { account: string; count: number; finalAmount: number }[];
+  byAccount: { account: string; accountLabel: string; count: number; finalAmount: number }[];
   /** 범위에 접대비 판정이 있는 과세연도마다 하나. runId 범위는 빈 배열 */
   limits: LimitYear[];
+  /** 답변 대기. 불가에 붙는 표지라 byVerdict.UNAVAILABLE 에도 들어 있다 */
+  awaiting: { count: number; spendAmount: number };
+  /** 사용자가 직접 바꾼 판정을 바뀐 판정별로 센다. byVerdict 에도 들어 있다 */
+  overridden: Record<Verdict, VerdictSummary>;
+  /** 판정이 있는 해(승인일)마다 가능 판정의 경비 가능 금액. 해 순 */
+  byYear: { year: number; finalAmount: number }[];
 }
 
 /**
@@ -495,6 +534,17 @@ export interface QuestionResponseResult {
   rejudgedTransactionCount: number;
 }
 
+/** 답 거두기. 답한 질문을 다시 대기로 돌린다 (api.md POST /question-responses/withdraw) */
+export interface QuestionWithdrawRequest {
+  questionIds: string[];
+}
+
+export interface QuestionWithdrawResult {
+  /** 대기로 돌린 질문 수. 이미 대기였으면 0 이다 */
+  withdrawnCount: number;
+  rejudgedTransactionCount: number;
+}
+
 export interface BulkAnswerRequest {
   batchId: string;
   factType: string;
@@ -591,7 +641,7 @@ export type NextStep = 'CLASSIFY' | 'INTERVIEW' | 'CONFIRM' | 'QUESTIONS' | 'RES
 
 /** GET /progress?batchId. 비서 도구 get_status 가 읽는 필드 */
 export interface Progress {
-  /** label 은 「국민 · 2026-09」, 여러 달이면 「국민 · 2026-01~2026-03」 */
+  /** label 은 「국민 2026-09」, 여러 달이면 「국민 2026-01~2026-03」 */
   batch: { id: string; label: string; transactionCount: number };
   /** 수입·이름·이메일은 담지 않는다 */
   context: { version: number; bookkeeping: BookkeepingDuty; hasEmployee: boolean } | null;

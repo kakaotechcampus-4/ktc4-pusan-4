@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react';
 import { cn } from './cn';
 
 export interface ChoiceOption<T extends string | boolean> {
@@ -18,6 +19,16 @@ interface ChoiceGroupProps<T extends string | boolean> {
   options: ChoiceOption<T>[];
   value: T;
   onChange: (value: T) => void;
+  /** 있으면 고른 칸을 다시 눌러 고른 것을 거둔다(판정, 질문). 없으면 다시 눌러도 그대로다 */
+  onClear?: () => void;
+  /**
+   * 화살표로 옮길 때 바로 고르는지. 기본은 고른다(라디오 묶음 관례).
+   * 고르는 순간 서버에 저장하는 곳(질문 답)은 끈다. 화살표는 초점만 옮기고 Space, Enter 로 고른다
+   */
+  selectOnFocus?: boolean;
+  /** 고르지 않아 저장을 막았다. 칸 테두리를 빨갛게 하고 오류 문구(describedBy)를 잇는다 */
+  invalid?: boolean;
+  describedBy?: string;
   /** 한 줄에 놓을 개수 (sm 이상). 기본 3 */
   columns?: 2 | 3 | 4;
   className?: string;
@@ -39,32 +50,92 @@ export function ChoiceGroup<T extends string | boolean>({
   options,
   value,
   onChange,
+  onClear,
+  selectOnFocus = true,
+  invalid = false,
+  describedBy,
   columns = 3,
   className
 }: ChoiceGroupProps<T>) {
+  const buttons = useRef<(HTMLButtonElement | null)[]>([]);
+  const enabled = options.flatMap((option, index) => option.disabled ? [] : [index]);
+  /*
+   * 라디오 묶음처럼 Tab 은 한 번만 선다. 고른 칸에, 아직 안 골랐으면 첫 칸에 선다.
+   * 칸 사이는 화살표로 옮기고 옮기면 바로 고른다 (WAI-ARIA radio group)
+   */
+  const selectedIndex = options.findIndex((option) => option.value === value && !option.disabled);
+  /**
+   * 고르지 않고 초점만 옮긴 칸(selectOnFocus 를 끈 묶음). Tab 은 지금 초점이 있는 칸에 서야
+   * Shift+Tab 한 번에 묶음을 벗어난다. 묶음을 벗어나면 다시 고른 칸으로 돌아간다
+   */
+  const [focused, setFocused] = useState<number | null>(null);
+  /**
+   * 화살표로 막 고른 칸. 거기서 Space, Enter 를 누르면 버튼의 click 이 한 번 더 온다.
+   * 그 click 은 고른 것을 거두는 게 아니라 고른 것을 확정하는 누름이다
+   */
+  const arrowPicked = useRef<number | null>(null);
+  const tabStop = !selectOnFocus && focused !== null ? focused : selectedIndex >= 0 ? selectedIndex : enabled[0];
+
+  const onKeyDown = (event: React.KeyboardEvent, index: number) => {
+    // Alt+← 같은 브라우저 단축키는 그대로 둔다
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
+    const edge = { Home: enabled[0], End: enabled[enabled.length - 1] }[event.key];
+    const at = enabled.indexOf(index);
+    const next = edge ?? (step === undefined ? undefined : enabled[(at + step + enabled.length) % enabled.length]);
+    if (next === undefined) return;
+    event.preventDefault();
+    buttons.current[next]?.focus();
+    if (selectOnFocus) {
+      arrowPicked.current = next;
+      onChange(options[next].value);
+    } else
+    setFocused(next);
+  };
+
   return (
     <div
       role="radiogroup"
       aria-label={name}
+      aria-invalid={invalid || undefined}
+      aria-describedby={describedBy}
+      onBlur={(event) => {
+        if (event.currentTarget.contains(event.relatedTarget)) return;
+        setFocused(null);
+        // 묶음을 떠났으면 화살표로 고른 것은 확정된 것이다. 다음 누름은 거두기다
+        arrowPicked.current = null;
+      }}
       className={cn('grid gap-2', COLUMNS[columns], className)}>
 
-      {options.map((option) => {
+      {options.map((option, index) => {
         const selected = option.value === value;
         return (
           <button
             key={String(option.value)}
+            ref={(el) => {
+              buttons.current[index] = el;
+            }}
             type="button"
             role="radio"
             aria-checked={selected}
             aria-disabled={option.disabled || undefined}
             disabled={option.disabled}
-            onClick={() => onChange(option.value)}
+            tabIndex={index === tabStop ? 0 : -1}
+            onKeyDown={(event) => onKeyDown(event, index)}
+            onClick={() => {
+              const confirming = arrowPicked.current === index;
+              arrowPicked.current = null;
+              if (selected && onClear && !confirming) onClear();else
+              onChange(option.value);
+            }}
             className={cn(
               'rounded-xl border px-3.5 py-3 text-left transition-colors duration-150 ease-snap',
               selected ?
               'border-accent bg-accent-soft' :
               option.disabled ?
               'cursor-not-allowed border-dashed border-edge bg-canvas opacity-60' :
+              invalid ?
+              'border-deny bg-canvas hover:bg-surface' :
               'border-edge bg-canvas hover:bg-surface'
             )}>
 

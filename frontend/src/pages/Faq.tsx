@@ -1,6 +1,6 @@
 import { MarketingHeader } from '../components/MarketingHeader';
 import { MarketingFooter } from '../components/MarketingFooter';
-import { Button, SectionHeading } from '../components/ui';
+import { MAIN_ID, SectionHeading } from '../components/ui';
 import { FAQ_GROUPS } from '../mock/faq';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { PAGES } from '../seo';
@@ -17,7 +17,7 @@ export function Faq() {
     <div className="min-h-full bg-canvas">
       <MarketingHeader />
 
-      <main className="mx-auto w-full max-w-page px-6 pb-28 pt-16 lg:px-gutter">
+      <main id={MAIN_ID} tabIndex={-1} className="mx-auto w-full max-w-page px-6 pb-28 pt-16 outline-none lg:px-gutter">
         <SectionHeading as="h1" eyebrow="자주 묻는 질문" title="먼저 묻는 것들" />
 
         <div className="mt-16 space-y-16">
@@ -53,15 +53,6 @@ export function Faq() {
               </ul>
             </section>
           )}
-        </div>
-
-        <div className="mt-20 border-t border-line pt-12">
-          <p className="text-h3 font-bold tracking-ir-sm text-ink [word-break:keep-all]">
-            여기에 없는 것은 직접 돌려 보는 편이 빠릅니다
-          </p>
-          <Button to="/login" size="md" className="mt-6">
-            판정해보기
-          </Button>
         </div>
       </main>
 

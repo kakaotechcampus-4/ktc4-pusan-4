@@ -8,19 +8,23 @@ import com.ktc4.pusan4.judgment.domain.JudgmentSummary;
 import com.ktc4.pusan4.judgment.domain.LimitYearTotal;
 import com.ktc4.pusan4.judgment.domain.Question;
 import com.ktc4.pusan4.judgment.domain.QuestionStatus;
+import com.ktc4.pusan4.judgment.domain.Verdict;
 import com.ktc4.pusan4.judgment.limit.EntertainmentLimit;
+import com.ktc4.pusan4.judgment.persistence.JudgmentListQuery.Sort;
 import com.ktc4.pusan4.judgment.persistence.JudgmentCitationRepository.CitationRow;
 import com.ktc4.pusan4.judgment.persistence.LimitBucketEntryRepository.EntryAmount;
 import com.ktc4.pusan4.shared.api.ApiException;
+import com.ktc4.pusan4.user.persistence.BusinessContextService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +36,9 @@ import java.util.stream.Collectors;
 
 /**
  * 판정 조회 (api.md 3.7). 저장은 {@link JudgmentService} 가 한다.
+ *
+ * <p>조회는 판정, 거래, 인용을 쿼리 여러 번으로 나눠 읽는다. 사이에 업로드 삭제가 커밋돼도 한 시점을 보도록
+ * 읽기는 REPEATABLE READ 다({@link QuestionQueryService} 와 같은 이유).
  */
 @Service
 public class JudgmentQueryService {
@@ -41,31 +48,34 @@ public class JudgmentQueryService {
     private final JudgmentCitationRepository citationRepository;
     private final LimitBucketEntryRepository entryRepository;
     private final QuestionQueryService questionQueryService;
+    private final BusinessContextService contextService;
 
     public JudgmentQueryService(
         JudgmentRepository judgmentRepository,
         TransactionRecordRepository transactionRepository,
         JudgmentCitationRepository citationRepository,
         LimitBucketEntryRepository entryRepository,
-        QuestionQueryService questionQueryService
+        QuestionQueryService questionQueryService,
+        BusinessContextService contextService
     ) {
         this.judgmentRepository = judgmentRepository;
         this.transactionRepository = transactionRepository;
         this.citationRepository = citationRepository;
         this.entryRepository = entryRepository;
         this.questionQueryService = questionQueryService;
+        this.contextService = contextService;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public JudgmentRevision get(UUID userId, UUID judgmentId) {
         JudgmentEntity judgment = judgmentRepository.findForUser(judgmentId, userId)
             .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "JUDGMENT_NOT_FOUND", "판정을 찾을 수 없습니다."));
         return toDomain(List.of(judgment)).getFirst();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Page<JudgmentRevision> list(UUID userId, JudgmentListQuery query, int page, int size) {
-        Page<JudgmentEntity> judgments = find(userId, query, PageRequest.of(page, size));
+        Page<JudgmentEntity> judgments = judgmentRepository.findPage(userId, query, PageRequest.of(page, size));
         return new PageImpl<>(toDomain(judgments.getContent()), judgments.getPageable(), judgments.getTotalElements());
     }
 
@@ -77,13 +87,24 @@ public class JudgmentQueryService {
      * finalAmount 합이고, 초과액은 {@link #limits} 로 따로 준다.
      * 과거 Run 도 finalAmount 그대로다. 한도 항목은 지금 상태만 남아 그 Run 시점의 인정액이 아니다.
      */
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public JudgmentSummary summary(UUID userId, UUID batchId, Integer year, UUID runId) {
-        JudgmentListQuery query = new JudgmentListQuery(null, batchId, year, null, true, runId);
+        JudgmentListQuery query = new JudgmentListQuery(null, batchId, year, null, true, runId, null, Sort.COMPUTED_AT);
         Map<UUID, Long> limitAllowed = year == null ? Map.of() : limitAllowedAmounts(userId);
-        return JudgmentSummary.of(find(userId, query, Pageable.unpaged()).stream()
-            .map(judgment -> judgment.toSummaryRow(limitAllowed.get(judgment.id())))
+        return JudgmentSummary.of(judgmentRepository.findSummaryRows(userId, query).stream()
+            .map(row -> new JudgmentSummary.Row(Verdict.valueOf(row.verdict()), row.account(),
+                limitAllowed.getOrDefault(row.judgmentId(), row.finalAmount()), row.spendAmount(), row.awaiting(),
+                row.year(), row.overridden()))
             .toList());
+    }
+
+    /**
+     * 주어진 거래 가운데 답하지 않은 질문이 남은 거래. 판정 응답의 답변 대기 표지(awaitingAnswer)를 만든다.
+     * 거래 id 는 부르는 쪽이 이미 사용자 범위로 읽은 판정에서 온다.
+     */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public Set<UUID> pendingQuestionTransactionIds(Collection<UUID> transactionIds) {
+        return questionQueryService.pendingTransactionIds(transactionIds);
     }
 
     /**
@@ -92,22 +113,31 @@ public class JudgmentQueryService {
      * 배분 순서로만 정해지고 법이 정하지 않아서다(#15). 그해 초과액은 {@link #limits} 가 준다.
      * 파일(CSV) 변환은 FE 가 한다.
      */
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public List<JudgmentExportRow> export(UUID userId, UUID batchId, Integer year) {
-        JudgmentListQuery query = new JudgmentListQuery(null, batchId, year, null, true, null);
-        List<JudgmentRevision> judgments = toDomain(find(userId, query, Pageable.unpaged()).getContent());
+        JudgmentListQuery query = new JudgmentListQuery(null, batchId, year, null, true, null, null, Sort.COMPUTED_AT);
+        List<JudgmentRevision> judgments = toDomain(judgmentRepository.findPage(userId, query, Pageable.unpaged()).getContent());
         List<EntryAmount> entries = entryRepository.findEntryAmounts(userId, EntertainmentLimit.BUCKET);
         Map<UUID, EntryAmount> entryByJudgment = entries.stream()
             .collect(Collectors.toMap(EntryAmount::judgmentId, Function.identity()));
-        Set<Integer> exceededYears = yearTotals(entries).stream()
-            .filter(LimitYearTotal::exceeded)
-            .map(LimitYearTotal::taxYear)
+        Set<Integer> exceededYears = entries.stream()
+            .collect(Collectors.groupingBy(EntryAmount::taxYear,
+                Collectors.summingLong(entry -> entry.taggedAmount() - entry.allowedAmount())))
+            .entrySet().stream()
+            .filter(yearExcess -> yearExcess.getValue() > 0)
+            .map(Map.Entry::getKey)
             .collect(Collectors.toSet());
-        Map<UUID, List<Answer>> answers = answersByTransaction(questionQueryService.find(userId, batchId, null));
+        List<Question> questions = questionQueryService.find(userId, batchId, null);
+        Map<UUID, List<Answer>> answers = answersByTransaction(questions);
+        Set<UUID> pending = questions.stream()
+            .filter(question -> question.status() == QuestionStatus.PENDING)
+            .map(Question::transactionId)
+            .collect(Collectors.toSet());
         return judgments.stream()
             .map(judgment -> new JudgmentExportRow(judgment,
                 allowedAmount(judgment, entryByJudgment.get(judgment.id()), exceededYears),
-                answers.getOrDefault(judgment.transactionId(), List.of())))
+                answers.getOrDefault(judgment.transactionId(), List.of()),
+                pending.contains(judgment.transactionId())))
             .toList();
     }
 
@@ -122,7 +152,7 @@ public class JudgmentQueryService {
      * batchId·year 범위에 접대비 판정이 있는 과세연도마다 한도 합계와 초과액 (api.md 3.7 limits). 과세연도 순이다.
      * 한도는 사용자의 한 해 전체 기준이라, batchId 범위여도 그해의 다른 batch 까지 합친 값이다. runId 범위는 없다.
      */
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public List<LimitYearTotal> limits(UUID userId, UUID batchId, Integer year) {
         if (batchId == null && year == null) {
             return List.of();
@@ -130,17 +160,24 @@ public class JudgmentQueryService {
         Set<Integer> years = year != null
             ? Set.of(year)
             : Set.copyOf(entryRepository.findTaxYearsOfBatch(userId, EntertainmentLimit.BUCKET, batchId));
-        return yearTotals(entryRepository.findEntryAmounts(userId, EntertainmentLimit.BUCKET)).stream()
-            .filter(total -> years.contains(total.taxYear()))
-            .toList();
+        Map<Integer, List<EntryAmount>> byYear = entryRepository.findEntryAmounts(userId, EntertainmentLimit.BUCKET)
+            .stream()
+            .filter(entry -> years.contains(entry.taxYear()))
+            .collect(Collectors.groupingBy(EntryAmount::taxYear, TreeMap::new, Collectors.toList()));
+        // 항목은 문진이 있어야 생긴다. 문진 전 사용자는 여기서 끝나 문진을 읽지 않는다.
+        if (byYear.isEmpty()) {
+            return List.of();
+        }
+        // 집계(LimitSettlementService.settleProvisional)와 같은 수입금액이라 초과액과 맞는다.
+        // 문진을 고치면 같은 트랜잭션에서 다시 집계하므로 항목도 이 한도로 나뉘어 있다.
+        long annualLimit = EntertainmentLimit.annual(contextService.current(userId).prevYearRevenue());
+        return yearTotals(byYear, annualLimit);
     }
 
     /** 항목을 과세연도별로 더한다. 과세연도 순이다. */
-    private static List<LimitYearTotal> yearTotals(List<EntryAmount> entries) {
-        Map<Integer, List<EntryAmount>> byYear = entries.stream()
-            .collect(Collectors.groupingBy(EntryAmount::taxYear, TreeMap::new, Collectors.toList()));
+    private static List<LimitYearTotal> yearTotals(Map<Integer, List<EntryAmount>> byYear, long annualLimit) {
         return byYear.entrySet().stream()
-            .map(year -> new LimitYearTotal(EntertainmentLimit.BUCKET, year.getKey(),
+            .map(year -> new LimitYearTotal(EntertainmentLimit.BUCKET, year.getKey(), annualLimit,
                 year.getValue().stream().mapToLong(EntryAmount::taggedAmount).sum(),
                 year.getValue().stream().mapToLong(entry -> entry.taggedAmount() - entry.allowedAmount()).sum()))
             .toList();
@@ -163,14 +200,6 @@ public class JudgmentQueryService {
                 .put(question.factType(), new Answer(question.questionText(), question.answer())));
         return byTransaction.entrySet().stream()
             .collect(Collectors.toMap(Map.Entry::getKey, entry -> List.copyOf(entry.getValue().values())));
-    }
-
-    private Page<JudgmentEntity> find(UUID userId, JudgmentListQuery query, Pageable pageable) {
-        LocalDate yearStart = query.year() == null ? null : LocalDate.of(query.year(), 1, 1);
-        return judgmentRepository.findPage(userId, query.transactionId(), query.batchId(),
-            yearStart, yearStart == null ? null : yearStart.plusYears(1),
-            query.verdict() == null ? null : query.verdict().name(),
-            query.runId(), !query.latestOnly(), pageable);
     }
 
     /** 거래와 인용을 판정마다 따로 읽지 않도록 한 번에 읽어 붙인다. */

@@ -9,6 +9,7 @@ import { formatNumber } from '../utils/format';
 import {
   FIELD_ORDER,
   JUDGED_INDUSTRY,
+  PICKABLE_DUTIES,
   checkForm,
   dutyFor,
   formFrom,
@@ -17,8 +18,8 @@ import {
   sameForm,
   saveDraft,
   savedDraft,
-  withRevenue,
   type HomeAnswer,
+  type KnowsRevenue,
   type InterviewForm } from
 './interviewForm';
 
@@ -35,10 +36,19 @@ const INDUSTRIES: ChoiceOption<string>[] = [
 { value: 'ETC', label: '그 외', disabled: true }];
 
 
-const BOOKKEEPING: ChoiceOption<BookkeepingDuty>[] = [
-{ value: '복식부기', label: '복식부기', hint: '직전연도 수입 7,500만 원 이상' },
-{ value: '간편장부', label: '간편장부', hint: '서비스 대상 밖 (참고용)' },
-{ value: '추계', label: '추계', hint: '서비스 대상 밖 (참고용)' }];
+/**
+ * 수입금액을 모르면 기준을 보여 주고 기장의무를 직접 고르게 한다(11/9 치오).
+ * 인적용역(940909)은 직전연도 수입 7,500만 원부터 복식부기 의무다 (소득세법 시행령 제208조 제5항)
+ */
+const DUTY_HINT: Record<string, string> = {
+  간편장부: '직전연도 수입 7,500만 원 미만',
+  복식부기: '직전연도 수입 7,500만 원 이상'
+};
+const BOOKKEEPING: ChoiceOption<BookkeepingDuty>[] = PICKABLE_DUTIES.map((duty) => ({
+  value: duty,
+  label: duty,
+  hint: DUTY_HINT[duty]
+}));
 
 
 /**
@@ -54,7 +64,7 @@ interface LocationState {
 const todayKst = () => new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
 
 /*
- * 칸 하나가 틀렸을 때의 모양. 3번 개업일과 6번 면적 비율이 서로 달랐다 (#242 리뷰) —
+ * 칸 하나가 틀렸을 때의 모양. 개업일과 면적 비율이 서로 달랐다 (#242 리뷰) —
  * 개업일은 빨간 글자만 띄우고 테두리는 그대로였고, 비율은 aria-invalid 만 걸어 둬서
  * 아무것도 안 보였다. 테두리와 글자를 묶어 모든 칸이 같은 식으로 알리게 한다
  */
@@ -78,7 +88,7 @@ export function Interview() {
         못 읽었는데 빈 폼을 열면 저장된 답을 모른 채 새 버전을 만든다 (C57)
       */}
       {contextStatus === 'loading' ?
-      <p role="status" className="mt-6 text-body text-ink2">불러오는 중…</p> :
+      <p role="status" className="mt-6 text-body text-ink2">불러오는 중</p> :
       contextStatus === 'error' ?
       <Empty
         className="mt-6"
@@ -112,8 +122,8 @@ function InterviewBody() {
 
   // 저장하지 않고 떠났던 입력이 있으면 그것으로 연다. 저장된 문진과 같으면 남길 것이 없다
   const [initial] = useState(() => {
-    const draft = userId ? savedDraft(userId) : null;
     const stored = formFrom(context);
+    const draft = userId ? savedDraft(userId) : null;
     return draft && !sameForm(draft, stored) ? { form: draft, restored: true } : { form: stored, restored: false };
   });
   const [form, setForm] = useState<InterviewForm>(initial.form);
@@ -157,6 +167,8 @@ function InterviewBody() {
     for (let seen = 0; position > 0 && seen < after; position -= 1) {
       if (/\d/.test(input.value[position - 1])) seen += 1;
     }
+    // 쉼표 뒤에 두면 Backspace 가 쉼표만 지워 아무 일도 없는 것처럼 보인다. 쉼표 앞, 방금 친 숫자 뒤에 둔다
+    while (position > 0 && input.value[position - 1] === ',') position -= 1;
     input.setSelectionRange(position, position);
   });
 
@@ -246,33 +258,73 @@ function InterviewBody() {
                 options={INDUSTRIES} />
             </section>
 
-            <section>
-              <label htmlFor="revenue" className={labelClass}>
-                2. 직전연도 수입금액
-              </label>
-              <div className="mt-3 flex items-center gap-2">
-                {/* 숫자 칸(type=number)은 지우면 0 이 남고 휠로 값이 바뀐다 (C6). 글자 칸에 쉼표를 넣어 보여 준다 */}
-                <input
-                  ref={revenueRef}
-                  id="revenue"
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  placeholder="예: 50,000,000"
-                  value={form.revenue === '' ? '' : formatNumber(Number(form.revenue))}
-                  aria-invalid={errors.revenue !== undefined}
-                  aria-describedby={errors.revenue ? 'revenue-error' : undefined}
-                  onChange={(event) => {
-                    const input = event.target;
-                    caretFromEnd.current = input.value.slice(input.selectionStart ?? input.value.length).replace(/\D/g, '').length;
-                    const digits = revenueDigits(input.value);
-                    change((prev) => withRevenue(prev, digits));
-                  }}
-                  className={`w-56 ${fieldClass}`} />
-                <span className="text-body text-ink">원</span>
-              </div>
-              {errors.revenue &&
-              <p id="revenue-error" role="alert" className={fieldErrorClass}>{errors.revenue}</p>
+            <section id="knowsRevenue">
+              <span className={labelClass}>2. 직전연도 수입금액을 알고 있나요?</span>
+              <ChoiceGroup<KnowsRevenue>
+                className="mt-3"
+                name="직전연도 수입금액을 아는지"
+                value={form.knowsRevenue}
+                onChange={(value) => change((prev) => ({ ...prev, knowsRevenue: value }))}
+                invalid={errors.knowsRevenue !== undefined}
+                describedBy={errors.knowsRevenue ? 'knowsRevenue-error' : undefined}
+                options={[
+                { value: 'yes', label: '예' },
+                { value: 'no', label: '아니요' }]
+                } />
+              {errors.knowsRevenue &&
+              <p id="knowsRevenue-error" role="alert" className={fieldErrorClass}>{errors.knowsRevenue}</p>
+              }
+
+              {/* 알면 금액을 받아 기장의무를 정하고, 모르면 기준을 보여 주고 고르게 한다 */}
+              {form.knowsRevenue === 'yes' &&
+              <div className="mt-5">
+                  <label htmlFor="revenue" className="text-body font-bold text-ink">
+                    직전연도 수입금액
+                  </label>
+                  <div className="mt-2.5 flex items-center gap-2">
+                    {/* 숫자 칸(type=number)은 지우면 0 이 남고 휠로 값이 바뀐다 (C6). 글자 칸에 쉼표를 넣어 보여 준다 */}
+                    <input
+                    ref={revenueRef}
+                    id="revenue"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    placeholder="예: 50,000,000"
+                    value={form.revenue === '' ? '' : formatNumber(Number(form.revenue))}
+                    aria-invalid={errors.revenue !== undefined}
+                    aria-describedby={errors.revenue ? 'revenue-error' : form.revenue !== '' ? 'revenue-duty' : undefined}
+                    onChange={(event) => {
+                      const input = event.target;
+                      caretFromEnd.current = input.value.slice(input.selectionStart ?? input.value.length).replace(/\D/g, '').length;
+                      const revenue = revenueDigits(input.value);
+                      change((prev) => ({ ...prev, revenue }));
+                    }}
+                    className={`w-56 ${fieldClass}`} />
+                    <span className="text-body text-ink">원</span>
+                  </div>
+                  {errors.revenue ?
+                <p id="revenue-error" role="alert" className={fieldErrorClass}>{errors.revenue}</p> :
+                form.revenue !== '' &&
+                <p id="revenue-duty" className="mt-2 text-small text-ink2">
+                      기장의무 <b className="text-ink">{dutyFor(Number(form.revenue))}</b>
+                    </p>
+                }
+                </div>
+              }
+
+              {form.knowsRevenue === 'no' &&
+              <div id="duty" className="mt-5">
+                  <span className="text-body font-bold text-ink">기장의무</span>
+                  <ChoiceGroup<BookkeepingDuty | ''>
+                  className="mt-2.5"
+                  name="기장의무"
+                  value={form.duty}
+                  onChange={(value) => change((prev) => ({ ...prev, duty: value }))}
+                  invalid={errors.duty !== undefined}
+                  describedBy={errors.duty ? 'duty-error' : undefined}
+                  options={BOOKKEEPING} />
+                  {errors.duty && <p id="duty-error" role="alert" className={fieldErrorClass}>{errors.duty}</p>}
+                </div>
               }
             </section>
 
@@ -298,28 +350,7 @@ function InterviewBody() {
             </section>
 
             <section>
-              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                <span className={labelClass}>4. 기장의무</span>
-                {/* 수입금액을 적기 전에는 판정할 것이 없다 (C1). 한 단 화면이라 옆 칸 대신 이 질문 옆에 둔다 */}
-                {form.revenue !== '' &&
-                <span className="text-small text-ink2">
-                    수입금액 기준{' '}
-                    <b className="text-ink">
-                      {dutyFor(Number(form.revenue)) === '복식부기' ? '복식부기 의무자' : '간편장부 대상자'}
-                    </b>
-                  </span>
-                }
-              </div>
-              <ChoiceGroup<BookkeepingDuty | ''>
-                className="mt-3"
-                name="기장의무"
-                value={form.duty}
-                onChange={(value) => change((prev) => ({ ...prev, duty: value, dutyChosen: true }))}
-                options={BOOKKEEPING} />
-            </section>
-
-            <section>
-              <span className={labelClass}>5. 직원이 있나요?</span>
+              <span className={labelClass}>4. 직원이 있나요?</span>
               <ChoiceGroup
                 className="mt-3"
                 name="직원 유무"
@@ -327,22 +358,25 @@ function InterviewBody() {
                 onChange={(value) => change((prev) => ({ ...prev, hasEmployee: value }))}
                 options={[
                 { value: false, label: '없음 (1인)' },
-                { value: true, label: '있음', hint: '서비스 대상 밖 (참고용)' }]
+                // 직원이 있는 사업자는 아직 판정하지 않는다. 업종처럼 보이되 고를 수 없다
+                { value: true, label: '있음', disabled: true }]
                 } />
             </section>
 
             <section id="home">
-              <span className={labelClass}>6. 자택에서 작업하나요?</span>
+              <span className={labelClass}>5. 자택에서 작업하나요?</span>
               <ChoiceGroup<HomeAnswer>
                 className="mt-3"
                 name="자택 작업 여부"
                 value={form.home}
                 onChange={(value) => change((prev) => ({ ...prev, home: value }))}
+                invalid={errors.home !== undefined}
+                describedBy={errors.home ? 'home-error' : undefined}
                 options={[
                 { value: 'no', label: '아니요' },
                 { value: 'yes', label: '예' }]
                 } />
-              {errors.home && <p role="alert" className={fieldErrorClass}>{errors.home}</p>}
+              {errors.home && <p id="home-error" role="alert" className={fieldErrorClass}>{errors.home}</p>}
 
               {form.home === 'yes' &&
               <div className="mt-5">
@@ -381,7 +415,7 @@ function InterviewBody() {
 
           <div className="mt-8 flex flex-wrap items-center gap-2">
             <Button type="submit" size="md" disabled={saving}>
-              {saving ? '저장하는 중…' : '저장'}
+              {saving ? '저장하는 중' : '저장'}
             </Button>
             <Button variant="secondary" size="md" onClick={back}>
               {welcome ? '나중에 하기' : '돌아가기'}

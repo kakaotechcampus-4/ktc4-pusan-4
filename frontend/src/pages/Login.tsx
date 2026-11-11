@@ -1,17 +1,22 @@
 import React, { useRef, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { MessageCircleIcon } from 'lucide-react';
 import { useSession } from '../contexts/SessionContext';
 import { ApiRequestError, isMock, mockPassword } from '../api';
 import { AUTH_FIELD_ERROR, AUTH_INPUT, AUTH_LABEL, AuthLayout } from '../components/AuthLayout';
 import { Button } from '../components/ui';
-import { beginKakaoLogin, kakaoAvailable } from '../auth/kakao';
+import { kakaoAvailable } from '../auth/kakao';
+import { KakaoStart } from '../components/KakaoStart';
 import type { SessionEndReason } from '../auth/session';
 
 interface LocationState {
   from?: string;
   /** RequireAuth 가 넘긴다. 로그인이 저절로 끝났을 때만 있다 */
   reason?: SessionEndReason | null;
+  /** 비밀번호 재설정(PasswordReset)이나 변경(Account)을 마치고 왔다. 새 비밀번호로 다시 들어간다 */
+  passwordReset?: boolean;
+  passwordChanged?: boolean;
+  /** 재설정한 이메일. 이메일 칸에 채워 둔다 */
+  email?: string;
 }
 
 /** 로그인이 왜 끝났는지 한 줄로 알린다 (C51·C44·C45) */
@@ -28,7 +33,7 @@ export function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const { status, signIn } = useSession();
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState((location.state as LocationState | null)?.email ?? '');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [errorField, setErrorField] = useState<ErrorField>(null);
@@ -38,7 +43,11 @@ export function Login() {
 
   const state = location.state as LocationState | null;
   const from = state?.from ?? '/';
-  const ended = state?.reason ? ENDED[state.reason] : null;
+  const ended = state?.reason ?
+  ENDED[state.reason] :
+  state?.passwordReset || state?.passwordChanged ?
+  '비밀번호를 바꿨습니다. 새 비밀번호로 로그인해 주세요.' :
+  null;
 
   // 서버 문장은 그대로 띄우지 않는다. code 로 고른다 (api.md 1.1)
   const complete = async (nextEmail: string, nextPassword: string) => {
@@ -84,15 +93,6 @@ export function Login() {
     void complete(email, password);
   };
 
-  const startKakao = () => {
-    const { url, external } = beginKakaoLogin(from);
-    if (external) {
-      window.location.assign(url);
-      return;
-    }
-    navigate(url);
-  };
-
   // 이미 로그인했으면 로그인 뒤에 갈 곳으로 보낸다 (C52). 이어 가는 중에는 폼을 그리지 않는다 — 그렸다가 바로 넘어가면 깜빡인다
   if (status === 'signedIn' && !signingIn.current) return <Navigate to={from} replace />;
   if (status === 'restoring') return <AuthLayout title="로그인">{null}</AuthLayout>;
@@ -115,25 +115,7 @@ export function Login() {
         </p>
       }
 
-      {kakaoAvailable &&
-      <>
-          <button
-          type="button"
-          disabled={busy}
-          onClick={startKakao}
-          className="mt-8 flex w-full items-center justify-center gap-2 rounded-xl bg-[#FEE500] px-4 py-3 text-[15px] font-bold text-[#191600] transition-opacity duration-150 ease-snap hover:opacity-90">
-
-            <MessageCircleIcon className="h-4 w-4" aria-hidden="true" />
-            카카오로 계속하기
-          </button>
-
-          <div className="my-6 flex items-center gap-3">
-            <span className="h-px flex-1 bg-line" />
-            <span className="text-[12px] text-ink2">또는 이메일로 로그인</span>
-            <span className="h-px flex-1 bg-line" />
-          </div>
-        </>
-      }
+      <KakaoStart from={from} label="카카오로 계속하기" divider="또는 이메일로" disabled={busy} />
 
       <form onSubmit={submit} noValidate className={kakaoAvailable ? undefined : 'mt-8'}>
         <div className="space-y-3">
@@ -169,6 +151,13 @@ export function Login() {
               className={AUTH_INPUT} />
 
             {fieldError('password')}
+            <Link
+              to="/password-reset"
+              state={email.includes('@') ? { email } : undefined}
+              className="mt-2 inline-block text-[12px] text-ink2 underline underline-offset-4 hover:text-ink">
+
+              비밀번호 재설정
+            </Link>
           </div>
         </div>
 
@@ -179,7 +168,7 @@ export function Login() {
         }
 
         <Button type="submit" disabled={busy} className="mt-5 w-full">
-          {busy ? '로그인 중…' : '로그인'}
+          {busy ? '로그인 중' : '로그인'}
         </Button>
       </form>
 

@@ -3,9 +3,10 @@ import { Link } from 'react-router-dom';
 import { ArrowRightIcon } from 'lucide-react';
 import type { Judgment, JudgmentOriginType, LimitYear, Verdict } from '../../types/domain';
 import { api, ApiRequestError, useApi } from '../../api';
-import { Badge, Button, ChoiceGroup, Input, cn } from '../ui';
+import { Badge, Button, ChoiceGroup, Input, SymbolIcon, cn } from '../ui';
 import { VerdictBadge } from '../VerdictBadge';
 import { StatuteCitation } from '../StatuteCitation';
+import { ExcludeConfirm } from './ExcludeConfirm';
 import { VERDICT_LABEL, VERDICT_META } from '../../utils/verdict';
 import { formatFullDate, formatWon, ro } from '../../utils/format';
 import {
@@ -95,7 +96,8 @@ export function JudgmentDetailPanel({
   const [memo, setMemo] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  /** 빼기 실패는 빼기 버튼 옆에 알린다. 판정 바꾸기의 실패와 자리가 다르다 */
+  /** 빼기는 확인 창에서 한 번 더 묻는다. 실패도 그 창 안에 알린다 */
+  const [confirmingExclude, setConfirmingExclude] = useState(false);
   const [excludeError, setExcludeError] = useState<string | null>(null);
   const [done, setDone] = useState('');
   const title = useRef<HTMLHeadingElement>(null);
@@ -179,7 +181,7 @@ export function JudgmentDetailPanel({
   const hasReason = Boolean(reviewState || overridden || because);
   const note = verdictNote(judgment, reviewState === 'PRESUMED');
   const details = [
-  ...(judgment.account ? [{ label: '계정과목', value: judgment.account }] : []),
+  ...(judgment.accountLabel ? [{ label: '계정과목', value: judgment.accountLabel }] : []),
   ...attributeRows(judgment.attributes)];
 
   const booking = bookingNote(judgment.attributes);
@@ -187,7 +189,7 @@ export function JudgmentDetailPanel({
   const targets: Target[] = (['AVAILABLE', 'UNAVAILABLE'] as const).filter(
     (code) => code !== judgment.verdict.code
   );
-  const reason = [preset, memo.trim()].filter(Boolean).join(' — ');
+  const reason = [preset, memo.trim()].filter(Boolean).join(', ');
 
   const open = (next: Target) => {
     setTarget(next);
@@ -255,6 +257,7 @@ export function JudgmentDetailPanel({
     setExcludeError(null);
     try {
       await api.transactions.exclude(judgment.transactionId);
+      setConfirmingExclude(false);
       onExcluded(merchantTitle(transaction));
     } catch (caught) {
       setExcludeError(errorMessage(caught, '판정 대상에서 빼지 못했습니다. 잠시 후 다시 시도해 주세요.'));
@@ -271,7 +274,7 @@ export function JudgmentDetailPanel({
             VERDICT_TEXT[judgment.verdict.code]}`
             }>
 
-            <span aria-hidden="true">{VERDICT_META[judgment.verdict.code].symbol}</span>
+            <SymbolIcon symbol={VERDICT_META[judgment.verdict.code].symbol} className="h-4 w-4" />
             {judgment.verdict.label}
           </p>
           {note && <span className="shrink-0 whitespace-nowrap text-small text-ink2">{note}</span>}
@@ -308,7 +311,7 @@ export function JudgmentDetailPanel({
           <dd className="mt-1">
               <span className="block text-h4 font-bold text-ink">연간 한도 대상</span>
               <span className="mt-1 block text-caption text-ink2">
-                {exceededLimit.taxYear}년 접대비가 한도를 {formatWon(exceededLimit.excessAmount)} 넘어 거래마다 금액을
+                {exceededLimit.taxYear}년 {exceededLimit.bucketLabel}가 한도 {formatWon(exceededLimit.limitAmount)}을 {formatWon(exceededLimit.excessAmount)} 넘어 거래마다 금액을
                 정하지 않습니다.
               </span>
             </dd> :
@@ -321,7 +324,7 @@ export function JudgmentDetailPanel({
               {/* 서버는 가능이 아니면 0 을 준다(#184). 「0원」은 확인 필요를 금액이 정해진 것처럼 보이게 해 비워 둔다 */}
               {judgment.verdict.code === 'AVAILABLE' && judgment.finalAmount !== null ?
             `${formatWon(judgment.finalAmount)}${asset ? '까지' : ''}` :
-            '—'}
+            '-'}
             </dd>
           }
         </div>
@@ -390,8 +393,9 @@ export function JudgmentDetailPanel({
           판정이 실제와 다르다면
         </h3>
 
+        {/* 버튼은 판 폭을 채운다. 아래 빼기 버튼과 같은 폭이 된다 */}
         {target === null ?
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 flex gap-2">
             {targets.map((code) =>
           <Button
             key={code}
@@ -426,6 +430,7 @@ export function JudgmentDetailPanel({
             columns={2}
             value={preset}
             onChange={setPreset}
+            onClear={() => setPreset('')}
             options={REASONS[target].map((text) => ({ value: text, label: text }))} />
 
             <Input
@@ -440,7 +445,7 @@ export function JudgmentDetailPanel({
                 취소
               </Button>
               <Button size="sm" disabled={!reason || busy} onClick={() => void save()}>
-                {busy ? '저장 중…' : '저장'}
+                {busy ? '저장 중' : '저장'}
               </Button>
             </div>
           </div>
@@ -459,26 +464,33 @@ export function JudgmentDetailPanel({
       {onExcluded &&
       <section className="px-5 py-4">
           <h3 className="text-body font-bold text-ink">판정할 필요가 없는 거래라면</h3>
-          {/* 불가에는 위에 「불가로 바꾸기」가 없다. 판정에 맞는 말만 한다 (C105) */}
+          {/* 불가에는 위에 「불가로 바꾸기」가 없어 빼면 어떻게 되는지만 적는다 (C105) */}
+          {judgment.verdict.code === 'UNAVAILABLE' &&
           <p className="mt-1.5 text-small text-ink2">
-            {judgment.verdict.code === 'UNAVAILABLE' ?
-          '빼면 결과와 합계에서 사라지고, 거래 화면에서 다시 넣을 수 있습니다.' :
-          '경비가 아니라는 뜻이면 빼지 말고 위에서 불가로 바꿔 주세요. 뺀 거래는 거래 화면에서 다시 넣을 수 있습니다.'}
-          </p>
-          <Button
-          variant="secondary"
-          size="sm"
-          className="mt-3 whitespace-nowrap"
-          disabled={busy}
-          onClick={() => void exclude()}>
-
-            판정 대상에서 빼기
-          </Button>
-          {excludeError &&
-        <p role="alert" className="mt-2 text-small text-deny">
-              {excludeError}
+              빼면 결과와 합계에서 사라지고, 거래 화면에서 다시 넣을 수 있습니다.
             </p>
-        }
+          }
+          <div className="mt-3 flex">
+            <Button
+            variant="secondary"
+            size="sm"
+            className="flex-1 whitespace-nowrap"
+            disabled={busy}
+            onClick={() => {
+              setExcludeError(null);
+              setConfirmingExclude(true);
+            }}>
+
+              판정 대상에서 빼기
+            </Button>
+          </div>
+          <ExcludeConfirm
+          transaction={confirmingExclude ? transaction : null}
+          busy={busy}
+          error={excludeError}
+          onConfirm={() => void exclude()}
+          onClose={() => setConfirmingExclude(false)} />
+
         </section>
       }
 

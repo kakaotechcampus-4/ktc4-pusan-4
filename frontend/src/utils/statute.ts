@@ -9,12 +9,13 @@ const RULE_ARTICLE = /^[^#]+#\d+-(\d+)(?:의(\d+))?$/;
 const branch = (number: string | undefined) => number ? `의${number}` : '';
 
 /**
- * 근거 조문의 제목. 서버 title 은 법령 이름뿐이라(C8) statuteId 로 조·항·호를 붙인다.
+ * 조문 id 만 있을 때의 제목. 판정 내보내기와 규칙 후보는 Citation 에 statuteId 만 준다.
+ * 조문 화면(GET /statutes)은 서버가 법률, 시행령, 시행규칙 title 에 조, 항, 호를 붙여 주므로 그것을 그대로 쓴다.
  * 소득세법-33-1-5 → 소득세법 제33조 제1항 제5호, 소득세법-81의6-1 → 소득세법 제81조의6 제1항.
- * 심판례·해석례처럼 조가 없는 문서는 title 이 이미 사건 제목이라 그대로 둔다.
- * 서버가 제목에 조를 넣어 주기 시작하면 그것을 그대로 쓴다
+ * 조가 없는 문서(심판례, 해석례)는 lawTitle 을 그대로 돌려준다
  */
 export function statuteTitle(statuteId: string, lawTitle: string): string {
+  // 서버가 법률, 시행령, 시행규칙 제목에는 조를 붙여 준다. 고시 같은 행정규칙은 이름뿐이라 여기서 붙인다
   if (/제\d+조/.test(lawTitle)) return lawTitle;
   const law = LAW_ARTICLE.exec(statuteId);
   if (law) {
@@ -29,12 +30,4 @@ export function statuteTitle(statuteId: string, lawTitle: string): string {
   const rule = RULE_ARTICLE.exec(statuteId);
   if (rule) return `${lawTitle} 제${rule[1]}조${branch(rule[2])}`;
   return lawTitle;
-}
-
-/**
- * 국가법령정보 주소. law.go.kr 은 …/제81조의6 꼴만 열고 …/제81의6조 는 오류 페이지다.
- * 말뭉치가 뒤의 꼴로 쌓아 둔 행(13,550행, C9)이 고쳐지지 않으므로 읽을 때 바꾼다
- */
-export function lawGoKrUrl(url: string): string {
-  return url.replace(/제(\d+)의(\d+)조/, '제$1조의$2');
 }

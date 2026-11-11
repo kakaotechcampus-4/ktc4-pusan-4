@@ -124,7 +124,7 @@ flowchart TD
     end
 
     subgraph EXTRACT["규칙 후보 추출 · candidates.py (주 1회 EC2 timer, 자동, 후보당 LLM 3회)"]
-        AGG["① 집계 (SQL)<br/>unmatched_log(RULE_NOT_FOUND)<br/>merchant_category × industry_code<br/>distinct_users ≥ 2 로 자르고, 빈도는 상위 N 정렬에만 쓴다<br/>이미 후보 행이 있는 조합은 건너뛴다"]
+        AGG["① 집계 (SQL)<br/>unmatched_log(RULE_NOT_FOUND)<br/>merchant_category × industry_code<br/>distinct_users ≥ 2 로 자르고, 빈도는 상위 N 정렬에만 쓴다<br/>이미 후보 행이 있는 조합은 건너뛴다 (--key 로 만든 빈도 0 행은 세지 않는다)"]
         PLAN["② 질의 작성 (에이전트 ①)<br/>SearchPlan: 의미질의 + 정확일치 키워드"]
         SEARCH["③ 4개 위계 동시 검색 (코드)<br/>법령 · 행정규칙 · 심판례해석 · 판례 각 top-k<br/>하이브리드: 벡터 + LIKE(pg_bigm) → RRF<br/>법령은 조 단위로 뽑아 형제 잎까지 라벨을 붙여 넘긴다<br/>임베딩 호출은 여기 한 번뿐"]
         FRAME["기본 조문 · search.retrieve() (코드)<br/>소득세법 27조 · 33조 잎을 검색 없이 항상 붙인다<br/>시행령 61조 · 78조(33조1항 5호 · 13호의 범위)도 같이 붙인다<br/>33-1-9 는 뺀다 (페르소나가 면세라 9호 단서에 해당)<br/>27조 2·3항 · 33조 3항도 뺀다 (전기 비용 귀속 · 위임이라 근거가 아니다)"]
@@ -246,7 +246,7 @@ flowchart TD
 
 - **대상은 만들 때 고정한다.** 판정대상이면서 분류 완료인 거래를 `judgment_run_item`에 PENDING으로 넣는다. 그래서 실행 중에 사용자가 거래를 제외해도 `totalCount`와 처리 대상이 어긋나지 않는다.
 - **실행은 커밋 뒤에 시작한다**(`@TransactionalEventListener`). 커밋 전에 시작하면 다른 스레드가 아직 보이지 않는 run을 읽는다.
-- **한 batch에 진행 중인 run은 하나다**(`409 RUN_ALREADY_ACTIVE`, api.md 3.6). 두 run이 같은 거래를 동시에 판정하면 늦게 쓴 쪽이 최신이 되어 문진이 다른 결과가 섞인다(#187). 만들 때 사용자 락을 잡고 진행 중인 run을 조회한다. DB 부분 유니크 인덱스는 쓰지 않았다. 마지막 진행 뒤 5분 지난 run을 빼는 시간 조건을 인덱스에 넣을 수 없고, 버그 때문에 운영에 이미 겹친 run이 남아 있으면 마이그레이션이 실패한다.
+- **한 사용자에게 진행 중인 run은 하나다**(`409 RUN_ALREADY_ACTIVE`, api.md 3.6). 두 run이 같은 거래를 동시에 판정하면 늦게 쓴 쪽이 최신이 되어 문진이 다른 결과가 섞인다(#187). 같은 파일을 다시 올리면 batch가 달라지므로 batch가 아니라 사용자로 센다. 화면은 `GET /judgment-runs/active`로 진행 중인 run을 찾아 진행 화면으로 돌아간다. 만들 때 사용자 락을 잡고 진행 중인 run을 조회한다. DB 부분 유니크 인덱스는 쓰지 않았다. 마지막 진행 뒤 5분 지난 run을 빼는 시간 조건을 인덱스에 넣을 수 없고, 버그 때문에 운영에 이미 겹친 run이 남아 있으면 마이그레이션이 실패한다.
 - **판정 전용 스레드 풀에서 돈다**(`JudgmentRunExecutorConfiguration`, `app.judgment-run`). 워커 하나가 run 하나를 맡으므로 워커 수가 동시에 도는 run의 최대 개수이고, 워커마다 DB 커넥션(Hikari 기본 10개)을 하나 쓴다. 값은 서버 CPU에 따라 달라 운영(`application.yml`, 워커 2·대기열 50)과 로컬 개발(`application-local.yml`, 워커 4·대기열 150)을 따로 둔다. 근거는 각 설정 파일 주석에 있다. 대기열까지 차면 그 run은 바로 `RUN_START_FAILED`로 끝난다. 202는 이미 나갔으므로 사용자는 폴링으로 실패를 보고 다시 실행한다.
 - **거래마다 따로 커밋한다.** 판정 저장과 항목 SUCCEEDED는 한 트랜잭션이다. 판정이 실패하면 그 트랜잭션을 롤백하고, FAILED(`RULE_PROCESSING_FAILED`, 고정 문구)를 새 트랜잭션에 남긴다. 응답으로 나가는 값이라 예외 메시지는 로그에만 남긴다. 한 건의 기술적 실패가 다른 건을 막지 않는다.
 - 판정 결과(`NEEDS_REVIEW` 포함)는 실패가 아니다. 실패는 인용 조문의 `statute_version`이 없는 경우처럼 기술적인 것만 뜻한다.

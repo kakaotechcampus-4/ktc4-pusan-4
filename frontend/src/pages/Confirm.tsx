@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { PlayIcon } from 'lucide-react';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { PencilIcon, PlayIcon, UploadIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { StepEyebrow } from '../components/StepEyebrow';
-import { InfoPanel, InfoRows, PANEL_LINK, PanelFailed, PanelNote } from '../components/InfoPanel';
+import { InfoPanel, InfoRows, PANEL_ICON, PANEL_LINK, PanelFailed, PanelNote } from '../components/InfoPanel';
 import { useSession } from '../contexts/SessionContext';
 import { api, ApiRequestError, useApi } from '../api';
-import { Button } from '../components/ui';
+import { Button, IconButton } from '../components/ui';
 import { uploadName } from '../copy';
 import { formatNumber, formatPeriod } from '../utils/format';
 import { contextRows, isJudgedIndustry } from '../utils/context';
@@ -30,6 +30,12 @@ export function Confirm() {
     );
     return { batch, judgeable: classified.page.totalElements, unclassified: unclassified.page.totalElements };
   }, [batchId]);
+  /**
+   * 진행 중인 판정이 있으면 확인 화면 대신 그 진행 화면을 보인다. 진행 화면을 떠났다가 단계 표시나
+   * 다른 화면의 버튼으로 돌아와도 동의부터 다시 받지 않고, 판정 중에 또 시작하지 못한다.
+   * 못 읽으면 확인 화면을 그대로 보인다. 그래도 시작은 서버가 409 로 막는다
+   */
+  const activeQ = useApi(() => api.runs.active(), []);
   // 다른 업로드로 바꾼 직후에는 앞 업로드의 응답이 남아 있다
   const loaded = batchQ.data && batchQ.data.batch.id === batchId ? batchQ.data : null;
   const [agreed, setAgreed] = useState(false);
@@ -87,6 +93,10 @@ export function Confirm() {
     }
   };
 
+  if (activeQ.data) return <Navigate to={`/run/${activeQ.data.id}`} replace />;
+  // 확인을 보였다가 진행 화면으로 넘어가며 깜빡이지 않게, 진행 중인지 알 때까지 그리지 않는다
+  if (activeQ.loading) return <AppShell narrow>{null}</AppShell>;
+
   return (
     <AppShell narrow>
       <div className="max-w-3xl">
@@ -98,14 +108,16 @@ export function Confirm() {
         <InfoPanel
           title="카드내역"
           action={
-          batchState === 'ready' ?
-          <Link to="/upload" className={PANEL_LINK}>다시 올리기</Link> :
-          batchState === 'none' ?
-          <Link to="/upload" className={PANEL_LINK}>카드내역 올리기</Link> :
+          batchState === 'ready' || batchState === 'none' ?
+          <IconButton
+            to="/upload"
+            icon={UploadIcon}
+            className={PANEL_ICON}
+            label={batchState === 'ready' ? '카드내역 다시 올리기' : '카드내역 올리기'} /> :
           null
           }>
 
-          {batchState === 'loading' && <PanelNote>불러오는 중…</PanelNote>}
+          {batchState === 'loading' && <PanelNote>불러오는 중</PanelNote>}
           {batchState === 'error' &&
           <PanelFailed onRetry={batchStatus === 'error' ? reloadBatch : batchQ.reload}>
               카드내역을 불러오지 못했습니다.
@@ -134,14 +146,17 @@ export function Confirm() {
         <InfoPanel
           title="사업자 문진"
           action={
-          contextStatus === 'ready' ?
-          <Link to="/interview" state={FROM_HERE} className={PANEL_LINK}>문진 고치기</Link> :
-          contextStatus === 'none' ?
-          <Link to="/interview" state={FROM_HERE} className={PANEL_LINK}>문진 하기</Link> :
+          contextStatus === 'ready' || contextStatus === 'none' ?
+          <IconButton
+            to="/interview"
+            state={FROM_HERE}
+            icon={PencilIcon}
+            className={PANEL_ICON}
+            label={contextStatus === 'ready' ? '문진 고치기' : '문진 하기'} /> :
           null
           }>
 
-          {contextStatus === 'loading' && <PanelNote>불러오는 중…</PanelNote>}
+          {contextStatus === 'loading' && <PanelNote>불러오는 중</PanelNote>}
           {contextStatus === 'error' && <PanelFailed onRetry={reloadContext}>문진을 불러오지 못했습니다.</PanelFailed>}
           {contextStatus === 'none' && <PanelNote>아직 문진을 하지 않았습니다.</PanelNote>}
           {contextStatus === 'ready' && context && <InfoRows rows={contextRows(context)} />}
@@ -154,8 +169,9 @@ export function Confirm() {
             흰 바탕 대비 1.19 다. 셋 다 `sr-only` 로 진짜 입력을 숨기고 span 으로 흉내 낸 탓이다.
             Signup.tsx·Questions.tsx 가 이미 브라우저 네모를 쓰고 있어 관례도 이쪽이다
           */}
-          <label className="flex cursor-pointer items-start gap-2.5">
+          <label htmlFor="confirm-agree" className="flex cursor-pointer items-start gap-2.5">
             <input
+              id="confirm-agree"
               type="checkbox"
               checked={agreed}
               onChange={(event) => setAgreed(event.target.checked)}
@@ -182,7 +198,7 @@ export function Confirm() {
             onClick={() => void start()}>
 
             <PlayIcon className="h-4 w-4" aria-hidden="true" />
-            {starting ? '판정을 시작하는 중…' : '판정 시작'}
+            {starting ? '판정을 시작하는 중' : '판정 시작'}
           </Button>
         </div>
       </div>

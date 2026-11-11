@@ -55,7 +55,7 @@ function ErrorScreen() {
           </Button>
         </div>
         <p className="mt-6 text-small text-muted">
-          계속 같은 화면에서 멈추면 <BugReportButton className="inline-flex items-center gap-1 font-bold text-ink underline underline-offset-4" />로
+          계속 같은 화면에서 멈추면 <BugReportButton icon={false} className="inline align-baseline underline underline-offset-4 hover:text-ink" />로
           알려 주세요.
         </p>
       </div>

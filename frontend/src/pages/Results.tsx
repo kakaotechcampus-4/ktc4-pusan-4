@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRightIcon, CircleHelpIcon, DownloadIcon, SearchXIcon } from 'lucide-react';
+import { ArrowRightIcon, CircleHelpIcon, DownloadIcon, Loader2Icon, SearchXIcon, XIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { StepEyebrow } from '../components/StepEyebrow';
 import { JudgmentDetailPanel } from '../components/results/JudgmentDetailPanel';
 import { AmountHero } from '../components/results/AmountHero';
-import { sharesOf } from '../utils/shares';
+import { JudgmentAmount } from '../components/results/JudgmentAmount';
+import { sharesOf, spendOf } from '../utils/shares';
 import { categoryLabel, merchantTitle, verdictNote } from '../components/results/display';
 import { VerdictBadge } from '../components/VerdictBadge';
 import {
@@ -13,46 +14,23 @@ import {
   Button,
   Empty,
   FilterBar,
+  IconButton,
   Pagination,
   Table,
   type Column } from
 '../components/ui';
 import { useSession } from '../contexts/SessionContext';
 import { useAssistantSubject } from '../components/assistant/context';
-import { api, ApiRequestError, useApi } from '../api';
-import type { Judgment, Verdict } from '../types/domain';
+import { api, useApi } from '../api';
+import type { Judgment } from '../types/domain';
 import { formatFullDate, formatNumber, formatPeriod, formatWon } from '../utils/format';
-import { AWAITING_ANSWER, awaitingOf } from '../utils/verdict';
-import { readAll } from '../api/readAll';
-import { download, exportRowOf, judgmentsCsv } from '../utils/csv';
+import { AWAITING_ANSWER, verdictFilterQuery, type VerdictFilter } from '../utils/verdict';
+import { download, judgmentsCsv } from '../utils/csv';
 import { exceededLimitOf, excessNote } from '../utils/limit';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 
-/** 답변 대기는 판정이 아니라 불가에 붙는 표지라 서버 필터가 없다. 불가를 읽어 화면에서 가른다 (C12) */
-type Filter = 'ALL' | Verdict | 'AWAITING';
-
-/** 내보내기 API(#214)가 아직 없는 서버는 판정 목록을 끝까지 읽어 같은 모양을 만든다 */
-const readAllJudgments = (batchId: string) => readAll((page, size) => api.judgments.list({ batchId, page, size }));
-
 /** 표 한 쪽의 행 수. 서버 목록의 기본 크기와 같다 */
 const PAGE_SIZE = 20;
-
-/**
- * 세무사에게 넘길 내보내기. 인정 금액, 답한 내용, 연도별 접대비 한도(#226)가 함께 온다.
- * 내보내기가 없는 서버는 `/judgments/export` 를 `/judgments/{judgmentId}` 로 읽어 400 VALIDATION_ERROR(id 가 UUID 가 아님)를,
- * 그 경로도 없으면 404 를 준다. 이때만 판정 목록으로 만든다. 내보내기의 400 INVALID_EXPORT_SCOPE 는 그대로 실패다
- */
-const noExportApi = (caught: unknown) =>
-caught instanceof ApiRequestError && (
-caught.status === 404 || caught.status === 400 && caught.code === 'VALIDATION_ERROR');
-
-const readExport = (batchId: string) =>
-api.judgments.
-export({ batchId }).
-catch(async (caught: unknown) => {
-  if (!noExportApi(caught)) throw caught;
-  return { items: (await readAllJudgments(batchId)).map(exportRowOf), limits: [] };
-});
 
 /** 표 머리 글자. 골격 줄 옆에서 열이 좁아져도 한 글자씩 꺾이지 않게 한다 (C66) */
 const head = (text: string) => <span className="whitespace-nowrap">{text}</span>;
@@ -73,7 +51,7 @@ const PANEL_SCROLL =
  */
 export function Results() {
   const { batchId, batchStatus, reloadBatch } = useSession();
-  const [filter, setFilter] = useState<Filter>('ALL');
+  const [filter, setFilter] = useState<VerdictFilter>('ALL');
   const [page, setPage] = useState(0);
   /** 고른 거래. 거래 정보를 아직 못 받은 행도 고를 수 있게 id 만 든다 */
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -105,35 +83,21 @@ export function Results() {
     [batchId]
   );
   /**
-   * 현재 판정을 끝까지 읽어 화면에서 거르고 쪽을 나눈다. 서버는 판정한 시각 순으로 주므로 답하거나 고친 행이
-   * 맨 위로 올라온다. 여기서 승인일 순으로 다시 세운다. 경비 가능 금액의 바탕인 결제 합계도 여기서 더한다
+   * 표의 한 쪽. 서버가 필터로 거르고 승인일 순으로 세워 준다(답하거나 고친 행이 맨 위로 올라오지 않는다).
+   * 건수와 금액은 요약(summaryQ)에서 받는다. 전부 읽어 화면에서 세면 거래가 많을 때 요청이 쪽 수만큼 늘어난다
    */
-  const allQ = useApi(
+  const listQ = useApi(
     () =>
     batchId ?
-    readAllJudgments(batchId).then((items) =>
-    [...items].sort((a, b) =>
-    b.transaction.approvedAt.localeCompare(a.transaction.approvedAt) || b.id.localeCompare(a.id)
-    )
-    ) :
+    api.judgments.list({ batchId, ...verdictFilterQuery(filter), sort: 'APPROVED_AT', page, size: PAGE_SIZE }) :
     Promise.resolve(null),
-    [batchId]
+    [batchId, filter, page]
   );
-  // 불가와 답변 대기를 가른다 (C12). 답을 기다리는 질문을 끝까지 읽는다. 못 읽으면 답변 대기 표지만 빠진다
-  const pendingQ = useApi(
-    () =>
-    batchId ?
-    readAll((page, size) => api.questions.list({ batchId, status: 'PENDING', page, size })).then(
-      (pending) => new Set(pending.map((question) => question.transactionId))
-    ) :
-    Promise.resolve(null),
-    [batchId]
-  );
-  // 다 답한 뒤에도 답을 바꾸러 갈 수 있어야 한다 (3.10 정정, F1-c)
+  // 다 답한 뒤에도 답을 바꾸러 갈 수 있어야 한다 (3.10 정정, F1-c). 있는지만 보므로 한 개만 읽는다
   const answeredQ = useApi(
     () =>
     batchId ?
-    api.questions.grouped({ batchId, status: 'ANSWERED', size: 1 }) :
+    api.questions.list({ batchId, status: 'ANSWERED', size: 1 }) :
     Promise.resolve(null),
     [batchId]
   );
@@ -146,28 +110,8 @@ export function Results() {
     [batchId]
   );
 
-  const all = allQ.data;
-  const awaiting = pendingQ.data ?? new Set<string>();
-  const unavailable = all?.filter((judgment) => judgment.verdict.code === 'UNAVAILABLE') ?? [];
-  const awaitingRows = awaitingOf(unavailable, awaiting);
-  const awaitingCount = awaitingRows.length;
-  const spend = all ? all.reduce((sum, judgment) => sum + judgment.transaction.amount, 0) : null;
-  const filtered =
-  filter === 'ALL' ?
-  all ?? [] :
-  filter === 'AWAITING' ?
-  awaitingRows :
-  filter === 'UNAVAILABLE' ?
-  unavailable.filter((judgment) => !awaiting.has(judgment.transactionId)) :
-  all?.filter((judgment) => judgment.verdict.code === filter) ?? [];
-  const listPage = {
-    number: page,
-    size: PAGE_SIZE,
-    totalElements: filtered.length,
-    totalPages: Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)),
-    hasNext: (page + 1) * PAGE_SIZE < filtered.length
-  };
-  const judgments: Judgment[] = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const judgments: Judgment[] = listQ.data?.items ?? [];
+  const listPage = listQ.data?.page;
 
   // 패널은 고른 거래의 현재 판정을 따로 읽는다(거래 요약이 함께 온다). 수정하면 그 행이 다른 판정으로
   // 옮겨 가도 패널은 그 거래에 머문다
@@ -204,7 +148,7 @@ export function Results() {
   }, [wide]);
 
   // 마지막 행이 다른 분류로 빠지면 그 페이지가 빈다. Pagination 이 사라지므로 첫 페이지로
-  const pageEmpty = Boolean(all) && judgments.length === 0;
+  const pageEmpty = Boolean(listQ.data) && judgments.length === 0;
   useEffect(() => {
     if (page > 0 && pageEmpty) setPage(0);
   }, [page, pageEmpty]);
@@ -217,8 +161,7 @@ export function Results() {
 
   // 판정 대상에서 빼면 그 거래의 질문도 집계에서 빠진다(3.9). 질문 안내도 다시 읽는다
   const changed = () => {
-    allQ.reload();
-    pendingQ.reload();
+    listQ.reload();
     summaryQ.reload();
     panelQ.reload();
     questionsQ.reload();
@@ -228,8 +171,7 @@ export function Results() {
   const reloadAll = () => {
     batchQ.reload();
     summaryQ.reload();
-    allQ.reload();
-    pendingQ.reload();
+    listQ.reload();
     questionsQ.reload();
     answeredQ.reload();
     unclassifiedQ.reload();
@@ -248,7 +190,7 @@ export function Results() {
     setExporting(true);
     setExportFailed(false);
     try {
-      const { items, limits } = await readExport(batchId);
+      const { items, limits } = await api.judgments.export({ batchId });
       const batch = batchQ.data;
       const period = batch ? `${batch.periodStart}_${batch.periodEnd}` : batchId.slice(0, 8);
       download(`PreeT-판정결과-${period}.csv`, judgmentsCsv(items, limits));
@@ -261,6 +203,7 @@ export function Results() {
 
   const summary = summaryQ.data;
   const limits = summary?.limits ?? [];
+  const awaitingCount = summary?.awaiting.count ?? 0;
   // batch 합계는 접대비 한도 전 금액이다(#226). 넘은 해가 있으면 헤더 합계 아래에 알린다
   const excess = excessNote(limits);
   const filters = [
@@ -270,7 +213,7 @@ export function Results() {
   {
     value: 'UNAVAILABLE' as const,
     label: '불가',
-    count: summary && all && (pendingQ.data || pendingQ.error) ? summary.byVerdict.UNAVAILABLE.count - awaitingCount : undefined
+    count: summary ? summary.byVerdict.UNAVAILABLE.count - awaitingCount : undefined
   },
   // 답을 기다리는 거래가 있을 때만 둔다. 고른 채로 다 답했으면 빈 목록이 보이도록 남긴다
   ...(awaitingCount > 0 || filter === 'AWAITING' ?
@@ -280,13 +223,13 @@ export function Results() {
   const unresolved = questionsQ.data?.unresolved;
   // 다시 읽다가 실패하면 예전 질문 수를 띄우지 않고 실패를 알린다
   const questionsFailed = Boolean(questionsQ.error) && !questionsQ.loading;
-  const answeredGroups = answeredQ.data?.page.totalElements ?? 0;
+  const answeredCount = answeredQ.data?.page.totalElements ?? 0;
   const unclassified = unclassifiedQ.data?.page.totalElements ?? 0;
   /**
    * 처음 읽는 동안. 머리글 줄, 질문 안내, 분류 안내, 표를 다 받은 뒤 한 번에 그린다.
    * 따로 그리면 늦게 온 줄이 이미 그린 표를 밀어 내린다 (C66). 실패한 것은 기다리지 않는다
    */
-  const firstLoad = [batchQ, summaryQ, allQ, questionsQ, pendingQ, unclassifiedQ].some(
+  const firstLoad = [batchQ, summaryQ, listQ, questionsQ, unclassifiedQ].some(
     (query) => query.loading && !query.data && !query.error
   );
 
@@ -325,37 +268,14 @@ export function Results() {
   {
     header: head('금액'),
     align: 'right',
-    cell: (row) => {
-      const { transaction } = row;
-      // 「일부 인정」은 AVAILABLE + finalAmount < amount 다 (2.1).
-      // 자산은 그해 넣을 수 있는 한도라 「최대」로 쓴다 (CONTEXT.md G4 화면 문구)
-      const asset = row.attributes['자산'] === true;
-      const partial =
-      row.verdict.code === 'AVAILABLE' &&
-      row.finalAmount !== null && (
-      asset || row.finalAmount !== transaction.amount);
-      // 한도를 넘은 해의 접대비는 거래별 금액이 없다(#226). 금액 대신 한도 대상임을 적는다
-      const overLimit = exceededLimitOf(row, limits);
-      return (
-        <span className="block">
-            <span className="whitespace-nowrap font-bold text-ink">{formatWon(transaction.amount)}</span>
-            {overLimit ?
-          <span className="block whitespace-nowrap text-caption text-ink2">연간 한도 대상</span> :
-          partial && row.finalAmount !== null &&
-          <span className="block whitespace-nowrap text-caption text-ink2">
-                  {asset ? '최대' : '경비 가능'} {formatWon(row.finalAmount)}
-                </span>
-          }
-          </span>);
-
-    }
+    cell: (row) => <JudgmentAmount row={row} limits={limits} />
   },
   {
     header: head('판정'),
     align: 'right',
     cell: (row) => {
       // 직접 수정, 세무사에게 넘김(rule-card-fields.md ②), 답변 대기는 같은 배지라도 할 일이 달라 배지 아래에 적는다
-      const note = verdictNote(row, awaiting.has(row.transactionId));
+      const note = verdictNote(row, row.awaitingAnswer);
       return (
         <span className="inline-flex flex-col items-end gap-1">
             <VerdictBadge verdict={row.verdict} />
@@ -379,27 +299,23 @@ export function Results() {
       </div>
       <div className="flex flex-col items-end gap-1">
         <div className="flex flex-wrap items-center gap-2">
-          {/* 판정이 끝난 뒤 나가는 길. 빵부스러기의 「홈」만으로는 눈에 띄지 않는다 (#242 리뷰) */}
+          {/* 판정이 끝난 뒤 나가는 길 (#242 리뷰) */}
           <Button to="/" variant="ghost" size="sm" className="whitespace-nowrap">
             홈으로
           </Button>
           {/* 확인할 질문이 없을 때는 아래 안내가 사라지므로, 답을 바꾸러 가는 길을 여기 남긴다 */}
-          {!(unresolved && unresolved.count > 0) && answeredGroups > 0 &&
+          {!(unresolved && unresolved.count > 0) && answeredCount > 0 &&
         <Button to="/questions" variant="ghost" size="sm" className="whitespace-nowrap">
               답한 질문 보기
             </Button>
         }
           {batchId && summary && summary.totalCount > 0 &&
-        <Button
-          variant="ghost"
-          size="sm"
-          className="whitespace-nowrap"
-          disabled={exporting}
-          onClick={() => void exportCsv()}>
-
-              <DownloadIcon className="h-4 w-4" aria-hidden="true" />
-              {exporting ? 'CSV 만드는 중…' : 'CSV 내려받기'}
-            </Button>
+        <IconButton
+          icon={exporting ? Loader2Icon : DownloadIcon}
+          spin={exporting}
+          label={exporting ? 'CSV 만드는 중' : 'CSV 내려받기'}
+          busy={exporting}
+          onClick={() => void exportCsv()} />
         }
           <Button to="/summary" variant="secondary" size="sm" className="whitespace-nowrap">
             요약 보기
@@ -451,8 +367,7 @@ export function Results() {
 
   }
 
-  // 답을 기다리는 질문을 못 읽으면 답변 대기 목록만 실패로 보인다. 다른 목록은 표지만 빠진 채 그린다
-  const failed = Boolean(allQ.error || summaryQ.error || filter === 'AWAITING' && pendingQ.error);
+  const failed = Boolean(listQ.error || summaryQ.error);
   const nothingJudged = summary?.totalCount === 0;
 
   const empty = failed ?
@@ -522,8 +437,8 @@ export function Results() {
       <AmountHero
         className="mt-6"
         amount={summary.byVerdict.AVAILABLE.finalAmount}
-        spend={allQ.error ? null : spend}
-        shares={all && !allQ.error ? sharesOf(all, pendingQ.error ? null : awaitingRows) : null}
+        spend={spendOf(summary)}
+        shares={sharesOf(summary)}
         counts={false}>
 
           {excess && <p>{excess}</p>}
@@ -548,17 +463,16 @@ export function Results() {
       {excludedName &&
       <p
         role="status"
-        className="mt-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl border border-line px-4 py-3 text-small text-ink2">
+        className="mt-4 flex items-start justify-between gap-3 rounded-xl border border-line px-4 py-3 text-small text-ink2">
 
-          <span>
+          {/* 닫기 그림은 줄이 꺾여도 오른쪽 위에 둔다. 버튼 안 여백만큼 당겨 그림 끝을 상자 여백에 맞춘다 */}
+          <span className="min-w-0 flex-1 py-0.5">
             {excludedName} 거래를 판정 대상에서 뺐습니다.{' '}
             <Link to="/transactions" className="font-bold text-accent hover:underline">
               거래에서 다시 넣기
             </Link>
           </span>
-          <button type="button" onClick={() => setExcludedName(null)} className="shrink-0 py-1 text-ink2 hover:text-ink">
-            닫기
-          </button>
+          <IconButton icon={XIcon} label="알림 닫기" className="-my-1.5 -mr-2.5" onClick={() => setExcludedName(null)} />
         </p>
       }
 
@@ -614,12 +528,12 @@ export function Results() {
             columns={columns}
             rows={failed || firstLoad ? [] : judgments}
             rowKey={(row) => row.id}
-            loading={allQ.loading || firstLoad}
+            loading={listQ.loading || firstLoad}
             selectedKey={judgments.find((row) => row.transactionId === selectedId)?.id}
             onRowClick={(row) => select(row.transactionId)}
             empty={empty} />
 
-          {!failed && !firstLoad && judgments.length > 0 && <Pagination page={listPage} onChange={setPage} />}
+          {!failed && !firstLoad && listPage && judgments.length > 0 && <Pagination page={listPage} onChange={setPage} />}
         </section>
 
         {wide && selectedId && !failed && !nothingJudged && !firstLoad &&

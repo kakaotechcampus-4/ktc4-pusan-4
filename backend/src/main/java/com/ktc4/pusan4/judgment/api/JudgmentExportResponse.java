@@ -2,6 +2,7 @@ package com.ktc4.pusan4.judgment.api;
 
 import com.ktc4.pusan4.judgment.domain.JudgmentExportRow;
 import com.ktc4.pusan4.judgment.domain.LimitYearTotal;
+import com.ktc4.pusan4.judgment.domain.RuleSet;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
@@ -13,10 +14,12 @@ public record JudgmentExportResponse(
     List<LimitYearResponse> limits
 ) {
 
-    public static JudgmentExportResponse from(List<JudgmentExportRow> rows, List<LimitYearTotal> limits) {
+    public static JudgmentExportResponse from(
+        List<JudgmentExportRow> rows, List<LimitYearTotal> limits, RuleSet rules
+    ) {
         return new JudgmentExportResponse(rows.stream()
-            .map(row -> new Item(JudgmentResponse.from(row.judgment()), row.allowedAmount(), row.answers()))
-            .toList(), LimitYearResponse.from(limits));
+            .map(row -> new Item(JudgmentResponse.from(row.judgment(), rules, row.pendingQuestion()), row.allowedAmount(), row.answers()))
+            .toList(), LimitYearResponse.from(limits, rules));
     }
 
     public record Item(

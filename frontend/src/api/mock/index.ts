@@ -1,5 +1,5 @@
 import type { Api } from '../contract';
-import { ApiRequestError } from '../contract';
+import { ApiRequestError, rememberTraceId } from '../contract';
 import type {
   AssistantChatRequest,
   AssistantChatResponse,
@@ -43,6 +43,7 @@ import {
   UPLOAD_BATCH } from
 './data';
 import { STATUTES } from './statutes';
+import { passwordProblem } from '../../utils/password';
 
 /**
  * 백엔드 준비 전 목업 구현. 응답 모양은 API 명세와 같고,
@@ -218,6 +219,12 @@ const store = {
   verifications: new Map<string, { sentAt: number; sentToday: number; attempts: number; used: boolean }>(),
   /** 가입 토큰 → 인증한 이메일 */
   verificationTokens: new Map<string, string>(),
+  /** 이메일 → 보낸 비밀번호 재설정 코드의 상태. 가입 인증과 따로 센다 */
+  resets: new Map<string, { sentAt: number; sentToday: number; attempts: number; used: boolean }>(),
+  /** 재설정 토큰 → 인증한 이메일 */
+  resetTokens: new Map<string, string>(),
+  /** 이번 시간에 받은 버그 신고 시각들 (한 시간 5건) */
+  bugReports: [] as number[],
   ruleCandidates: RULE_CANDIDATES.map((c) => ({ ...c })) as RuleCandidate[],
   /** 다음 비서 요청을 이 오류로 실패시킨다 (개발용) */
   failAssistant: null as ApiRequestError | null,
@@ -239,8 +246,48 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const CODE_TTL_MS = 5 * 60_000;
 const RESEND_MS = 60_000;
 
+/** 서버처럼 오류마다 traceId 를 붙인다. 버그 신고가 마지막 traceId 를 싣는 것을 목업에서도 볼 수 있다 */
 const reject = (status: number, code: string, message: string) =>
-Promise.reject(new ApiRequestError(status, code, message));
+Promise.reject(new ApiRequestError(status, code, message, nextId('mock-trace')));
+
+/** 코드 보내기. 가입 인증과 재설정이 같은 규칙(60초, 하루 5번)을 따로 센다 */
+const sendCode = (
+sent: Map<string, { sentAt: number; sentToday: number; attempts: number; used: boolean }>,
+key: string) =>
+{
+  const previous = sent.get(key);
+  const at = Date.now();
+  if (previous && at - previous.sentAt < RESEND_MS) {
+    const left = Math.ceil((RESEND_MS - (at - previous.sentAt)) / 1000);
+    return reject(429, 'VERIFICATION_RESEND_TOO_SOON', `${left}초 뒤에 다시 요청할 수 있습니다.`);
+  }
+  if (previous && previous.sentToday >= 5)
+  return reject(429, 'VERIFICATION_DAILY_LIMIT', '오늘은 더 보낼 수 없습니다.');
+  sent.set(key, { sentAt: at, sentToday: (previous?.sentToday ?? 0) + 1, attempts: 0, used: false });
+  return delay(undefined);
+};
+
+/** 코드 확인. 맞으면 tokens 에 토큰을 넣고 돌려준다 */
+const confirmCode = (
+sent: Map<string, { sentAt: number; sentToday: number; attempts: number; used: boolean }>,
+tokens: Map<string, string>,
+email: string,
+code: string) =>
+{
+  const key = normalizeEmail(email);
+  if (!/^\d{6}$/.test(code)) return reject(400, 'VALIDATION_ERROR', '코드는 숫자 6자리입니다.');
+  const record = sent.get(key);
+  if (!record || record.used || record.attempts >= 5 || Date.now() - record.sentAt > CODE_TTL_MS)
+  return reject(400, 'VERIFICATION_CODE_EXPIRED', '코드를 다시 받아 주세요.');
+  if (code !== MOCK_VERIFICATION_CODE) {
+    record.attempts += 1;
+    return reject(400, 'INVALID_VERIFICATION_CODE', '코드가 맞지 않습니다.');
+  }
+  record.used = true;
+  const verificationToken = `mock-verification-${++seq}`;
+  tokens.set(verificationToken, key);
+  return delay({ verificationToken });
+};
 
 const signInAs = (email: string | null) => {
   store.signedIn = true;
@@ -299,10 +346,27 @@ const summaryOf = (t: Transaction): TransactionSummary => ({
   installmentMonths: t.installmentMonths
 });
 
-/** 판정에 거래 요약을 붙인다. 판정 당시가 아니라 응답 시점의 거래 값이다 (3.4 거래 요약) */
+/** 계정과목 화면 이름. 서버는 rules/accounts.yaml 의 label 을 붙이고, 없으면 ID 그대로다 (3.7 accountLabel) */
+const ACCOUNT_LABELS: Record<string, string> = { 접대비: '기업업무추진비' };
+const labelOf = (account: string) => ACCOUNT_LABELS[account] ?? account;
+
+/** 목업 한도. 서버는 최신 문진의 직전연도 수입금액으로 계산한다(api.md 3.7 limitAmount 예시 값) */
+const MOCK_LIMIT_AMOUNT = 12_090_000;
+
+/**
+ * 판정에 거래 요약과 계정과목 화면 이름, 답변 대기 표지를 붙인다. 판정 당시가 아니라 응답 시점의 거래 값이다 (3.4 거래 요약).
+ * 답변 대기는 불가인데 그 거래에 답하지 않은 질문이 남은 것이다 (3.7 awaitingAnswer)
+ */
 const withTransaction = (j: JudgmentSeed): Judgment | null => {
   const t = transactionOf(j.transactionId);
-  return t ? { ...j, transaction: summaryOf(t) } : null;
+  return t ?
+  {
+    ...j,
+    accountLabel: j.account && labelOf(j.account),
+    awaitingAnswer: j.verdict.code === 'UNAVAILABLE' && hasPendingQuestion(j.transactionId),
+    transaction: summaryOf(t)
+  } :
+  null;
 };
 
 /** §5 판정 대상: 판정대상이면서 분류가 끝난 거래 */
@@ -323,7 +387,9 @@ const limitsFor = (rows: JudgmentSeed[]): LimitYear[] => {
   const years = [...new Set(rows.filter(limited).map(yearOf))].filter((y): y is string => y !== undefined).sort();
   return years.map((year) => ({
     bucket: '접대비',
+    bucketLabel: labelOf('접대비'),
     taxYear: Number(year),
+    limitAmount: MOCK_LIMIT_AMOUNT,
     totalAmount: currentAll().
     filter((j) => limited(j) && yearOf(j) === year).
     reduce((sum, j) => sum + (j.finalAmount ?? 0), 0),
@@ -458,6 +524,10 @@ filter((g) => g.pairs.length > 0);
 
 const isAnswered = (g: LiveGroup) => store.answers.has(g.seed.groupKey);
 
+/** 답하지 않은 질문이 남은 거래인지. 질문 목록처럼 판정 대상인 거래만 본다 */
+const hasPendingQuestion = (transactionId: string) =>
+visibleGroups().some((g) => !isAnswered(g) && g.pairs.some((p) => p.transaction.id === transactionId));
+
 /**
  * 소명 대기 (3.11). Override 를 뺀 최신 자동 판정이 불가인데 PENDING 질문이 남은 거래.
  * 현재 결과가 아니라 자동 판정을 본다 — Override 를 해제하면 자동 판정이 다시 현재 결과가 된다
@@ -570,7 +640,11 @@ transactionId?: string)
 };
 
 const notFound = (code: string, message: string) =>
-Promise.reject(new ApiRequestError(404, code, message));
+Promise.reject(new ApiRequestError(404, code, message, nextId('mock-trace')));
+
+/** 진행 중인 실행. 체험 화면은 한 사용자라 전부에서 찾는다. 가장 새것을 준다 */
+const activeRun = () =>
+[...store.runs.values()].filter((r) => r.status.code === 'QUEUED' || r.status.code === 'RUNNING').at(-1) ?? null;
 
 /** 승인·기각. 검토한 사람과 시각을 남긴다. 이미 처리한 후보는 다시 바꾸지 않는다 */
 const reviewCandidate = (id: number, status: RuleCandidate['status']) => {
@@ -658,13 +732,13 @@ const mockChat = async ({ message, context }: AssistantChatRequest): Promise<Ass
       return reply('남은 질문이 많거나 소명 대기가 섞여 있어 한 번에 답할 수 없습니다. 하나씩 답해 주세요.');
       const count = sameType.reduce((sum, g) => sum + g.count, 0);
       const amount = sameType.reduce((sum, g) => sum + g.totalAmount, 0);
-      return reply(`남은 「${target.factType}」 질문 ${count}건에 같은 답을 넣는 카드를 만들었습니다.`, [
+      return reply(`남은 ${target.factType} 질문 ${count}건에 같은 답을 넣는 카드를 만들었습니다.`, [
       {
         kind: 'bulk_answer',
         batchId,
         factType: target.factType,
         value,
-        card: `남은 '${target.factType}' 질문 ${count}건 ${amount.toLocaleString('ko-KR')}원 → '${value}'`
+        card: `남은 '${target.factType}' 질문 ${count}건 ${amount.toLocaleString('ko-KR')}원 답변: '${value}'`
       }]
       );
     }
@@ -679,7 +753,7 @@ const mockChat = async ({ message, context }: AssistantChatRequest): Promise<Ass
       questionIds: group.questionIds,
       value,
       source: 'ASSISTANT',
-      card: `${cardTarget(group.transactions[0])} → '${value}'`
+      card: `${cardTarget(group.transactions[0])} 답변: '${value}'`
     }]
     );
   }
@@ -694,7 +768,7 @@ const mockChat = async ({ message, context }: AssistantChatRequest): Promise<Ass
       kind: 'classification',
       reviewIds: group.reviewIds,
       merchantCategory: category,
-      card: `${cardTarget(group.transactions[0])} → ${category}`
+      card: `${cardTarget(group.transactions[0])} 분류: ${category}`
     }]
     );
   }
@@ -716,14 +790,14 @@ const mockChat = async ({ message, context }: AssistantChatRequest): Promise<Ass
       judgmentId: current.id,
       toVerdict,
       reason: message.trim(),
-      card: `${cardTarget(summaryOf(t))} 판정 ${current.verdict.label} → ${LABEL[toVerdict]}`
+      card: `${cardTarget(summaryOf(t))} 판정을 ${current.verdict.label}에서 ${LABEL[toVerdict]}${toVerdict === 'AVAILABLE' ? '으로' : '로'} 변경`
     }]
     );
   }
 
   const next = batchId ? (await mockApi.progress.get(batchId)).next : null;
   return next ?
-  reply(`다음 할 일은 「${next.label}」입니다.`, [
+  reply(`다음 할 일은 ${next.label}입니다.`, [
   { kind: 'navigation', route: next.route, card: `다음 할 일: ${next.label}` }]
   ) :
   reply('카드내역을 올리면 분류 확인부터 차례로 안내합니다.', [
@@ -733,7 +807,7 @@ const mockChat = async ({ message, context }: AssistantChatRequest): Promise<Ass
 
 // ── 구현 ────────────────────────────────────────────
 
-export const mockApi: Api = {
+const mockGroups: Api = {
   auth: {
     // 목업 비밀번호면 어떤 이메일이든 들어간다. 목업에서 가입한 계정은 그 비밀번호로도 들어간다
     login: ({ email, password }) => {
@@ -747,42 +821,37 @@ export const mockApi: Api = {
       const key = normalizeEmail(email);
       if (!EMAIL_PATTERN.test(key)) return reject(400, 'VALIDATION_ERROR', '이메일 형식이 아닙니다.');
       if (store.accounts.has(key)) return reject(409, 'EMAIL_ALREADY_EXISTS', '이미 가입한 이메일입니다.');
-      const previous = store.verifications.get(key);
-      const at = Date.now();
-      if (previous && at - previous.sentAt < RESEND_MS) {
-        const left = Math.ceil((RESEND_MS - (at - previous.sentAt)) / 1000);
-        return reject(429, 'VERIFICATION_RESEND_TOO_SOON', `${left}초 뒤에 다시 요청할 수 있습니다.`);
-      }
-      if (previous && previous.sentToday >= 5)
-      return reject(429, 'VERIFICATION_DAILY_LIMIT', '오늘은 더 보낼 수 없습니다.');
-      store.verifications.set(key, { sentAt: at, sentToday: (previous?.sentToday ?? 0) + 1, attempts: 0, used: false });
-      return delay(undefined);
+      return sendCode(store.verifications, key);
     },
-    confirmEmailVerification: ({ email, code }) => {
-      const key = normalizeEmail(email);
-      if (!/^\d{6}$/.test(code)) return reject(400, 'VALIDATION_ERROR', '코드는 숫자 6자리입니다.');
-      const sent = store.verifications.get(key);
-      if (!sent || sent.used || sent.attempts >= 5 || Date.now() - sent.sentAt > CODE_TTL_MS)
-      return reject(400, 'VERIFICATION_CODE_EXPIRED', '코드를 다시 받아 주세요.');
-      if (code !== MOCK_VERIFICATION_CODE) {
-        sent.attempts += 1;
-        return reject(400, 'INVALID_VERIFICATION_CODE', '코드가 맞지 않습니다.');
-      }
-      sent.used = true;
-      const verificationToken = `mock-verification-${++seq}`;
-      store.verificationTokens.set(verificationToken, key);
-      return delay({ verificationToken });
-    },
+    confirmEmailVerification: ({ email, code }) => confirmCode(store.verifications, store.verificationTokens, email, code),
     signup: ({ email, password, verificationToken }) => {
       const key = normalizeEmail(email);
-      if (password.length < 8 || new TextEncoder().encode(password).length > 72)
-      return reject(400, 'VALIDATION_ERROR', '비밀번호는 8자 이상, 72바이트 이하입니다.');
+      const problem = passwordProblem(password);
+      if (problem) return reject(400, 'VALIDATION_ERROR', problem);
       if (store.verificationTokens.get(verificationToken) !== key)
       return reject(400, 'EMAIL_NOT_VERIFIED', '이메일 인증을 다시 해 주세요.');
       if (store.accounts.has(key)) return reject(409, 'EMAIL_ALREADY_EXISTS', '이미 가입한 이메일입니다.');
       store.verificationTokens.delete(verificationToken);
       store.accounts.set(key, password);
       signInAs(key);
+      return delay(undefined);
+    },
+    // 목업은 어느 이메일이든 목업 비밀번호로 들어가므로 가입한 이메일로 보고 코드를 보낸다
+    requestPasswordReset: ({ email }) => {
+      const key = normalizeEmail(email);
+      if (!EMAIL_PATTERN.test(key)) return reject(400, 'VALIDATION_ERROR', '이메일 형식이 아닙니다.');
+      return sendCode(store.resets, key);
+    },
+    confirmPasswordReset: ({ email, code }) => confirmCode(store.resets, store.resetTokens, email, code),
+    completePasswordReset: ({ email, verificationToken, newPassword }) => {
+      const key = normalizeEmail(email);
+      if (store.resetTokens.get(verificationToken) !== key)
+      return reject(400, 'EMAIL_NOT_VERIFIED', '코드 확인부터 다시 해 주세요.');
+      // 규칙에 맞지 않으면 토큰은 그대로 둔다. 고쳐서 다시 보내면 된다
+      const problem = passwordProblem(newPassword);
+      if (problem) return reject(400, 'VALIDATION_ERROR', problem);
+      store.resetTokens.delete(verificationToken);
+      store.accounts.set(key, newPassword);
       return delay(undefined);
     },
     // 목업은 카카오에 다녀오지 않는다. 코드가 비어 있지 않으면 카카오 계정(이메일 없음)으로 들어간다
@@ -812,7 +881,32 @@ export const mockApi: Api = {
       createdAt: '2026-09-01T10:00:00+09:00',
       role: isAdminEmail(store.email) ? 'ADMIN' as const : 'USER' as const
     }),
-    remove: () => delay(undefined)
+    remove: () => delay(undefined),
+    changePassword: ({ currentPassword, newPassword }) => {
+      if (!store.signedIn) return reject(401, 'UNAUTHORIZED', '로그인이 필요합니다.');
+      if (store.email === null) return reject(409, 'PASSWORD_NOT_SET', '비밀번호가 없는 계정입니다.');
+      const saved = store.accounts.get(store.email);
+      if (currentPassword !== (saved ?? MOCK_PASSWORD))
+      return reject(400, 'INVALID_CURRENT_PASSWORD', '현재 비밀번호가 맞지 않습니다.');
+      const problem = passwordProblem(newPassword);
+      if (problem) return reject(400, 'VALIDATION_ERROR', problem);
+      store.accounts.set(store.email, newPassword);
+      return delay(undefined);
+    }
+  },
+
+  bugReports: {
+    create: ({ message }) => {
+      if (!store.signedIn) return reject(401, 'UNAUTHORIZED', '로그인이 필요합니다.');
+      if (!message.trim() || message.length > 2000)
+      return reject(400, 'VALIDATION_ERROR', '내용을 2000자 안으로 적어 주세요.');
+      const hour = Math.floor(Date.now() / 3_600_000);
+      store.bugReports = store.bugReports.filter((at) => Math.floor(at / 3_600_000) === hour);
+      if (store.bugReports.length >= 5)
+      return reject(429, 'BUG_REPORT_RATE_LIMITED', `${60 - new Date().getMinutes()}분 뒤에 다시 보내 주세요.`);
+      store.bugReports.push(Date.now());
+      return delay(undefined);
+    }
   },
 
   contexts: {
@@ -963,7 +1057,7 @@ export const mockApi: Api = {
       // 2.3 취소상계는 사용자가 포함으로 바꿀 수 없다
       if (t.sourceStatus.code === 'CANCELED_OFFSET')
       return Promise.reject(
-        new ApiRequestError(409, 'CANCELED_TRANSACTION_NOT_INCLUDABLE', '취소·상계 거래는 판정 대상으로 포함할 수 없습니다.')
+        new ApiRequestError(409, 'CANCELED_TRANSACTION_NOT_INCLUDABLE', '취소나 상계 거래는 판정 대상으로 포함할 수 없습니다.')
       );
       return delay(applyInclusion(t, 'INCLUDED'));
     },
@@ -980,6 +1074,12 @@ export const mockApi: Api = {
       return notFound('BATCH_NOT_FOUND', '업로드를 찾을 수 없습니다.');
       const context = store.contexts.find((c) => c.id === contextId);
       if (!context) return notFound('CONTEXT_NOT_FOUND', '사업자 문진을 찾을 수 없습니다.');
+      // 진행 중인 실행이 있으면 업로드와 상관없이 막는다 (api.md 3.6)
+      const active = activeRun();
+      if (active)
+      return Promise.reject(
+        new ApiRequestError(409, 'RUN_ALREADY_ACTIVE', '이미 판정 중인 업로드가 있습니다. 끝난 뒤 다시 실행해 주세요.', '', undefined, active.id)
+      );
       // 판정 대상은 JUDGEABLE 이면서 분류가 끝난 거래다. 미분류는 엔진에 넘기지 않는다(api.md 3.3)
       const judgeable = (t: Transaction) =>
       t.batchId === batchId &&
@@ -1056,6 +1156,10 @@ export const mockApi: Api = {
       }
       return delay({ ...run });
     },
+    active: () => {
+      const run = activeRun();
+      return delay(run ? { ...run } : null);
+    },
     failures: (runId, q) => {
       const run = store.runs.get(runId);
       if (!run) return notFound('JUDGMENT_RUN_NOT_FOUND', '판정 실행을 찾을 수 없습니다.');
@@ -1072,7 +1176,7 @@ export const mockApi: Api = {
       );
       if (given.length !== 1)
       return Promise.reject(
-        new ApiRequestError(400, 'INVALID_SUMMARY_SCOPE', 'batchId·year·runId 중 하나만 지정해야 합니다.')
+        new ApiRequestError(400, 'INVALID_SUMMARY_SCOPE', 'batchId, year, runId 중 하나만 지정해야 합니다.')
       );
       const type = scope.batchId ? 'BATCH' : scope.year ? 'YEAR' : 'RUN';
       const id = String(scope.batchId ?? scope.year ?? scope.runId);
@@ -1094,16 +1198,37 @@ export const mockApi: Api = {
         return true;
       });
 
-      const by: Record<Verdict, { count: number; finalAmount: number }> = {
-        AVAILABLE: { count: 0, finalAmount: 0 },
-        UNAVAILABLE: { count: 0, finalAmount: 0 },
-        NEEDS_REVIEW: { count: 0, finalAmount: 0 }
+      const by: Record<Verdict, { count: number; finalAmount: number; spendAmount: number }> = {
+        AVAILABLE: { count: 0, finalAmount: 0, spendAmount: 0 },
+        UNAVAILABLE: { count: 0, finalAmount: 0, spendAmount: 0 },
+        NEEDS_REVIEW: { count: 0, finalAmount: 0, spendAmount: 0 }
       };
+      const awaiting = { count: 0, spendAmount: 0 };
+      const overridden: Record<Verdict, { count: number; finalAmount: number; spendAmount: number }> = {
+        AVAILABLE: { count: 0, finalAmount: 0, spendAmount: 0 },
+        UNAVAILABLE: { count: 0, finalAmount: 0, spendAmount: 0 },
+        NEEDS_REVIEW: { count: 0, finalAmount: 0, spendAmount: 0 }
+      };
+      const years = new Map<number, number>();
       const accounts = new Map<string, { count: number; finalAmount: number }>();
       for (const j of rows) {
         const slot = by[j.verdict.code];
+        const spend = transactionOf(j.transactionId)?.amount ?? 0;
         slot.count += 1;
         slot.finalAmount += j.finalAmount ?? 0;
+        slot.spendAmount += spend;
+        if (j.verdict.code === 'UNAVAILABLE' && hasPendingQuestion(j.transactionId)) {
+          awaiting.count += 1;
+          awaiting.spendAmount += spend;
+        }
+        if (j.origin.type === 'OVERRIDE') {
+          const changed = overridden[j.verdict.code];
+          changed.count += 1;
+          changed.finalAmount += j.finalAmount ?? 0;
+          changed.spendAmount += spend;
+        }
+        const year = Number(transactionOf(j.transactionId)?.approvedAt.slice(0, 4));
+        years.set(year, (years.get(year) ?? 0) + (j.verdict.code === 'AVAILABLE' ? j.finalAmount ?? 0 : 0));
         if (j.verdict.code !== 'AVAILABLE' || !j.account) continue;
         const acc = accounts.get(j.account) ?? { count: 0, finalAmount: 0 };
         acc.count += 1;
@@ -1116,10 +1241,13 @@ export const mockApi: Api = {
         totalCount: rows.length,
         byVerdict: by,
         byAccount: [...accounts].
-        map(([account, v]) => ({ account, ...v })).
+        map(([account, v]) => ({ account, accountLabel: labelOf(account), ...v })).
         sort((a, b) => b.finalAmount - a.finalAmount || a.account.localeCompare(b.account)),
         // 과거 Run 범위는 그 시점 한도가 남아 있지 않아 빈 배열이다 (api.md 3.7)
-        limits: scope.runId ? [] : limitsFor(rows)
+        limits: scope.runId ? [] : limitsFor(rows),
+        awaiting,
+        overridden,
+        byYear: [...years].sort(([a], [b]) => a - b).map(([year, finalAmount]) => ({ year, finalAmount }))
       });
     },
     list: (q) => {
@@ -1149,7 +1277,12 @@ export const mockApi: Api = {
       const out = items.
       map(withTransaction).
       filter((j): j is Judgment => j !== null).
-      sort((a, b) => b.computedAt.localeCompare(a.computedAt) || b.id.localeCompare(a.id));
+      filter((j) => q?.awaiting === undefined || j.awaitingAnswer === q.awaiting).
+      sort((a, b) =>
+      (q?.sort === 'APPROVED_AT' ?
+      b.transaction.approvedAt.localeCompare(a.transaction.approvedAt) :
+      b.computedAt.localeCompare(a.computedAt)) || b.id.localeCompare(a.id)
+      );
       return delay(paginate(out, q?.page, q?.size ?? 20));
     },
     get: (id) => {
@@ -1160,7 +1293,7 @@ export const mockApi: Api = {
     // 대상은 같은 조건의 현재 판정이고 페이지가 없다(#214). 목업은 한도를 넘지 않아 인정 금액이 finalAmount 다
     export: (scope) => {
       if ((scope.batchId === undefined) === (scope.year === undefined))
-      return Promise.reject(new ApiRequestError(400, 'INVALID_EXPORT_SCOPE', 'batchId·year 중 하나만 지정해야 합니다.'));
+      return Promise.reject(new ApiRequestError(400, 'INVALID_EXPORT_SCOPE', 'batchId, year 중 하나만 지정해야 합니다.'));
       const answersOf = (transactionId: string) =>
       liveGroups().
       filter((g) => g.pairs.some((p) => p.transaction.id === transactionId) && store.answers.has(g.seed.groupKey)).
@@ -1218,7 +1351,12 @@ export const mockApi: Api = {
         judgmentId: next.id,
         active: true
       });
-      return delay({ ...next, transaction: summaryOf(t) });
+      return delay({
+        ...next,
+        accountLabel: next.account && labelOf(next.account),
+        awaitingAnswer: next.verdict.code === 'UNAVAILABLE' && hasPendingQuestion(next.transactionId),
+        transaction: summaryOf(t)
+      });
     },
     removeOverride: (overrideId) => {
       const found = store.overrides.get(overrideId);
@@ -1309,6 +1447,39 @@ export const mockApi: Api = {
         rejudgedTransactionCount: rejudged.length
       });
     },
+    withdraw: ({ questionIds }) => {
+      if (questionIds.length === 0)
+      return Promise.reject(new ApiRequestError(400, 'VALIDATION_ERROR', '거둘 질문을 보내야 합니다.'));
+      const groups = liveGroups();
+      const owners = questionIds.map((id) => groups.find((g) => g.pairs.some((p) => p.questionId === id)));
+      const group = owners[0];
+      if (!group || owners.some((g) => g === undefined))
+      return notFound('QUESTION_NOT_FOUND', '질문을 찾을 수 없습니다.');
+      const { groupKey } = group.seed;
+      // 이미 대기면 바꿀 것이 없다
+      if (!store.answers.has(groupKey)) return delay({ withdrawnCount: 0, rejudgedTransactionCount: 0 });
+      store.answers.delete(groupKey);
+      // 답하기 전처럼 확인 필요로 다시 판정한다. 답할 때와 같은 거래만 다시 판정한다
+      const rejudged = group.pairs.
+      map((p) => p.transaction).
+      filter((t) => isJudgeable(t) && automaticOf(t.id) !== undefined);
+      rejudged.forEach((t) => {
+        const prev = automaticOf(t.id);
+        if (!prev) return;
+        store.judgments.push({
+          ...prev,
+          id: nextId('0199f1c3'),
+          revision: latestOf(t.id).revision + 1,
+          origin: { type: 'USER_FACT', id: factIdOf(groupKey) },
+          verdict: { code: 'NEEDS_REVIEW', label: LABEL.NEEDS_REVIEW },
+          account: null,
+          finalAmount: null,
+          explanation: null,
+          computedAt: now()
+        });
+      });
+      return delay({ withdrawnCount: group.pairs.length, rejudgedTransactionCount: rejudged.length });
+    },
     suggestions: (batchId) => delay({ items: suggestionsIn(batchId) }),
     bulkAnswer: ({ batchId, factType, answer }) => {
       // 이 배치의 PENDING 중 factType 이 같은 질문만 한 번에 닫는다. 새 Run 은 만들지 않는다 (3.11)
@@ -1394,7 +1565,7 @@ export const mockApi: Api = {
     respond: ({ reviewIds, merchantCategory }) => {
       if (merchantCategory === '미분류')
       return Promise.reject(
-        new ApiRequestError(422, 'UNCLASSIFIED_CATEGORY_NOT_ALLOWED', '「미분류」는 답변으로 제출할 수 없습니다.')
+        new ApiRequestError(422, 'UNCLASSIFIED_CATEGORY_NOT_ALLOWED', '미분류는 답변으로 제출할 수 없습니다.')
       );
       const rows = store.reviews.filter((r) => reviewIds.includes(r.id));
       if (rows.length === 0)
@@ -1442,7 +1613,7 @@ export const mockApi: Api = {
           appliedRuleIds: [],
           rulesCommitSha: RULES_SHA,
           userContextVersion: completedRun.contextVersion,
-          explanation: `가맹점 업종을 「${merchantCategory}」로 확인한 뒤 다시 판정했습니다.`,
+          explanation: `가맹점 업종을 ${merchantCategory} 분류로 확인한 뒤 다시 판정했습니다.`,
           computedAt: now(),
           citations: []
         });
@@ -1508,7 +1679,7 @@ export const mockApi: Api = {
       return delay({
         batch: {
           id: batch.id,
-          label: `${batch.cardIssuer} · ${start === end ? start : `${start}~${end}`}`,
+          label: `${batch.cardIssuer} ${start === end ? start : `${start}~${end}`}`,
           transactionCount: store.transactions.filter((t) => t.batchId === batchId).length
         },
         context: context ?
@@ -1536,6 +1707,46 @@ export const mockApi: Api = {
       return delay(note);
     }
   }
+};
+
+/** http.ts 처럼 오류 응답의 traceId 를 버그 신고에 실을 값으로 적는다 */
+const remembering = <T extends object>(group: T): T =>
+Object.fromEntries(
+  Object.entries(group).map(([key, value]) => [
+  key,
+  typeof value === 'function' ?
+  (...args: unknown[]) => {
+    const result: unknown = value(...args);
+    return result instanceof Promise ?
+    result.catch((caught: unknown) => {
+      if (caught instanceof ApiRequestError && caught.traceId) rememberTraceId(caught.traceId);
+      throw caught;
+    }) :
+    result;
+  } :
+  typeof value === 'object' && value !== null ?
+  remembering(value) :
+  value]
+  )
+) as T;
+
+/** 로그인과 신고 자체의 실패는 신고할 오류가 아니라 적지 않는다 (http.ts 와 같다) */
+/** 로그인, 로그아웃하면 앞 세션의 traceId 를 지운다 (http.ts 와 같다) */
+const forgetting = <A extends unknown[], R>(call: (...args: A) => R) => (...args: A) => {
+  rememberTraceId(null);
+  return call(...args);
+};
+
+export const mockApi: Api = {
+  ...remembering(mockGroups),
+  auth: {
+    ...mockGroups.auth,
+    login: forgetting(mockGroups.auth.login),
+    signup: forgetting(mockGroups.auth.signup),
+    kakao: forgetting(mockGroups.auth.kakao),
+    logout: forgetting(mockGroups.auth.logout)
+  },
+  bugReports: mockGroups.bugReports
 };
 
 /**

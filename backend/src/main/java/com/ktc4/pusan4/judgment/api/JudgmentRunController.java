@@ -13,6 +13,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -39,7 +40,7 @@ public class JudgmentRunController {
         description = "같은 Batch 에 여러 번 실행할 수 있고, 다시 판정하면 새 revision 을 만든다")
     @ApiResponse(responseCode = "404", description = "BATCH_NOT_FOUND, CONTEXT_NOT_FOUND(문진 전)",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
-    @ApiResponse(responseCode = "409", description = "RUN_ALREADY_ACTIVE — 같은 업로드에 진행 중인 run 이 있다. 본문 runId 가 그 run",
+    @ApiResponse(responseCode = "409", description = "RUN_ALREADY_ACTIVE — 이 사용자에게 진행 중인 run 이 있다(업로드와 상관없이). 본문 runId 가 그 run",
         content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @PostMapping
     @ResponseStatus(HttpStatus.ACCEPTED)
@@ -50,6 +51,16 @@ public class JudgmentRunController {
         return JudgmentRunCreatedResponse.from(
             runService.create(currentUser.id(), request.batchId(), request.contextId())
         );
+    }
+
+    @Operation(summary = "진행 중인 판정 실행 조회",
+        description = "이 사용자의 QUEUED·RUNNING run. 화면이 진행 화면으로 돌아가고 판정 시작을 막는 데 쓴다. 없으면 204")
+    @ApiResponse(responseCode = "204", description = "진행 중인 run 이 없다")
+    @GetMapping("/active")
+    public ResponseEntity<JudgmentRunResponse> active(CurrentUser currentUser) {
+        return runService.active(currentUser.id())
+            .map(run -> ResponseEntity.ok(JudgmentRunResponse.from(run)))
+            .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
     @Operation(summary = "판정 실행 상태 조회")

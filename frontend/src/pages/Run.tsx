@@ -18,7 +18,6 @@ import type {
 import { Badge, Button, cn } from '../components/ui';
 import { formatNumber, formatWon } from '../utils/format';
 import { AWAITING_ANSWER, VERDICT_LABEL, VERDICT_META } from '../utils/verdict';
-import { readUnavailableSplit } from '../api/readAll';
 import { pollErrorOf, runPhase, type PollError } from './runPhase';
 
 /**
@@ -181,18 +180,16 @@ function RunProgress() {
   const runBatchId = run?.batchId ?? null;
 
   // 집계를 못 읽어도 판정은 끝났다. 결과 보기는 그대로 두고 그 자리에서 다시 읽게 한다 (C62)
+  // 답변 대기(불가 가운데 답을 기다리는 거래)도 요약이 함께 센다 (C12)
   useEffect(() => {
-    if (!runId || !judged || !runBatchId) return;
+    if (!runId || !judged) return;
     let cancelled = false;
     setCountsFailed(false);
-    void Promise.all([
-    api.judgments.summary({ runId }),
-    readUnavailableSplit(api, { runId }, runBatchId)]
-    ).
+    void api.judgments.summary({ runId }).
     then(
-      ([summary, split]) => {
+      (summary) => {
         if (cancelled) return;
-        setAwaitingCount(split.awaiting.length);
+        setAwaitingCount(summary.awaiting.count);
         setByVerdict(summary.byVerdict);
       },
       () => {
@@ -202,7 +199,7 @@ function RunProgress() {
     return () => {
       cancelled = true;
     };
-  }, [runId, judged, runBatchId, countsAttempt]);
+  }, [runId, judged, countsAttempt]);
 
   useEffect(() => {
     if (!runId || !finished || failedCount === 0) return;
@@ -500,7 +497,7 @@ function RunProgress() {
               variant={judged ? 'secondary' : 'primary'}
               disabled={retrying}
               onClick={() => void retry()}>
-                {retrying ? '다시 판정하는 중…' : '다시 판정하기'}
+                {retrying ? '다시 판정하는 중' : '다시 판정하기'}
               </Button>
               {retryFailed &&
               <p role="alert" className="text-small text-deny">
