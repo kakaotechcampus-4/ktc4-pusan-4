@@ -5,7 +5,6 @@ import com.ktc4.pusan4.judgment.domain.PreviousAnswer;
 import com.ktc4.pusan4.judgment.domain.PreviousAnswerSuggester;
 import com.ktc4.pusan4.judgment.domain.PreviousAnswerSuggestion;
 import com.ktc4.pusan4.judgment.domain.QuestionGroup;
-import com.ktc4.pusan4.judgment.domain.QuestionStatus;
 import com.ktc4.pusan4.judgment.domain.RuleSet;
 import com.ktc4.pusan4.shared.api.ApiException;
 import org.springframework.http.HttpStatus;
@@ -46,9 +45,7 @@ public class QuestionSuggestionService {
         if (!batchRepository.existsByIdAndUserId(batchId, userId)) {
             throw new ApiException(HttpStatus.NOT_FOUND, "BATCH_NOT_FOUND", "업로드를 찾을 수 없습니다.");
         }
-        List<QuestionGroup> pending = QuestionGroup.group(queryService.find(userId, batchId, null).stream()
-            .filter(question -> question.status() == QuestionStatus.PENDING)
-            .toList());
+        List<QuestionGroup> pending = QuestionGroup.group(queryService.findPending(userId, batchId));
         // C 등급 질문은 지난 답을 읽을 필요가 없다.
         Set<String> codes = pending.stream()
             .map(group -> group.questions().getFirst().code())

@@ -5,6 +5,7 @@ CONTEXT.md 9.5 의 [1] 과 [6]. 가운데 셋(질의·근거 선택·초안)은 
 사용:
     python -m pipeline.candidates --dry-run
     python -m pipeline.candidates --limit 10
+    python -m pipeline.candidates --key 카페/940909   # 집계 없이 이 조합 하나로 후보를 만든다
 
 집계는 기간을 안 자른다. 대신 이미 후보 행이 있는 (카테고리 × 업종)을 건너뛴다.
 기간으로 자르면 주당 한두 건씩 쌓이는 카테고리가 영영 임계값을 못 넘고, 안 자르면
@@ -48,9 +49,11 @@ SELECT u.merchant_category, u.industry_code,
   JOIN transaction t  ON t.id = j.transaction_id
   JOIN upload_batch b ON b.id = t.batch_id
  WHERE u.reason = %(reason)s
+   -- --key 로 만든 빈도 0 후보는 세지 않는다. 기각해도 행이 남아 이 조합의 자동 후보를 막는다
    AND NOT EXISTS (SELECT 1 FROM rule_candidate c
                     WHERE c.merchant_category = u.merchant_category
-                      AND c.industry_code = u.industry_code)
+                      AND c.industry_code = u.industry_code
+                      AND c.occurrence_count > 0)
  GROUP BY u.merchant_category, u.industry_code
 HAVING count(DISTINCT b.user_id) >= %(min_users)s
  ORDER BY occurrence_count DESC
@@ -144,12 +147,22 @@ def main() -> int:
     ap.add_argument("--limit", type=int, default=10, help="빈도 상위 N건")
     ap.add_argument("--min-users", type=int, default=MIN_USERS, help="서로 다른 사용자 수 하한")
     ap.add_argument("--dry-run", action="store_true", help="집계만 하고 적재하지 않는다")
+    ap.add_argument("--key", help="집계 없이 이 (카테고리/업종코드) 하나로 후보를 만든다. 예: 카페/940909")
     args = ap.parse_args()
 
     today = datetime.now(UTC).date()
     meta = category_meta()
+    if args.key:
+        cat, _, ind = args.key.partition("/")
+        # 모르는 카테고리면 성격이 빈 채로 에이전트가 돈다
+        if cat not in meta or not ind:
+            ap.error(f"--key 는 카테고리/업종코드 형식이고 카테고리는 docs/categories.md 에 있어야 한다: {args.key}")
     with psycopg.connect(settings.database_url, row_factory=dict_row) as conn:
-        rows = aggregate(conn, args.min_users, args.limit)
+        if args.key:
+            # 미판정에서 온 게 아니라 사용자 수 · 빈도가 없다
+            rows = [{"merchant_category": cat, "industry_code": ind, "distinct_users": 0, "occurrence_count": 0}]
+        else:
+            rows = aggregate(conn, args.min_users, args.limit)
         print(f"후보 {len(rows)}건 (reason={REASON}, distinct_users>={args.min_users})")
         for r in rows:
             print(f"  {r['merchant_category']}/{r['industry_code']}"

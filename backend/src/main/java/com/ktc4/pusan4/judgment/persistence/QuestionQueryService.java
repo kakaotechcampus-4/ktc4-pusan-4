@@ -69,6 +69,13 @@ public class QuestionQueryService {
         return toDomain(rows, withPending);
     }
 
+    /** {@link #find} 의 PENDING 질문만. 답한 질문은 읽지 않는다. 정렬: createdAt ASC, id ASC. */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public List<Question> findPending(UUID userId, UUID batchId) {
+        List<QuestionRow> rows = questionRepository.findPendingRows(userId, batchId);
+        return toDomain(rows, rows.stream().map(QuestionRow::transactionId).collect(Collectors.toSet()));
+    }
+
     /**
      * {@link #find} 와 같은 조건에 status 를 더한 한 쪽. 그 쪽의 질문만 거래, 답, 수정 여부를 붙인다.
      * 전부 읽어 메모리에서 자르면 끝까지 읽는 화면이 쪽 수만큼 전체를 다시 읽는다.

@@ -3,6 +3,8 @@
 import sys
 from datetime import date
 
+import pytest
+
 from pipeline import candidates
 from pipeline.candidates import docs, hold_reasons, top_tier
 from pipeline.search import Hit
@@ -119,6 +121,39 @@ def test_배치_끝에_실패한_조합을_한_줄로_남긴다(monkeypatch, cap
 
     assert candidates.main() == 0
     assert capsys.readouterr().out.splitlines()[-1] == "실패 2건 (보험/940909, 차량/940909)"
+
+
+def test_key_를_주면_집계_없이_그_조합만_적재한다(monkeypatch):
+    seen = []
+
+    def propose(conn, row, *_):
+        seen.append(row)
+        return dict(row, status="대기"), "G2/확인필요 근거 1건"
+
+    def aggregate(*_):
+        raise AssertionError("집계를 부르면 안 된다")
+
+    monkeypatch.setattr(candidates.psycopg, "connect", lambda *_, **__: 연결())
+    monkeypatch.setattr(candidates, "category_meta", lambda: {"카페": "혼재"})
+    monkeypatch.setattr(candidates, "aggregate", aggregate)
+    monkeypatch.setattr(candidates, "propose", propose)
+    monkeypatch.setattr(sys, "argv", ["candidates", "--key", "카페/940909"])
+
+    assert candidates.main() == 0
+    assert seen == [{"merchant_category": "카페", "industry_code": "940909",
+                     "distinct_users": 0, "occurrence_count": 0}]
+
+
+def test_key_의_카테고리가_없으면_에이전트를_돌리지_않는다(monkeypatch):
+    monkeypatch.setattr(candidates, "category_meta", lambda: {"카페": "혼재"})
+    def connect(*_, **__):
+        raise AssertionError("DB 에 붙기 전에 멈춰야 한다")
+
+    monkeypatch.setattr(candidates.psycopg, "connect", connect)
+    for key in ("커피/940909", "카페"):
+        monkeypatch.setattr(sys, "argv", ["candidates", "--key", key])
+        with pytest.raises(SystemExit):
+            candidates.main()
 
 
 def test_suggested_docs_에_위계가_붙는다():
