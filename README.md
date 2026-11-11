@@ -115,7 +115,7 @@
 > "이건 왜 안 돼요?" 같은 질문에 내 판정 결과와 조문을 바탕으로 답합니다
 
 > **프롬프트 인젝션 방어**
-> 6가지 공격 유형을 직접 시험해 막았습니다 ([보고서](docs/really-prompt-injection-report.md))
+> 7가지 공격 유형을 직접 시험해 막았습니다 ([보고서](docs/really-prompt-injection-report.md))
 
 <p align="center"><img src="./docs/img/readme/really-v2.gif" width="80%" alt="Really" /></p>
 
