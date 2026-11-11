@@ -1142,6 +1142,12 @@ document.addEventListener('click', e => {
 });
 addEventListener('popstate', () => render());
 render();
+// htmlpreview 는 이 파일을 document.write 로 넣어서 head 의 파비콘이 탭에 뜨지 않는다.
+// 로딩이 끝난 뒤 링크를 다시 붙이면 뜬다. 바로 붙이면 무시돼서 시간을 두고 두 번 붙인다.
+if (location.hostname === 'htmlpreview.github.io') {
+  const reattachIcons = () => document.querySelectorAll('link[rel="icon"]').forEach(l => { const n = l.cloneNode(); l.remove(); document.head.append(n); });
+  [300, 2000].forEach(ms => setTimeout(reattachIcons, ms));
+}
 </script>
 </body>
 </html>
