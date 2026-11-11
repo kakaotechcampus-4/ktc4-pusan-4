@@ -42,3 +42,10 @@
 - `docs/site/index.html` 의 `<title>` 아래에 앱과 같은 파비콘을 넣었다. `frontend/public/favicon.svg` 와 SVG 를 못 읽는 브라우저용 `favicon-32.png` 두 개다.
 - 사이트가 파일 하나로 htmlpreview 에서 보여야 해서 다른 이미지처럼 base64 data URI 로 넣었다. 넣은 데이터가 원본 파일과 같은지 비교했다.
 - 브라우저 탭에 실제로 뜨는지는 보지 못했다(헤드리스 스크린샷에는 탭이 없다).
+
+## 13:09 htmlpreview 에서 파비콘이 안 뜨던 문제 수정
+
+- 커밋: 42c1d6ac (1개)
+- htmlpreview 는 받은 HTML 을 `document.write` 로 자기 페이지에 넣는다. 이때 head 의 파비콘은 Chrome 탭에 반영되지 않았다(파일을 직접 열면 뜸). Chrome 디버깅 목록(`/json/list` 의 `faviconUrl`)으로 확인했다.
+- 스크립트 끝에서 htmlpreview 일 때만 파비콘 링크를 다시 붙인다. 바로 붙이면 무시되고 100ms 뒤부터 반영돼서, 300ms 와 2초 두 번 붙인다.
+- htmlpreview 와 같은 방식으로 띄운 로컬 페이지에서 고치기 전 없음, 고친 뒤 뜸을 확인했다.
