@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
+import { rulesData } from './scripts/rules-data.mjs'
 
 // 배포에서는 Caddy 가 /api/v1/* 를 백엔드로 넘긴다(deploy/caddy/Caddyfile). 개발 중에도 같은
 // 경로를 쓰도록 여기서 프록시한다 — 화면 코드가 환경에 따라 달라지지 않게.
@@ -16,7 +17,8 @@ export default defineConfig(({ mode }) => {
     process.env.VITE_API_TARGET ?? env.VITE_API_TARGET ?? 'https://ktc4-pusan-4.duckdns.org'
 
   return {
-    plugins: [react()],
+    // 규칙 카드, 용어집, 평가 사례를 빌드 때 JSON 으로 바꿔 넣는다. 못 읽으면 빌드가 멈춘다
+    plugins: [react(), rulesData()],
     server: {
       proxy: {
         '/api/v1': { target, changeOrigin: true, secure: true },

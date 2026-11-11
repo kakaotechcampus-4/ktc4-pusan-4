@@ -7,6 +7,8 @@ import { Badge, Button, ChoiceGroup, Input, SymbolIcon, cn } from '../ui';
 import { VerdictBadge } from '../VerdictBadge';
 import { StatuteCitation } from '../StatuteCitation';
 import { ExcludeConfirm } from './ExcludeConfirm';
+import { GateRail } from '../rules/GateRail';
+import { askProps, REF_ATTR } from '../assistant/ask';
 import { VERDICT_LABEL, VERDICT_META } from '../../utils/verdict';
 import { formatFullDate, formatWon, ro } from '../../utils/format';
 import {
@@ -53,8 +55,21 @@ const VERDICT_TEXT: Record<Verdict, string> = {
   UNAVAILABLE: 'text-deny'
 };
 
+/**
+ * 패널 머리의 판정색. 왼쪽 위에서 판정색이 둥글게 번져 흰색으로 흐른다(index.css .verdict-head-*).
+ * 위쪽의 진한 띠와 패널 테두리는 두지 않는다(11/11 치오). 행을 바꾸면 패널이 새로 그려져 색도 함께 바뀐다
+ */
+const VERDICT_HEAD: Record<Verdict, string> = {
+  AVAILABLE: 'verdict-head-ok',
+  NEEDS_REVIEW: 'verdict-head-warn',
+  UNAVAILABLE: 'verdict-head-deny'
+};
+
 /** 사용자가 바꿀 수 있는 판정. 확인 필요로 되돌리는 수정은 받지 않는다 (#62 논의) */
 type Target = 'AVAILABLE' | 'UNAVAILABLE';
+
+/** 결과 표의 단축키가 패널에 시키는 일. nonce 가 바뀔 때마다 한 번 한다 */
+export type PanelCommand = {kind: 'exclude';nonce: number;};
 
 /** 3.8 reason. 자주 쓰는 사유를 고르고, 필요하면 덧붙여 적는다 */
 const REASONS: Record<Target, string[]> = {
@@ -80,6 +95,10 @@ interface JudgmentDetailPanelProps {
   onExcluded?: (merchant: string) => void;
   /** 바깥 상자에 더할 클래스. 넓은 화면은 높이를 막고 상자 안에서 스크롤한다 */
   className?: string;
+  /** 표에서 ← → Delete 를 누르면 바꾸기 폼이나 빼기 확인 창을 연다 */
+  command?: PanelCommand | null;
+  /** command 를 받았다. 같은 거래로 돌아와 패널을 새로 그려도 다시 하지 않게 지운다 */
+  onCommandDone?: () => void;
 }
 
 export function JudgmentDetailPanel({
@@ -88,7 +107,9 @@ export function JudgmentDetailPanel({
   focusKey = 0,
   onChanged,
   onExcluded,
-  className
+  className,
+  command = null,
+  onCommandDone
 }: JudgmentDetailPanelProps) {
   const transaction = judgment.transaction;
   const [target, setTarget] = useState<Target | null>(null);
@@ -147,6 +168,18 @@ export function JudgmentDetailPanel({
   useEffect(() => {
     if (target) form.current?.querySelector<HTMLElement>('button')?.focus();
   }, [target]);
+
+  // 표의 Delete 단축키. 빼기 확인 창을 연다
+  const lastCommand = useRef<number | null>(null);
+  useEffect(() => {
+    if (!command || command.nonce === lastCommand.current) return;
+    lastCommand.current = command.nonce;
+    onCommandDone?.();
+    // 저장하는 동안 누른 키는 버린다. 끝난 뒤에 창이 저절로 열리지 않게 한다
+    if (busy || !onExcluded) return;
+    setExcludeError(null);
+    setConfirmingExclude(true);
+  }, [command, busy, onExcluded, onCommandDone]);
 
   const overridden = judgment.origin.type === 'OVERRIDE';
   const asset = judgment.attributes['자산'] === true;
@@ -266,8 +299,12 @@ export function JudgmentDetailPanel({
   };
 
   return (
-    <div className={cn('divide-y divide-line rounded-2xl border border-line bg-sheet', className)}>
-      <header className="px-5 py-4">
+    <div
+      {...{ [REF_ATTR]: `tx:${judgment.transactionId} j:${judgment.id}` }}
+      className={cn('divide-y divide-line rounded-2xl bg-sheet', className)}>
+      <header
+        {...askProps({ kind: 'transaction', transactionId: judgment.transactionId, label: merchantTitle(transaction) })}
+        className={cn('rounded-t-2xl px-5 pb-4 pt-5', VERDICT_HEAD[judgment.verdict.code])}>
         <div className="flex items-center justify-between gap-3">
           <p
             className={`flex items-center gap-2 text-h4 font-bold ${
@@ -331,7 +368,9 @@ export function JudgmentDetailPanel({
       </dl>
 
       {hasReason &&
-      <section className="px-5 py-4">
+      <section
+        {...askProps({ kind: 'reason', transactionId: judgment.transactionId, label: merchantTitle(transaction) })}
+        className="px-5 py-4">
         <h3 className="text-body font-bold text-ink">판정 이유</h3>
         {reviewState &&
         <p className="mt-2 text-small leading-6 text-ink2">
@@ -367,6 +406,13 @@ export function JudgmentDetailPanel({
           </div>
         }
       </section>
+      }
+
+      {/* 판정이 관문을 어떻게 지났는지. 직접 바꾼 판정이면 자동 판정의 길이다. 자동 판정을 읽기 전에는 그리지 않는다 */}
+      {(!overridden || engine) &&
+      <section className="px-5 py-3">
+          <GateRail judgment={engine ?? judgment} title={`${merchantTitle(transaction)} 판정 경로`} />
+        </section>
       }
 
       {/* 계정과목·증빙은 짧고 먼저 읽을 것이라 바꾸기 위에 둔다 (C72) */}
@@ -521,7 +567,9 @@ export function JudgmentDetailPanel({
       }
 
       {/* 할 일(바꾸기, 빼기)을 먼저 두고 조문은 맨 끝에 둔다. 사람들은 조문보다 할 일을 먼저 찾는다 */}
-      <section className="px-5 py-4">
+      <section
+        {...judgment.citations.length > 0 ? askProps({ kind: 'statute', transactionId: judgment.transactionId, label: merchantTitle(transaction) }) : {}}
+        className="px-5 py-4">
         {/* 수정한 판정은 규칙 엔진의 근거를 그대로 들고 있다. 수정의 근거로 읽히지 않게 한다 */}
         <h3 className="text-body font-bold text-ink">
           {overridden ? '자동 판정의 근거 조문' : '근거 조문'}

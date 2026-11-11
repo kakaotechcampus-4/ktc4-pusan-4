@@ -73,7 +73,7 @@ export function BottomSheet({ open, onClose, label, children }: BottomSheetProps
         onClick={(event) => event.stopPropagation()}
         className="max-h-[85vh] w-full overflow-y-auto rounded-t-2xl bg-sheet pb-6 outline-none">
         
-        <div className="sticky top-0 z-10 flex items-center justify-between bg-sheet px-4 pb-2 pt-3">
+        <div className="sticky top-0 z-10 flex h-12 items-center justify-between bg-sheet px-4">
           <span aria-hidden="true" className="mx-auto h-1 w-10 rounded-full bg-line" />
           <span id={labelId} className="sr-only">{label}</span>
           <button

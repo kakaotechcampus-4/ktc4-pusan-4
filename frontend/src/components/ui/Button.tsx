@@ -63,7 +63,8 @@ export type ButtonProps = ButtonAsButton | ButtonAsLink | ButtonAsAnchor;
 
 export function Button(props: ButtonProps) {
   const { variant = 'primary', size = 'md', className, children } = props;
-  const classes = cn(BASE, VARIANT[variant], SIZE[size], className);
+  // 글 속 링크(ghost, inline)는 자리를 움직이지 않는다. 나머지는 올리면 오르고 누르면 눌린다 (index.css .m-step)
+  const classes = cn(BASE, VARIANT[variant], SIZE[size], variant !== 'ghost' && size !== 'inline' && 'm-step', className);
 
   if (props.to !== undefined) {
     const { to, replace, state } = props;

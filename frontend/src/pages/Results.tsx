@@ -1,10 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRightIcon, CircleHelpIcon, DownloadIcon, Loader2Icon, SearchXIcon, XIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { StepEyebrow } from '../components/StepEyebrow';
-import { JudgmentDetailPanel } from '../components/results/JudgmentDetailPanel';
+import { JudgmentDetailPanel, type PanelCommand } from '../components/results/JudgmentDetailPanel';
+import { VerdictGrid } from '../components/results/VerdictGrid';
+import { GRID_MAX, judgmentCell } from '../components/results/verdictCells';
+import { ShortcutHelp, type Shortcut } from '../components/ShortcutHelp';
+import { askBus, askProps, REF_ATTR } from '../components/assistant/ask';
 import { AmountHero } from '../components/results/AmountHero';
+import { UnclassifiedNote } from '../components/results/UnclassifiedNote';
 import { JudgmentAmount } from '../components/results/JudgmentAmount';
 import { sharesOf, spendOf } from '../utils/shares';
 import { categoryLabel, merchantTitle, verdictNote } from '../components/results/display';
@@ -20,6 +25,7 @@ import {
   type Column } from
 '../components/ui';
 import { useSession } from '../contexts/SessionContext';
+import { uploadName } from '../copy';
 import { useAssistantSubject } from '../components/assistant/context';
 import { api, useApi } from '../api';
 import type { Judgment } from '../types/domain';
@@ -32,17 +38,25 @@ import { useMediaQuery } from '../hooks/useMediaQuery';
 /** 표 한 쪽의 행 수. 서버 목록의 기본 크기와 같다 */
 const PAGE_SIZE = 20;
 
+/** ? 를 누르면 뜨는 목록. 표의 행에 초점이 있을 때 듣는다 */
+const SHORTCUTS: Shortcut[] = [
+{ keys: ['↑', '↓'], label: '위아래 거래로 옮기기' },
+{ keys: ['Delete'], label: '판정 대상에서 빼기' },
+{ keys: ['?'], label: '단축키 보기' }];
+
+
 /** 표 머리 글자. 골격 줄 옆에서 열이 좁아져도 한 글자씩 꺾이지 않게 한다 (C66) */
 const head = (text: string) => <span className="whitespace-nowrap">{text}</span>;
 
 /**
  * 넓은 화면의 상세 상자. 화면보다 길면 테두리 상자째 안에서 스크롤해, 스크롤해도 테두리가 끊기지 않는다 (C72).
- * macOS 는 스크롤 막대를 숨겨 아래가 더 있는지 모르므로 막대를 늘 그린다.
+ * macOS 는 스크롤 막대를 숨겨 아래가 더 있는지 모르므로 막대를 늘 그린다. 상자 테두리가 없어 막대가 한쪽 테두리처럼
+ * 보이지 않게 가늘고 옅게 두고, 마우스를 올리면 진해진다.
  * 높이는 끝까지 내렸을 때를 기준으로 잡는다. 그때 sticky 상자는 표 영역 바닥(꼬리말 위, 화면 아래에서 약 11rem)에
  * 밀려 올라가므로, 상자가 그보다 길면 위쪽이 머리말(72px) 밑으로 들어간다. 표가 짧아도 같다
  */
 const PANEL_SCROLL =
-'max-h-[calc(100vh-16.5rem)] overflow-y-auto [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted/40 [&::-webkit-scrollbar]:w-2';
+'max-h-[calc(100vh-16.5rem)] overflow-y-auto [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-line hover:[&::-webkit-scrollbar-thumb]:bg-muted/40 [&::-webkit-scrollbar]:w-1.5';
 
 /**
  * 3.7 판정 결과.
@@ -60,11 +74,13 @@ export function Results() {
   // 「이거 왜 불가야?」의 「이거」 (FR-2)
   useAssistantSubject(selectedId);
   /** 넓은 화면은 표 옆에 상세를 늘 띄우고, 좁은 화면은 행을 누를 때만 아래에서 올린다 */
-  const wide = useMediaQuery('(min-width: 1024px)');
+  const wide = useMediaQuery('(min-width: 1280px)');
   const [exporting, setExporting] = useState(false);
   const [exportFailed, setExportFailed] = useState(false);
   /** 방금 판정 대상에서 뺀 거래의 이름. 다시 넣는 곳을 알려 준다 */
   const [excludedName, setExcludedName] = useState<string | null>(null);
+  /** 표의 단축키가 패널에 시킨 일. 고른 거래의 것일 때만 패널에 넘긴다 */
+  const [command, setCommand] = useState<(PanelCommand & {transactionId: string;}) | null>(null);
 
   const batchQ = useApi(
     () => batchId ? api.uploads.get(batchId) : Promise.resolve(null),
@@ -110,6 +126,16 @@ export function Results() {
     [batchId]
   );
 
+  /**
+   * 판정 칸 띠. 이 업로드의 현재 판정 전부를 한 번에 받는다(세무사 CSV 와 같은 API). 표의 쪽과 필터와 상관없다.
+   * 못 읽으면 띠만 빠지고 나머지 화면은 그대로다
+   */
+  const gridQ = useApi(
+    () => batchId ? api.judgments.export({ batchId }) : Promise.resolve(null),
+    [batchId]
+  );
+  const cells = useMemo(() => gridQ.data?.items.map((row) => judgmentCell(row.judgment)) ?? [], [gridQ.data]);
+
   const judgments: Judgment[] = listQ.data?.items ?? [];
   const listPage = listQ.data?.page;
 
@@ -153,10 +179,31 @@ export function Results() {
     if (page > 0 && pageEmpty) setPage(0);
   }, [page, pageEmpty]);
 
+  /**
+   * 패널 제목으로 초점을 옮길 거래. select 로 고른 거래일 때만 패널에 focusKey 를 넘긴다.
+   * 패널은 거래마다 새로 그려져서, 넘기면 새로 그릴 때마다 초점을 옮긴다
+   */
+  const [focusFor, setFocusFor] = useState<string | null>(null);
   // 패널은 열릴 때 제목으로 초점을 옮긴다. 좁은 화면에서는 아래에서 올라오는 창으로 연다
   const select = (transactionId: string) => {
     setSelectedId(transactionId);
+    setFocusFor(transactionId);
     setFocusKey((key) => key + 1);
+  };
+  /** 고르기만 하고 초점은 그대로 둔다(↑↓, 마우스로 행 누르기, 비서에게 끌어다 묻기) */
+  const selectQuietly = (transactionId: string) => {
+    setSelectedId(transactionId);
+    setFocusFor(null);
+  };
+  /**
+   * 마우스로 행을 누르면 초점을 행에 둔다. 이어서 ↑↓ 로 옆 행으로 옮길 수 있다.
+   * 키보드로 고르면(Enter, Space) 패널 제목으로 옮겨 화면 읽기 프로그램이 패널을 읽는다
+   */
+  const byPointer = useRef(false);
+  const pick = (transactionId: string) => {
+    if (byPointer.current && wide) selectQuietly(transactionId);else
+    select(transactionId);
+    byPointer.current = false;
   };
 
   // 판정 대상에서 빼면 그 거래의 질문도 집계에서 빠진다(3.9). 질문 안내도 다시 읽는다
@@ -165,6 +212,44 @@ export function Results() {
     summaryQ.reload();
     panelQ.reload();
     questionsQ.reload();
+    gridQ.reload();
+  };
+
+  /*
+   * 비서 버튼을 행이나 패널에 놓거나 행의 묻기 버튼을 누르면 넓은 화면에서는 그 거래를 고른다. 비서는 고른 거래를 보고 답한다.
+   * 좁은 화면에서는 고르면 아래에서 상세 창이 올라와 비서 패널을 덮는다. 고르지 않고 비서만 그 거래를 본다
+   */
+  useEffect(
+    () =>
+    askBus.subscribe((target) => {
+      if (target.kind !== 'transaction' || !wide) return;
+      setSelectedId(target.transactionId);
+      setFocusFor(null);
+    }),
+    [wide]
+  );
+
+  /**
+   * 표의 행에서 누른 키. 입력칸이나 행 안의 버튼에서는 듣지 않는다.
+   * ↑↓ 는 옆 행으로 옮기며 고르고(초점은 표에 남는다), Delete 는 고른 거래의 패널에서 빼기 확인 창을 연다.
+   * ← → 로 판정을 바꾸던 단축키는 쓰지 않아 뺐다(11/11 치오)
+   */
+  const onRowKeyDown = (row: Judgment, event: React.KeyboardEvent<HTMLTableRowElement>) => {
+    if (event.target !== event.currentTarget || event.altKey || event.metaKey || event.ctrlKey) return;
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      const next = (event.key === 'ArrowDown' ? event.currentTarget.nextElementSibling : event.currentTarget.previousElementSibling) as HTMLElement | null;
+      const index = judgments.findIndex((item) => item.id === row.id) + (event.key === 'ArrowDown' ? 1 : -1);
+      if (!next || !judgments[index]) return;
+      event.preventDefault();
+      next.focus();
+      // 좁은 화면에서 고르면 상세 창이 올라온다. 초점만 옮긴다
+      if (wide) selectQuietly(judgments[index].transactionId);
+      return;
+    }
+    if (!wide || event.key !== 'Delete' && event.key !== 'Backspace') return;
+    event.preventDefault();
+    selectQuietly(row.transactionId);
+    setCommand({ kind: 'exclude', nonce: Date.now(), transactionId: row.transactionId });
   };
 
   /** 처음 불러오기가 실패했을 때. 표만이 아니라 기간, 질문 안내, 분류 안내도 다시 읽는다 (C64) */
@@ -175,6 +260,7 @@ export function Results() {
     questionsQ.reload();
     answeredQ.reload();
     unclassifiedQ.reload();
+    gridQ.reload();
   };
 
   /** 판정 대상에서 뺀 거래는 목록에서 사라진다. 다시 넣는 곳을 알려 준다 */
@@ -229,7 +315,10 @@ export function Results() {
    * 처음 읽는 동안. 머리글 줄, 질문 안내, 분류 안내, 표를 다 받은 뒤 한 번에 그린다.
    * 따로 그리면 늦게 온 줄이 이미 그린 표를 밀어 내린다 (C66). 실패한 것은 기다리지 않는다
    */
-  const firstLoad = [batchQ, summaryQ, listQ, questionsQ, unclassifiedQ].some(
+  // 판정 칸 띠도 금액 판 안에 서므로 같이 기다린다. 늦게 오면 판 안의 목록이 밀려 내려간다
+  // 판정이 많으면 띠 대신 막대를 그리므로 띠를 기다리지 않는다
+  const manyJudged = (summaryQ.data?.totalCount ?? 0) > GRID_MAX;
+  const firstLoad = [batchQ, summaryQ, listQ, questionsQ, unclassifiedQ, ...(manyJudged ? [] : [gridQ])].some(
     (query) => query.loading && !query.data && !query.error
   );
 
@@ -293,16 +382,12 @@ export function Results() {
         <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">결과</h1>
         {batchQ.data &&
       <p className="mt-1 text-small tabular-nums text-ink2">
-            {formatPeriod(batchQ.data.periodStart, batchQ.data.periodEnd)}
+            {uploadName(batchQ.data)}, {formatPeriod(batchQ.data.periodStart, batchQ.data.periodEnd)}
           </p>
       }
       </div>
       <div className="flex flex-col items-end gap-1">
         <div className="flex flex-wrap items-center gap-2">
-          {/* 판정이 끝난 뒤 나가는 길 (#242 리뷰) */}
-          <Button to="/" variant="ghost" size="sm" className="whitespace-nowrap">
-            홈으로
-          </Button>
           {/* 확인할 질문이 없을 때는 아래 안내가 사라지므로, 답을 바꾸러 가는 길을 여기 남긴다 */}
           {!(unresolved && unresolved.count > 0) && answeredCount > 0 &&
         <Button to="/questions" variant="ghost" size="sm" className="whitespace-nowrap">
@@ -311,6 +396,7 @@ export function Results() {
         }
           {batchId && summary && summary.totalCount > 0 &&
         <IconButton
+          variant="secondary"
           icon={exporting ? Loader2Icon : DownloadIcon}
           spin={exporting}
           label={exporting ? 'CSV 만드는 중' : 'CSV 내려받기'}
@@ -406,9 +492,11 @@ export function Results() {
     key={selectedId}
     judgment={panelData.judgment}
     exceededLimit={exceededLimitOf(panelData.judgment, limits)}
-    focusKey={focusKey}
+    focusKey={focusFor === selectedId ? focusKey : 0}
     onChanged={changed}
     onExcluded={excluded}
+    command={command?.transactionId === selectedId ? command : null}
+    onCommandDone={() => setCommand(null)}
     className={wide ? PANEL_SCROLL : undefined} /> :
 
   // 수정 뒤 다시 읽기가 실패해도 이전 판정을 그리지 않고 실패를 알린다
@@ -439,25 +527,20 @@ export function Results() {
         amount={summary.byVerdict.AVAILABLE.finalAmount}
         spend={spendOf(summary)}
         shares={sharesOf(summary)}
-        counts={false}>
+        counts={false}
+        // 판정 칸 띠가 판정별 몫 막대를 대신한다. 둘 다 두면 같은 것을 두 번 보인다(11/11 치오).
+        // 못 읽었거나 판정이 GRID_MAX 를 넘으면 막대가 남는다
+        visual={cells.length > 0 && !manyJudged && cells.length <= GRID_MAX ?
+        <VerdictGrid cells={cells} selectedKey={selectedId} onSelect={select} legend={false} fit animate /> :
+        undefined}>
 
-          {excess && <p>{excess}</p>}
-          {unclassified > 0 &&
-        <p className="flex flex-wrap items-center gap-x-2">
-              분류가 필요한 거래 {formatNumber(unclassified)}건은 판정하지 않았습니다.
-              <Link
-            to="/preview"
-            className="inline-flex items-center gap-1 py-1 font-bold text-accent hover:underline">
-
-                분류 확인하기
-                <ArrowRightIcon className="h-3.5 w-3.5" aria-hidden="true" />
-              </Link>
-            </p>
-        }
+          {/* 접대비 한도 넘음. Really 버튼을 여기에 놓으면 한도를 묻는다 */}
+          {excess && <p {...askProps({ kind: 'limit' })}>{excess}</p>}
+          {unclassified > 0 && <UnclassifiedNote count={unclassified} judged />}
         </AmountHero> :
 
       // 높이를 미리 잡아 둔다. 늦게 들어와도 아래를 밀지 않는다 (C66)
-      batchId && firstLoad && <span className="mt-6 block h-64 animate-pulse rounded-2xl bg-surface" />
+      batchId && firstLoad && <span className="hero-wash mt-6 block h-64 animate-pulse rounded-2xl" />
       }
 
       {excludedName &&
@@ -509,8 +592,15 @@ export function Results() {
         </p>
       }
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
-        <section className="min-w-0">
+      <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <section
+          className="min-w-0"
+          onPointerDownCapture={() => {
+            byPointer.current = true;
+          }}
+          onKeyDownCapture={() => {
+            byPointer.current = false;
+          }}>
           <FilterBar
             name="판정 결과"
             value={filter}
@@ -530,7 +620,12 @@ export function Results() {
             rowKey={(row) => row.id}
             loading={listQ.loading || firstLoad}
             selectedKey={judgments.find((row) => row.transactionId === selectedId)?.id}
-            onRowClick={(row) => select(row.transactionId)}
+            onRowClick={(row) => pick(row.transactionId)}
+            onRowKeyDown={onRowKeyDown}
+            rowProps={(row) => ({
+              [REF_ATTR]: `tx:${row.transactionId} j:${row.id}`,
+              ...askProps({ kind: 'transaction', transactionId: row.transactionId, label: merchantTitle(row.transaction) })
+            })}
             empty={empty} />
 
           {!failed && !firstLoad && listPage && judgments.length > 0 && <Pagination page={listPage} onChange={setPage} />}
@@ -548,6 +643,7 @@ export function Results() {
 
         {panel}
       </BottomSheet>
+      <ShortcutHelp shortcuts={SHORTCUTS} />
     </AppShell>);
 
 }

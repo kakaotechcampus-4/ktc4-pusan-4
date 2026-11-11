@@ -10,7 +10,7 @@ import { Run } from './Run';
 const { api, session, showNudge } = vi.hoisted(() => ({
   api: {
     runs: { get: vi.fn(), failures: vi.fn(), create: vi.fn() },
-    judgments: { summary: vi.fn(), list: vi.fn() },
+    judgments: { summary: vi.fn(), list: vi.fn(), export: vi.fn() },
     questions: { list: vi.fn() },
     progress: { get: vi.fn() },
     transactions: { get: vi.fn() }
@@ -95,6 +95,7 @@ beforeEach(() => {
   session.batchId = 'batch-run';
   api.progress.get.mockResolvedValue({ questions: { fillableFromPrevious: 0 } });
   api.judgments.list.mockResolvedValue(onePage([]));
+  api.judgments.export.mockResolvedValue({ items: [], limits: [] });
   api.questions.list.mockResolvedValue(onePage([]));
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -136,6 +137,64 @@ describe('Run', () => {
     expect(api.judgments.summary).toHaveBeenCalledWith({ runId: 'run-1' });
     expect(api.judgments.list).not.toHaveBeenCalled();
     expect(api.questions.list).not.toHaveBeenCalled();
+  });
+
+  it('진행 중에는 새 판정을 도착 순서대로 칠하고, 못 읽은 처리분과 판정 전을 따로 그린다', async () => {
+    api.runs.get.mockResolvedValue(run('RUNNING', { totalCount: 6, processedCount: 4 }));
+    const judged = (id: string, code: 'AVAILABLE' | 'UNAVAILABLE') => ({
+      id: `j-${id}`,
+      transactionId: id,
+      transaction: { approvedAt: '2026-09-01T10:00:00+09:00', amount: 1000, merchantRaw: id, merchantNorm: id },
+      verdict: { code, label: code },
+      awaitingAnswer: false
+    });
+    // 최근 판정부터 온다. 화면은 먼저 난 것부터 칠한다
+    api.judgments.list.mockResolvedValue(onePage([judged('b', 'UNAVAILABLE'), judged('a', 'AVAILABLE')]));
+    await mount();
+
+    expect(api.judgments.list).toHaveBeenCalledWith({ runId: 'run-1', page: 0, size: 100 });
+    const cells = [...container.querySelectorAll('[data-cell]')].map((cell) =>
+    cell.className.match(/bg-(ok|deny|muted|line)/)?.[1]
+    );
+    expect(cells).toEqual(['ok', 'deny', 'muted', 'muted', 'line', 'line']);
+  });
+
+  it('한 쪽이 다 새 판정이면 다음 쪽도 읽어, 1초에 100건 넘게 나도 칸이 회색으로 남지 않는다', async () => {
+    api.runs.get.mockResolvedValue(run('RUNNING', { totalCount: 4, processedCount: 4 }));
+    const judged = (id: string) => ({
+      id: `j-${id}`,
+      transactionId: id,
+      transaction: { approvedAt: '2026-09-01T10:00:00+09:00', amount: 1000, merchantRaw: id, merchantNorm: id },
+      verdict: { code: 'AVAILABLE', label: '가능' },
+      awaitingAnswer: false
+    });
+    const page = (items: unknown[], number: number, hasNext: boolean) => ({
+      items,
+      page: { number, size: 2, totalElements: 4, totalPages: 2, hasNext }
+    });
+    api.judgments.list.mockImplementation(({ page: number }: {page: number;}) =>
+    Promise.resolve(number === 0 ? page([judged('d'), judged('c')], 0, true) : page([judged('b'), judged('a')], 1, false))
+    );
+    await mount();
+
+    expect(api.judgments.list).toHaveBeenCalledWith({ runId: 'run-1', page: 1, size: 100 });
+    const cells = [...container.querySelectorAll('[data-cell]')].map((cell) => cell.className.match(/bg-(ok|muted|line)/)?.[1]);
+    expect(cells).toEqual(['ok', 'ok', 'ok', 'ok']);
+  });
+
+  it('판정이 1,000건을 넘으면 칸 띠를 그리지 않고, 끝나면 진행 막대가 판정별 몫으로 갈린다', async () => {
+    api.runs.get.mockResolvedValue(run('COMPLETED', { totalCount: 1200, processedCount: 1200 }));
+    api.judgments.summary.mockResolvedValue({
+      byVerdict: { AVAILABLE: { count: 600 }, NEEDS_REVIEW: { count: 400 }, UNAVAILABLE: { count: 200 } },
+      awaiting: { count: 0, spendAmount: 0 }
+    });
+    await mount();
+
+    expect(container.querySelectorAll('[data-cell]')).toHaveLength(0);
+    expect(api.judgments.list).not.toHaveBeenCalled();
+    expect(api.judgments.export).not.toHaveBeenCalled();
+    const segments = [...container.querySelectorAll('span[style*="flex"]')].map((span) => span.className);
+    expect(segments).toEqual(['bg-ok-bar', 'bg-warn-bar', 'bg-deny-bar']);
   });
 
   it('진행 중 조회가 한 번 실패해도 진행 화면을 두고, 다시 올리라고 하지 않는다 (C63)', async () => {

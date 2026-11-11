@@ -1,11 +1,22 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRightIcon, PencilIcon } from 'lucide-react';
+import {
+  ArrowRightIcon,
+  BriefcaseBusinessIcon,
+  CalendarRangeIcon,
+  FolderOpenIcon,
+  HistoryIcon,
+  KeyRoundIcon,
+  ListIcon,
+  LogOutIcon,
+  PencilIcon,
+  UserRoundIcon } from
+'lucide-react';
 import { AppShell } from '../components/AppShell';
-import { InfoPanel, InfoRows, PANEL_ICON, PanelFailed, PanelNote } from '../components/InfoPanel';
+import { InfoPanel, InfoRows, PANEL_BODY, PANEL_ICON, PanelFailed, PanelNote } from '../components/InfoPanel';
 import { api, ApiRequestError, useApi } from '../api';
 import { useSession } from '../contexts/SessionContext';
-import { Button, IconButton, Modal } from '../components/ui';
+import { Button, IconButton, Modal, cn } from '../components/ui';
 import { formatFullDate } from '../utils/format';
 import { accountLabel } from '../utils/account';
 import { contextRows } from '../utils/context';
@@ -15,6 +26,13 @@ import { PasswordChange } from '../components/PasswordChange';
  * 내 정보 (FR-02·03). 계정과 사업자 문진, 내 자료로 가는 길, 비밀번호, 탈퇴.
  * 계정 연결은 BE API 가 생기면 붙인다
  */
+/** 내 자료 상자의 줄. 그림은 화면마다 하나다 */
+const MY_DATA = [
+{ to: '/yearly', label: '연간 결과', icon: CalendarRangeIcon },
+{ to: '/uploads', label: '업로드 이력', icon: HistoryIcon },
+{ to: '/transactions', label: '거래', icon: ListIcon }];
+
+
 export function Account() {
   const navigate = useNavigate();
   const { signOut, context, contextStatus, reloadContext } = useSession();
@@ -60,7 +78,7 @@ export function Account() {
           <h1 className="text-h2 font-bold tracking-tight text-ink">내 정보</h1>
         </header>
 
-        <InfoPanel title="계정">
+        <InfoPanel title="계정" icon={UserRoundIcon}>
           {meQ.loading && !me && <PanelNote>불러오는 중</PanelNote>}
           {!meQ.loading && !me &&
           <PanelFailed onRetry={meQ.reload}>가입 정보를 불러오지 못했습니다.</PanelFailed>
@@ -70,6 +88,7 @@ export function Account() {
 
         <InfoPanel
           title="사업자 문진"
+          icon={BriefcaseBusinessIcon}
           action={
           contextStatus === 'ready' || contextStatus === 'none' ?
           <IconButton
@@ -88,54 +107,48 @@ export function Account() {
           {contextStatus === 'ready' && context && <InfoRows rows={contextRows(context)} />}
         </InfoPanel>
 
-        <InfoPanel title="내 자료">
-          <ul className="divide-y divide-line text-small">
-            {/* 올린 파일을 합쳐 한 해 단위로 본다. 파일 하나를 따라가는 판정 흐름(단계 띠)과 섞지 않는다 */}
-            <li>
-              <Link to="/yearly" className="flex items-center justify-between gap-3 px-5 py-3 text-ink hover:bg-surface">
-                연간 결과
-                <ArrowRightIcon className="h-4 w-4 text-ink2" aria-hidden="true" />
-              </Link>
-            </li>
-            <li>
-              <Link to="/uploads" className="flex items-center justify-between gap-3 px-5 py-3 text-ink hover:bg-surface">
-                업로드 이력
-                <ArrowRightIcon className="h-4 w-4 text-ink2" aria-hidden="true" />
-              </Link>
-            </li>
-            <li>
-              <Link to="/transactions" className="flex items-center justify-between gap-3 px-5 py-3 text-ink hover:bg-surface">
-                거래
-                <ArrowRightIcon className="h-4 w-4 text-ink2" aria-hidden="true" />
-              </Link>
-            </li>
+        <InfoPanel title="내 자료" icon={FolderOpenIcon}>
+          {/* 올린 파일을 합쳐 한 해 단위로 본다. 파일 하나를 따라가는 판정 흐름(단계 띠)과 섞지 않는다 */}
+          <ul className="px-2.5 pb-2.5 pt-0.5 text-body">
+            {MY_DATA.map(({ to, label, icon: Icon }) =>
+            <li key={to}>
+                <Link to={to} className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-ink transition-colors duration-150 hover:bg-surface">
+                  <Icon className="h-[18px] w-[18px] shrink-0 text-ink2" aria-hidden="true" />
+                  {label}
+                  <ArrowRightIcon className="ml-auto h-4 w-4 text-ink2" aria-hidden="true" />
+                </Link>
+              </li>
+            )}
           </ul>
         </InfoPanel>
 
+        {/* 위의 상자들과 같은 모양으로 둔다. 제목 크기가 다르면 다른 종류의 내용처럼 읽힌다 */}
         {me &&
-        <section className="mt-10">
-            <h2 className="text-h4 font-bold text-ink">비밀번호</h2>
-            <PasswordChange email={me.email} />
-          </section>
+        <InfoPanel title="비밀번호" icon={KeyRoundIcon}>
+            <div className={cn(PANEL_BODY, 'pb-5 pt-1')}>
+              <PasswordChange email={me.email} />
+            </div>
+          </InfoPanel>
         }
 
-        <section className="mt-10">
-          <h2 className="text-h4 font-bold text-ink">탈퇴</h2>
-          <p className="mt-1.5 text-body leading-6 text-ink">
-            탈퇴하면 계정과 함께 올린 카드내역과 거래, 판정 결과, 질문과 답변, 사업자 문진이 모두
-            사라집니다. 되돌릴 수 없습니다.
-          </p>
-          {/* 계정을 지우는 것은 되돌릴 수 없어 빨강이다(11/8 회의). 확인 창에서 한 번 더 묻는다 */}
-          <Button
-            variant="danger"
-            size="md"
-            className="mt-4"
-            disabled={!me}
-            onClick={() => setConfirming(true)}>
+        <InfoPanel title="탈퇴" icon={LogOutIcon} tone="danger">
+          <div className={cn(PANEL_BODY, 'pb-5 pt-1')}>
+            <p className="text-small leading-6 text-ink">
+              탈퇴하면 계정과 함께 올린 카드내역과 거래, 판정 결과, 질문과 답변, 사업자 문진이 모두
+              사라집니다. 되돌릴 수 없습니다.
+            </p>
+            {/* 계정을 지우는 것은 되돌릴 수 없어 빨강이다(11/8 회의). 확인 창에서 한 번 더 묻는다 */}
+            <Button
+              variant="danger"
+              size="md"
+              className="mt-4"
+              disabled={!me}
+              onClick={() => setConfirming(true)}>
 
-            탈퇴하기
-          </Button>
-        </section>
+              탈퇴하기
+            </Button>
+          </div>
+        </InfoPanel>
 
         <Modal
           open={confirming}

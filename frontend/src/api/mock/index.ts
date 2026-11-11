@@ -95,10 +95,37 @@ const MERCHANT_KEYWORDS: [RegExp, string, string][] = [
 const RULES_SHA = JUDGMENTS[0]?.rulesCommitSha ?? '';
 
 /**
- * 분류 확인 화면이 먼저 보여줄 선택지. 서버는 분류 모델이 고르지만 목업은 고정이다.
+ * 분류 확인 화면이 먼저 보여줄 선택지. 서버는 분류 모델이 고른다. 목업은 가맹점 이름의 낱말로 짐작하고,
+ * 짐작이 안 되면 비운다(화면은 「추천할 업종이 없습니다」라고 한다). 예전에는 모든 가맹점에 같은 세 개를 줘서
+ * 무엇을 올려도 해외SaaS 를 추천했다(11/11 치오).
  * 서버처럼 최대 3개, 가맹점 카테고리 안의 값만 두고 `기타`·`PG_미상`은 넣지 않는다(#209)
  */
-const SUGGESTED_CATEGORIES = ['해외SaaS', '사무용품', '구독서비스'] as const;
+const SUGGEST_HINTS: [RegExp, string[]][] = [
+[/배민|배달의민족|요기요|쿠팡이츠/, ['음식배달', '음식점']],
+[/커피|카페|COFFEE|CAFE|컴포즈|메가MGC|빽다방|할리스|폴바셋|블루보틀/i, ['카페', '음식점']],
+[/식당|국밥|치킨|피자|김밥|분식|한우|고기|횟집|초밥|스시|버거|맥도날드|롯데리아|본죽|냉면|칼국수|반점|BBQ/i, ['음식점', '음식배달']],
+[/PADDLE|STRIPE|GUMROAD|ADOBE|CANVA|JETBRAINS|VERCEL|CURSOR|ZOOM|DROPBOX|ATLASSIAN|MIRO|CLAUDE|GOOGLE/i, ['해외SaaS', '구독서비스']],
+[/APPLE\.COM|ITUNES|YOUTUBE|SPOTIFY|멜론|왓챠|티빙|웨이브|디즈니/i, ['구독서비스', '해외SaaS']],
+[/한글과컴퓨터|한컴|더존|네이버클라우드|카카오워크/, ['국내SW', '구독서비스']],
+[/광고|META|FACEBOOK|INSTAGRAM/i, ['광고']],
+[/다이소|이케아|IKEA|생활/i, ['생활용품', '사무용품']],
+[/오피스|문구|모닝글로리|알파/, ['사무용품', '생활용품']],
+[/전자|컴퓨터|노트북|APPLE STORE|애플/i, ['전자기기', '사무용품']],
+[/병원|의원|약국|치과|한의원/, ['의료']],
+[/학원|교육|클래스|인프런|패스트캠퍼스|UDEMY|COURSERA/i, ['교육', '도서']],
+[/호텔|모텔|숙박|AIRBNB|에어비앤비|야놀자|여기어때/i, ['여비교통', '여가']],
+[/주차|톨게이트|하이패스|카센터|정비|세차/, ['차량', '수리비']],
+[/수리|서비스센터|AS센터/, ['수리비', '전자기기']],
+[/미용|헤어|네일|바버/, ['미용']],
+[/보험/, ['보험']],
+[/세무|법무|회계|노무/, ['전문가수수료']],
+[/임대|관리비|부동산/, ['임차료', '수도광열']],
+[/전기|가스|수도|한국전력/, ['수도광열']],
+[/PC방|노래|CGV|메가박스|롯데시네마|볼링|골프|헬스|필라테스/i, ['여가', '게임']],
+[/게임|STEAM|NINTENDO|PLAYSTATION/i, ['게임', '여가']],
+[/마트|홈플러스|코스트코|롯데마트/, ['생활용품', '편의점']]];
+
+const suggestedCategoriesFor = (raw: string): string[] => SUGGEST_HINTS.find(([pattern]) => pattern.test(raw))?.[1].slice(0, 3) ?? [];
 
 /** 못 맞히면 category 가 null 이다 */
 const guessMerchant = (raw: string) => {
@@ -981,7 +1008,7 @@ const mockGroups: Api = {
         merchantRaw: r.transaction.merchantRaw,
         merchantNorm: r.transaction.merchantNorm,
         status: { code: 'PENDING', label: '대기' },
-        suggestedCategories: [...SUGGESTED_CATEGORIES],
+        suggestedCategories: suggestedCategoriesFor(r.transaction.merchantRaw),
         createdAt: batch.createdAt,
         resolvedAt: null
       }));

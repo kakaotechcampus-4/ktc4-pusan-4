@@ -31,10 +31,12 @@ src/
   contexts/        세션 상태 (로그인, 현재 batch·context·run id)
   types/           도메인 타입 (API 명세와 1:1)
   utils/           포맷·판정 메타
+  rules/           빌드 때 옮긴 규칙 카드, 용어집과 그것으로 그리는 관문 경로(trace.ts)
   seo.ts           공개 페이지 목록과 검색·공유용 제목·설명
   entry-server.tsx 빌드 때만 쓰는 서버 렌더 입구
 scripts/
   prerender.mjs    공개 페이지 HTML·robots.txt·sitemap.xml·llms.txt 생성
+  rules-data.mjs   ../rules/cards, ../rules/glossary.yaml, ../eval/cases 를 빌드 때 JSON 모듈(virtual:rule-cards, virtual:glossary, virtual:eval-cases)로 바꾼다. 못 읽으면 빌드가 멈춘다. 배포 이미지는 이 셋을 /rules, /eval 에 복사한다(deploy/web.Dockerfile)
   build-demo-pool.ts  업로드 화면 「무작위 카드내역 만들기」의 거래 풀(src/parser/demoPool.json)을 실제 서버 판정으로 만든다. 실행법은 파일 머리에
 ```
 

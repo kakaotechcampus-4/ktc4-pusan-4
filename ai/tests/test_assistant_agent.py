@@ -68,6 +68,18 @@ def test_모르는_화면_값은_시스템_메시지에_넣지_않는다():
     assert "999,000" in api.requests[1]["messages"][-1]["content"]
 
 
+def test_보고_있는_거래를_가리키는_말은_그_거래로_묻게_한다():
+    # 결과 화면에서 행을 고르거나 Really 를 끌어다 놓으면 context.transactionId 가 온다. 「이게 뭐야」가 업로드 전체 진행으로 답해졌다(11/11)
+    tid = FakeBackend().transactions[0][0]
+    api = FakeAPI(reply("이 거래는 카페 결제입니다."))
+
+    run(api, "이게 뭐야", context={**QUESTIONS, "screen": "/results", "transactionId": tid})
+
+    system = api.requests[0]["messages"][0]["content"]
+    assert "보고 있는 거래(사용자가 화면에서 고르거나 붙인 거래): t1" in system
+    assert "'이거', '이게', '이건', '이 거래'" in system and "get_judgment" in system
+
+
 def test_제안_카드를_실제_id_로_돌려준다():
     said = "SK텔레콤은 가족이랑 같이 쓰는 공용 회선이야"
     api = FakeAPI(reply(None, ("list_questions", {"merchant": "SK텔레콤", "date": None})),

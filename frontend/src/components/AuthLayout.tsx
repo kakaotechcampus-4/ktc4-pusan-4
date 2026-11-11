@@ -1,62 +1,7 @@
-import React from 'react';
-import { useDocumentTitle } from '../hooks/useDocumentTitle';
-import { DISCLAIMER } from '../copy';
-import { Logo } from './Logo';
-import { MAIN_ID } from './ui';
-
-const PRINCIPLES = [
-'판정마다 근거 조문과 시행일을 붙입니다',
-'근거를 못 붙이면 가능이나 불가로 저장하지 않습니다',
-'카드내역 원본은 서버로 올라가지 않습니다'];
-
-
-/** 로그인·가입·카카오 콜백이 같이 쓰는 틀. 왼쪽은 브랜드 패널(lg 이상), 오른쪽은 폼 */
-export function AuthLayout({ title, children }: {title: string;children: React.ReactNode;}) {
-  useDocumentTitle(title);
-  return (
-    <div className="flex min-h-full w-full bg-canvas">
-      {/* 좌측 브랜드 패널 */}
-      <aside className="hidden w-[46%] flex-col justify-between bg-ink px-12 py-12 lg:flex">
-        <Logo tone="light" />
-
-        <div>
-          <h2 className="max-w-md text-[30px] font-bold leading-[1.35] tracking-tight text-white">
-            결과만 주는 대신,
-            <br />
-            근거까지 드립니다
-          </h2>
-          <ul className="mt-8 space-y-3">
-            {PRINCIPLES.map((principle) =>
-            <li
-              key={principle}
-              className="flex gap-3 text-[14px] leading-7 text-white/70">
-              
-                <span
-                aria-hidden="true"
-                className="mt-3 h-1 w-1 shrink-0 rounded-full bg-accent" />
-              
-                {principle}
-              </li>
-            )}
-          </ul>
-        </div>
-
-        {/* /40 은 bg-ink 위에서 대비 3.80 이라 본문 글자로 모자란다 (접근성 보고서 2026-10-22). /60 이면 7.03 */}
-        <p className="max-w-md text-[12px] leading-6 text-white/60">{DISCLAIMER}</p>
-      </aside>
-
-      <main id={MAIN_ID} tabIndex={-1} className="flex flex-1 items-center justify-center px-6 py-14 outline-none">
-        <div className="w-full max-w-[380px]">
-          {/* 좁은 화면에서는 왼쪽 판이 없어 여기에 로고를 둔다 */}
-          <div className="mb-10 lg:hidden">
-            <Logo />
-          </div>
-          {children}
-        </div>
-      </main>
-    </div>);
-
-}
+/*
+ * 로그인, 가입, 비밀번호 재설정, 카카오 콜백 폼이 같이 쓰는 입력칸 모양. 화면 틀은 auth/SignInLayout 이다.
+ * 예전 틀(어두운 브랜드 판)은 로그인 화면을 바꾸며 뺐다(11/11)
+ */
 
 /**
  * 로그인·가입 폼의 입력칸. 흰 바탕에 진한 테두리(edge)다. 틀린 칸은 aria-invalid 로 테두리가 빨개진다 (C91).
