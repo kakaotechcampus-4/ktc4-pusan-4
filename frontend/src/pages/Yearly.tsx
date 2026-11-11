@@ -50,7 +50,8 @@ export function Yearly() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [focusKey, setFocusKey] = useState(0);
   useAssistantSubject(selectedId);
-  const wide = useMediaQuery('(min-width: 1024px)');
+  // 상세가 표 옆에 서는 두 단은 1280px 부터다. 1024px 에서 나누면 표가 500px 로 줄어 가맹점 이름이 두세 글자만 남는다(결과 화면과 같다)
+  const wide = useMediaQuery('(min-width: 1280px)');
 
   const uploadsQ = useApi(() => readAll((page, size) => api.uploads.list({ page, size })), []);
   const years = uploadsQ.data ? yearsOf(uploadsQ.data) : [];
@@ -239,6 +240,7 @@ export function Yearly() {
       {summary && summary.totalCount > 0 &&
     <div className="flex flex-col items-end gap-1">
           <IconButton
+        variant="secondary"
         icon={exporting ? Loader2Icon : DownloadIcon}
         spin={exporting}
         label={exporting ? 'CSV 만드는 중' : 'CSV 내려받기'}
@@ -312,7 +314,7 @@ export function Yearly() {
         {header}
         {pageEmptyState ?
       <div className="mt-6">{pageEmptyState}</div> :
-      <span className="mt-6 block h-64 animate-pulse rounded-2xl bg-surface" />}
+      <span className="hero-wash mt-6 block h-64 animate-pulse rounded-2xl" />}
       </AppShell>);
 
 
@@ -375,17 +377,17 @@ export function Yearly() {
         }
         </AmountHero> :
 
-      <span className="mt-6 block h-64 animate-pulse rounded-2xl bg-surface" />
+      <span className="hero-wash mt-6 block h-64 animate-pulse rounded-2xl" />
       }
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
         {/* 좁은 화면에서는 계정과목이 표 위에 온다. 넓은 화면에서는 오른쪽 칸 맨 위다 */}
-        <aside className="min-w-0 space-y-6 lg:order-2">
+        <aside className="min-w-0 space-y-6 xl:order-2">
           <AccountBreakdown summary={summary} loading={firstLoad} />
           {wide && selectedId && !firstLoad && <div className="sticky top-24">{panel}</div>}
         </aside>
 
-        <section className="min-w-0 lg:order-1">
+        <section className="min-w-0 xl:order-1">
           <FilterBar
             name="판정 결과"
             value={filter}

@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { api, ApiRequestError, mockVerificationCode } from '../api';
-import { AUTH_FIELD_ERROR, AUTH_INPUT, AUTH_LABEL, AuthLayout } from '../components/AuthLayout';
+import { AUTH_FIELD_ERROR, AUTH_INPUT, AUTH_LABEL } from '../components/AuthLayout';
+import { SignInLayout } from '../components/auth/SignInLayout';
 import { Button } from '../components/ui';
 import { PasswordCheck } from '../components/PasswordCheck';
 import { PASSWORD_RULE, passwordProblem } from '../utils/password';
@@ -232,28 +233,10 @@ export function PasswordReset() {
   error && errorField === field ? `reset-${field}-error` : undefined;
 
   return (
-    <AuthLayout title="비밀번호 재설정">
-      <h1 className="text-[26px] font-bold tracking-tight text-ink">
-        비밀번호 재설정
-      </h1>
+    <SignInLayout title="비밀번호 재설정">
+      {/* 로그인, 가입과 같은 틀과 제목 크기다 */}
+      <h1 className="text-h2 font-bold tracking-ir text-ink sm:text-h2-lg">비밀번호 재설정</h1>
 
-      <ol className="mt-6 flex gap-2 text-[12px]" aria-label="재설정 단계">
-        {['이메일', '코드 확인', '새 비밀번호'].map((label, index) =>
-        <li
-          key={label}
-          aria-current={step === index + 1 ? 'step' : undefined}
-          className={`flex-1 rounded-full px-2 py-1 text-center ${
-          step === index + 1 ?
-          'bg-accent font-bold text-white' :
-          step > index + 1 ?
-          'text-ink2' :
-          'text-muted'}`
-          }>
-
-            {index + 1}. {label}
-          </li>
-        )}
-      </ol>
 
       <form onSubmit={submitEmail} noValidate className="mt-6">
         <label htmlFor="reset-email" className={AUTH_LABEL}>
@@ -388,6 +371,6 @@ export function PasswordReset() {
           로그인
         </Link>
       </p>
-    </AuthLayout>);
+    </SignInLayout>);
 
 }

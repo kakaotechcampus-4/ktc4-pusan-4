@@ -62,6 +62,96 @@ textarea[aria-invalid='true']:focus {
 .field-box textarea[aria-invalid='true']:focus {
   box-shadow: none;
 }
+/*
+  움직임. 시간과 곡선을 하나로 맞춘다: 올릴 때 140ms, 뗄 때 200ms, 누를 때 90ms, 튀지 않는 곡선 하나.
+  움직임 줄이기를 켰으면 색만 바뀌고 자리는 움직이지 않는다
+*/
+:root {
+  --m-in: 140ms;
+  --m-out: 200ms;
+  --m-press: 90ms;
+  --m-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+/* 버튼은 마우스를 올리면 1px 오르고, 누르면 1px 내려가며 조금 줄어든다. 글 속 링크 모양(ghost)은 움직이지 않는다 */
+@media (prefers-reduced-motion: no-preference) {
+  .m-step {
+    transition:
+      transform var(--m-out) var(--m-ease),
+      color var(--m-out) var(--m-ease),
+      background-color var(--m-out) var(--m-ease),
+      border-color var(--m-out) var(--m-ease),
+      text-decoration-color var(--m-out) var(--m-ease);
+  }
+  .m-step:active:not(:disabled) {
+    transform: translateY(1px) scale(0.985);
+    transition-duration: var(--m-press);
+  }
+  /* 링크가 걸린 판은 2px 오른다 */
+  .m-lift {
+    transition:
+      transform var(--m-out) var(--m-ease),
+      background-color var(--m-out) var(--m-ease),
+      border-color var(--m-out) var(--m-ease);
+  }
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .m-step:hover:not(:disabled):not(:active) {
+    transform: translateY(-1px);
+    transition-duration: var(--m-in);
+  }
+  .m-lift:hover {
+    transform: translateY(-2px);
+    transition-duration: var(--m-in);
+  }
+}
+
+/*
+  Really 를 끌고 있을 때 놓을 수 있는 곳은 점선, 위에 온 곳은 실선과 옅은 파랑이다(components/assistant/useDragAsk).
+  제안 카드에 올리면 그 제안이 바꿀 행이나 질문에 실선을 두른다(Highlighter). 행은 칸을 칠한다
+*/
+.ask-drop:not(tr),
+.ask-target:not(tr) {
+  outline: 2px dashed theme('colors.accent.DEFAULT');
+  outline-offset: 2px;
+}
+.ask-target:not(tr) {
+  outline-style: solid;
+}
+.ask-drop-over:not(tr) {
+  outline: 2px solid theme('colors.accent.DEFAULT');
+  outline-offset: 2px;
+  background-color: theme('colors.accent.soft');
+}
+/* 상세 패널의 머리와 근거 조문은 overflow 가 걸린 카드 안에 붙어 있어 바깥으로 두른 선이 잘린다. 안쪽으로 두른다 */
+:is(header, section).ask-drop,
+:is(header, section).ask-drop-over,
+:is(header, section).ask-target {
+  outline-offset: -4px;
+}
+tr.ask-drop > td {
+  box-shadow: inset 0 1px 0 0 theme('colors.accent.line'), inset 0 -1px 0 0 theme('colors.accent.line');
+}
+tr.ask-drop-over > td,
+tr.ask-target > td {
+  background-color: theme('colors.accent.soft');
+}
+
+/* 결과, 요약, 연간 결과의 금액 판과 판정 진행판. 회색 대신 브랜드 파랑을 아주 옅게 깐다(11/11 치오) */
+.hero-wash {
+  background: linear-gradient(180deg, #F3F7FE 0%, #EEF3FC 100%);
+}
+
+/* 결과 상세 패널의 머리. 왼쪽 위 모서리에서 판정색이 둥글게 번져 흰색으로 흐른다 */
+.verdict-head-ok {
+  background: radial-gradient(ellipse 90% 170% at 0% 0%, theme('colors.ok.line') 0%, theme('colors.ok.bg') 45%, theme('colors.sheet') 100%);
+}
+.verdict-head-warn {
+  background: radial-gradient(ellipse 90% 170% at 0% 0%, theme('colors.warn.line') 0%, theme('colors.warn.bg') 45%, theme('colors.sheet') 100%);
+}
+.verdict-head-deny {
+  background: radial-gradient(ellipse 90% 170% at 0% 0%, theme('colors.deny.line') 0%, theme('colors.deny.bg') 45%, theme('colors.sheet') 100%);
+}
+
 /* 팔레트에서 노랑을 뺐다. 핑크는 선택 바탕으로 쓰면 ink2 대비 2.46 · muted 1.59 라 글자가 묻힌다 */
 ::selection {
   background: #E4EDFB;

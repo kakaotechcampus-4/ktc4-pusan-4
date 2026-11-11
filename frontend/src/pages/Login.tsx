@@ -2,7 +2,8 @@ import React, { useRef, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useSession } from '../contexts/SessionContext';
 import { ApiRequestError, isMock, mockPassword } from '../api';
-import { AUTH_FIELD_ERROR, AUTH_INPUT, AUTH_LABEL, AuthLayout } from '../components/AuthLayout';
+import { AUTH_FIELD_ERROR, AUTH_INPUT, AUTH_LABEL } from '../components/AuthLayout';
+import { SignInLayout } from '../components/auth/SignInLayout';
 import { Button } from '../components/ui';
 import { kakaoAvailable } from '../auth/kakao';
 import { KakaoStart } from '../components/KakaoStart';
@@ -95,7 +96,7 @@ export function Login() {
 
   // 이미 로그인했으면 로그인 뒤에 갈 곳으로 보낸다 (C52). 이어 가는 중에는 폼을 그리지 않는다 — 그렸다가 바로 넘어가면 깜빡인다
   if (status === 'signedIn' && !signingIn.current) return <Navigate to={from} replace />;
-  if (status === 'restoring') return <AuthLayout title="로그인">{null}</AuthLayout>;
+  if (status === 'restoring') return <SignInLayout title="로그인">{null}</SignInLayout>;
 
   const fieldError = (field: ErrorField) =>
   error && errorField === field &&
@@ -105,9 +106,11 @@ export function Login() {
 
 
   return (
-    <AuthLayout title="로그인">
-      <h1 className="text-[26px] font-bold tracking-tight text-ink">
-        로그인
+    <SignInLayout title="로그인">
+      <h1 className="text-h2 font-bold tracking-ir text-ink sm:text-h2-lg">
+        카드내역을 올리면
+        <br />
+        경비를 판정합니다
       </h1>
       {ended &&
       <p role="status" className="mt-3 text-[14px] leading-6 text-ink">
@@ -172,17 +175,6 @@ export function Login() {
         </Button>
       </form>
 
-      <p className="mt-4 text-center text-[13px] text-ink2">
-        계정이 없으면{' '}
-        <Link
-          to="/signup"
-          state={{ from }}
-          className="font-bold text-ink underline underline-offset-4 decoration-accent-line hover:decoration-ink">
-
-          이메일로 가입하기
-        </Link>
-      </p>
-
       {isMock &&
       <Button
         variant="secondary"
@@ -199,6 +191,6 @@ export function Login() {
           목업 비밀번호는 {mockPassword} 입니다. admin@ 으로 시작하는 이메일은 관리자로 들어갑니다.
         </p>
       }
-    </AuthLayout>);
+    </SignInLayout>);
 
 }

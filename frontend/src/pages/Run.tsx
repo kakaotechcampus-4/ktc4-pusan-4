@@ -8,7 +8,10 @@ import { useAssistant } from '../components/assistant/context';
 import { api, ApiRequestError, isMock } from '../api';
 import { useSession } from '../contexts/SessionContext';
 import { merchantTitle } from '../components/results/display';
+import { VerdictGrid } from '../components/results/VerdictGrid';
+import { GRID_MAX, judgmentCell, type GridCell } from '../components/results/verdictCells';
 import type {
+  Judgment,
   JudgmentRun,
   JudgmentRunFailure,
   JudgmentSummary,
@@ -18,6 +21,7 @@ import type {
 import { Badge, Button, cn } from '../components/ui';
 import { formatNumber, formatWon } from '../utils/format';
 import { AWAITING_ANSWER, VERDICT_LABEL, VERDICT_META } from '../utils/verdict';
+import { SHARE_BAR } from '../utils/shares';
 import { pollErrorOf, runPhase, type PollError } from './runPhase';
 
 /**
@@ -36,6 +40,11 @@ const FAILURES_SHOWN = 5;
 
 const VERDICTS: Verdict[] = ['AVAILABLE', 'NEEDS_REVIEW', 'UNAVAILABLE'];
 
+/** 진행 중에 한 쪽에 읽는 새 판정 수. 한 쪽이 다 새것이면 다음 쪽도 읽는다 */
+const ARRIVAL_PAGE = 100;
+/** 한 번에 읽는 쪽 수의 끝. 띠는 GRID_MAX(1,000)건까지라 열 쪽이면 다 따라잡는다 */
+const ARRIVAL_PAGES = 10;
+
 /** 다시 물어도 같은 실패. 이때만 다른 업로드로 가는 길을 준다 */
 const GONE_TEXT: Record<Exclude<PollError, 'transient'>, string> = {
   missing: isMock ?
@@ -44,13 +53,6 @@ const GONE_TEXT: Record<Exclude<PollError, 'transient'>, string> = {
   badAddress: '주소가 잘못됐습니다.'
 };
 
-/** 판정색 막대의 채움색. 답변 대기는 판정이 아니라 불가에 붙는 표지라 판정 색을 쓰지 않는다 */
-const VERDICT_BAR: Record<Verdict, string> = {
-  AVAILABLE: 'bg-ok-bar',
-  NEEDS_REVIEW: 'bg-warn-bar',
-  UNAVAILABLE: 'bg-deny-bar'
-};
-const AWAITING_BAR = 'bg-edge';
 
 /** 끝난 화면의 움직임. 진행 막대가 끝까지 찬 뒤 판정별로 갈리고, 칸이 차례로 올라오며 숫자가 센다 */
 const EASE = [0.23, 1, 0.32, 1] as const;
@@ -128,6 +130,10 @@ function RunProgress() {
   const [failedTx, setFailedTx] = useState<Map<string, Transaction>>(new Map());
   const [retrying, setRetrying] = useState(false);
   const [retryFailed, setRetryFailed] = useState(false);
+  /** 진행 중에 읽은 판정. 도착한 순서대로 칸을 칠한다 */
+  const [arrived, setArrived] = useState<Judgment[]>([]);
+  /** 끝난 뒤 달로 묶은 칸. 못 읽으면 진행 중의 칸을 그대로 둔다 */
+  const [monthCells, setMonthCells] = useState<GridCell[] | null>(null);
   const timer = useRef<number | null>(null);
 
   // 1초 폴링. SSE 토큰 방식이 정해지면 교체 (명세 4.3 #9)
@@ -178,6 +184,65 @@ function RunProgress() {
   const judged = phase === 'completed' || phase === 'partial';
   const failedCount = run?.failedCount ?? 0;
   const runBatchId = run?.batchId ?? null;
+  /** 판정이 많으면 칸 띠 대신 진행 막대가 끝나고 판정별 몫으로 갈린다. 칸을 칠할 판정도 읽지 않는다 */
+  const manyCells = (run?.totalCount ?? 0) > GRID_MAX;
+
+  /*
+   * 판정 칸 띠. 진행 중에는 이 실행의 새 판정을 1초마다 최근 판정부터 읽어 처음 본 것을 도착 순서대로 칠한다.
+   * 서버가 1초에 100건 넘게 판정하면 한 쪽만 읽어서는 못 따라가 칸이 회색으로 남았다. 한 쪽이 다 새것이면
+   * 이미 본 판정이 나올 때까지 다음 쪽을 읽는다(ARRIVAL_PAGES 까지). 끝나면 멈추고, 아래에서 달로 묶은 띠로 바꾼다
+   */
+  useEffect(() => {
+    if (!runId || phase !== 'running' || manyCells) return;
+    const id = runId;
+    let stopped = false;
+    let inFlight = false;
+    const seen = new Set<string>();
+    const read = async () => {
+      if (inFlight || stopped) return;
+      inFlight = true;
+      const fresh: Judgment[] = [];
+      try {
+        for (let page = 0; page < ARRIVAL_PAGES; page += 1) {
+          const result = await api.judgments.list({ runId: id, page, size: ARRIVAL_PAGE });
+          if (stopped) return;
+          const unseen = result.items.filter((judgment) => !seen.has(judgment.transactionId));
+          // 읽는 사이 새 판정이 들어오면 앞 쪽 행이 다음 쪽으로 밀려 다시 온다
+          unseen.forEach((judgment) => seen.add(judgment.transactionId));
+          fresh.push(...unseen);
+          if (unseen.length < result.items.length || !result.page.hasNext) break;
+        }
+      } catch {
+        // 칸을 못 칠해도 진행은 위의 처리 수가 보인다. 다음 주기에 다시 읽는다
+      } finally {
+        inFlight = false;
+      }
+      if (stopped || fresh.length === 0) return;
+      // 최근 판정부터 왔다. 먼저 난 것부터 칠한다
+      setArrived((prev) => [...prev, ...fresh.reverse()]);
+    };
+    void read();
+    const interval = window.setInterval(() => void read(), 1000);
+    return () => {
+      stopped = true;
+      window.clearInterval(interval);
+    };
+  }, [runId, phase, manyCells]);
+
+  // 끝나면 이 업로드의 판정을 한 번 읽어 달로 묶는다. 결과 화면의 띠와 같은 모양이다
+  useEffect(() => {
+    if (!judged || !runBatchId || manyCells) return;
+    let cancelled = false;
+    void api.judgments.export({ batchId: runBatchId }).then(
+      ({ items }) => {
+        if (!cancelled && items.length > 0) setMonthCells(items.map((row) => judgmentCell(row.judgment)));
+      },
+      () => undefined
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [judged, runBatchId, manyCells]);
 
   // 집계를 못 읽어도 판정은 끝났다. 결과 보기는 그대로 두고 그 자리에서 다시 읽게 한다 (C62)
   // 답변 대기(불가 가운데 답을 기다리는 거래)도 요약이 함께 센다 (C12)
@@ -309,9 +374,9 @@ function RunProgress() {
             {VERDICT_LABEL[verdict]}
           </Badge>,
     count: byVerdict[verdict].count - (verdict === 'UNAVAILABLE' ? awaitingCount : 0),
-    bar: VERDICT_BAR[verdict]
+    bar: SHARE_BAR[verdict]
   })),
-  ...(awaitingCount > 0 ? [{ key: 'AWAITING', badge: <Badge>{AWAITING_ANSWER}</Badge>, count: awaitingCount, bar: AWAITING_BAR }] : [])] :
+  ...(awaitingCount > 0 ? [{ key: 'AWAITING', badge: <Badge symbol="wait">{AWAITING_ANSWER}</Badge>, count: awaitingCount, bar: SHARE_BAR.AWAITING }] : [])] :
   null;
   const tileTotal = tiles?.reduce((sum, tile) => sum + tile.count, 0) ?? 0;
   /** 막대가 다 찬 뒤 칸이 올라온다 */
@@ -320,6 +385,21 @@ function RunProgress() {
   animate ? { duration: seconds, delay, ease: EASE } : { duration: 0 };
   const goneText =
   pollError === 'missing' || pollError === 'badAddress' ? GONE_TEXT[pollError] : null;
+  /**
+   * 진행 중의 칸. 읽은 판정, 처리했지만 아직 못 읽은 몫(한 번에 100건 넘게 났을 때), 아직 판정 전 순이다.
+   * 칸은 자리로 이름을 붙여, 판정이 오면 그 자리의 칸이 뒤집힌다
+   */
+  const runCells: GridCell[] = (() => {
+    if (!run || total === 0 || manyCells) return [];
+    const done = phase === 'completed' ? total : processed;
+    const unseen = Math.max(0, done - arrived.length);
+    return Array.from({ length: total }, (_, index): GridCell => {
+      const judgment = arrived[index];
+      if (judgment) return { ...judgmentCell(judgment), key: `run-${index}` };
+      return { key: `run-${index}`, state: index < arrived.length + unseen ? 'SEEN' : 'PENDING' };
+    });
+  })();
+  const gridCells = monthCells ?? runCells;
 
   return (
     <AppShell narrow>
@@ -353,7 +433,7 @@ function RunProgress() {
 
         {/* 진행과 끝난 칸을 한 판에 둔다. 결과와 요약 머리의 판과 같은 모양이다 */}
         {!goneText && (!finished || judged) &&
-        <div className="mt-8 rounded-2xl bg-surface p-6 sm:p-8">
+        <div className="hero-wash mt-8 rounded-2xl p-6 sm:p-8">
             <p aria-live="polite" className="text-stat font-bold leading-none tabular-nums text-ink">
               {run ?
               <>
@@ -362,7 +442,10 @@ function RunProgress() {
                 </> :
               <span className="invisible">0</span>}
             </p>
-            {/* 진행 중에는 파랗게 차고, 끝나면 끝까지 찬 뒤 판정별 몫으로 갈린다 */}
+            {/*
+              진행 막대는 진행만 보인다. 끝나면 끝까지 찬다. 판정별 몫은 아래 칸 띠와 건수 칸이 보여서 막대를 판정색으로 나누지 않는다(11/11 치오).
+              칸 띠를 그리지 않는 큰 업로드(GRID_MAX 초과)는 끝까지 찬 뒤 막대가 판정별 몫으로 갈린다. 결과 화면의 막대와 같다
+            */}
             <div
             className="relative mt-5 h-3 overflow-hidden rounded-full bg-line"
             role={judged ? undefined : 'progressbar'}
@@ -376,19 +459,25 @@ function RunProgress() {
               initial={{ width: 0 }}
               animate={{ width: `${progress}%` }}
               transition={animate ? { duration: judged ? FILL_SECONDS : 0.3, ease: EASE } : { duration: 0 }} />
-              {tiles && tileTotal > 0 &&
-            <motion.div
-              className="absolute inset-y-0 left-0 flex gap-0.5 bg-surface"
-              style={{ width: `${progress}%` }}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={motionOf(settleDelay, 0.24)}>
+              {manyCells && tiles && tileTotal > 0 &&
+              <motion.div
+                className="absolute inset-y-0 left-0 flex gap-0.5 bg-line"
+                style={{ width: `${progress}%` }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={motionOf(settleDelay, 0.24)}>
                   {tiles.filter((tile) => tile.count > 0).map((tile) =>
-              <span key={tile.key} className={tile.bar} style={{ flex: `${tile.count} 1 0` }} />
-              )}
+                <span key={tile.key} className={tile.bar} style={{ flex: `${tile.count} 1 0` }} />
+                )}
                 </motion.div>
-            }
+              }
             </div>
+            {/* 판정 칸 띠. 진행 중에는 회색 칸이 판정이 나는 대로 뒤집히고, 끝나면 달로 묶인다 */}
+            {gridCells.length > 0 &&
+            <div key={monthCells ? 'month' : 'run'} className={cn('mt-6', monthCells && 'motion-safe:animate-enter')}>
+                <VerdictGrid cells={gridCells} byMonth={Boolean(monthCells)} legend={false} fit animate={Boolean(monthCells)} />
+              </div>
+            }
             {judged && <div className="mt-6">
             {countsFailed ?
             <div className="flex flex-wrap items-center gap-3">
@@ -401,14 +490,15 @@ function RunProgress() {
                 </Button>
               </div> :
             <dl className={cn('grid gap-3', tiles && tiles.length > 3 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3')}>
-                {(tiles ?? VERDICTS.map((verdict) => ({ key: verdict, badge: null, count: 0, bar: '' }))).map((tile, index) =>
+                {(tiles ?? VERDICTS.map((verdict) => ({ key: verdict, badge: null, count: 0 }))).map((tile, index) =>
               <motion.div
                 key={tile.key}
                 className={cn('rounded-xl bg-canvas px-4 py-4 sm:px-5', !tiles && 'invisible')}
                 initial={animate ? { opacity: 0, y: 8 } : false}
                 animate={tiles ? { opacity: 1, y: 0 } : undefined}
                 transition={motionOf(settleDelay + index * STAGGER_SECONDS)}>
-                    <dt>{tile.badge}</dt>
+                    {/* 기호 그림이 든 배지는 글줄 기준선이 그림을 따라 올라간다. flex 로 놓아 네 칸의 배지 윗변을 맞춘다 */}
+                    <dt className="flex">{tile.badge}</dt>
                     <dd className="mt-3 text-h3 font-bold tabular-nums text-ink">
                       <CountUp
                     value={tile.count}

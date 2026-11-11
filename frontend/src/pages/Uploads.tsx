@@ -80,7 +80,6 @@ export function Uploads() {
         </span> :
 
     <IconButton
-      variant="secondary"
       icon={EyeIcon}
       label={`${uploadName(row)} ${formatPeriod(row.periodStart, row.periodEnd)} 보기`}
       onClick={() => setBatchId(row.id)} />

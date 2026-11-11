@@ -100,7 +100,7 @@ export function AppShell({ children, showSteps = true, disclaimer = true, narrow
           한 줄을 넘기면 한글이 음절 단위로 꺾인다. 줄바꿈을 막고, 폭이 모자라면 덜 중요한 것부터 접는다:
           lg 미만 — 이메일(「내 정보」로) · md 미만 — 단계 표시
         */}
-        <div className="mx-auto flex h-[72px] max-w-page items-center justify-between gap-3 whitespace-nowrap px-4 sm:px-6">
+        <div className="mx-auto flex h-[72px] max-w-page items-center justify-between gap-3 whitespace-nowrap px-6">
           <Logo
             suffix={
             <>
@@ -164,7 +164,8 @@ export function AppShell({ children, showSteps = true, disclaimer = true, narrow
 
       {disclaimer && <DisclaimerBar />}
 
-      <main id={MAIN_ID} tabIndex={-1} className={`mx-auto w-full max-w-page flex-1 pb-12 pt-10 outline-none ${gutter}`}>
+      {/* 화면을 옮기면 본문이 짧게 떠오른다. 머리띠와 단계 표시는 그대로 있어 무엇이 바뀌었는지 보인다 */}
+      <main id={MAIN_ID} tabIndex={-1} className={`mx-auto w-full max-w-page flex-1 pb-12 pt-10 outline-none motion-safe:animate-enter ${gutter}`}>
         {narrow ? <div className={column}>{children}</div> : children}
       </main>
 

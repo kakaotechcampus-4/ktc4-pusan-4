@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { ArrowRightIcon, CopyCheckIcon, CopyIcon, PrinterIcon, SearchXIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { StepEyebrow } from '../components/StepEyebrow';
 import { Button, Card, Empty, IconButton } from '../components/ui';
 import { AmountHero } from '../components/results/AmountHero';
+import { UnclassifiedNote } from '../components/results/UnclassifiedNote';
+import { askProps } from '../components/assistant/ask';
 import { AccountBreakdown } from '../components/results/AccountBreakdown';
 import { sharesOf, spendOf } from '../utils/shares';
 import { useSession } from '../contexts/SessionContext';
@@ -187,8 +188,15 @@ export function Summary() {
         }
       </div>
       {/* PDF 는 서버에서 만들지 않는다. 인쇄용 스타일(index.css)로 화면 틀을 빼고 브라우저 인쇄로 저장한다 */}
+      {/* 결과 화면 머리의 「CSV, 요약 보기」와 같은 자리, 같은 모양이다 */}
       {summary && summary.totalCount > 0 &&
-    <IconButton variant="secondary" icon={PrinterIcon} label="PDF로 저장" className="print:hidden" onClick={() => window.print()} />
+    <div className="flex items-center gap-2 print:hidden">
+          <IconButton variant="secondary" icon={PrinterIcon} label="PDF로 저장" onClick={() => window.print()} />
+          <Button to="/results" variant="secondary" size="sm" className="whitespace-nowrap">
+            결과 보기
+            <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
+          </Button>
+        </div>
     }
     </header>;
 
@@ -311,26 +319,16 @@ export function Summary() {
 
           {spanLine && <p className="tabular-nums">{spanLine}</p>}
           {/* 초과액은 그해 사용자 전체 기준이라 이 업로드 몫을 정할 수 없다(#15). 합계에서 빼지 않고 따로 알린다 */}
-          {excess && <p>{excess}</p>}
+          {/* 접대비 한도 넘음. Really 버튼을 여기에 놓으면 한도를 묻는다 */}
+          {excess && <p {...askProps({ kind: 'limit' })}>{excess}</p>}
           {unresolved && unresolved.count > 0 &&
         <p>답하지 않은 질문이 {formatNumber(unresolved.count)}개 있습니다. 답하면 위 금액이 바뀔 수 있습니다.</p>
         }
           {questionsQ.error && <p className="text-deny">답하지 않은 질문 수를 불러오지 못했습니다. 새로고침해 주세요.</p>}
-          {unclassified > 0 &&
-        <p className="flex flex-wrap items-center gap-x-2">
-              가맹점을 분류하지 못한 {formatNumber(unclassified)}건은 아직 판정하지 않았습니다.
-              <Link
-            to="/preview"
-            className="inline-flex items-center gap-1 whitespace-nowrap font-bold text-accent hover:underline">
-
-                분류 확인하기
-                <ArrowRightIcon className="h-3.5 w-3.5" aria-hidden="true" />
-              </Link>
-            </p>
-        }
+          {unclassified > 0 && <UnclassifiedNote count={unclassified} judged />}
         </AmountHero> :
 
-      <span className="mt-8 block h-64 animate-pulse rounded-2xl bg-surface" />
+      <span className="hero-wash mt-8 block h-64 animate-pulse rounded-2xl" />
       }
 
       {/* 넓은 화면은 두 칸이다. 계정과목과 넘길 문장은 서로 기대지 않아 나란히 둔다 */}
@@ -364,10 +362,6 @@ export function Summary() {
               답한 질문 보기
             </Button>
           }
-          <Button to="/results" variant="ghost" size="sm">
-            결과 보기
-            <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
-          </Button>
         </div>
         <span role="status" className="sr-only">
           {copy === 'done' ? '문장을 복사했습니다.' : ''}

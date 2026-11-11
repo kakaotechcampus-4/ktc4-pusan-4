@@ -1,6 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ChevronDownIcon, SendIcon, XIcon } from 'lucide-react';
+import { ChevronDownIcon, CornerDownRightIcon, SendIcon, XIcon } from 'lucide-react';
 /*
  * 버튼 한 장이다. SVG 가 파란 원판에 돼지까지 그려 둔 완성된 얼굴이라,
  * 알약 안에 넣으면 원판 위에 원판이 겹친다 (#242 리뷰). 브랜드 문서가 정한 모양도
@@ -13,6 +13,11 @@ import { useAssistant } from './context';
 import type { ChatEntry } from './context';
 import { HELP_TOPICS } from './help';
 import { blockedReason, MESSAGE_CHARS, PROPOSAL_LABEL } from './logic';
+import { highlightBus, proposalRefs } from './ask';
+import { useDragAsk } from './useDragAsk';
+import { Highlighter } from './Highlighter';
+import { SelectionPopover } from './SelectionPopover';
+import { answerLabel } from '../questions/logic';
 
 /** 로그인 전 메인에 서는 같은 모양의 버튼. 누르면 대화 대신 로그인으로 보낸다 */
 function SignInLauncher() {
@@ -50,12 +55,49 @@ export function Assistant() {
   const button = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLElement>(null);
   const wasOpen = useRef(false);
+  const launcher = useRef<HTMLDivElement>(null);
+  /** 알림 카드를 버튼의 점으로 접었는지. 카드가 화면을 오래 가리지 않게 한다 */
+  const [folded, setFolded] = useState(false);
+  /** 좁은 화면에서 아래로 내리는 동안 버튼을 치운다. 내용 위에 떠서 가리지 않게 */
+  const [tucked, setTucked] = useState(false);
+  // 접혀 있을 때 버튼을 끌어 화면의 행, 조문, 금액 판에 놓으면 그것에 대해 묻는다
+  const drag = useDragAsk(!open && status === 'signedIn', really);
 
   // 접으면 버튼으로 초점을 돌려준다
   useEffect(() => {
     if (wasOpen.current && !open) button.current?.focus();
     wasOpen.current = open;
   }, [open]);
+
+  // 새 알림은 카드로 펴서 보인다. 6초가 지나거나 화면을 내리거나 카드 밖을 누르면 점으로 접는다
+  useEffect(() => setFolded(false), [nudge]);
+  useEffect(() => {
+    if (!nudge || folded) return;
+    const fold = () => setFolded(true);
+    const onPointerDown = (event: PointerEvent) => {
+      if (!launcher.current?.contains(event.target as Node | null)) fold();
+    };
+    const timer = window.setTimeout(fold, 6000);
+    window.addEventListener('scroll', fold, { once: true, passive: true });
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('scroll', fold);
+      document.removeEventListener('pointerdown', onPointerDown);
+    };
+  }, [nudge, folded]);
+
+  // 아래로 내리면 숨기고 위로 올리거나 끝(바닥글이 버튼 자리를 비워 둔 96px)에 닿으면 다시 보인다. sm 아래에서만 쓴다
+  useEffect(() => {
+    let y = window.scrollY;
+    const onScroll = () => {
+      const down = window.scrollY > y && window.scrollY + window.innerHeight < document.documentElement.scrollHeight - 96;
+      setTucked(down);
+      y = window.scrollY;
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   /*
    * 패널 밖을 누르면 접는다. 버튼은 빼 둔다 — 버튼에도 접는 일이 걸려 있어서,
@@ -72,6 +114,8 @@ export function Assistant() {
       if (!target) return;
       if (panel.current?.contains(target)) return;
       if (button.current?.contains(target)) return;
+      // 글 고르기 상자는 패널 밖에 뜬다. 뜻을 보거나 묻으려고 눌러도 대화는 열어 둔다
+      if (target instanceof Element && target.closest('[data-selection-popover]')) return;
       setOpen(false);
     };
     document.addEventListener('pointerdown', onPointerDown);
@@ -85,6 +129,9 @@ export function Assistant() {
 
   return (
     <>
+      <Highlighter />
+      <SelectionPopover />
+      {drag.ghost}
       {open && <Panel onClose={() => setOpen(false)} panelRef={panel} />}
       {/* 적용 결과는 왼쪽 아래에 띄운다. 오른쪽은 패널과 버튼이 차지한다.
           좁은 화면에서 패널이 열려 있으면 아래는 입력칸이라 위로 올리고, 눌러도 뒤로 지나가게 한다 */}
@@ -100,8 +147,14 @@ export function Assistant() {
         </p>
       }
       {/* 좁은 화면에서는 패널이 화면을 다 덮으므로 버튼을 패널 안의 「접기」로 대신한다 */}
-      <div className={cn('fixed bottom-5 right-5 z-40 flex flex-col items-end gap-2', open && 'max-sm:hidden')}>
-        {nudge && !open &&
+      <div
+        ref={launcher}
+        className={cn(
+          'fixed bottom-5 right-5 z-40 flex flex-col items-end gap-2 transition duration-200 ease-snap motion-reduce:transition-none',
+          open && 'max-sm:hidden',
+          tucked && !(nudge && !folded) && 'max-sm:pointer-events-none max-sm:translate-y-24 max-sm:opacity-0'
+        )}>
+        {nudge && !open && !folded &&
         <div
           role="status"
           className="w-72 rounded-2xl border border-edge bg-canvas p-4 text-small text-ink2 shadow-panel motion-safe:animate-rise">
@@ -137,16 +190,28 @@ export function Assistant() {
           ref={button}
           type="button"
           aria-expanded={open}
-          aria-label={open ? '비서 접기' : '비서에게 묻기'}
-          onClick={() => setOpen(!open)}
+          aria-label={open ? '비서 접기' : nudge && folded ? '비서 알림 보기' : '비서에게 묻기'}
+          {...drag.bind}
+          onClick={() => {
+            if (drag.consumeClick()) return;
+            // 접어 둔 알림이 있으면 대화 대신 알림 카드를 다시 편다
+            if (nudge && folded && !open) {
+              setFolded(false);
+              return;
+            }
+            setOpen(!open);
+          }}
           className={cn(
-            'h-14 w-14 rounded-full transition-transform duration-150 ease-snap hover:-translate-y-0.5',
+            'relative h-14 w-14 rounded-full transition-transform duration-150 ease-snap hover:-translate-y-0.5',
             open ? 'flex items-center justify-center bg-ink text-white' : 'block'
           )}>
 
           {open ?
           <ChevronDownIcon className="h-6 w-6" aria-hidden="true" /> :
-          <img src={really} alt="" className="block h-14 w-14 rounded-full" />}
+          <img src={really} alt="" draggable={false} className="block h-14 w-14 rounded-full" />}
+          {nudge && folded && !open &&
+          <span aria-hidden="true" className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full bg-deny ring-2 ring-canvas motion-safe:animate-rise" />
+          }
         </button>
       </div>
     </>);
@@ -160,19 +225,28 @@ function Panel({
 
 
 }: {onClose: () => void; panelRef: React.RefObject<HTMLElement>;}) {
-  const { entries, pending, error, draft, setDraft, send, showHelp, showNext } = useAssistant();
+  const { entries, pending, error, draft, setDraft, send, showHelp, showNext, attached, detach } = useAssistant();
   const input = useRef<HTMLInputElement>(null);
   const end = useRef<HTMLDivElement>(null);
 
   // 열리면 입력칸으로 초점을 옮긴다
   useEffect(() => {
     input.current?.focus();
+    // 닫히면 카드에 초점이 있어도 blur 가 오지 않는다. 행 강조를 지운다
+    return () => highlightBus.emit(null);
   }, []);
 
-  // 새 말이 오면 맨 아래로 내린다
+  // 거래를 붙이거나 물을 말을 미리 적어 주면 이어서 적게 입력칸으로 간다
+  useEffect(() => {
+    if (attached || draft) input.current?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attached]);
+
+  // 새 말이 오면 맨 아래로 내린다. 마지막 답에 다음 답 칩이나 칩으로 연 카드가 붙어도 내린다
+  const last = entries[entries.length - 1];
   useEffect(() => {
     end.current?.scrollIntoView({ block: 'end' });
-  }, [entries.length, pending]);
+  }, [entries.length, pending, last?.next, last?.proposals.length]);
 
   const onKeyDown = (event: React.KeyboardEvent) => {
     if (event.key === 'Escape') onClose();
@@ -216,8 +290,9 @@ function Panel({
       aria-label="비서 Really"
       onKeyDown={onKeyDown}
       /* 흰 화면 위에 흰 창이 뜬다. 테두리는 edge(흰 바탕 3.44)로 세워 어디서 끝나는지 보이게 한다.
-         line(1.23)은 안 보였다 (#242 리뷰) */
-      className="fixed inset-0 z-40 flex flex-col bg-canvas sm:inset-auto sm:bottom-20 sm:right-5 sm:h-[min(38rem,calc(100vh-8rem))] sm:w-[25rem] sm:rounded-2xl sm:border sm:border-edge sm:shadow-panel">
+         line(1.23)은 안 보였다 (#242 리뷰).
+         아래 버튼(bottom-5, 56px)과 20px 띄우려고 bottom-24 에 두고, 위는 머리띠(72px)에서 8px 띄운다 */
+      className="fixed inset-0 z-40 flex flex-col bg-canvas sm:inset-auto sm:bottom-24 sm:right-5 sm:h-[min(38rem,calc(100vh-11rem))] sm:w-[25rem] sm:rounded-2xl sm:border sm:border-edge sm:shadow-panel">
 
       <header className="flex items-center gap-3 border-b border-line px-5 py-4">
         <h2 className="min-w-0 flex-1 text-body font-bold text-ink">Really</h2>
@@ -253,6 +328,22 @@ function Panel({
 
       <form onSubmit={submit} className="border-t border-line px-4 py-3">
         <div className="mb-2">{topics}</div>
+        {/* 끌어다 놓거나 행의 묻기 버튼으로 붙인 거래. 비서는 이 거래를 보고 답한다 */}
+        {attached &&
+        <p className="mb-2 flex items-center gap-2 rounded-xl bg-accent-soft py-1.5 pl-3 pr-1.5 text-small text-accent-hover">
+            <span className="min-w-0 flex-1 truncate">
+              <span className="font-bold">{attached.label}</span> 거래에 대해 묻습니다
+            </span>
+            <button
+            type="button"
+            aria-label="붙인 거래 떼기"
+            onClick={detach}
+            className="shrink-0 rounded-lg p-1 hover:bg-canvas">
+
+              <XIcon className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+          </p>
+        }
         {error &&
         <p role="alert" className="mb-2 text-small text-deny">
             {error}
@@ -277,9 +368,26 @@ function Panel({
 
 }
 
+/** 제안 카드에 올리거나 초점을 두면 그 카드가 바꿀 행이나 질문에 테두리를 두른다 */
+const highlight = (refs: string[]) =>
+refs.length === 0 ?
+{} :
+{
+  onMouseEnter: () => highlightBus.emit(refs),
+  onMouseLeave: () => highlightBus.emit(null),
+  onFocus: () => highlightBus.emit(refs),
+  onBlur: () => highlightBus.emit(null)
+};
+
 function Message({ entry }: {entry: ChatEntry;}) {
-  const { apply } = useAssistant();
+  const { apply, entries, pickNext, pending } = useAssistant();
   const mine = entry.role === 'user';
+  // 다음 답 칩은 마지막 답에만 둔다. 앞의 답에 남은 칩은 이미 지난 질문일 수 있다. 그 질문에 답을 적용했으면 뺀다
+  const last = entries[entries.length - 1]?.id === entry.id;
+  const nextQuestion = entry.next?.questionId;
+  const answered = entry.proposals.some(
+    (item) => item.state === 'done' && item.proposal.kind === 'answer' && nextQuestion !== undefined && item.proposal.questionIds.includes(nextQuestion)
+  );
   return (
     <div className={cn('flex flex-col gap-2', mine ? 'items-end' : 'items-start')}>
       <div className={cn('flex w-full gap-2', mine ? 'justify-end' : 'justify-start')}>
@@ -311,7 +419,7 @@ function Message({ entry }: {entry: ChatEntry;}) {
               </p>);
 
         return (
-          <div key={item.key} className="w-full rounded-2xl border border-line bg-canvas p-3.5">
+          <div key={item.key} className="w-full rounded-2xl border border-line bg-canvas p-3.5" {...highlight(proposalRefs(item.proposal))}>
             <Badge>{PROPOSAL_LABEL[item.proposal.kind]}</Badge>
             <p className="mt-2 text-small font-normal text-ink">{item.proposal.card}</p>
             {blocked ?
@@ -339,6 +447,23 @@ function Message({ entry }: {entry: ChatEntry;}) {
           </div>);
 
       })}
+      {last && !mine && entry.next && !answered &&
+      <div className="flex w-full flex-wrap items-center gap-1.5 pl-10">
+          <CornerDownRightIcon className="h-3.5 w-3.5 shrink-0 text-ink2" aria-label="다음 답" />
+          {entry.next.options.map((value) =>
+        <button
+          key={value}
+          type="button"
+          disabled={pending}
+          onClick={() => pickNext(entry.id, value)}
+          {...highlight([`q:${entry.next?.questionId}`])}
+          className="m-step whitespace-nowrap rounded-full border border-accent-line bg-canvas px-3 py-1.5 text-caption font-bold text-ink hover:border-accent disabled:opacity-50">
+
+              {answerLabel(value)}
+            </button>
+        )}
+        </div>
+      }
     </div>);
 
 }

@@ -17,6 +17,21 @@ export interface ChatEntry {
   proposals: ProposalEntry[];
   /** 비서를 거치지 않고 화면이 답한 문답(도움말·다음 할 일). 비서에게 보내는 대화에서 뺀다 */
   local?: boolean;
+  /** 답 아래의 다음 답 칩. 보고 있는 거래의 남은 질문 하나와 그 선택지다 */
+  next?: NextAnswers;
+}
+
+/** 다음 답 칩의 재료. 칩을 누르면 그 값의 답 카드가 열리고, 사용자가 [적용]을 누른다 */
+export interface NextAnswers {
+  questionId: string;
+  questionText: string;
+  options: string[];
+}
+
+/** 끌어다 놓거나 행의 묻기 버튼으로 붙인 거래. 입력칸 위에 이름이 붙고, 비서는 이 거래를 보고 답한다 */
+export interface Attached {
+  transactionId: string;
+  label: string;
 }
 
 /** 먼저 말 걸기. 한 번에 하나만, 닫을 수 있게 (FR-3·4) */
@@ -49,6 +64,11 @@ export interface AssistantValue {
   dismissNudge: () => void;
   /** [적용]한 결과 문장. 몇 초 뒤 사라진다 */
   toast: string | null;
+  attached: Attached | null;
+  /** 붙인 거래를 뗀다. 비서는 더는 그 거래를 보고 있지 않다 */
+  detach: () => void;
+  /** 다음 답 칩을 눌렀다. 그 답의 카드를 그 답 아래에 연다 */
+  pickNext: (entryId: string, value: string) => void;
 }
 
 export const AssistantContext = createContext<AssistantValue | null>(null);

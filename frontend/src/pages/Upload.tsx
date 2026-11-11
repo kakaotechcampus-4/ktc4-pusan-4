@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   AlertTriangleIcon,
   ArrowRightIcon,
+  CheckIcon,
   CircleHelpIcon,
   FileSpreadsheetIcon,
   Loader2Icon,
@@ -12,6 +13,9 @@ import {
 import { AppShell } from '../components/AppShell';
 import { StepEyebrow } from '../components/StepEyebrow';
 import { merchantName } from '../components/results/display';
+import { LiveBorder } from '../components/upload/LiveBorder';
+import { ReadPanel } from '../components/upload/ReadPanel';
+import { SendBar } from '../components/upload/SendBar';
 import { Badge, Button, Table, cn, type Column } from '../components/ui';
 import { useSession } from '../contexts/SessionContext';
 import { api, ApiRequestError } from '../api';
@@ -65,6 +69,8 @@ const PREVIEW_ROWS = 10;
 
 /** 카드 모양 상자. 흰 바탕에 괘선만 두른다 */
 const BOX = 'animate-rise rounded-2xl border border-line bg-canvas p-6';
+/** 읽은 거래 판 아래에 오는 카드 */
+const BELOW = 'mt-4';
 
 type SendState = 'idle' | 'sending' | ApiRequestError;
 
@@ -79,6 +85,18 @@ type Phase =
 {kind: 'ready';file: File;outcome: ParsedOutcome;created: UploadBatchCreated;};
 
 const IDLE: Phase = { kind: 'idle' };
+
+/** 읽은 거래 판의 key. 파일이 바뀌면 판을 새로 그리고, 같은 파일이면 읽기에서 결과까지 한 판이 이어진다 */
+const fileIds = new WeakMap<File, number>();
+let nextFileId = 0;
+const fileId = (file: File) => {
+  let id = fileIds.get(file);
+  if (id === undefined) {
+    id = ++nextFileId;
+    fileIds.set(file, id);
+  }
+  return id;
+};
 
 /**
  * 화면 단계는 화면 밖에 둔다. 단계 띠로 다른 화면에 갔다 와도 읽은 파일이 남고(C54),
@@ -296,7 +314,17 @@ export function Upload() {
               </div>
             }
 
-            {phase.kind === 'parsing' && <ParsingCard file={phase.file} />}
+            {/*
+              놓은 파일이 이 판으로 들어와 읽은 거래가 흐르고 판정 전 칸으로 접힌다. 읽는 중, 미리보기, 올리는 중,
+              올린 뒤까지 같은 자리에 둔다 — 카드가 바뀌어도 판은 다시 그려지지 않고 움직임을 이어 간다
+            */}
+            {phase.kind !== 'idle' && phase.kind !== 'blocked' &&
+            <ReadPanel
+              key={fileId(phase.file)}
+              file={phase.file}
+              outcome={phase.kind === 'parsing' ? null : phase.outcome} />
+
+            }
 
             {phase.kind === 'blocked' &&
             <BlockedCard file={phase.file} outcome={phase.outcome} onReset={reset} />
@@ -349,12 +377,19 @@ function DropZone({ onFiles, invalid }: {onFiles: (files: ArrayLike<File>) => vo
         setDragging(false);
         onFiles(event.dataTransfer.files);
       }}
+      // 파일을 끌어 올리면 칸이 조금 커지고 점선이 흐른다. 움직임 줄이기를 켰으면 색만 바뀐다
       className={cn(
-        'rounded-2xl border-2 border-dashed px-6 py-12 text-center transition-colors duration-150 ease-snap',
-        dragging ? 'border-accent bg-accent-soft' : invalid ? 'border-deny bg-canvas' : 'border-edge bg-canvas'
+        'relative rounded-2xl px-6 py-12 text-center transition-[transform,background-color] duration-200 ease-motion',
+        dragging ? 'bg-accent-soft motion-safe:scale-[1.012]' : 'bg-canvas'
       )}>
 
-      <UploadCloudIcon className="mx-auto h-8 w-8 text-ink2" aria-hidden="true" />
+      <LiveBorder tone={dragging ? 'accent' : invalid ? 'deny' : 'edge'} moving={dragging} />
+      <UploadCloudIcon
+        className={cn(
+          'mx-auto h-8 w-8 transition-[transform,color] duration-200 ease-motion',
+          dragging ? 'text-accent motion-safe:-translate-y-1' : 'text-ink2'
+        )}
+        aria-hidden="true" />
       <p className="mt-3 text-body-lg font-bold text-ink">
         승인내역 파일을 여기에 끌어다 놓으세요
       </p>
@@ -483,18 +518,6 @@ function RandomSample({ onPick }: {onPick: (file: File) => void;}) {
 
 }
 
-function ParsingCard({ file }: {file: File;}) {
-  return (
-    <section className={BOX} aria-busy="true">
-      <div className="flex items-center gap-2.5">
-        <Loader2Icon className="h-4 w-4 animate-spin text-ink2" aria-hidden="true" />
-        <h2 className="text-body-lg font-bold text-ink">파일을 읽고 있습니다</h2>
-      </div>
-      <p className="mt-1.5 break-all text-body text-ink2">{file.name}</p>
-    </section>);
-
-}
-
 /**
  * 올리는 중. 서버는 한 요청 안에서 거래를 저장하고 가맹점을 분류한 뒤 답한다. 얼마나 남았는지 알 길이 없어
  * 진행 막대 대신 지난 시간을 센다. 멈춘 것이 아니라는 것만 보인다
@@ -509,6 +532,7 @@ function SendingCard({
 }: {request: UploadBatchRequest;since: number;onReset: () => void;}) {
   const [now, setNow] = useState(() => Date.now());
   // 누른 버튼이 사라지므로 초점을 제목으로 옮긴다. body 로 떨어지면 키보드로 이어 갈 자리를 잃는다
+  // 키보드로 왔을 때는 전역 :focus-visible 테가 outline-none 을 이긴다. 옮겨 온 초점의 테는 focus-visible: 로 한 번 더 끈다
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => heading.current?.focus(), []);
   useEffect(() => {
@@ -518,14 +542,15 @@ function SendingCard({
   const seconds = Math.max(0, Math.floor((now - since) / 1000));
 
   return (
-    <section className={BOX} aria-busy="true">
+    <section className={cn(BOX, BELOW)} aria-busy="true">
       <div className="flex items-center gap-2.5">
         <Loader2Icon className="h-4 w-4 animate-spin text-ink2" aria-hidden="true" />
-        <h2 ref={heading} tabIndex={-1} className="text-body-lg font-bold text-ink outline-none">
+        <h2 ref={heading} tabIndex={-1} className="text-body-lg font-bold text-ink outline-none focus-visible:outline-none">
           카드내역을 올리고 있습니다
         </h2>
       </div>
       <Identity request={request} />
+      <SendBar />
       <p className="mt-4 text-body text-ink">
         {formatNumber(request.transactions.length)}건을 저장하고 가맹점을 분류합니다.{' '}
         {/* 매초 읽으면 시끄럽다. 화면 읽기 프로그램에는 aria-busy 로 기다리는 중임을 알린다 */}
@@ -545,9 +570,12 @@ function SendingCard({
 
 }
 
-/** 보조 동작이 앞, 주 동작이 뒤에 오고 오른쪽에 붙는다 (C90) */
+/**
+ * 보조 동작이 앞, 주 동작이 뒤에 오고 오른쪽에 붙는다 (C90).
+ * sm 아래에서는 왼쪽에 붙는다. 오른쪽 아래에 떠 있는 비서 버튼이 줄바꿈된 버튼 글자를 가린다
+ */
 function Actions({ children }: {children: React.ReactNode;}) {
-  return <div className="mt-6 flex flex-wrap items-center justify-end gap-3">{children}</div>;
+  return <div className="mt-6 flex flex-wrap items-center gap-3 sm:justify-end">{children}</div>;
 }
 
 /** 어느 카드사의 언제 내역인지. 업로드 이력·판정 전 확인과 같은 이름을 쓴다 (C59) */
@@ -620,8 +648,8 @@ function PreviewCard({
     if (error) errorBox.current?.focus();
   }, [error]);
 
+  // 읽은 행 수는 위의 읽은 거래 판이 센다
   const counts = [
-  { term: '읽은 행', value: rows.length },
   { term: '보낼 거래', value: sent.length },
   { term: '보내지 않는 행', value: unsendable.length }];
 
@@ -693,19 +721,20 @@ function PreviewCard({
   const head = rows.filter((_, index) => !unsentIndex.has(index)).slice(0, PREVIEW_ROWS);
   // 보내지 않는 행도 처음 몇 건만 보인다. 수백 건이 다 그려지면 올리기 버튼이 한참 아래로 밀린다(#276 리뷰). 전체 수는 위 숫자에 있다
   const unsentHead = unsendable.slice(0, PREVIEW_ROWS);
+  // 가맹점명 칸이 남는 폭만 쓰고 넘치면 말줄임한다(w-full max-w-0). 좁은 화면에서는 가맹점명과 금액만 둔다. 상태별 건수는 위 문장에 있다
   const rowColumns: Column<ParsedRow>[] = [
-  { header: '승인일', cell: (r) => <span className="whitespace-nowrap tabular-nums">{r.approvedAt ? formatFullDate(r.approvedAt) : '-'}</span> },
-  { header: '가맹점명', cell: (r) => merchantCell(merchantName(r.rawMerchant)) },
+  { header: '승인일', hideBelow: 'sm', cell: (r) => <span className="whitespace-nowrap tabular-nums">{r.approvedAt ? formatFullDate(r.approvedAt) : '-'}</span> },
+  { header: '가맹점명', width: 'w-full max-w-0', cell: (r) => merchantCell(merchantName(r.rawMerchant)) },
   {
     header: '금액',
     align: 'right',
     cell: (r) => <span className="whitespace-nowrap">{r.amount === null ? '-' : formatWon(r.amount)}</span>
   },
-  { header: '상태', cell: (r) => <Badge>{r.status}</Badge> }];
+  { header: '상태', hideBelow: 'sm', cell: (r) => <Badge>{r.status}</Badge> }];
 
 
   return (
-    <section className={BOX}>
+    <section className={cn(BOX, BELOW)}>
       <p className="break-all text-caption text-muted">{file.name}</p>
       <h2 className="mt-1 text-h4 font-bold text-ink">
         {uploadName({ cardIssuer: outcome.issuer, sourceType: '승인내역' })}
@@ -776,7 +805,7 @@ function PreviewCard({
       {request === null && <p className="mt-6 text-body text-deny">보낼 수 있는 거래가 없습니다.</p>}
 
       {error && view &&
-      <div ref={errorBox} tabIndex={-1} role="alert" className="mt-6 text-body text-deny outline-none">
+      <div ref={errorBox} tabIndex={-1} role="alert" className="mt-6 text-body text-deny outline-none focus-visible:outline-none">
           <p>{view.message}</p>
           {view.trace && error.traceId &&
         <p className="mt-1 text-caption tabular-nums text-muted">추적 번호 {error.traceId}</p>
@@ -821,11 +850,14 @@ function ReadyCard({
 }: {outcome: ParsedOutcome;created: UploadBatchCreated;onReset: () => void;}) {
   const { contextStatus } = useSession();
   const { request } = outcome;
+  // 올리는 중 카드와 그 안의 버튼이 사라진다. 초점이 body 로 떨어지지 않게 결과 제목으로 옮긴다
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => heading.current?.focus(), []);
 
   if (created.transactionCount === 0) {
     return (
-      <section className={BOX}>
-        <h2 className="text-h4 font-bold text-ink">새로 들어간 거래가 없습니다</h2>
+      <section className={cn(BOX, BELOW)}>
+        <h2 ref={heading} tabIndex={-1} className="text-h4 font-bold text-ink outline-none focus-visible:outline-none">새로 들어간 거래가 없습니다</h2>
         <p className="mt-2 text-body text-ink2">
           이 파일의 거래 {formatNumber(created.skippedDuplicateCount)}건은 모두 이미 올린 거래입니다.
         </p>
@@ -842,8 +874,14 @@ function ReadyCard({
   const pending = created.classificationPendingCount;
   const next = nextStep(pending, contextStatus === 'none');
   return (
-    <section className={BOX}>
-      <h2 className="text-h4 font-bold text-ink">
+    <section className={cn(BOX, BELOW)}>
+      <h2 ref={heading} tabIndex={-1} className="flex items-center gap-2 text-h4 font-bold text-ink outline-none focus-visible:outline-none">
+        <span
+          aria-hidden="true"
+          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent text-white motion-safe:animate-cell">
+
+          <CheckIcon className="h-4 w-4" />
+        </span>
         {formatNumber(created.transactionCount)}건을 올렸습니다
       </h2>
       {request && <Identity request={request} />}

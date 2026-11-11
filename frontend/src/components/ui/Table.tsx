@@ -10,7 +10,7 @@ export interface Column<T> {
   cell: (row: T) => React.ReactNode;
   align?: 'left' | 'right';
   /** 좁은 화면에서 숨길 열. 핵심 정보에는 쓰지 않는다 */
-  hideBelow?: 'sm' | 'md' | 'lg';
+  hideBelow?: 'sm' | 'md' | 'lg' | 'xl';
   /** 고정 폭이 필요할 때만 (예: 'w-28') */
   width?: string;
 }
@@ -29,13 +29,18 @@ interface TableProps<T> {
   empty?: React.ReactNode;
   /** 첫 로딩 중이면 골격을 보여준다 */
   loading?: boolean;
+  /** 행에 더할 속성. 비서가 찾을 표지(data-*)와 클래스를 붙인다 */
+  rowProps?: (row: T) => {className?: string;} & Record<`data-${string}`, string | undefined>;
+  /** 행 안에서 눌린 키. 행을 옮기거나 행의 동작을 여는 단축키를 화면이 정한다 */
+  onRowKeyDown?: (row: T, event: React.KeyboardEvent<HTMLTableRowElement>) => void;
   className?: string;
 }
 
 const HIDE = {
   sm: 'hidden sm:table-cell',
   md: 'hidden md:table-cell',
-  lg: 'hidden lg:table-cell'
+  lg: 'hidden lg:table-cell',
+  xl: 'hidden xl:table-cell'
 } as const;
 
 /**
@@ -51,6 +56,8 @@ export function Table<T>({
   selectedKey,
   empty,
   loading = false,
+  rowProps,
+  onRowKeyDown,
   className
 }: TableProps<T>) {
   // 비었을 때도 표 자리의 간격(className)을 지킨다. 빼면 빈 상태가 위의 필터에 붙는다
@@ -68,7 +75,7 @@ export function Table<T>({
   return (
     <div className={cn('overflow-x-auto', className)}>
       {/* 표는 패널에 넣지 않는다. 머리 위 굵은 괘선 하나와 행 사이 얇은 괘선만 쓴다 */}
-      <table className="w-full border-collapse border-t-2 border-rule">
+      <table className="w-full border-collapse border-t border-line">
         <caption className="sr-only">{caption}</caption>
         <thead>
           <tr className="border-b border-line">
@@ -96,18 +103,22 @@ export function Table<T>({
               </tr>
           )}
 
-          {rows.map((row) => {
+          {rows.map((row, index) => {
             const key = rowKey(row);
             const selected = key === selectedKey;
+            const { className: extraClass, ...extra } = rowProps?.(row) ?? {};
             return (
               <tr
+                {...extra}
                 key={key}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
                 tabIndex={onRowClick ? 0 : undefined}
                 aria-current={selected ? 'true' : undefined}
                 onKeyDown={
-                onRowClick ?
+                onRowClick || onRowKeyDown ?
                 (event) => {
+                  onRowKeyDown?.(row, event);
+                  if (event.defaultPrevented || !onRowClick) return;
                   if (event.key !== 'Enter' && event.key !== ' ') return;
                   event.preventDefault();
                   onRowClick(row);
@@ -115,8 +126,11 @@ export function Table<T>({
                 undefined
                 }
                 // 고른 행은 accent-soft, hover 는 surface 다. 둘이 같은 회색이면 어느 행을 골랐는지 안 보인다 (C79)
+                // 목록이 나타날 때 행이 위에서부터 짧게 떠오른다. 같은 행을 다시 읽을 때는 움직이지 않는다
+                style={{ animationDelay: `${Math.min(index, 10) * 20}ms` }}
                 className={cn(
-                  'transition-colors duration-150',
+                  'transition-colors duration-150 motion-safe:animate-enter',
+                  extraClass,
                   onRowClick &&
                   'cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
                   selected ? 'bg-accent-soft' : onRowClick && 'hover:bg-surface focus-visible:bg-surface'
@@ -153,6 +167,8 @@ export function Pagination({ page, onChange, note }: PaginationProps) {
       <span className="tabular-nums">
         {note ?? `${first}~${last} / ${page.totalElements.toLocaleString('ko-KR')}건`}
       </span>
+      {/* 한 쪽뿐이면 누를 수 없는 화살표를 그리지 않는다 */}
+      {page.totalPages > 1 &&
       <div className="flex items-center gap-2">
         {/* 다른 그림 버튼(IconButton)과 같은 36px 알약이다 */}
         <IconButton
@@ -171,6 +187,7 @@ export function Pagination({ page, onChange, note }: PaginationProps) {
           disabled={!page.hasNext}
           onClick={() => onChange(page.number + 1)} />
       </div>
+      }
     </div>);
 
 }

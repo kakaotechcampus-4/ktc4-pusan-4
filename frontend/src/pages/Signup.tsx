@@ -1,14 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { CheckIcon, ChevronRightIcon } from 'lucide-react';
 import { SignedUpError, useSession } from '../contexts/SessionContext';
 import { api, ApiRequestError, mockVerificationCode } from '../api';
 import {
   AUTH_FIELD_ERROR,
   AUTH_INPUT,
-  AUTH_LABEL,
-  AuthLayout } from
+  AUTH_LABEL } from
 '../components/AuthLayout';
+import { SignInLayout } from '../components/auth/SignInLayout';
 import { Button, IconButton, Modal } from '../components/ui';
 import { TERMS_EFFECTIVE, TermsBody } from './public/Terms';
 import { PRIVACY_EFFECTIVE, PrivacyBody } from './public/Privacy';
@@ -308,7 +308,7 @@ export function Signup() {
 
   // 이미 로그인했으면 로그인 뒤에 갈 곳으로 보낸다 (C52). 이어 가는 중에는 폼을 그리지 않는다
   if (status === 'signedIn' && !signingUp.current) return <Navigate to={from ?? '/'} replace />;
-  if (status === 'restoring') return <AuthLayout title="회원가입">{null}</AuthLayout>;
+  if (status === 'restoring') return <SignInLayout title="회원가입">{null}</SignInLayout>;
 
   const step = verificationToken ? 3 : sentTo ? 2 : 1;
   /** 그 칸 바로 아래 둘 오류. 칸이 정해지지 않은 오류는 field 를 null 로 불러 그 자리에 둔다 */
@@ -322,30 +322,12 @@ export function Signup() {
   error && errorField === field ? `signup-${field}-error` : undefined;
 
   return (
-    <AuthLayout title="회원가입">
-      <h1 className="text-[26px] font-bold tracking-tight text-ink">
-        회원가입
-      </h1>
+    <SignInLayout title="회원가입">
+      {/* 로그인 화면과 같은 틀과 제목 크기다 */}
+      <h1 className="text-h2 font-bold tracking-ir text-ink sm:text-h2-lg">회원가입</h1>
 
       <KakaoStart from={from ?? '/'} label="카카오로 시작하기" divider="또는 이메일로" disabled={busy} />
 
-      <ol className="mt-6 flex gap-2 text-[12px]" aria-label="가입 단계">
-        {['이메일 인증', '코드 확인', '비밀번호'].map((label, index) =>
-        <li
-          key={label}
-          aria-current={step === index + 1 ? 'step' : undefined}
-          className={`flex-1 rounded-full px-2 py-1 text-center ${
-          step === index + 1 ?
-          'bg-accent font-bold text-white' :
-          step > index + 1 ?
-          'text-ink2' :
-          'text-muted'}`
-          }>
-
-            {index + 1}. {label}
-          </li>
-        )}
-      </ol>
 
       <form onSubmit={submitEmail} noValidate className="mt-6">
         <label htmlFor="signup-email" className={AUTH_LABEL}>
@@ -547,16 +529,6 @@ export function Signup() {
         </form>
       }
 
-      <p className="mt-6 text-center text-[13px] text-ink2">
-        계정이 있으면{' '}
-        <Link
-          to="/login"
-          state={from ? { from } : undefined}
-          className="font-bold text-ink underline underline-offset-4 decoration-accent-line hover:decoration-ink">
-
-          로그인
-        </Link>
-      </p>
-    </AuthLayout>);
+    </SignInLayout>);
 
 }

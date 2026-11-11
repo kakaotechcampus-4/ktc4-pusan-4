@@ -15,9 +15,10 @@ interface ModalProps {
   tone?: 'neutral' | 'danger';
   /**
    * lg 는 읽을 거리가 긴 창(약관·처리방침)에 쓴다. 본문이 화면보다 길면 그 안에서 스크롤한다 —
-   * 창이 열려 있는 동안 뒤 스크롤을 막기 때문에, 여기서 스크롤하지 않으면 아래를 읽을 길이 없다
+   * 창이 열려 있는 동안 뒤 스크롤을 막기 때문에, 여기서 스크롤하지 않으면 아래를 읽을 길이 없다.
+   * xl 은 넓게 펼쳐 보는 그림(규칙 카드 전체 그래프)에 쓴다
    */
-  size?: 'md' | 'lg';
+  size?: 'md' | 'lg' | 'xl';
 }
 
 /**
@@ -89,7 +90,7 @@ export function Modal({
       브라우저가 거기까지 밀어서 문서가 중간부터 열린다. 창은 tabIndex=-1 이라 받을 수 있고,
       스크린리더는 제목을 읽는다. Tab 을 누르면 그때 본문 첫 요소로 간다
     */
-    (size === 'lg' ? panel.current : focusable()[0] ?? panel.current)?.focus();
+    (size !== 'md' ? panel.current : focusable()[0] ?? panel.current)?.focus();
     // 뒤 목록이 같이 스크롤되지 않게 한다
     const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -117,8 +118,9 @@ export function Modal({
         tabIndex={-1}
         onClick={(event) => event.stopPropagation()}
         className={cn(
-          'relative flex w-full max-h-[calc(100vh-2rem)] flex-col rounded-2xl border border-line bg-canvas p-6 shadow-panel outline-none motion-safe:animate-rise',
-          size === 'lg' ? 'max-w-2xl' : 'max-w-md'
+          // 키보드로 열면 판이 포커스를 받는다. 전역 :focus-visible 테가 outline-none 을 이겨 테두리 밖에 검은 테가 하나 더 생기므로 다시 끈다
+          'relative flex w-full max-h-[calc(100vh-2rem)] flex-col rounded-2xl border border-line bg-canvas p-6 shadow-panel outline-none focus-visible:outline-none motion-safe:animate-rise',
+          size === 'xl' ? 'max-w-5xl' : size === 'lg' ? 'max-w-2xl' : 'max-w-md'
         )}>
 
         <h2
