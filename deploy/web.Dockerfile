@@ -5,6 +5,13 @@ COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ ./
 COPY rules/categories.yaml /rules/categories.yaml
+# 관문 그래프, 용어집, 관리자 화면이 쓰는 원본. 빌드가 JSON 으로 바꿔 번들에 넣고, 못 읽으면 빌드가 멈춘다(scripts/rules-data.mjs)
+COPY rules/cards /rules/cards
+COPY rules/glossary.yaml /rules/glossary.yaml
+COPY eval/cases /eval/cases
+# 백엔드 이미지와 같은 커밋 SHA. 판정의 rulesCommitSha 와 다르면 화면이 「판정 당시 카드와 지금 카드가 다를 수 있다」고 알린다
+ARG RULES_COMMIT_SHA=""
+ENV VITE_RULES_COMMIT_SHA=$RULES_COMMIT_SHA
 # 카카오 REST API 키는 브라우저 인가 주소에 그대로 실리는 공개 값이라 GitHub variable 로 넘긴다. 키는 VITE_API=http 로 빌드한 실서버 화면에서만 쓴다. 그때 비우면 카카오 버튼을 숨기고, 목업 화면은 키 없이 늘 버튼을 보인다
 ARG VITE_KAKAO_REST_API_KEY=""
 ENV VITE_KAKAO_REST_API_KEY=$VITE_KAKAO_REST_API_KEY
