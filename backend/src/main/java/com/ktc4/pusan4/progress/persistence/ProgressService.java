@@ -51,7 +51,7 @@ public class ProgressService {
         Optional<BusinessContext> context = contextService.findCurrent(userId);
         Pending classification = progressRepository.countPendingClassification(batchId);
         RunRow run = progressRepository.findLatestRuns(batchId, PageRequest.of(0, 1)).stream().findFirst().orElse(null);
-        PendingTotal questions = PendingTotal.of(questionQueryService.find(userId, batchId, null));
+        PendingTotal questions = questionQueryService.unresolved(userId, batchId, null);
         int fillable = suggestionService.suggest(userId, batchId).stream()
             .filter(PreviousAnswerSuggestion::fillable)
             .mapToInt(PreviousAnswerSuggestion::questionCount)
