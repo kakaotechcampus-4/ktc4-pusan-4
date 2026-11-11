@@ -6,8 +6,8 @@ interface KakaoStartProps {
   /** 카카오에서 돌아와 로그인한 뒤 갈 곳 */
   from: string;
   label: string;
-  /** 버튼 아래 가름줄 글자. 그 아래 이메일 폼이 이어진다 */
-  divider: string;
+  /** 버튼 아래 가름줄 글자. 그 아래 이메일 폼이 이어진다. 없으면 가름줄을 긋지 않는다(로그인은 이메일 버튼이 바로 온다) */
+  divider?: string;
   disabled?: boolean;
 }
 
@@ -40,11 +40,13 @@ export function KakaoStart({ from, label, divider, disabled }: KakaoStartProps) 
         {label}
       </button>
 
+      {divider &&
       <div className="my-6 flex items-center gap-3">
-        <span className="h-px flex-1 bg-line" />
-        <span className="text-[12px] text-ink2">{divider}</span>
-        <span className="h-px flex-1 bg-line" />
-      </div>
+          <span className="h-px flex-1 bg-line" />
+          <span className="text-[12px] text-ink2">{divider}</span>
+          <span className="h-px flex-1 bg-line" />
+        </div>
+      }
     </>);
 
 }

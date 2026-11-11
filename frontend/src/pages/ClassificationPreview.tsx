@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ArrowRightIcon, CheckIcon, ChevronDownIcon, Loader2Icon, SparklesIcon, UploadIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { StepEyebrow } from '../components/StepEyebrow';
 import { api, ApiRequestError, useApi } from '../api';
+import { readAll } from '../api/readAll';
 import { useSession } from '../contexts/SessionContext';
 import { Button, Empty, cn } from '../components/ui';
 import { MERCHANT_CATEGORIES } from '../types/domain';
@@ -80,7 +82,16 @@ export function ClassificationPreview() {
   const nextTo = toInterview ? '/interview' : '/confirm';
 
   const timers = useRef<number[]>([]);
-  useEffect(() => () => timers.current.forEach(window.clearTimeout), []);
+  /** 모두 정하는 동안 화면을 떠나면 끝나도 다음 화면으로 옮기지 않는다 */
+  const alive = useRef(true);
+  useEffect(() => () => {
+    alive.current = false;
+    timers.current.forEach(window.clearTimeout);
+  }, []);
+  const navigate = useNavigate();
+  /** 모두 추천 분류로 정하는 중. 몇 곳째인지 센다 */
+  const [bulk, setBulk] = useState<{done: number;total: number;} | null>(null);
+  const [bulkError, setBulkError] = useState<string | null>(null);
 
   const setCard = (key: string, state: CardState) =>
   setCards((prev) => ({ ...prev, [key]: state }));
@@ -107,6 +118,50 @@ export function ClassificationPreview() {
       setCard(key, { kind: 'gone' });
       groupsQ.reload();
     }, 280));
+  };
+
+  /**
+   * 추천이 있는 가맹점을 모두 첫 추천으로 정하고 다음 화면으로 간다. 보이는 쪽(100곳)만이 아니라 끝까지 읽는다.
+   * 하나씩 차례로 보낸다. 판정한 적이 있으면 보낼 때마다 서버가 그 거래를 다시 판정한다(api.md 3.5).
+   * 추천이 없는 가맹점은 그대로 남아 판정에서 빠지고, 하나라도 못 정하면 넘어가지 않고 그 카드에 적는다
+   */
+  const acceptAll = async () => {
+    if (!batchId || bulk) return;
+    setBulkError(null);
+    let all: ClassificationReviewGroup[];
+    try {
+      all = await readAll((page, size) => api.classificationReviews.grouped({ batchId, status: 'PENDING', page, size }));
+    } catch {
+      setBulkError('분류할 가맹점을 불러오지 못했습니다. 다시 눌러 주세요.');
+      return;
+    }
+    const targets = all.filter((group) => group.suggestedCategories.length > 0);
+    let failed = 0;
+    setBulk({ done: 0, total: targets.length });
+    for (const [index, group] of targets.entries()) {
+      const category = group.suggestedCategories[0];
+      setCard(group.groupKey, { kind: 'saving', category });
+      try {
+        await api.classificationReviews.respond({ reviewIds: group.reviewIds, merchantCategory: category });
+        setCard(group.groupKey, { kind: 'saved' });
+      } catch (caught) {
+        // 409 는 다른 곳에서 이미 정했다. 정한 것으로 친다
+        if (caught instanceof ApiRequestError && caught.status === 409) setCard(group.groupKey, { kind: 'saved' });else
+        {
+          failed += 1;
+          setCard(group.groupKey, { kind: 'error', message: `${merchantName(group.merchantRaw)} 분류를 저장하지 못했습니다. 다시 눌러 주세요.` });
+        }
+      }
+      setBulk({ done: index + 1, total: targets.length });
+    }
+    setBulk(null);
+    if (!alive.current) return;
+    if (failed > 0) {
+      setBulkError(`가맹점 ${formatNumber(failed)}곳을 저장하지 못했습니다. 다시 눌러 주세요.`);
+      groupsQ.reload();
+      return;
+    }
+    navigate(nextTo);
   };
 
   const body = () => {
@@ -213,12 +268,12 @@ export function ClassificationPreview() {
           </ul>
         </section>
 
-        {/* 건너뛰면 잃는 것을 말한다. 고르지 않은 거래는 판정에 들어가지 않는다 */}
-        <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-line pt-6">
-          <p className="max-w-md text-body text-ink2">
-            분류하지 않은{' '}
-            <strong className="font-bold text-ink">{formatNumber(pendingCount)}건</strong>은 판정에서 빠집니다.
-          </p>
+        <div className="mt-8 flex flex-wrap items-center justify-end gap-x-4 gap-y-3 border-t border-line pt-6">
+          {bulkError &&
+          <p role="alert" className="mr-auto text-small text-deny">
+              {bulkError}
+            </p>
+          }
           <div className="flex flex-wrap items-center justify-end gap-3">
             <Button variant="secondary" size="md" className="whitespace-nowrap" to="/upload">
               다시 올리기
@@ -227,6 +282,21 @@ export function ClassificationPreview() {
               {toInterview ? '건너뛰고 사업자 문진으로' : '건너뛰고 판정 전 확인으로'}
               <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
             </Button>
+            {(groups.some((group) => group.suggestedCategories.length > 0) || groups.length < merchantTotal) &&
+            <Button size="md" className="whitespace-nowrap" disabled={bulk !== null} onClick={() => void acceptAll()}>
+                {bulk ?
+              <>
+                    <Loader2Icon className="h-4 w-4 animate-spin" aria-hidden="true" />
+                    추천 분류로 정하는 중 {formatNumber(bulk.done)}/{formatNumber(bulk.total)}
+                  </> :
+
+              <>
+                    모두 추천 분류로 정하고 넘어가기
+                    <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
+                  </>
+              }
+              </Button>
+            }
           </div>
         </div>
       </>);
@@ -239,11 +309,10 @@ export function ClassificationPreview() {
         <header>
           <StepEyebrow />
           <h1 className="mt-1.5 text-h2 font-bold tracking-tight text-ink">분류 확인</h1>
-          {/* 어느 업로드를 보고 있는지 (C54). 업로드 이력·판정 전 확인과 같은 이름을 쓴다 */}
+          {/* 어느 업로드를 보고 있는지 (C54). 결과, 요약과 같은 줄이다 */}
           {batch &&
-          <p className="mt-2 flex flex-wrap gap-x-3 text-body text-ink2">
-              <span className="font-bold text-ink">{uploadName(batch)}</span>
-              <span className="tabular-nums">{formatPeriod(batch.periodStart, batch.periodEnd)}</span>
+          <p className="mt-1 text-small tabular-nums text-ink2">
+              {uploadName(batch)}, {formatPeriod(batch.periodStart, batch.periodEnd)}
             </p>
           }
         </header>
@@ -291,7 +360,7 @@ function Choice({
       onClick={onClick}
       className={cn(
         CHOICE,
-        suggestion ? 'border-accent' : 'border-edge',
+        suggestion ? 'border-accent' : 'border-accent-line enabled:hover:border-ink',
         // 저장 중인 칸은 고른 칸이라 흐리게 하지 않는다
         saving ? 'bg-accent-soft' : 'bg-canvas disabled:opacity-40'
       )}>
@@ -300,8 +369,9 @@ function Choice({
       <Loader2Icon className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> :
       suggestion && <SparklesIcon className="h-3.5 w-3.5 text-accent" aria-hidden="true" />}
       {children}
-      {/* AI 가 고른 첫 후보라는 표시. 판정이 아니라 분류 후보다 (DESIGN.md 말투 규칙) */}
-      {suggestion && <span className="text-caption font-bold text-accent">추천</span>}
+      {/* AI 가 고른 첫 후보. 바로 위 문장(suggestionReason)이 추천이라고 말해서 칸에는 글자를 두지 않고
+          파란 테두리와 반짝이 그림만 둔다. 화면 읽기 프로그램에는 칸마다 읽어 준다 */}
+      {suggestion && <span className="sr-only">추천</span>}
       {saving && <span className="sr-only">저장하는 중</span>}
     </button>);
 
@@ -309,7 +379,7 @@ function Choice({
 
 /**
  * 가맹점 하나. 이름과 금액, 묻는 말, 그리고 같은 모양의 선택지 한 줄이다 (U6, C74).
- * 모델의 첫 후보는 파란 테두리와 「추천」으로 표시하고, 나머지 카테고리는 같은 모양으로 펼친다
+ * 모델의 첫 후보는 파란 테두리와 반짝이 그림으로 표시하고, 나머지 카테고리는 같은 모양으로 펼친다
  */
 function ReviewCard({
   group,
@@ -374,9 +444,13 @@ function ReviewCard({
           {rows[0].installmentMonths > 0 && `, ${rows[0].installmentMonths}개월 할부`}
         </p> :
 
-      <details className="mt-1">
-        <summary className="cursor-pointer text-small text-ink2 hover:text-ink">
+      <details className="group/rows mt-1">
+        {/* 브라우저 삼각형 대신 옆의 「다른 카테고리」와 같은 꺾쇠를 쓴다 */}
+        <summary className="inline-flex cursor-pointer list-none items-center gap-1 py-0.5 text-small text-ink2 hover:text-ink [&::-webkit-details-marker]:hidden">
           건별 보기 ({formatNumber(group.count)}건)
+          <ChevronDownIcon
+            className="h-4 w-4 transition-transform duration-150 group-open/rows:rotate-180"
+            aria-hidden="true" />
         </summary>
         <ul className="mt-2 divide-y divide-line2">
           {rows.slice(0, 4).map((row) => {
@@ -417,7 +491,7 @@ function ReviewCard({
           aria-expanded={open}
           disabled={busy}
           onClick={() => setExpanded((value) => !value)}
-          className={cn(CHOICE, 'border-edge bg-canvas disabled:opacity-40')}>
+          className={cn(CHOICE, 'border-accent-line bg-canvas enabled:hover:border-ink disabled:opacity-40')}>
 
             다른 카테고리
             <ChevronDownIcon

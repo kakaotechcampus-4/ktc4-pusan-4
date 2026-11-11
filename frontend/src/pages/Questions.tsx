@@ -13,6 +13,19 @@ import { answerLabel, respondOnce, UNCONFIRMED_CODE, verdictsAfter, withHeld } f
 import type { VerdictTally } from '../components/questions/logic';
 import type { AnswerSource, QuestionGroup } from '../types/domain';
 import { formatFullDate, formatNumber, formatWon, ro } from '../utils/format';
+import { ShortcutHelp, type Shortcut } from '../components/ShortcutHelp';
+import { REF_ATTR } from '../components/assistant/ask';
+
+/** ? 를 누르면 뜨는 목록. 선택지에 초점이 있을 때 듣는다 */
+const SHORTCUTS: Shortcut[] = [
+{ keys: ['1', '2', '3'], label: '몇 번째 선택지로 답하기' },
+{ keys: ['←', '→'], label: '선택지 사이 옮기기' },
+{ keys: ['?'], label: '단축키 보기' }];
+
+
+/** Really 제안 카드에 마우스를 올리면 바뀔 질문에 테두리를 두른다(제안이 가리키는 질문과 거래) */
+const groupRef = (group: QuestionGroup) =>
+[...group.questionIds.map((id) => `q:${id}`), ...new Set(group.transactions.map((row) => `tx:${row.transactionId}`))].join(' ');
 
 /** F1-a. 한 번에 보여주는 질문 수(잠정). 다 답하면 다음 질문이 이어서 나온다 */
 const BATCH_SIZE = 15;
@@ -436,6 +449,7 @@ export function Questions() {
       </div>
       <Button to="/results" variant="secondary" size="sm" className="whitespace-nowrap">
         결과 보기
+        <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
       </Button>
     </header>;
 
@@ -615,7 +629,7 @@ export function Questions() {
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}>
 
-                    <section className="overflow-hidden rounded-2xl border border-line">
+                    <section {...{ [REF_ATTR]: groupRef(group) }} className="overflow-hidden rounded-2xl border border-line">
                       <header className="flex items-start gap-3 border-b border-line2 px-5 py-4">
                         <span className="mt-0.5 w-6 shrink-0 text-center text-small font-bold tabular-nums text-muted">
                           {shownPage * BATCH_SIZE + index + 1}
@@ -689,6 +703,7 @@ export function Questions() {
                           columns={group.options.length >= 3 ? 3 : 2}
                           value={answerOf(group) ?? ''}
                           selectOnFocus={false}
+                          numberKeys
                           onChange={(value) => void answer(group, value, { index })}
                           onClear={() => void withdraw(group, index)}
                           options={choicesOf(group)} />
@@ -819,6 +834,7 @@ export function Questions() {
                       columns={group.options.length >= 3 ? 3 : 2}
                       value={value ?? ''}
                       selectOnFocus={false}
+                      numberKeys
                       onChange={(next) => void answer(group, next)}
                       onClear={() => void withdraw(group)}
                       options={choicesOf(group)} />
@@ -846,6 +862,7 @@ export function Questions() {
           </div>
         }
       </div>
+      <ShortcutHelp shortcuts={SHORTCUTS} />
     </AppShell>);
 
 }

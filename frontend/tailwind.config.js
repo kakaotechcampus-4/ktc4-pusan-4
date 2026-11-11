@@ -137,6 +137,8 @@ export default {content: [
       },
       transitionTimingFunction: {
         snap: 'cubic-bezier(0.23, 1, 0.32, 1)',
+        /** 움직임의 곡선 하나. 튀거나 넘치지 않는다 (index.css --m-ease) */
+        motion: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
       },
       keyframes: {
         rise: {
@@ -165,6 +167,24 @@ export default {content: [
           from: { opacity: '0', transform: 'scale(0.42)' },
           to: { opacity: '1', transform: 'scale(1)' },
         },
+        /*
+         * 화면과 목록이 나타날 때. 끝 모습은 transform 이 없는 기본 모습이고 fill 은 backwards 다.
+         * 끝난 뒤에도 transform 이 남으면 그 안의 fixed 요소(바텀시트, 끌기 그림)가 화면 대신 이 상자에 붙는다
+         */
+        enter: {
+          from: { opacity: '0', transform: 'translateY(6px)' },
+          to: { opacity: '1', transform: 'none' },
+        },
+        /* 판정 칸이 하나씩 들어온다 */
+        cell: {
+          from: { opacity: '0', transform: 'scale(0.4)' },
+          to: { opacity: '1', transform: 'none' },
+        },
+        /* 판정이 난 칸이 뒤집혀 판정색이 된다 */
+        flip: {
+          from: { transform: 'perspective(60px) rotateX(-90deg)' },
+          to: { transform: 'none' },
+        },
       },
       animation: {
         rise: 'rise 0.32s cubic-bezier(0.23, 1, 0.32, 1) both',
@@ -174,6 +194,9 @@ export default {content: [
         'orbit-slow-back': 'orbit 78s linear infinite',
         draw: 'draw 0.6s cubic-bezier(0.23, 1, 0.32, 1) both',
         spread: 'spread 0.7s cubic-bezier(0.23, 1, 0.32, 1) both',
+        enter: 'enter 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) backwards',
+        cell: 'cell 0.26s cubic-bezier(0.2, 0.8, 0.2, 1) backwards',
+        flip: 'flip 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) backwards',
       },
     },
   },

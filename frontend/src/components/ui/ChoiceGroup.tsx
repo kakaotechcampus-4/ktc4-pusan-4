@@ -32,6 +32,11 @@ interface ChoiceGroupProps<T extends string | boolean> {
   /** 한 줄에 놓을 개수 (sm 이상). 기본 3 */
   columns?: 2 | 3 | 4;
   className?: string;
+  /**
+   * 묶음 안에 초점이 있을 때 숫자 1~9 로 n번째 선택지를 고른다(질문 화면). 키보드로 들어오면 선택지에 번호가 뜬다.
+   * 이미 고른 칸의 번호를 다시 눌러도 거두지 않는다
+   */
+  numberKeys?: boolean;
 }
 
 const COLUMNS = {
@@ -55,7 +60,8 @@ export function ChoiceGroup<T extends string | boolean>({
   invalid = false,
   describedBy,
   columns = 3,
-  className
+  className,
+  numberKeys = false
 }: ChoiceGroupProps<T>) {
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const enabled = options.flatMap((option, index) => option.disabled ? [] : [index]);
@@ -79,6 +85,15 @@ export function ChoiceGroup<T extends string | boolean>({
   const onKeyDown = (event: React.KeyboardEvent, index: number) => {
     // Alt+← 같은 브라우저 단축키는 그대로 둔다
     if (event.altKey || event.ctrlKey || event.metaKey) return;
+    if (numberKeys && /^[1-9]$/.test(event.key)) {
+      const picked = Number(event.key) - 1;
+      const option = options[picked];
+      if (!option || option.disabled) return;
+      event.preventDefault();
+      buttons.current[picked]?.focus();
+      if (option.value !== value) onChange(option.value);
+      return;
+    }
     const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
     const edge = { Home: enabled[0], End: enabled[enabled.length - 1] }[event.key];
     const at = enabled.indexOf(index);
@@ -105,7 +120,7 @@ export function ChoiceGroup<T extends string | boolean>({
         // 묶음을 떠났으면 화살표로 고른 것은 확정된 것이다. 다음 누름은 거두기다
         arrowPicked.current = null;
       }}
-      className={cn('grid gap-2', COLUMNS[columns], className)}>
+      className={cn('group/choices grid gap-2', COLUMNS[columns], className)}>
 
       {options.map((option, index) => {
         const selected = option.value === value;
@@ -133,10 +148,10 @@ export function ChoiceGroup<T extends string | boolean>({
               selected ?
               'border-accent bg-accent-soft' :
               option.disabled ?
-              'cursor-not-allowed border-dashed border-edge bg-canvas opacity-60' :
+              'cursor-not-allowed border-dashed border-accent-line bg-canvas opacity-60' :
               invalid ?
               'border-deny bg-canvas hover:bg-surface' :
-              'border-edge bg-canvas hover:bg-surface'
+              'border-accent-line bg-canvas hover:border-ink hover:bg-surface'
             )}>
 
             <span className="flex items-center justify-between gap-2">
@@ -146,6 +161,15 @@ export function ChoiceGroup<T extends string | boolean>({
                   selected ? 'text-accent-hover' : 'text-ink'
                 )}>
 
+                {/* 마우스로 고를 때는 숨기고, 키보드로 묶음에 들어오면 번호를 보인다 */}
+                {numberKeys && index < 9 &&
+                <span
+                  aria-hidden="true"
+                  className="mr-1.5 hidden h-4 w-4 items-center justify-center rounded border border-edge text-caption font-normal tabular-nums text-ink2 group-has-[:focus-visible]/choices:inline-flex">
+
+                    {index + 1}
+                  </span>
+                }
                 {option.label}
               </span>
               {option.disabled &&

@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from './cn';
+import { RollingNumber } from '../motion/RollingNumber';
 
 export interface FilterOption<V extends string> {
   value: V;
@@ -52,9 +53,8 @@ export function FilterBar<V extends string>({
 
             {option.label}
             {option.count !== undefined &&
-            <span className="ml-1.5 font-normal tabular-nums">
-                {option.count.toLocaleString('ko-KR')}
-              </span>
+            // 답하거나 고쳐 건수가 바뀌면 숫자가 굴러간다
+            <RollingNumber value={option.count} format={(count) => count.toLocaleString('ko-KR')} className="ml-1.5 font-normal tabular-nums" />
             }
           </button>);
 

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Loader2Icon } from 'lucide-react';
 import { useSession } from '../contexts/SessionContext';
 import { ApiRequestError } from '../api';
-import { AuthLayout } from '../components/AuthLayout';
+import { SignInLayout } from '../components/auth/SignInLayout';
 import { Button } from '../components/ui';
 import { takeKakaoLogin } from '../auth/kakao';
 
@@ -65,12 +65,11 @@ export function KakaoCallback() {
   }, [status, navigate, signInWithKakao]);
 
   return (
-    <AuthLayout title="카카오 로그인">
+    // 카카오에서 돌아온 직후에 잠깐 보이는 화면이다. 로그인 화면과 같은 틀이어야 예전 화면이 번쩍 보이지 않는다(11/11 치오)
+    <SignInLayout title="카카오 로그인">
       {error ?
       <>
-          <h1 className="text-[26px] font-bold tracking-tight text-ink">
-            카카오 로그인
-          </h1>
+          <h1 className="text-h2 font-bold tracking-ir text-ink sm:text-h2-lg">카카오 로그인</h1>
           <p role="alert" className="mt-3 text-[14px] leading-7 text-deny">
             {error}
           </p>
@@ -87,6 +86,6 @@ export function KakaoCallback() {
           카카오 계정으로 로그인하고 있습니다
         </p>
       }
-    </AuthLayout>);
+    </SignInLayout>);
 
 }

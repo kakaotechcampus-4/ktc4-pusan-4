@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
-import { PencilIcon, PlayIcon, UploadIcon } from 'lucide-react';
+import { Navigate, useNavigate } from 'react-router-dom';
+import { BriefcaseBusinessIcon, CreditCardIcon, PencilIcon, PlayIcon, UploadIcon } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { StepEyebrow } from '../components/StepEyebrow';
-import { InfoPanel, InfoRows, PANEL_ICON, PANEL_LINK, PanelFailed, PanelNote } from '../components/InfoPanel';
+import { UnclassifiedNote } from '../components/results/UnclassifiedNote';
+import { InfoPanel, InfoRows, PANEL_ICON, PanelFailed, PanelNote } from '../components/InfoPanel';
 import { useSession } from '../contexts/SessionContext';
 import { api, ApiRequestError, useApi } from '../api';
 import { Button, IconButton } from '../components/ui';
@@ -107,6 +108,7 @@ export function Confirm() {
 
         <InfoPanel
           title="카드내역"
+          icon={CreditCardIcon}
           action={
           batchState === 'ready' || batchState === 'none' ?
           <IconButton
@@ -127,6 +129,7 @@ export function Confirm() {
           {loaded &&
           <>
               <InfoRows
+              variant="tiles"
               rows={[
               { term: '파일', value: uploadName(loaded.batch) },
               { term: '기간', value: formatPeriod(loaded.batch.periodStart, loaded.batch.periodEnd) },
@@ -134,10 +137,10 @@ export function Confirm() {
               } />
 
               {loaded.unclassified > 0 &&
-            <p className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line px-5 py-3 text-small text-ink">
-                  분류하지 않은 거래 {formatNumber(loaded.unclassified)}건은 판정하지 않습니다.
-                  <Link to="/preview" className={PANEL_LINK}>분류 확인</Link>
-                </p>
+            <UnclassifiedNote
+              count={loaded.unclassified}
+              judged={false}
+              className="-mt-2 px-5 pb-3 text-small text-ink" />
             }
             </>
           }
@@ -145,6 +148,7 @@ export function Confirm() {
 
         <InfoPanel
           title="사업자 문진"
+          icon={BriefcaseBusinessIcon}
           action={
           contextStatus === 'ready' || contextStatus === 'none' ?
           <IconButton
@@ -159,7 +163,7 @@ export function Confirm() {
           {contextStatus === 'loading' && <PanelNote>불러오는 중</PanelNote>}
           {contextStatus === 'error' && <PanelFailed onRetry={reloadContext}>문진을 불러오지 못했습니다.</PanelFailed>}
           {contextStatus === 'none' && <PanelNote>아직 문진을 하지 않았습니다.</PanelNote>}
-          {contextStatus === 'ready' && context && <InfoRows rows={contextRows(context)} />}
+          {contextStatus === 'ready' && context && <InfoRows variant="tiles" rows={contextRows(context)} />}
         </InfoPanel>
 
         <div className="mt-8">

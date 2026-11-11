@@ -45,7 +45,7 @@ export function Empty({
       className={cn(
         'flex flex-col items-center text-center',
         inTable && tone !== 'error' ?
-        'border-t-2 border-rule px-6 py-12' :
+        'border-t border-line px-6 py-12' :
         cn('rounded-2xl border px-6 py-14', tone === 'error' ? 'border-deny-line bg-deny-bg' : 'border-dashed border-line bg-canvas'),
         className
       )}>

@@ -117,18 +117,18 @@ export function PasswordChange({ email }: {email: string | null;}) {
 
   if (email === null || noPassword)
   return (
-    <p className="mt-1.5 text-body leading-6 text-ink">
+    <p className="text-small leading-6 text-ink">
         카카오로 로그인한 계정이라 비밀번호가 없습니다.
       </p>);
 
   if (!open)
   return (
-    <Button id="password-change-open" variant="secondary" size="md" className="mt-4" onClick={() => setOpen(true)}>
+    <Button id="password-change-open" variant="secondary" size="md" onClick={() => setOpen(true)}>
         비밀번호 바꾸기
       </Button>);
 
   return (
-    <form onSubmit={submit} noValidate className="mt-4 max-w-sm space-y-3">
+    <form onSubmit={submit} noValidate className="max-w-sm space-y-3">
       <div>
         <label htmlFor="password-current" className={AUTH_LABEL}>
           지금 비밀번호
