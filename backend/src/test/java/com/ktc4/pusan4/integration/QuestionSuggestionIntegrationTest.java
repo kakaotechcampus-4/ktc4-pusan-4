@@ -86,6 +86,8 @@ class QuestionSuggestionIntegrationTest {
         october.judged("통신", "KT", "2025-10-08");
         october.judged("카페", "스타벅스", "2025-10-08");
         october.judged("카페", "스타벅스", "2025-10-11");
+        // 10월에 이미 답한 질문은 대기 질문이 아니라 목록에 나오지 않는다
+        answer(october, october.judged("통신", "SK텔레콤", "2025-10-09"), "전용여부", "전용");
 
         // when / then
         mockMvc.perform(get("/api/v1/questions/suggestions").param("batchId", october.batchId.toString()))

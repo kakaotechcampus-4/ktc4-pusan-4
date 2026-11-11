@@ -17,6 +17,9 @@ interface QuestionQueueRepositoryCustom {
     // 거래를 지정해도 거른다(api.md 3.9). 정렬: createdAt, id.
     List<QuestionRow> findRows(UUID userId, UUID batchId, UUID transactionId);
 
+    // findRows 와 같은 조건의 PENDING 질문.
+    List<QuestionRow> findPendingRows(UUID userId, UUID batchId);
+
     // findRows 와 같은 조건에 status 를 더해 한 쪽만 읽는다. status 가 비면 거르지 않는다.
     Page<QuestionRow> findRowsPage(UUID userId, UUID batchId, UUID transactionId, String status, Pageable pageable);
 
