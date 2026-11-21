@@ -1,0 +1,17 @@
+# 1인 IT 개발·강의업에서 미용 지출은 대개 사업과 무관한 개인 소비로 보아 불산입한다. 업무 관련성이 구체적으로 입증되는 예외적 지출은 별도 검토한다.
+#
+# 규칙 후보 #2 에서 승격. 승인 2026-11-09
+id: R-C2
+version: 1
+gate: G2
+priority: 410
+effective_period: { start: 2026-11-09, end: null }
+match:
+  category: [미용]
+  industry: ["940909"]
+verdict: 불가
+citations:
+  - { id: 소득세법-27-1, verified: true }
+  - { id: 소득세법-33-1-5, verified: true }
+  - { id: 소득세법시행령-61-1-1, verified: true }
+review: { by: 관리자, date: 2026-11-09 }
